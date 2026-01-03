@@ -2,6 +2,10 @@ import { define } from "../../utils.ts";
 import { db } from "../../src/db/index.ts";
 import * as schema from "../../src/db/schema.ts";
 import MappingsTable from "../../islands/MappingsTable.tsx";
+import { SidebarLayout } from "../../components/SidebarLayout.tsx";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card.tsx";
+import { Button } from "../../components/ui/button.tsx";
+import { Plus } from "lucide-preact";
 
 export const handler = define.handlers({
   async GET(ctx) {
@@ -10,21 +14,33 @@ export const handler = define.handlers({
   },
 });
 
-export default define.page<typeof handler>(function MappingsPage({ data }) {
+export default define.page<typeof handler>(function MappingsPage({ data, url }) {
   return (
-    <div class="container mx-auto px-4 py-8">
-      <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold">OCPP Tag Mappings</h1>
-        <a
-          href="/mappings/new"
-          class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
-          Add Mapping
-        </a>
-      </div>
-
-      <MappingsTable mappings={data.mappings} />
-    </div>
+    <SidebarLayout
+      currentPath={url.pathname}
+      title="OCPP Tag Mappings"
+      description="Manage mappings between OCPP tags and Lago billing customers"
+      actions={
+        <Button asChild>
+          <a href="/mappings/new">
+            <Plus className="size-4 mr-2" />
+            Add Mapping
+          </a>
+        </Button>
+      }
+    >
+      <Card>
+        <CardHeader>
+          <CardTitle>All Mappings</CardTitle>
+          <CardDescription>
+            {data.mappings.length} mapping{data.mappings.length !== 1 ? "s" : ""} configured
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <MappingsTable mappings={data.mappings} />
+        </CardContent>
+      </Card>
+    </SidebarLayout>
   );
 });
 

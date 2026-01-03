@@ -3,6 +3,10 @@ import { db } from "../src/db/index.ts";
 import * as schema from "../src/db/schema.ts";
 import { desc, gte } from "drizzle-orm";
 import DashboardStats from "../islands/DashboardStats.tsx";
+import { SidebarLayout } from "../components/SidebarLayout.tsx";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.tsx";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.tsx";
+import { Badge } from "../components/ui/badge.tsx";
 
 interface DashboardData {
   stats: {
@@ -76,54 +80,62 @@ export const handler = define.handlers({
   },
 });
 
-export default define.page<typeof handler>(function DashboardPage({ data }) {
+export default define.page<typeof handler>(function DashboardPage({ data, url }) {
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case "completed": return "success";
+      case "failed": return "destructive";
+      default: return "warning";
+    }
+  };
+
   return (
-    <div class="container mx-auto px-4 py-8">
-      <h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+    <SidebarLayout currentPath={url.pathname} title="Dashboard" description="Overview of your EV billing system">
+      <div className="space-y-6">
+        <DashboardStats stats={data.stats} />
 
-      <DashboardStats stats={data.stats} />
-
-      <div class="mt-8">
-        <h2 class="text-xl font-semibold mb-4">Recent Sync Runs</h2>
-        <div class="bg-white shadow rounded-lg overflow-hidden">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium">Time</th>
-                <th class="px-6 py-3 text-left text-xs font-medium">Status</th>
-                <th class="px-6 py-3 text-left text-xs font-medium">
-                  Processed
-                </th>
-                <th class="px-6 py-3 text-left text-xs font-medium">Events</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200">
-              {data.recentSyncRuns.map((run) => (
-                <tr key={run.id}>
-                  <td class="px-6 py-4 text-sm">
-                    {new Date(run.startedAt).toLocaleString()}
-                  </td>
-                  <td class="px-6 py-4 text-sm">
-                    <span
-                      class={`px-2 py-1 text-xs rounded ${
-                        run.status === "completed"
-                          ? "bg-green-100 text-green-800"
-                          : run.status === "failed"
-                          ? "bg-red-100 text-red-800"
-                          : "bg-yellow-100 text-yellow-800"
-                      }`}
-                    >
-                      {run.status}
-                    </span>
-                  </td>
-                  <td class="px-6 py-4 text-sm">{run.transactionsProcessed}</td>
-                  <td class="px-6 py-4 text-sm">{run.eventsCreated}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Sync Runs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Time</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Processed</TableHead>
+                  <TableHead>Events</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.recentSyncRuns.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                      No sync runs yet
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  data.recentSyncRuns.map((run) => (
+                    <TableRow key={run.id}>
+                      <TableCell className="font-medium">
+                        {new Date(run.startedAt).toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusVariant(run.status)}>
+                          {run.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{run.transactionsProcessed}</TableCell>
+                      <TableCell>{run.eventsCreated}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </SidebarLayout>
   );
 });

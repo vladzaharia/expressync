@@ -3,6 +3,8 @@ import { db } from "../../src/db/index.ts";
 import * as schema from "../../src/db/schema.ts";
 import { eq } from "drizzle-orm";
 import MappingForm from "../../islands/MappingForm.tsx";
+import { SidebarLayout } from "../../components/SidebarLayout.tsx";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card.tsx";
 
 export const handler = define.handlers({
   async GET(ctx) {
@@ -20,15 +22,25 @@ export const handler = define.handlers({
   },
 });
 
-export default define.page<typeof handler>(function EditMappingPage({ data }) {
+export default define.page<typeof handler>(function EditMappingPage({ data, url }) {
   return (
-    <div class="container mx-auto px-4 py-8">
-      <h1 class="text-2xl font-bold mb-6">Edit Mapping</h1>
-
-      <div class="bg-white shadow rounded-lg p-6">
-        <MappingForm mapping={data.mapping} />
-      </div>
-    </div>
+    <SidebarLayout
+      currentPath={url.pathname}
+      title="Edit Mapping"
+      description={`Editing mapping for ${data.mapping.steveOcppIdTag}`}
+    >
+      <Card className="max-w-2xl">
+        <CardHeader>
+          <CardTitle>Mapping Details</CardTitle>
+          <CardDescription>
+            Update the OCPP tag and Lago customer information.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <MappingForm mapping={data.mapping} />
+        </CardContent>
+      </Card>
+    </SidebarLayout>
   );
 });
 

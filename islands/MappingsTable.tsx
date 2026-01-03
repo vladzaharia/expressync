@@ -1,4 +1,8 @@
 import { useSignal } from "@preact/signals";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Pencil, Trash2, Loader2, CornerDownRight } from "lucide-preact";
 
 interface Props {
   mappings: Array<{
@@ -31,7 +35,6 @@ export default function MappingsTable({ mappings: initialMappings }: Props) {
       const res = await fetch(`/api/mappings?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         const data = await res.json();
-        // Refresh the page to show updated mappings after deletion
         if (data.deletedCount && data.deletedCount > 1) {
           alert(`Deleted ${data.deletedCount} mappings (1 parent + ${data.deletedCount - 1} children)`);
         }
@@ -55,7 +58,6 @@ export default function MappingsTable({ mappings: initialMappings }: Props) {
       });
 
       if (res.ok) {
-        // Refresh to show updated status for parent and children
         window.location.reload();
       } else {
         alert("Failed to update mapping");
@@ -67,81 +69,80 @@ export default function MappingsTable({ mappings: initialMappings }: Props) {
 
   if (mappings.value.length === 0) {
     return (
-      <div class="bg-white shadow rounded-lg p-8 text-center text-gray-500">
+      <div className="text-center py-12 text-muted-foreground">
         No mappings found. Create your first mapping to get started.
       </div>
     );
   }
 
   return (
-    <div class="bg-white shadow rounded-lg overflow-hidden">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-          <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium">OCPP Tag</th>
-            <th class="px-6 py-3 text-left text-xs font-medium">
-              Display Name
-            </th>
-            <th class="px-6 py-3 text-left text-xs font-medium">
-              Lago Customer
-            </th>
-            <th class="px-6 py-3 text-left text-xs font-medium">
-              Subscription
-            </th>
-            <th class="px-6 py-3 text-left text-xs font-medium">Status</th>
-            <th class="px-6 py-3 text-left text-xs font-medium">Notes</th>
-            <th class="px-6 py-3 text-left text-xs font-medium">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-200">
-          {mappings.value.map((mapping) => {
-            const isChildMapping = mapping.notes?.includes("Auto-created from parent");
-            return (
-              <tr key={mapping.id} class={isChildMapping ? "bg-blue-50" : ""}>
-                <td class="px-6 py-4 text-sm font-mono">
-                  {isChildMapping && <span class="text-gray-400 mr-1">↳</span>}
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>OCPP Tag</TableHead>
+          <TableHead>Display Name</TableHead>
+          <TableHead>Lago Customer</TableHead>
+          <TableHead>Subscription</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead className="max-w-[200px]">Notes</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {mappings.value.map((mapping) => {
+          const isChildMapping = mapping.notes?.includes("Auto-created from parent");
+          return (
+            <TableRow key={mapping.id} className={isChildMapping ? "bg-muted/30" : ""}>
+              <TableCell className="font-mono">
+                <div className="flex items-center gap-1">
+                  {isChildMapping && <CornerDownRight className="size-3 text-muted-foreground" />}
                   {mapping.steveOcppIdTag}
-                </td>
-                <td class="px-6 py-4 text-sm">{mapping.displayName || "-"}</td>
-                <td class="px-6 py-4 text-sm">{mapping.lagoCustomerExternalId}</td>
-                <td class="px-6 py-4 text-sm">{mapping.lagoSubscriptionExternalId}</td>
-                <td class="px-6 py-4 text-sm">
-                  <button
-                    onClick={() =>
-                      handleToggleActive(mapping.id, mapping.isActive)}
-                    class={`px-2 py-1 text-xs rounded ${
-                      mapping.isActive
-                        ? "bg-green-100 text-green-800"
-                        : "bg-gray-100 text-gray-800"
-                    }`}
-                  >
-                    {mapping.isActive ? "Active" : "Inactive"}
-                  </button>
-                </td>
-                <td class="px-6 py-4 text-sm text-gray-600 max-w-xs truncate" title={mapping.notes || ""}>
-                  {mapping.notes || "-"}
-                </td>
-                <td class="px-6 py-4 text-sm space-x-2">
-                  <a
-                    href={`/mappings/${mapping.id}`}
-                    class="text-blue-600 hover:text-blue-800"
-                  >
-                    Edit
-                  </a>
-                  <button
+                </div>
+              </TableCell>
+              <TableCell>{mapping.displayName || "-"}</TableCell>
+              <TableCell className="font-mono text-xs">{mapping.lagoCustomerExternalId}</TableCell>
+              <TableCell className="font-mono text-xs">{mapping.lagoSubscriptionExternalId}</TableCell>
+              <TableCell>
+                <Badge
+                  variant={mapping.isActive ? "success" : "secondary"}
+                  className="cursor-pointer"
+                  onClick={() => handleToggleActive(mapping.id, mapping.isActive)}
+                >
+                  {mapping.isActive ? "Active" : "Inactive"}
+                </Badge>
+              </TableCell>
+              <TableCell className="max-w-[200px] truncate text-muted-foreground" title={mapping.notes || ""}>
+                {mapping.notes || "-"}
+              </TableCell>
+              <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-1">
+                  <Button variant="ghost" size="icon" asChild>
+                    <a href={`/mappings/${mapping.id}`}>
+                      <Pencil className="size-4" />
+                      <span className="sr-only">Edit</span>
+                    </a>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => handleDelete(mapping.id)}
                     disabled={deleting.value === mapping.id}
-                    class="text-red-600 hover:text-red-800 disabled:opacity-50"
+                    className="text-destructive hover:text-destructive"
                   >
-                    {deleting.value === mapping.id ? "Deleting..." : "Delete"}
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+                    {deleting.value === mapping.id ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="size-4" />
+                    )}
+                    <span className="sr-only">Delete</span>
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
   );
 }
 

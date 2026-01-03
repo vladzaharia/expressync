@@ -3,6 +3,8 @@ import { db } from "../../src/db/index.ts";
 import * as schema from "../../src/db/schema.ts";
 import { desc } from "drizzle-orm";
 import TransactionsTable from "../../islands/TransactionsTable.tsx";
+import { SidebarLayout } from "../../components/SidebarLayout.tsx";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card.tsx";
 
 export const handler = define.handlers({
   async GET(ctx) {
@@ -16,13 +18,25 @@ export const handler = define.handlers({
   },
 });
 
-export default define.page<typeof handler>(function TransactionsPage({ data }) {
+export default define.page<typeof handler>(function TransactionsPage({ data, url }) {
   return (
-    <div class="container mx-auto px-4 py-8">
-      <h1 class="text-2xl font-bold mb-6">Billing Events</h1>
-
-      <TransactionsTable events={data.events} />
-    </div>
+    <SidebarLayout
+      currentPath={url.pathname}
+      title="Billing Events"
+      description="View synced charging transactions and billing events"
+    >
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Events</CardTitle>
+          <CardDescription>
+            {data.events.length} event{data.events.length !== 1 ? "s" : ""} shown (last 100)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TransactionsTable events={data.events} />
+        </CardContent>
+      </Card>
+    </SidebarLayout>
   );
 });
 

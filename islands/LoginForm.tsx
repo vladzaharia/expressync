@@ -1,4 +1,9 @@
 import { useSignal } from "@preact/signals";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
+import { Loader2 } from "lucide-preact";
 
 export default function LoginForm() {
   const email = useSignal("");
@@ -22,10 +27,8 @@ export default function LoginForm() {
       });
 
       const data = await res.json().catch(() => ({}));
-      console.log("Login response:", { status: res.status, data });
 
       if (res.ok) {
-        // Redirect to dashboard
         window.location.href = "/";
       } else {
         error.value = data.error?.message || data.message ||
@@ -40,58 +43,66 @@ export default function LoginForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} class="mt-8 space-y-6">
-      {error.value && (
-        <div class="bg-red-50 text-red-700 p-3 rounded text-sm">
-          {error.value}
-        </div>
-      )}
+    <Card className="w-full max-w-md mx-auto">
+      <CardHeader className="space-y-1">
+        <CardTitle className="text-2xl font-bold text-center">Welcome back</CardTitle>
+        <CardDescription className="text-center">
+          Enter your credentials to access the portal
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error.value && (
+            <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm border border-destructive/20">
+              {error.value}
+            </div>
+          )}
 
-      <div class="space-y-4">
-        <div>
-          <label for="email" class="block text-sm font-medium text-gray-700">
-            Email address
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            required
-            value={email.value}
-            onInput={(e) => (email.value = (e.target as HTMLInputElement).value)}
-            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm
-                   focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="email">Email address</Label>
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              placeholder="admin@example.com"
+              required
+              value={email.value}
+              onInput={(e) => (email.value = (e.target as HTMLInputElement).value)}
+              autoComplete="email"
+            />
+          </div>
 
-        <div>
-          <label for="password" class="block text-sm font-medium text-gray-700">
-            Password
-          </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            value={password.value}
-            onInput={(e) => (password.value = (e.target as HTMLInputElement).value)}
-            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm
-                   focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
-      </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              placeholder="••••••••"
+              required
+              value={password.value}
+              onInput={(e) => (password.value = (e.target as HTMLInputElement).value)}
+              autoComplete="current-password"
+            />
+          </div>
 
-      <button
-        type="submit"
-        disabled={loading.value}
-        class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md
-               shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700
-               focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
-               disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {loading.value ? "Signing in..." : "Sign in"}
-      </button>
-    </form>
+          <Button
+            type="submit"
+            disabled={loading.value}
+            className="w-full"
+          >
+            {loading.value ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Signing in...
+              </>
+            ) : (
+              "Sign in"
+            )}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 

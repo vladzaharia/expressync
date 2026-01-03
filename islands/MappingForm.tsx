@@ -1,5 +1,12 @@
 import { useSignal, useComputed } from "@preact/signals";
 import { useEffect } from "preact/hooks";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
+import { cn } from "@/src/lib/utils/cn.ts";
+import { Check, Tag, User, CreditCard, FileText, AlertTriangle, Loader2, Package } from "lucide-preact";
 
 interface Props {
   mapping?: {
@@ -233,96 +240,85 @@ export default function MappingForm({ mapping }: Props) {
     return 4;
   });
 
+  const StepIndicator = ({ step, label, icon: Icon }: { step: number; label: string; icon: typeof Tag }) => (
+    <div className="flex items-center gap-2">
+      <div className={cn(
+        "flex items-center justify-center size-8 rounded-full transition-colors",
+        currentStep.value >= step ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+      )}>
+        {currentStep.value > step ? <Check className="size-4" /> : <Icon className="size-4" />}
+      </div>
+      <span className={cn(
+        "text-sm font-medium hidden sm:inline",
+        currentStep.value >= step ? "text-foreground" : "text-muted-foreground"
+      )}>{label}</span>
+    </div>
+  );
+
   return (
-    <form onSubmit={handleSubmit} class="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
       {/* Progress indicator */}
-      <div class="flex items-center justify-between mb-8">
-        <div class="flex items-center gap-2">
-          <div class={`flex items-center justify-center w-8 h-8 rounded-full ${currentStep.value >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
-            {currentStep.value > 1 ? '✓' : '1'}
-          </div>
-          <span class={`text-sm font-medium ${currentStep.value >= 1 ? 'text-blue-600' : 'text-gray-500'}`}>Tag</span>
-        </div>
-        <div class={`flex-1 h-1 mx-2 ${currentStep.value >= 2 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
-        <div class="flex items-center gap-2">
-          <div class={`flex items-center justify-center w-8 h-8 rounded-full ${currentStep.value >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
-            {currentStep.value > 2 ? '✓' : '2'}
-          </div>
-          <span class={`text-sm font-medium ${currentStep.value >= 2 ? 'text-blue-600' : 'text-gray-500'}`}>Customer</span>
-        </div>
-        <div class={`flex-1 h-1 mx-2 ${currentStep.value >= 3 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
-        <div class="flex items-center gap-2">
-          <div class={`flex items-center justify-center w-8 h-8 rounded-full ${currentStep.value >= 3 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
-            {currentStep.value > 3 ? '✓' : '3'}
-          </div>
-          <span class={`text-sm font-medium ${currentStep.value >= 3 ? 'text-blue-600' : 'text-gray-500'}`}>Subscription</span>
-        </div>
-        <div class={`flex-1 h-1 mx-2 ${currentStep.value >= 4 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
-        <div class="flex items-center gap-2">
-          <div class={`flex items-center justify-center w-8 h-8 rounded-full ${currentStep.value >= 4 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
-            {currentStep.value > 4 ? '✓' : '4'}
-          </div>
-          <span class={`text-sm font-medium ${currentStep.value >= 4 ? 'text-blue-600' : 'text-gray-500'}`}>Details</span>
-        </div>
+      <div className="flex items-center justify-between mb-8">
+        <StepIndicator step={1} label="Tag" icon={Tag} />
+        <div className={cn("flex-1 h-0.5 mx-2 transition-colors", currentStep.value >= 2 ? "bg-primary" : "bg-muted")} />
+        <StepIndicator step={2} label="Customer" icon={User} />
+        <div className={cn("flex-1 h-0.5 mx-2 transition-colors", currentStep.value >= 3 ? "bg-primary" : "bg-muted")} />
+        <StepIndicator step={3} label="Subscription" icon={CreditCard} />
+        <div className={cn("flex-1 h-0.5 mx-2 transition-colors", currentStep.value >= 4 ? "bg-primary" : "bg-muted")} />
+        <StepIndicator step={4} label="Details" icon={FileText} />
       </div>
 
       {error.value && (
-        <div class="bg-red-50 text-red-700 p-3 rounded text-sm">
+        <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm border border-destructive/20">
           {error.value}
         </div>
       )}
 
       {successMessage.value && (
-        <div class="bg-green-50 text-green-700 p-3 rounded text-sm">
+        <div className="bg-green-500/10 text-green-600 p-3 rounded-md text-sm border border-green-500/20">
           {successMessage.value}
         </div>
       )}
 
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">
-          Select OCPP Tag
-        </label>
+      <div className="space-y-2">
+        <Label>Select OCPP Tag</Label>
 
         {availableTags.value.length === 0 ? (
-          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center text-gray-600">
+          <div className="bg-muted rounded-lg p-4 text-center text-muted-foreground">
             No available tags to map. All tags have been mapped.
           </div>
         ) : ocppTagId.value ? (
-          // Compact selected view
-          <div class="border border-blue-500 bg-blue-50 rounded-lg p-4">
-            <div class="flex items-start justify-between">
-              <div class="flex items-start gap-2 flex-1">
-                <span class="text-xl">🏷️</span>
-                <div class="flex-1">
-                  <h3 class="font-semibold text-gray-900 font-mono">
-                    {ocppTagId.value}
-                  </h3>
+          <div className="border border-primary bg-primary/5 rounded-lg p-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-3 flex-1">
+                <Tag className="size-5 text-primary mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-semibold font-mono">{ocppTagId.value}</h3>
                   {(() => {
                     const selectedTag = availableTags.value.find(t => t.id === ocppTagId.value);
                     return selectedTag?.note && (
-                      <p class="text-sm text-gray-600 mt-1">{selectedTag.note}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{selectedTag.note}</p>
                     );
                   })()}
                 </div>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   ocppTagId.value = "";
                   ocppTagPk.value = 0;
                 }}
-                class="text-sm text-blue-600 hover:text-blue-800 font-medium underline"
               >
                 Change
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
-          // Full selection view
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto p-1">
             {availableTags.value.map((tag) => {
               const info = tagInfoMap.value.get(tag.id);
-
               return (
                 <div
                   key={tag.id}
@@ -330,35 +326,30 @@ export default function MappingForm({ mapping }: Props) {
                     ocppTagId.value = tag.id;
                     ocppTagPk.value = tag.ocppTagPk;
                   }}
-                  class="border border-gray-300 hover:border-blue-300 hover:bg-gray-50 rounded-lg p-4 cursor-pointer transition-all"
+                  className="border border-border hover:border-primary/50 hover:bg-accent rounded-lg p-3 cursor-pointer transition-all"
                 >
-                  <div class="flex items-start gap-2">
-                    <span class="text-xl">🏷️</span>
-                    <div class="flex-1">
-                      <h3 class="font-semibold text-gray-900 font-mono text-sm">
-                        {tag.id}
-                      </h3>
+                  <div className="flex items-start gap-2">
+                    <Tag className="size-4 text-muted-foreground mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium font-mono text-sm truncate">{tag.id}</h3>
                       {tag.note && (
-                        <p class="text-xs text-gray-600 mt-1">{tag.note}</p>
+                        <p className="text-xs text-muted-foreground mt-1 truncate">{tag.note}</p>
                       )}
                     </div>
                   </div>
-
                   {info && info.childCount > 0 && (
-                    <div class="mt-2 pt-2 border-t border-gray-200">
-                      <p class="text-xs text-blue-600 font-medium">
-                        📦 {info.childCount} child{info.childCount > 1 ? "ren" : ""}
+                    <div className="mt-2 pt-2 border-t border-border">
+                      <p className="text-xs text-primary font-medium flex items-center gap-1">
+                        <Package className="size-3" />
+                        {info.childCount} child{info.childCount > 1 ? "ren" : ""}
                       </p>
                     </div>
                   )}
-
                   {info && info.mappedParent && (
-                    <div class="mt-2 pt-2 border-t border-amber-200 bg-amber-50 -mx-4 -mb-4 px-4 py-2 rounded-b-lg">
-                      <p class="text-xs text-amber-800 font-medium">
-                        ⚠️ Parent mapped
-                      </p>
-                      <p class="text-xs text-amber-700 mt-1">
-                        Will override inheritance
+                    <div className="mt-2 pt-2 border-t border-yellow-500/30 bg-yellow-500/10 -mx-3 -mb-3 px-3 py-2 rounded-b-lg">
+                      <p className="text-xs text-yellow-600 font-medium flex items-center gap-1">
+                        <AlertTriangle className="size-3" />
+                        Parent mapped - will override
                       </p>
                     </div>
                   )}
@@ -369,222 +360,176 @@ export default function MappingForm({ mapping }: Props) {
         )}
       </div>
 
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">
-          Select Lago Customer
-        </label>
+      <div className="space-y-2">
+        <Label>Select Lago Customer</Label>
 
         {lagoCustomers.value.length === 0 ? (
-          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center text-gray-600">
+          <div className="bg-muted rounded-lg p-4 text-center text-muted-foreground flex items-center justify-center gap-2">
+            <Loader2 className="size-4 animate-spin" />
             Loading customers...
           </div>
         ) : lagoCustomerId.value ? (
-          // Compact selected view
-          <div class="border border-blue-500 bg-blue-50 rounded-lg p-4">
-            <div class="flex items-start justify-between">
-              <div class="flex items-start gap-2 flex-1">
-                <span class="text-xl">👤</span>
-                <div class="flex-1">
+          <div className="border border-primary bg-primary/5 rounded-lg p-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-3 flex-1">
+                <User className="size-5 text-primary mt-0.5" />
+                <div className="flex-1">
                   {(() => {
                     const selectedCustomer = lagoCustomers.value.find(c => c.id === lagoCustomerId.value);
                     return selectedCustomer && (
-                      <>
-                        <h3 class="font-semibold text-gray-900">
-                          {selectedCustomer.name}
-                        </h3>
-                      </>
+                      <h3 className="font-semibold">{selectedCustomer.name}</h3>
                     );
                   })()}
                 </div>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   lagoCustomerId.value = "";
                   lagoSubscriptionId.value = "";
                 }}
-                class="text-sm text-blue-600 hover:text-blue-800 font-medium underline"
               >
                 Change
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
-          // Full selection view
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
-            {lagoCustomers.value.map((customer) => {
-              return (
-                <div
-                  key={customer.id}
-                  onClick={() => {
-                    lagoCustomerId.value = customer.id;
-                    lagoSubscriptionId.value = "";
-                  }}
-                  class="border border-gray-300 hover:border-blue-300 hover:bg-gray-50 rounded-lg p-4 cursor-pointer transition-all"
-                >
-                  <div class="flex items-start gap-2">
-                    <span class="text-xl">👤</span>
-                    <div class="flex-1">
-                      <h3 class="font-semibold text-gray-900 text-sm">
-                        {customer.name}
-                      </h3>
-                      <p class="text-xs text-gray-500 mt-1 font-mono">
-                        {customer.id}
-                      </p>
-                    </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto p-1">
+            {lagoCustomers.value.map((customer) => (
+              <div
+                key={customer.id}
+                onClick={() => {
+                  lagoCustomerId.value = customer.id;
+                  lagoSubscriptionId.value = "";
+                }}
+                className="border border-border hover:border-primary/50 hover:bg-accent rounded-lg p-3 cursor-pointer transition-all"
+              >
+                <div className="flex items-start gap-2">
+                  <User className="size-4 text-muted-foreground mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-sm truncate">{customer.name}</h3>
+                    <p className="text-xs text-muted-foreground mt-1 font-mono truncate">{customer.id}</p>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">
-          Select Lago Subscription <span class="text-gray-500 text-xs">(Optional)</span>
-        </label>
+      <div className="space-y-2">
+        <Label>Select Lago Subscription <span className="text-muted-foreground text-xs">(Optional)</span></Label>
 
         {!lagoCustomerId.value ? (
-          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center text-gray-600">
+          <div className="bg-muted rounded-lg p-4 text-center text-muted-foreground">
             Please select a customer first
           </div>
         ) : filteredSubscriptions.value.length === 0 ? (
-          <div class="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
-            <div class="flex items-start gap-3">
-              <span class="text-2xl">⚠️</span>
-              <div class="flex-1">
-                <h4 class="font-semibold text-yellow-900 mb-1">No Active Subscriptions</h4>
-                <p class="text-sm text-yellow-800 mb-2">
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="size-5 text-yellow-600 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-semibold text-yellow-600 mb-1">No Active Subscriptions</h4>
+                <p className="text-sm text-yellow-600/80 mb-2">
                   This customer has no active subscriptions. You can still save this mapping, but:
                 </p>
-                <ul class="text-sm text-yellow-800 list-disc list-inside space-y-1 mb-2">
+                <ul className="text-sm text-yellow-600/80 list-disc list-inside space-y-1">
                   <li>Transactions will be saved but not sent to Lago</li>
                   <li>The first active subscription will be auto-selected when syncing</li>
-                  <li>You should create a subscription for this customer before they start charging</li>
                 </ul>
               </div>
             </div>
           </div>
         ) : lagoSubscriptionId.value ? (
-          // Compact selected view
-          <div class="border border-blue-500 bg-blue-50 rounded-lg p-4">
-            <div class="flex items-start justify-between">
-              <div class="flex items-start gap-2 flex-1">
-                <span class="text-xl">💳</span>
-                <div class="flex-1">
+          <div className="border border-primary bg-primary/5 rounded-lg p-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-3 flex-1">
+                <CreditCard className="size-5 text-primary mt-0.5" />
+                <div className="flex-1">
                   {(() => {
                     const selectedSub = filteredSubscriptions.value.find(s => s.id === lagoSubscriptionId.value);
                     return selectedSub && (
                       <>
-                        <h3 class="font-semibold text-gray-900">
-                          {selectedSub.name}
-                        </h3>
-                        <p class="text-xs text-gray-500 mt-1 font-mono">
-                          {selectedSub.id}
-                        </p>
+                        <h3 className="font-semibold">{selectedSub.name}</h3>
+                        <p className="text-xs text-muted-foreground mt-1 font-mono">{selectedSub.id}</p>
                       </>
                     );
                   })()}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  lagoSubscriptionId.value = "";
-                }}
-                class="text-sm text-blue-600 hover:text-blue-800 font-medium underline"
-              >
+              <Button type="button" variant="ghost" size="sm" onClick={() => { lagoSubscriptionId.value = ""; }}>
                 Change
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
-          // Full selection view
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
-            {filteredSubscriptions.value.map((sub) => {
-              return (
-                <div
-                  key={sub.id}
-                  onClick={() => {
-                    lagoSubscriptionId.value = sub.id;
-                  }}
-                  class="border border-gray-300 hover:border-blue-300 hover:bg-gray-50 rounded-lg p-4 cursor-pointer transition-all"
-                >
-                  <div class="flex items-start gap-2">
-                    <span class="text-xl">💳</span>
-                    <div class="flex-1">
-                      <h3 class="font-semibold text-gray-900 text-sm">
-                        {sub.name}
-                      </h3>
-                      <p class="text-xs text-gray-500 mt-1 font-mono">
-                        {sub.id}
-                      </p>
-                    </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto p-1">
+            {filteredSubscriptions.value.map((sub) => (
+              <div
+                key={sub.id}
+                onClick={() => { lagoSubscriptionId.value = sub.id; }}
+                className="border border-border hover:border-primary/50 hover:bg-accent rounded-lg p-3 cursor-pointer transition-all"
+              >
+                <div className="flex items-start gap-2">
+                  <CreditCard className="size-4 text-muted-foreground mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-sm truncate">{sub.name}</h3>
+                    <p className="text-xs text-muted-foreground mt-1 font-mono truncate">{sub.id}</p>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">
-          Display Name (Optional)
-        </label>
-        <input
+      <div className="space-y-2">
+        <Label htmlFor="displayName">Display Name <span className="text-muted-foreground text-xs">(Optional)</span></Label>
+        <Input
+          id="displayName"
           type="text"
           value={displayName.value}
-          onChange={(e) =>
-            (displayName.value = (e.target as HTMLInputElement).value)}
-          class="w-full px-3 py-2 border border-gray-300 rounded-md"
+          onInput={(e) => (displayName.value = (e.target as HTMLInputElement).value)}
           placeholder="Friendly name for this mapping"
         />
       </div>
 
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">
-          Notes (Optional)
-        </label>
-        <textarea
+      <div className="space-y-2">
+        <Label htmlFor="notes">Notes <span className="text-muted-foreground text-xs">(Optional)</span></Label>
+        <Textarea
+          id="notes"
           value={notes.value}
-          onChange={(e) =>
-            (notes.value = (e.target as HTMLTextAreaElement).value)}
-          class="w-full px-3 py-2 border border-gray-300 rounded-md"
+          onInput={(e) => (notes.value = (e.target as HTMLTextAreaElement).value)}
           rows={3}
           placeholder="Additional notes about this mapping"
         />
       </div>
 
-      <div class="flex items-center">
-        <input
-          type="checkbox"
+      <div className="flex items-center space-x-2">
+        <Checkbox
           id="isActive"
           checked={isActive.value}
-          onChange={(e) =>
-            (isActive.value = (e.target as HTMLInputElement).checked)}
-          class="h-4 w-4 text-blue-600 border-gray-300 rounded"
+          onCheckedChange={(checked) => (isActive.value = checked)}
         />
-        <label for="isActive" class="ml-2 text-sm text-gray-700">
-          Active
-        </label>
+        <Label htmlFor="isActive" className="cursor-pointer">Active</Label>
       </div>
 
-      <div class="flex gap-4">
-        <button
-          type="submit"
-          disabled={loading.value}
-          class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {loading.value ? "Saving..." : mapping ? "Update" : "Create"}
-        </button>
-        <a
-          href="/mappings"
-          class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-        >
-          Cancel
-        </a>
+      <div className="flex gap-3 pt-4">
+        <Button type="submit" disabled={loading.value}>
+          {loading.value ? (
+            <>
+              <Loader2 className="mr-2 size-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            mapping ? "Update Mapping" : "Create Mapping"
+          )}
+        </Button>
+        <Button variant="outline" asChild>
+          <a href="/mappings">Cancel</a>
+        </Button>
       </div>
     </form>
   );

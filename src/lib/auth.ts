@@ -30,6 +30,15 @@ export const auth = betterAuth({
   // Base URL for redirects
   baseURL: config.AUTH_URL,
 
+  // Trusted origins for CORS (includes dev server)
+  trustedOrigins: [
+    config.AUTH_URL,
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+  ],
+
   // Email & password authentication
   emailAndPassword: {
     enabled: true,
