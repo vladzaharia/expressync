@@ -1,7 +1,9 @@
 import type { UserMapping } from "../db/schema.ts";
 import type { StEvEOcppTag } from "../lib/types/steve.ts";
+import type { LagoSubscription } from "../lib/types/lago.ts";
 import { getAllAncestorTags } from "../lib/tag-hierarchy.ts";
 import { logger } from "../lib/utils/logger.ts";
+import { lagoClient } from "../lib/lago-client.ts";
 
 /**
  * Resolve a mapping for an OCPP tag, checking parent tags if no direct mapping exists
@@ -130,3 +132,74 @@ export function buildMappingLookupWithInheritance(
   return enhancedMap;
 }
 
+/**
+ * Resolve subscription for a mapping, auto-selecting if none specified
+ *
+ * If the mapping has no subscription ID, this function will:
+ * 1. Fetch all subscriptions for the customer
+ * 2. Find the first active subscription
+ * 3. Return that subscription's external ID
+ *
+ * @param mapping - The user mapping (may have null subscription)
+ * @returns The subscription external ID, or null if none found
+ */
+export async function resolveSubscriptionId(
+  mapping: UserMapping
+): Promise<string | null> {
+  // If mapping already has a subscription, use it
+  if (mapping.lagoSubscriptionExternalId) {
+    logger.debug("MappingResolver", "Using explicit subscription from mapping", {
+      mappingId: mapping.id,
+      subscriptionId: mapping.lagoSubscriptionExternalId,
+    });
+    return mapping.lagoSubscriptionExternalId;
+  }
+
+  // No subscription specified, try to auto-select
+  if (!mapping.lagoCustomerExternalId) {
+    logger.warn("MappingResolver", "Cannot auto-select subscription: no customer ID", {
+      mappingId: mapping.id,
+    });
+    return null;
+  }
+
+  logger.info("MappingResolver", "Auto-selecting subscription for customer", {
+    mappingId: mapping.id,
+    customerId: mapping.lagoCustomerExternalId,
+  });
+
+  try {
+    // Fetch all subscriptions for the customer
+    const { subscriptions } = await lagoClient.getSubscriptions({
+      external_customer_id: mapping.lagoCustomerExternalId,
+    });
+
+    // Find first active subscription
+    const activeSubscription = subscriptions.find(
+      (sub: LagoSubscription) => sub.status === "active"
+    );
+
+    if (activeSubscription) {
+      logger.info("MappingResolver", "Auto-selected active subscription", {
+        mappingId: mapping.id,
+        subscriptionId: activeSubscription.external_id,
+        subscriptionName: activeSubscription.name,
+      });
+      return activeSubscription.external_id;
+    }
+
+    logger.warn("MappingResolver", "No active subscription found for customer", {
+      mappingId: mapping.id,
+      customerId: mapping.lagoCustomerExternalId,
+      totalSubscriptions: subscriptions.length,
+    });
+    return null;
+  } catch (error) {
+    logger.error("MappingResolver", "Failed to fetch subscriptions for auto-selection", {
+      mappingId: mapping.id,
+      customerId: mapping.lagoCustomerExternalId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}

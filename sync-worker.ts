@@ -10,12 +10,14 @@
  * - Shares database with main app
  * - Uses Croner for scheduling (stable, no unstable flags)
  * - Prevents overlapping executions
+ * - Listens for manual trigger notifications via PostgreSQL LISTEN/NOTIFY
  *
  * Usage:
  *   deno run --allow-net --allow-env --allow-read sync-worker.ts
  */
 
 import { Cron } from "croner";
+import postgres from "postgres";
 import { config, validateSyncWorkerConfig } from "./src/lib/config.ts";
 import { runSync } from "./src/services/sync.service.ts";
 
@@ -33,6 +35,15 @@ try {
 
 // Track if a sync is currently running (for additional safety)
 let isSyncing = false;
+
+// Channel name for sync notifications (must match sync-notifier.service.ts)
+const SYNC_CHANNEL = "sync_trigger";
+
+// Create a dedicated postgres client for LISTEN
+const listenClient = postgres(config.DATABASE_URL, {
+  max: 1, // Only need one connection for listening
+  idle_timeout: 0, // Keep connection alive
+});
 
 /**
  * Sync handler function
@@ -87,6 +98,26 @@ const job = new Cron(
 console.log("[Sync Worker] Cron job scheduled successfully");
 console.log(`[Sync Worker] Next run: ${job.nextRun()?.toISOString()}`);
 
+// Set up LISTEN for manual sync triggers
+console.log(`[Sync Worker] Setting up LISTEN on channel: ${SYNC_CHANNEL}`);
+await listenClient.listen(
+  SYNC_CHANNEL,
+  (payload) => {
+    try {
+      const data = JSON.parse(payload);
+      console.log(`[Sync Worker] Received sync trigger notification from ${data.source}`);
+      handleSync().catch((error) => {
+        console.error("[Sync Worker] Manual sync failed:", error);
+      });
+    } catch (error) {
+      console.error("[Sync Worker] Failed to parse notification payload:", error);
+    }
+  },
+  () => {
+    console.log(`[Sync Worker] LISTEN connection established on channel: ${SYNC_CHANNEL}`);
+  }
+);
+
 // Run sync immediately on startup (optional, but useful for testing)
 if (config.SYNC_ON_STARTUP === "true") {
   console.log("[Sync Worker] Running initial sync on startup...");
@@ -96,10 +127,12 @@ if (config.SYNC_ON_STARTUP === "true") {
 }
 
 // Graceful shutdown handler
-const shutdown = () => {
+const shutdown = async () => {
   console.log("[Sync Worker] Shutting down gracefully...");
   job.stop();
   console.log("[Sync Worker] Cron job stopped");
+  await listenClient.end();
+  console.log("[Sync Worker] LISTEN connection closed");
   Deno.exit(0);
 };
 

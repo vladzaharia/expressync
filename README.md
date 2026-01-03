@@ -103,8 +103,9 @@ This will watch the project directory and restart as necessary.
 - **Scheduler**: Croner (production-ready cron)
 - **Schedule**: Every 15 minutes (configurable)
 - **Purpose**: Automated billing synchronization
+- **Manual Trigger**: PostgreSQL LISTEN/NOTIFY for instant sync triggers
 
-See [docs/SYNC-WORKER.md](docs/SYNC-WORKER.md) for detailed documentation.
+See [docs/SYNC-WORKER.md](docs/SYNC-WORKER.md) and [docs/SYNC-TRIGGER.md](docs/SYNC-TRIGGER.md) for detailed documentation.
 
 ## Configuration
 

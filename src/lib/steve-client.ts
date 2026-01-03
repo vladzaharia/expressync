@@ -154,6 +154,58 @@ class StEvEClient {
   }
 
   /**
+   * Update an OCPP tag
+   *
+   * StEvE's PUT endpoint requires the complete tag object (OcppTagForm),
+   * not just the fields being updated. We must send all fields.
+   *
+   * @param tag - The complete tag object with updates applied
+   */
+  async updateOcppTag(tag: StEvEOcppTag): Promise<void> {
+    logger.info("StEvE", "Updating OCPP tag", {
+      ocppTagPk: tag.ocppTagPk,
+      idTag: tag.idTag,
+      maxActiveTransactionCount: tag.maxActiveTransactionCount,
+    });
+
+    // Build the complete OcppTagForm object
+    // All fields are optional, but we send all available data
+    const formData: Record<string, unknown> = {
+      idTag: tag.idTag, // Required for identification (though ignored in updates per spec)
+      maxActiveTransactionCount: tag.maxActiveTransactionCount,
+    };
+
+    // Add optional fields if they exist
+    if (tag.note !== undefined && tag.note !== null) {
+      formData.note = tag.note;
+    }
+    if (tag.parentIdTag !== undefined && tag.parentIdTag !== null) {
+      formData.parentIdTag = tag.parentIdTag;
+    }
+    if (tag.expiryDate !== undefined && tag.expiryDate !== null) {
+      formData.expiryDate = tag.expiryDate;
+    }
+
+    logger.debug("StEvE", "Sending tag update request", {
+      ocppTagPk: tag.ocppTagPk,
+      formData,
+    });
+
+    await this.request(
+      `/v1/ocppTags/${tag.ocppTagPk}`,
+      z.object({}), // StEvE typically returns empty object on success
+      {
+        method: "PUT",
+        body: JSON.stringify(formData),
+      }
+    );
+
+    logger.debug("StEvE", "OCPP tag updated successfully", {
+      ocppTagPk: tag.ocppTagPk,
+    });
+  }
+
+  /**
    * Fetch all charge boxes
    */
   async getChargeBoxes(): Promise<StEvEChargeBox[]> {
