@@ -1,0 +1,83 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ocpp_user
+      POSTGRES_PASSWORD: ocpp_password
+      POSTGRES_DB: ocpp_billing
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ocpp_user -d ocpp_billing"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Database Migration Service (runs once)
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://ocpp_user:ocpp_password@postgres:5432/ocpp_billing
+    command: ["deno", "task", "db:migrate"]
+    restart: "no"
+
+  # OCPP Billing Web Application (UI + API)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://ocpp_user:ocpp_password@postgres:5432/ocpp_billing
+      STEVE_API_URL: ${STEVE_API_URL}
+      STEVE_API_KEY: ${STEVE_API_KEY}
+      LAGO_API_URL: ${LAGO_API_URL}
+      LAGO_API_KEY: ${LAGO_API_KEY}
+      LAGO_METRIC_CODE: ${LAGO_METRIC_CODE}
+      PORT: 8000
+      DENO_ENV: production
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_URL: ${AUTH_URL:-http://localhost:8000}
+      DEBUG_LEVEL: ${DEBUG_LEVEL:-ERROR}
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  # OCPP Billing Sync Worker (Scheduled Sync Service)
+  sync:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://ocpp_user:ocpp_password@postgres:5432/ocpp_billing
+      STEVE_API_URL: ${STEVE_API_URL}
+      STEVE_API_KEY: ${STEVE_API_KEY}
+      LAGO_API_URL: ${LAGO_API_URL}
+      LAGO_API_KEY: ${LAGO_API_KEY}
+      LAGO_METRIC_CODE: ${LAGO_METRIC_CODE}
+      SYNC_CRON_SCHEDULE: ${SYNC_CRON_SCHEDULE:-*/15 * * * *}
+      SYNC_ON_STARTUP: ${SYNC_ON_STARTUP:-false}
+      DENO_ENV: production
+    command: ["deno", "run", "--allow-net", "--allow-env", "--allow-read", "sync-worker.ts"]
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+

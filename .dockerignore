@@ -1,0 +1,40 @@
+# Git
+.git
+.gitignore
+
+# Design docs
+_design
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Node modules (will be installed in container)
+node_modules
+
+# Deno cache
+.deno
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test files
+*.test.ts
+*.spec.ts
+__tests__
+
+# Documentation
+README.md
+docs
+

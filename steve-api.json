@@ -1,0 +1,753 @@
+{
+    "openapi": "3.0.3",
+    "info": {
+        "title": "SteVe REST API Documentation",
+        "description": "SteVe REST API Documentation",
+        "license": {
+            "name": "GPL-3.0",
+            "url": "https://github.com/steve-community/steve/blob/master/LICENSE.txt"
+        },
+        "version": "3.7.1"
+    },
+    "servers": [
+        {
+            "url": "https://ocpp.polaris.express:443",
+            "description": "Inferred Url"
+        }
+    ],
+    "tags": [
+        {
+            "name": "ocpp-tags-rest-controller",
+            "description": "Ocpp Tags Rest Controller"
+        },
+        {
+            "name": "transactions-rest-controller",
+            "description": "Transactions Rest Controller"
+        }
+    ],
+    "paths": {
+        "/steve/api/v1/ocppTags": {
+            "get": {
+                "tags": [
+                    "ocpp-tags-rest-controller"
+                ],
+                "summary": "get",
+                "operationId": "getUsingGET",
+                "parameters": [
+                    {
+                        "name": "blocked",
+                        "in": "query",
+                        "description": "Return blocked, not blocked, or all Ocpp tags? Defaults to ALL",
+                        "required": false,
+                        "style": "form",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "ALL",
+                                "FALSE",
+                                "TRUE"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "expired",
+                        "in": "query",
+                        "description": "Return expired, not expired, or all Ocpp tags? Defaults to ALL",
+                        "required": false,
+                        "style": "form",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "ALL",
+                                "FALSE",
+                                "TRUE"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "idTag",
+                        "in": "query",
+                        "description": "The OCPP tag",
+                        "required": false,
+                        "style": "form",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "inTransaction",
+                        "in": "query",
+                        "description": "Return in-transaction, not in-transaction, or all Ocpp tags? Defaults to ALL",
+                        "required": false,
+                        "style": "form",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "ALL",
+                                "FALSE",
+                                "TRUE"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "ocppTagPk",
+                        "in": "query",
+                        "description": "Database primary key of the OCPP tag",
+                        "required": false,
+                        "style": "form",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32"
+                        }
+                    },
+                    {
+                        "name": "parentIdTag",
+                        "in": "query",
+                        "description": "The parent OCPP tag of this OCPP tag",
+                        "required": false,
+                        "style": "form",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/Overview"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "ocpp-tags-rest-controller"
+                ],
+                "summary": "create",
+                "operationId": "createUsingPOST",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OcppTagForm"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Overview"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/steve/api/v1/ocppTags/{ocppTagPk}": {
+            "get": {
+                "tags": [
+                    "ocpp-tags-rest-controller"
+                ],
+                "summary": "getOne",
+                "operationId": "getOneUsingGET",
+                "parameters": [
+                    {
+                        "name": "ocppTagPk",
+                        "in": "path",
+                        "description": "ocppTagPk",
+                        "required": true,
+                        "style": "simple",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Overview"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "ocpp-tags-rest-controller"
+                ],
+                "summary": "update",
+                "operationId": "updateUsingPUT",
+                "parameters": [
+                    {
+                        "name": "ocppTagPk",
+                        "in": "path",
+                        "description": "ocppTagPk",
+                        "required": true,
+                        "style": "simple",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OcppTagForm"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Overview"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "ocpp-tags-rest-controller"
+                ],
+                "summary": "delete",
+                "operationId": "deleteUsingDELETE",
+                "parameters": [
+                    {
+                        "name": "ocppTagPk",
+                        "in": "path",
+                        "description": "ocppTagPk",
+                        "required": true,
+                        "style": "simple",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Overview"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/steve/api/v1/transactions": {
+            "get": {
+                "tags": [
+                    "transactions-rest-controller"
+                ],
+                "summary": "get",
+                "operationId": "getUsingGET_1",
+                "parameters": [
+                    {
+                        "name": "chargeBoxId",
+                        "in": "query",
+                        "description": "The identifier of the chargebox (i.e. charging station)",
+                        "required": false,
+                        "style": "form",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "description": "Show results that happened after this date/time. Format: ISO8601 without timezone. Example: `2022-10-10T09:00:00`",
+                        "required": false,
+                        "style": "form",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "name": "ocppIdTag",
+                        "in": "query",
+                        "description": "The OCPP tag",
+                        "required": false,
+                        "style": "form",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "periodType",
+                        "in": "query",
+                        "description": "Return the time period of the transactions. If FROM_TO, 'from' and 'to' must be set. Additionally, 'to' must be after 'from'. Defaults to ALL",
+                        "required": false,
+                        "style": "form",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "ALL",
+                                "FROM_TO",
+                                "LAST_10",
+                                "LAST_30",
+                                "LAST_90",
+                                "TODAY"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "description": "Show results that happened before this date/time. Format: ISO8601 without timezone. Example: `2022-10-10T12:00:00`",
+                        "required": false,
+                        "style": "form",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "name": "transactionPk",
+                        "in": "query",
+                        "description": "Database primary key of the transaction",
+                        "required": false,
+                        "style": "form",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32"
+                        }
+                    },
+                    {
+                        "name": "type",
+                        "in": "query",
+                        "description": "Return active or all transactions? Defaults to ALL",
+                        "required": false,
+                        "style": "form",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "ACTIVE",
+                                "ALL"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/Transaction"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "ApiErrorResponse": {
+                "title": "ApiErrorResponse",
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "path": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "timestamp": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                }
+            },
+            "OcppTagForm": {
+                "title": "OcppTagForm",
+                "type": "object",
+                "properties": {
+                    "expiryDate": {
+                        "type": "string",
+                        "description": "A date/time without timezone. Example: 2022-10-10T09:00",
+                        "format": "date-time"
+                    },
+                    "idTag": {
+                        "type": "string",
+                        "description": "Will be used in create/insert flows. Will be ignored in update flows."
+                    },
+                    "maxActiveTransactionCount": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "note": {
+                        "type": "string"
+                    },
+                    "parentIdTag": {
+                        "type": "string"
+                    }
+                }
+            },
+            "Overview": {
+                "title": "Overview",
+                "type": "object",
+                "properties": {
+                    "activeTransactionCount": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "blocked": {
+                        "type": "boolean"
+                    },
+                    "expiryDate": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "idTag": {
+                        "type": "string"
+                    },
+                    "inTransaction": {
+                        "type": "boolean"
+                    },
+                    "maxActiveTransactionCount": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "note": {
+                        "type": "string"
+                    },
+                    "ocppTagPk": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "parentIdTag": {
+                        "type": "string"
+                    },
+                    "parentOcppTagPk": {
+                        "type": "integer",
+                        "format": "int32"
+                    }
+                }
+            },
+            "Transaction": {
+                "title": "Transaction",
+                "type": "object",
+                "properties": {
+                    "chargeBoxId": {
+                        "type": "string"
+                    },
+                    "chargeBoxPk": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "connectorId": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "id": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "ocppIdTag": {
+                        "type": "string"
+                    },
+                    "ocppTagPk": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "startTimestamp": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "startValue": {
+                        "type": "string"
+                    },
+                    "stopEventActor": {
+                        "type": "string",
+                        "enum": [
+                            "manual",
+                            "station"
+                        ]
+                    },
+                    "stopReason": {
+                        "type": "string"
+                    },
+                    "stopTimestamp": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "stopValue": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    }
+}
