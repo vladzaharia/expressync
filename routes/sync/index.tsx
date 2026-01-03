@@ -3,6 +3,10 @@ import { db } from "../../src/db/index.ts";
 import * as schema from "../../src/db/schema.ts";
 import { desc } from "drizzle-orm";
 import SyncControls from "../../islands/SyncControls.tsx";
+import { SidebarLayout } from "../../components/SidebarLayout.tsx";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card.tsx";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table.tsx";
+import { Badge } from "../../components/ui/badge.tsx";
 
 export const handler = define.handlers({
   async GET(ctx) {
@@ -16,63 +20,73 @@ export const handler = define.handlers({
   },
 });
 
-export default define.page<typeof handler>(function SyncPage({ data }) {
-  return (
-    <div class="container mx-auto px-4 py-8">
-      <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold">Sync Status</h1>
-        <SyncControls />
-      </div>
+export default define.page<typeof handler>(function SyncPage({ data, url }) {
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case "completed": return "success";
+      case "failed": return "destructive";
+      default: return "warning";
+    }
+  };
 
-      <div class="bg-white shadow rounded-lg overflow-hidden">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium">Started</th>
-              <th class="px-6 py-3 text-left text-xs font-medium">Completed</th>
-              <th class="px-6 py-3 text-left text-xs font-medium">Status</th>
-              <th class="px-6 py-3 text-left text-xs font-medium">
-                Transactions
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium">Events</th>
-              <th class="px-6 py-3 text-left text-xs font-medium">Error</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200">
-            {data.syncRuns.map((run) => (
-              <tr key={run.id}>
-                <td class="px-6 py-4 text-sm">
-                  {new Date(run.startedAt).toLocaleString()}
-                </td>
-                <td class="px-6 py-4 text-sm">
-                  {run.completedAt
-                    ? new Date(run.completedAt).toLocaleString()
-                    : "-"}
-                </td>
-                <td class="px-6 py-4 text-sm">
-                  <span
-                    class={`px-2 py-1 text-xs rounded ${
-                      run.status === "completed"
-                        ? "bg-green-100 text-green-800"
-                        : run.status === "failed"
-                        ? "bg-red-100 text-red-800"
-                        : "bg-yellow-100 text-yellow-800"
-                    }`}
-                  >
-                    {run.status}
-                  </span>
-                </td>
-                <td class="px-6 py-4 text-sm">{run.transactionsProcessed}</td>
-                <td class="px-6 py-4 text-sm">{run.eventsCreated}</td>
-                <td class="px-6 py-4 text-sm text-red-600">
-                  {run.errorMessage || "-"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+  return (
+    <SidebarLayout
+      currentPath={url.pathname}
+      title="Sync Status"
+      description="Monitor and control data synchronization"
+      actions={<SyncControls />}
+    >
+      <Card>
+        <CardHeader>
+          <CardTitle>Sync History</CardTitle>
+          <CardDescription>Recent synchronization runs between SteVe and Lago</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Started</TableHead>
+                <TableHead>Completed</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Transactions</TableHead>
+                <TableHead>Events</TableHead>
+                <TableHead>Error</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.syncRuns.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    No sync runs yet
+                  </TableCell>
+                </TableRow>
+              ) : (
+                data.syncRuns.map((run) => (
+                  <TableRow key={run.id}>
+                    <TableCell className="font-medium">
+                      {new Date(run.startedAt).toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      {run.completedAt ? new Date(run.completedAt).toLocaleString() : "-"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getStatusVariant(run.status)}>
+                        {run.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{run.transactionsProcessed}</TableCell>
+                    <TableCell>{run.eventsCreated}</TableCell>
+                    <TableCell className="text-destructive max-w-[200px] truncate" title={run.errorMessage || ""}>
+                      {run.errorMessage || "-"}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </SidebarLayout>
   );
 });
 

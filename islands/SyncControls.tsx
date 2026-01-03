@@ -1,4 +1,6 @@
 import { useSignal } from "@preact/signals";
+import { Button } from "@/components/ui/button.tsx";
+import { RefreshCw, Loader2 } from "lucide-preact";
 
 export default function SyncControls() {
   const loading = useSignal(false);
@@ -29,25 +31,31 @@ export default function SyncControls() {
   };
 
   return (
-    <div class="flex items-center gap-4">
+    <div className="flex items-center gap-4">
       {message.value && (
         <span
-          class={`text-sm ${
+          className={`text-sm ${
             message.value.includes("success")
               ? "text-green-600"
-              : "text-red-600"
+              : "text-destructive"
           }`}
         >
           {message.value}
         </span>
       )}
-      <button
-        onClick={handleTriggerSync}
-        disabled={loading.value}
-        class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-      >
-        {loading.value ? "Triggering..." : "Trigger Sync"}
-      </button>
+      <Button onClick={handleTriggerSync} disabled={loading.value}>
+        {loading.value ? (
+          <>
+            <Loader2 className="mr-2 size-4 animate-spin" />
+            Syncing...
+          </>
+        ) : (
+          <>
+            <RefreshCw className="mr-2 size-4" />
+            Trigger Sync
+          </>
+        )}
+      </Button>
     </div>
   );
 }

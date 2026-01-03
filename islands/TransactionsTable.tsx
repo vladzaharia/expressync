@@ -1,4 +1,10 @@
 import { useSignal } from "@preact/signals";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Card, CardContent } from "@/components/ui/card.tsx";
+import { Filter, Loader2 } from "lucide-preact";
 
 interface Props {
   events: Array<{
@@ -36,87 +42,77 @@ export default function TransactionsTable({ events: initialEvents }: Props) {
   };
 
   return (
-    <div class="space-y-4">
-      <div class="bg-white shadow rounded-lg p-4">
-        <div class="flex gap-4 items-end">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
-              Start Date
-            </label>
-            <input
-              type="date"
-              value={startDate.value}
-              onInput={(e) =>
-                (startDate.value = (e.target as HTMLInputElement).value)}
-              class="px-3 py-2 border border-gray-300 rounded-md"
-            />
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="pt-4">
+          <div className="flex flex-wrap gap-4 items-end">
+            <div className="space-y-1">
+              <Label htmlFor="startDate">Start Date</Label>
+              <Input
+                id="startDate"
+                type="date"
+                value={startDate.value}
+                onInput={(e) => (startDate.value = (e.target as HTMLInputElement).value)}
+                className="w-auto"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="endDate">End Date</Label>
+              <Input
+                id="endDate"
+                type="date"
+                value={endDate.value}
+                onInput={(e) => (endDate.value = (e.target as HTMLInputElement).value)}
+                className="w-auto"
+              />
+            </div>
+            <Button onClick={handleFilter} disabled={loading.value}>
+              {loading.value ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Filtering...
+                </>
+              ) : (
+                <>
+                  <Filter className="mr-2 size-4" />
+                  Filter
+                </>
+              )}
+            </Button>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
-              End Date
-            </label>
-            <input
-              type="date"
-              value={endDate.value}
-              onInput={(e) =>
-                (endDate.value = (e.target as HTMLInputElement).value)}
-              class="px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <button
-            onClick={handleFilter}
-            disabled={loading.value}
-            class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loading.value ? "Filtering..." : "Filter"}
-          </button>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      <div class="bg-white shadow rounded-lg overflow-hidden">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium">
-                Transaction ID
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium">OCPP Tag</th>
-              <th class="px-6 py-3 text-left text-xs font-medium">kWh</th>
-              <th class="px-6 py-3 text-left text-xs font-medium">
-                Lago Event ID
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium">
-                Synced At
-              </th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200">
-            {events.value.length === 0
-              ? (
-                <tr>
-                  <td colSpan={5} class="px-6 py-8 text-center text-gray-500">
-                    No billing events found
-                  </td>
-                </tr>
-              )
-              : events.value.map((event) => (
-                <tr key={event.id}>
-                  <td class="px-6 py-4 text-sm">{event.transactionId}</td>
-                  <td class="px-6 py-4 text-sm">{event.ocppTagId}</td>
-                  <td class="px-6 py-4 text-sm">
-                    {event.kwhDelta.toFixed(2)}
-                  </td>
-                  <td class="px-6 py-4 text-sm font-mono text-xs">
-                    {event.lagoEventId}
-                  </td>
-                  <td class="px-6 py-4 text-sm">
-                    {new Date(event.syncedAt).toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
-      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Transaction ID</TableHead>
+            <TableHead>OCPP Tag</TableHead>
+            <TableHead>kWh</TableHead>
+            <TableHead>Lago Event ID</TableHead>
+            <TableHead>Synced At</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {events.value.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={5} className="text-center text-muted-foreground">
+                No billing events found
+              </TableCell>
+            </TableRow>
+          ) : (
+            events.value.map((event) => (
+              <TableRow key={event.id}>
+                <TableCell className="font-medium">{event.transactionId}</TableCell>
+                <TableCell className="font-mono">{event.ocppTagId}</TableCell>
+                <TableCell>{event.kwhDelta.toFixed(2)}</TableCell>
+                <TableCell className="font-mono text-xs">{event.lagoEventId}</TableCell>
+                <TableCell>{new Date(event.syncedAt).toLocaleString()}</TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
     </div>
   );
 }

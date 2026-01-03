@@ -1,5 +1,7 @@
 #!/usr/bin/env -S deno run -A
 
+// Load environment variables first
+import "../src/lib/config.ts";
 import { auth } from "../src/lib/auth.ts";
 
 const ADMIN_EMAIL = Deno.env.get("ADMIN_EMAIL") || "admin@example.com";
