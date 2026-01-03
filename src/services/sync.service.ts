@@ -19,6 +19,7 @@ import type {
 } from "../db/schema.ts";
 import { logger } from "../lib/utils/logger.ts";
 import { buildMappingLookupWithInheritance } from "./mapping-resolver.ts";
+import { syncTagStatus } from "./tag-sync.service.ts";
 
 export interface SyncResult {
   syncRunId: number;
@@ -93,8 +94,35 @@ export async function runSync(): Promise<SyncResult> {
       totalUnique: allTransactions.size,
     });
 
+    // Load user mappings and tags early (needed for tag sync even if no transactions)
+    logger.debug("Sync", "Loading user mappings");
+    const mappings = await getActiveMappings();
+
+    // Fetch all OCPP tags to enable parent/child resolution
+    logger.debug("Sync", "Fetching OCPP tags for hierarchy resolution");
+    const allTags = await steveClient.getOcppTags();
+
     if (allTransactions.size === 0) {
       logger.info("Sync", "No transactions to process, completing sync");
+
+      // Sync tag status even when there are no transactions
+      try {
+        logger.info("Sync", "Starting tag status synchronization");
+        const tagSyncResult = await syncTagStatus(mappings, allTags);
+        logger.info("Sync", "Tag status synchronization completed", {
+          totalTags: tagSyncResult.totalTags,
+          enabledTags: tagSyncResult.enabledTags,
+          disabledTags: tagSyncResult.disabledTags,
+          unchangedTags: tagSyncResult.unchangedTags,
+          errorCount: tagSyncResult.errors.length,
+        });
+      } catch (error) {
+        logger.error("Sync", "Tag sync failed (non-fatal)", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Don't fail the entire sync if tag sync fails
+      }
+
       await markSyncComplete(syncRun.id, 0, 0);
       return {
         syncRunId: syncRun.id,
@@ -117,15 +145,7 @@ export async function runSync(): Promise<SyncResult> {
       existingSyncStates.map((s) => [s.steveTransactionId, s])
     );
 
-    // 6. Load user mappings with parent/child inheritance support
-    logger.debug("Sync", "Loading user mappings");
-    const mappings = await getActiveMappings();
-
-    // Fetch all OCPP tags to enable parent/child resolution
-    logger.debug("Sync", "Fetching OCPP tags for hierarchy resolution");
-    const allTags = await steveClient.getOcppTags();
-
-    // Build mapping lookup with inheritance (child tags inherit parent mappings)
+    // 6. Build mapping lookup with inheritance (child tags inherit parent mappings)
     const mappingByOcppTag = buildMappingLookupWithInheritance(mappings, allTags);
 
     logger.info("Sync", "User mappings loaded with inheritance", {
@@ -138,7 +158,7 @@ export async function runSync(): Promise<SyncResult> {
     logger.info("Sync", "Processing transactions", {
       totalTransactions: allTransactions.size,
     });
-    const processedTransactions = processTransactions(
+    const processedTransactions = await processTransactions(
       allTransactions,
       syncStateByTxId,
       mappingByOcppTag,
@@ -146,15 +166,61 @@ export async function runSync(): Promise<SyncResult> {
     );
 
     transactionsProcessed = allTransactions.size;
-    eventsCreated = processedTransactions.length;
+
+    // Separate transactions that should be sent to Lago from those that shouldn't
+    const transactionsToSend = processedTransactions.filter(pt => pt.shouldSendToLago);
+    const transactionsWithoutSubscription = processedTransactions.filter(pt => !pt.shouldSendToLago);
+
+    eventsCreated = transactionsToSend.length;
 
     logger.info("Sync", "Transactions processed", {
       transactionsProcessed,
       eventsCreated,
+      transactionsWithoutSubscription: transactionsWithoutSubscription.length,
     });
 
-    if (processedTransactions.length === 0) {
-      logger.info("Sync", "No events to send, completing sync");
+    // Log warning if some transactions couldn't be sent
+    if (transactionsWithoutSubscription.length > 0) {
+      logger.warn("Sync", "Some transactions have no subscription and will not be sent to Lago", {
+        count: transactionsWithoutSubscription.length,
+        transactionIds: transactionsWithoutSubscription.map(pt => pt.steveTransactionId),
+      });
+    }
+
+    if (transactionsToSend.length === 0) {
+      logger.info("Sync", "No events to send to Lago, completing sync");
+
+      // Still save sync states for transactions without subscriptions
+      if (transactionsWithoutSubscription.length > 0) {
+        logger.info("Sync", "Saving sync states for transactions without subscriptions");
+        const syncStateUpdates = transactionsWithoutSubscription.map((pt) => ({
+          steveTransactionId: pt.steveTransactionId,
+          lastSyncedMeterValue: pt.meterValueTo,
+          totalKwhBilled: (syncStateByTxId.get(pt.steveTransactionId)?.totalKwhBilled || 0) + pt.kwhDelta,
+          lastSyncRunId: syncRun.id,
+          isFinalized: pt.isFinal,
+        }));
+        await batchUpsertSyncStates(syncStateUpdates);
+      }
+
+      // Sync tag status even when there are no transactions
+      try {
+        logger.info("Sync", "Starting tag status synchronization");
+        const tagSyncResult = await syncTagStatus(mappings, allTags);
+        logger.info("Sync", "Tag status synchronization completed", {
+          totalTags: tagSyncResult.totalTags,
+          enabledTags: tagSyncResult.enabledTags,
+          disabledTags: tagSyncResult.disabledTags,
+          unchangedTags: tagSyncResult.unchangedTags,
+          errorCount: tagSyncResult.errors.length,
+        });
+      } catch (error) {
+        logger.error("Sync", "Tag sync failed (non-fatal)", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Don't fail the entire sync if tag sync fails
+      }
+
       await markSyncComplete(syncRun.id, transactionsProcessed, 0);
       return {
         syncRunId: syncRun.id,
@@ -164,9 +230,9 @@ export async function runSync(): Promise<SyncResult> {
       };
     }
 
-    // 8. Build Lago events
+    // 8. Build Lago events (only for transactions with subscriptions)
     logger.debug("Sync", "Building Lago events");
-    const lagoEvents = buildLagoEvents(processedTransactions);
+    const lagoEvents = buildLagoEvents(transactionsToSend);
     logger.debug("Sync", "Lago events built", { count: lagoEvents.length });
 
     // 9. Send events to Lago in batches
@@ -193,7 +259,7 @@ export async function runSync(): Promise<SyncResult> {
       }
     }
 
-    // 10. Update sync states in database
+    // 10. Update sync states in database (for ALL processed transactions)
     logger.info("Sync", "Updating sync states in database");
     const syncStateUpdates: NewTransactionSyncState[] = processedTransactions
       .map((pt) => ({
@@ -207,6 +273,8 @@ export async function runSync(): Promise<SyncResult> {
 
     logger.debug("Sync", "Sync state updates prepared", {
       count: syncStateUpdates.length,
+      sentToLago: transactionsToSend.length,
+      savedWithoutSubscription: transactionsWithoutSubscription.length,
     });
     await batchUpsertSyncStates(syncStateUpdates);
     logger.debug("Sync", "Sync states updated successfully");
@@ -232,7 +300,25 @@ export async function runSync(): Promise<SyncResult> {
     await batchCreateSyncedEvents(syncedEventRecords);
     logger.debug("Sync", "Synced event records created successfully");
 
-    // 12. Mark sync as complete
+    // 12. Sync tag status (enable/disable tags based on mappings)
+    try {
+      logger.info("Sync", "Starting tag status synchronization");
+      const tagSyncResult = await syncTagStatus(mappings, allTags);
+      logger.info("Sync", "Tag status synchronization completed", {
+        totalTags: tagSyncResult.totalTags,
+        enabledTags: tagSyncResult.enabledTags,
+        disabledTags: tagSyncResult.disabledTags,
+        unchangedTags: tagSyncResult.unchangedTags,
+        errorCount: tagSyncResult.errors.length,
+      });
+    } catch (error) {
+      logger.error("Sync", "Tag sync failed (non-fatal)", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Don't fail the entire sync if tag sync fails
+    }
+
+    // 13. Mark sync as complete
     await markSyncComplete(syncRun.id, transactionsProcessed, eventsCreated, errors);
 
     logger.info("Sync", "Sync run completed successfully", {

@@ -1,16 +1,18 @@
 import type { StEvETransaction } from "../lib/types/steve.ts";
 import type { TransactionSyncState, UserMapping } from "../db/schema.ts";
 import { logger } from "../lib/utils/logger.ts";
+import { resolveSubscriptionId } from "./mapping-resolver.ts";
 
 export interface ProcessedTransaction {
   steveTransactionId: number;
   userMappingId: number;
-  lagoSubscriptionExternalId: string;
+  lagoSubscriptionExternalId: string | null; // Null if no subscription found
   kwhDelta: number;
   meterValueFrom: number;
   meterValueTo: number;
   isFinal: boolean;
   lagoEventTransactionId: string;
+  shouldSendToLago: boolean; // False if no subscription available
 }
 
 export interface TransactionWithCompletion extends StEvETransaction {
@@ -65,12 +67,12 @@ export function calculateDelta(
  * @param syncRunId - Current sync run ID
  * @returns Processed transaction data, or null if should be skipped
  */
-export function processTransaction(
+export async function processTransaction(
   tx: TransactionWithCompletion,
   syncState: TransactionSyncState | null,
   mapping: UserMapping | undefined,
   syncRunId: number
-): ProcessedTransaction | null {
+): Promise<ProcessedTransaction | null> {
   logger.debug("TransactionProcessor", "Processing transaction", {
     transactionId: tx.id,
     ocppIdTag: tx.ocppIdTag,
@@ -96,14 +98,17 @@ export function processTransaction(
     return null;
   }
 
-  // Skip if mapping doesn't have subscription
-  if (!mapping.lagoSubscriptionExternalId) {
-    logger.warn("TransactionProcessor", "Mapping has no subscription, skipping", {
+  // Try to resolve subscription (auto-select if not specified)
+  const subscriptionId = await resolveSubscriptionId(mapping);
+
+  if (!subscriptionId) {
+    logger.warn("TransactionProcessor", "No subscription available for mapping", {
       transactionId: tx.id,
       ocppIdTag: tx.ocppIdTag,
       mappingId: mapping.id,
+      hasExplicitSubscription: !!mapping.lagoSubscriptionExternalId,
     });
-    return null;
+    // Continue processing but mark as not ready for Lago
   }
 
   // Calculate delta
@@ -130,18 +135,21 @@ export function processTransaction(
   const result = {
     steveTransactionId: tx.id,
     userMappingId: mapping.id,
-    lagoSubscriptionExternalId: mapping.lagoSubscriptionExternalId,
+    lagoSubscriptionExternalId: subscriptionId,
     kwhDelta: delta.kwhDelta,
     meterValueFrom: delta.meterValueFrom,
     meterValueTo: delta.meterValueTo,
     isFinal: tx.isCompleted,
     lagoEventTransactionId,
+    shouldSendToLago: !!subscriptionId, // Only send if we have a subscription
   };
 
   logger.debug("TransactionProcessor", "Transaction processed successfully", {
     transactionId: tx.id,
     kwhDelta: result.kwhDelta,
     isFinal: result.isFinal,
+    hasSubscription: !!subscriptionId,
+    shouldSendToLago: result.shouldSendToLago,
   });
 
   return result;
@@ -156,12 +164,12 @@ export function processTransaction(
  * @param syncRunId - Current sync run ID
  * @returns Array of processed transactions
  */
-export function processTransactions(
+export async function processTransactions(
   transactions: Map<number, TransactionWithCompletion>,
   syncStates: Map<number, TransactionSyncState>,
   mappings: Map<string, UserMapping>,
   syncRunId: number
-): ProcessedTransaction[] {
+): Promise<ProcessedTransaction[]> {
   logger.info("TransactionProcessor", "Processing batch of transactions", {
     totalTransactions: transactions.size,
     syncStatesCount: syncStates.size,
@@ -175,7 +183,7 @@ export function processTransactions(
     const syncState = syncStates.get(txId) || null;
     const mapping = mappings.get(tx.ocppIdTag);
 
-    const result = processTransaction(tx, syncState, mapping, syncRunId);
+    const result = await processTransaction(tx, syncState, mapping, syncRunId);
 
     if (result) {
       processed.push(result);

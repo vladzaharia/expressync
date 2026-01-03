@@ -71,6 +71,12 @@ export const StEvEOcppTagSchema = z.object({
 
   /** Parent ID tag for grouping */
   parentIdTag: z.string().nullable(),
+
+  /** Expiry date for the tag (ISO 8601 date-time format) */
+  expiryDate: z.string().nullable().optional(),
+
+  /** Maximum number of active transactions allowed (-1 = unlimited, 0 = blocked) */
+  maxActiveTransactionCount: z.number().nullable().optional(),
 });
 
 export type StEvEOcppTag = z.infer<typeof StEvEOcppTagSchema>;

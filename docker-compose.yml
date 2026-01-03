@@ -74,6 +74,7 @@ services:
       LAGO_METRIC_CODE: ${LAGO_METRIC_CODE}
       SYNC_CRON_SCHEDULE: ${SYNC_CRON_SCHEDULE:-*/15 * * * *}
       SYNC_ON_STARTUP: ${SYNC_ON_STARTUP:-false}
+      DEBUG_LEVEL: ${DEBUG_LEVEL:-ERROR}
       DENO_ENV: production
     command: ["deno", "run", "--allow-net", "--allow-env", "--allow-read", "sync-worker.ts"]
     restart: unless-stopped

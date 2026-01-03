@@ -21,6 +21,17 @@ interface OcppTag {
   parentIdTag: string | null;
 }
 
+interface UserMapping {
+  id: number;
+  steveOcppIdTag: string;
+  steveOcppTagPk: number;
+  lagoCustomerExternalId: string;
+  lagoSubscriptionExternalId: string;
+  displayName?: string;
+  notes?: string;
+  isActive: boolean;
+}
+
 export default function MappingForm({ mapping }: Props) {
   const ocppTagId = useSignal(mapping?.steveOcppIdTag || "");
   const ocppTagPk = useSignal(mapping?.steveOcppTagPk || 0);
@@ -35,6 +46,7 @@ export default function MappingForm({ mapping }: Props) {
 
   // Fetch options from APIs
   const ocppTags = useSignal<Array<OcppTag>>([]);
+  const existingMappings = useSignal<Array<UserMapping>>([]);
   const lagoCustomers = useSignal<Array<{ id: string; name: string }>>([]);
   const lagoSubscriptions = useSignal<
     Array<{ id: string; name: string; customerId: string }>
@@ -47,20 +59,86 @@ export default function MappingForm({ mapping }: Props) {
     );
   });
 
-  // Compute child tags count for selected tag
-  const selectedTagInfo = useComputed(() => {
-    const tag = ocppTags.value.find((t) => t.id === ocppTagId.value);
-    if (!tag) return null;
+  const hasActiveSubscriptions = useComputed(() => {
+    return filteredSubscriptions.value.length > 0;
+  });
 
-    const childCount = ocppTags.value.filter(
-      (t) => t.parentIdTag === tag.id
-    ).length;
+  // Helper function to get all child tags recursively
+  const getAllChildTags = (parentId: string): OcppTag[] => {
+    const children: OcppTag[] = [];
+    const directChildren = ocppTags.value.filter(t => t.parentIdTag === parentId);
 
-    return {
-      tag,
-      childCount,
-      hasChildren: childCount > 0,
-    };
+    for (const child of directChildren) {
+      children.push(child);
+      children.push(...getAllChildTags(child.id));
+    }
+
+    return children;
+  };
+
+  // Helper function to check if a tag has a mapped parent
+  const hasMappedParent = (tag: OcppTag): string | null => {
+    if (!tag.parentIdTag) return null;
+
+    const parentMapping = existingMappings.value.find(
+      m => m.steveOcppIdTag === tag.parentIdTag
+    );
+
+    if (parentMapping) {
+      return tag.parentIdTag;
+    }
+
+    // Check grandparents recursively
+    const parent = ocppTags.value.find(t => t.id === tag.parentIdTag);
+    if (parent) {
+      return hasMappedParent(parent);
+    }
+
+    return null;
+  };
+
+  // Filter tags to show only unmapped tags (or tags with mapped parents for override)
+  const availableTags = useComputed(() => {
+    return ocppTags.value.filter(tag => {
+      // If editing, allow the current tag
+      if (mapping && tag.id === mapping.steveOcppIdTag) {
+        return true;
+      }
+
+      // Check if tag already has a direct mapping
+      const hasDirectMapping = existingMappings.value.some(
+        m => m.steveOcppIdTag === tag.id
+      );
+
+      if (hasDirectMapping) {
+        return false; // Hide tags with direct mappings
+      }
+
+      // Tag is available if it has no mapping
+      return true;
+    });
+  });
+
+  // Compute info for each available tag
+  const tagInfoMap = useComputed(() => {
+    const map = new Map<string, {
+      tag: OcppTag;
+      childCount: number;
+      mappedParent: string | null;
+    }>();
+
+    for (const tag of availableTags.value) {
+      const children = getAllChildTags(tag.id);
+      const mappedParent = hasMappedParent(tag);
+
+      map.set(tag.id, {
+        tag,
+        childCount: children.length,
+        mappedParent,
+      });
+    }
+
+    return map;
   });
 
   useEffect(() => {
@@ -68,6 +146,12 @@ export default function MappingForm({ mapping }: Props) {
     fetch("/api/steve/ocpp-tags")
       .then((res) => res.json())
       .then((data) => (ocppTags.value = data))
+      .catch(console.error);
+
+    // Fetch existing mappings
+    fetch("/api/mappings")
+      .then((res) => res.json())
+      .then((data) => (existingMappings.value = data))
       .catch(console.error);
 
     // Fetch Lago customers
@@ -85,6 +169,18 @@ export default function MappingForm({ mapping }: Props) {
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
+
+    // Validate required fields
+    if (!ocppTagId.value) {
+      error.value = "Please select an OCPP tag";
+      return;
+    }
+    if (!lagoCustomerId.value) {
+      error.value = "Please select a Lago customer";
+      return;
+    }
+    // Subscription is now optional - will be auto-selected at sync time if not specified
+
     loading.value = true;
     error.value = "";
     successMessage.value = "";
@@ -128,8 +224,48 @@ export default function MappingForm({ mapping }: Props) {
     }
   };
 
+  // Compute progress
+  const currentStep = useComputed(() => {
+    if (!ocppTagId.value) return 1;
+    if (!lagoCustomerId.value) return 2;
+    // Subscription is optional, so we move to step 3 once customer is selected
+    if (lagoCustomerId.value && !lagoSubscriptionId.value && hasActiveSubscriptions.value) return 3;
+    return 4;
+  });
+
   return (
     <form onSubmit={handleSubmit} class="space-y-6">
+      {/* Progress indicator */}
+      <div class="flex items-center justify-between mb-8">
+        <div class="flex items-center gap-2">
+          <div class={`flex items-center justify-center w-8 h-8 rounded-full ${currentStep.value >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+            {currentStep.value > 1 ? '✓' : '1'}
+          </div>
+          <span class={`text-sm font-medium ${currentStep.value >= 1 ? 'text-blue-600' : 'text-gray-500'}`}>Tag</span>
+        </div>
+        <div class={`flex-1 h-1 mx-2 ${currentStep.value >= 2 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
+        <div class="flex items-center gap-2">
+          <div class={`flex items-center justify-center w-8 h-8 rounded-full ${currentStep.value >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+            {currentStep.value > 2 ? '✓' : '2'}
+          </div>
+          <span class={`text-sm font-medium ${currentStep.value >= 2 ? 'text-blue-600' : 'text-gray-500'}`}>Customer</span>
+        </div>
+        <div class={`flex-1 h-1 mx-2 ${currentStep.value >= 3 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
+        <div class="flex items-center gap-2">
+          <div class={`flex items-center justify-center w-8 h-8 rounded-full ${currentStep.value >= 3 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+            {currentStep.value > 3 ? '✓' : '3'}
+          </div>
+          <span class={`text-sm font-medium ${currentStep.value >= 3 ? 'text-blue-600' : 'text-gray-500'}`}>Subscription</span>
+        </div>
+        <div class={`flex-1 h-1 mx-2 ${currentStep.value >= 4 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
+        <div class="flex items-center gap-2">
+          <div class={`flex items-center justify-center w-8 h-8 rounded-full ${currentStep.value >= 4 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+            {currentStep.value > 4 ? '✓' : '4'}
+          </div>
+          <span class={`text-sm font-medium ${currentStep.value >= 4 ? 'text-blue-600' : 'text-gray-500'}`}>Details</span>
+        </div>
+      </div>
+
       {error.value && (
         <div class="bg-red-50 text-red-700 p-3 rounded text-sm">
           {error.value}
@@ -143,81 +279,254 @@ export default function MappingForm({ mapping }: Props) {
       )}
 
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">
-          OCPP Tag
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          Select OCPP Tag
         </label>
-        <select
-          required
-          value={ocppTagId.value}
-          onChange={(e) => {
-            const selectedId = (e.target as HTMLSelectElement).value;
-            ocppTagId.value = selectedId;
-            const tag = ocppTags.value.find((t) => t.id === selectedId);
-            if (tag) {
-              ocppTagPk.value = tag.ocppTagPk;
-            }
-          }}
-          class="w-full px-3 py-2 border border-gray-300 rounded-md"
-        >
-          <option value="">Select OCPP Tag</option>
-          {ocppTags.value.map((tag) => (
-            <option key={tag.id} value={tag.id}>
-              {tag.id} {tag.note ? `- ${tag.note}` : ""}
-            </option>
-          ))}
-        </select>
-        {selectedTagInfo.value?.hasChildren && (
-          <p class="mt-1 text-sm text-blue-600">
-            ℹ️ This tag has {selectedTagInfo.value.childCount} child tag(s).
-            Creating this mapping will automatically create mappings for all child tags.
-          </p>
-        )}
-        {selectedTagInfo.value?.tag.parentIdTag && (
-          <p class="mt-1 text-sm text-gray-600">
-            Parent tag: {selectedTagInfo.value.tag.parentIdTag}
-          </p>
+
+        {availableTags.value.length === 0 ? (
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center text-gray-600">
+            No available tags to map. All tags have been mapped.
+          </div>
+        ) : ocppTagId.value ? (
+          // Compact selected view
+          <div class="border border-blue-500 bg-blue-50 rounded-lg p-4">
+            <div class="flex items-start justify-between">
+              <div class="flex items-start gap-2 flex-1">
+                <span class="text-xl">🏷️</span>
+                <div class="flex-1">
+                  <h3 class="font-semibold text-gray-900 font-mono">
+                    {ocppTagId.value}
+                  </h3>
+                  {(() => {
+                    const selectedTag = availableTags.value.find(t => t.id === ocppTagId.value);
+                    return selectedTag?.note && (
+                      <p class="text-sm text-gray-600 mt-1">{selectedTag.note}</p>
+                    );
+                  })()}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  ocppTagId.value = "";
+                  ocppTagPk.value = 0;
+                }}
+                class="text-sm text-blue-600 hover:text-blue-800 font-medium underline"
+              >
+                Change
+              </button>
+            </div>
+          </div>
+        ) : (
+          // Full selection view
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
+            {availableTags.value.map((tag) => {
+              const info = tagInfoMap.value.get(tag.id);
+
+              return (
+                <div
+                  key={tag.id}
+                  onClick={() => {
+                    ocppTagId.value = tag.id;
+                    ocppTagPk.value = tag.ocppTagPk;
+                  }}
+                  class="border border-gray-300 hover:border-blue-300 hover:bg-gray-50 rounded-lg p-4 cursor-pointer transition-all"
+                >
+                  <div class="flex items-start gap-2">
+                    <span class="text-xl">🏷️</span>
+                    <div class="flex-1">
+                      <h3 class="font-semibold text-gray-900 font-mono text-sm">
+                        {tag.id}
+                      </h3>
+                      {tag.note && (
+                        <p class="text-xs text-gray-600 mt-1">{tag.note}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {info && info.childCount > 0 && (
+                    <div class="mt-2 pt-2 border-t border-gray-200">
+                      <p class="text-xs text-blue-600 font-medium">
+                        📦 {info.childCount} child{info.childCount > 1 ? "ren" : ""}
+                      </p>
+                    </div>
+                  )}
+
+                  {info && info.mappedParent && (
+                    <div class="mt-2 pt-2 border-t border-amber-200 bg-amber-50 -mx-4 -mb-4 px-4 py-2 rounded-b-lg">
+                      <p class="text-xs text-amber-800 font-medium">
+                        ⚠️ Parent mapped
+                      </p>
+                      <p class="text-xs text-amber-700 mt-1">
+                        Will override inheritance
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">
-          Lago Customer
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          Select Lago Customer
         </label>
-        <select
-          required
-          value={lagoCustomerId.value}
-          onChange={(e) =>
-            (lagoCustomerId.value = (e.target as HTMLSelectElement).value)}
-          class="w-full px-3 py-2 border border-gray-300 rounded-md"
-        >
-          <option value="">Select Customer</option>
-          {lagoCustomers.value.map((customer) => (
-            <option key={customer.id} value={customer.id}>
-              {customer.name}
-            </option>
-          ))}
-        </select>
+
+        {lagoCustomers.value.length === 0 ? (
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center text-gray-600">
+            Loading customers...
+          </div>
+        ) : lagoCustomerId.value ? (
+          // Compact selected view
+          <div class="border border-blue-500 bg-blue-50 rounded-lg p-4">
+            <div class="flex items-start justify-between">
+              <div class="flex items-start gap-2 flex-1">
+                <span class="text-xl">👤</span>
+                <div class="flex-1">
+                  {(() => {
+                    const selectedCustomer = lagoCustomers.value.find(c => c.id === lagoCustomerId.value);
+                    return selectedCustomer && (
+                      <>
+                        <h3 class="font-semibold text-gray-900">
+                          {selectedCustomer.name}
+                        </h3>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  lagoCustomerId.value = "";
+                  lagoSubscriptionId.value = "";
+                }}
+                class="text-sm text-blue-600 hover:text-blue-800 font-medium underline"
+              >
+                Change
+              </button>
+            </div>
+          </div>
+        ) : (
+          // Full selection view
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
+            {lagoCustomers.value.map((customer) => {
+              return (
+                <div
+                  key={customer.id}
+                  onClick={() => {
+                    lagoCustomerId.value = customer.id;
+                    lagoSubscriptionId.value = "";
+                  }}
+                  class="border border-gray-300 hover:border-blue-300 hover:bg-gray-50 rounded-lg p-4 cursor-pointer transition-all"
+                >
+                  <div class="flex items-start gap-2">
+                    <span class="text-xl">👤</span>
+                    <div class="flex-1">
+                      <h3 class="font-semibold text-gray-900 text-sm">
+                        {customer.name}
+                      </h3>
+                      <p class="text-xs text-gray-500 mt-1 font-mono">
+                        {customer.id}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">
-          Lago Subscription
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          Select Lago Subscription <span class="text-gray-500 text-xs">(Optional)</span>
         </label>
-        <select
-          required
-          value={lagoSubscriptionId.value}
-          onChange={(e) =>
-            (lagoSubscriptionId.value = (e.target as HTMLSelectElement).value)}
-          class="w-full px-3 py-2 border border-gray-300 rounded-md"
-          disabled={!lagoCustomerId.value}
-        >
-          <option value="">Select Subscription</option>
-          {filteredSubscriptions.value.map((sub) => (
-            <option key={sub.id} value={sub.id}>
-              {sub.name}
-            </option>
-          ))}
-        </select>
+
+        {!lagoCustomerId.value ? (
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center text-gray-600">
+            Please select a customer first
+          </div>
+        ) : filteredSubscriptions.value.length === 0 ? (
+          <div class="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
+            <div class="flex items-start gap-3">
+              <span class="text-2xl">⚠️</span>
+              <div class="flex-1">
+                <h4 class="font-semibold text-yellow-900 mb-1">No Active Subscriptions</h4>
+                <p class="text-sm text-yellow-800 mb-2">
+                  This customer has no active subscriptions. You can still save this mapping, but:
+                </p>
+                <ul class="text-sm text-yellow-800 list-disc list-inside space-y-1 mb-2">
+                  <li>Transactions will be saved but not sent to Lago</li>
+                  <li>The first active subscription will be auto-selected when syncing</li>
+                  <li>You should create a subscription for this customer before they start charging</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        ) : lagoSubscriptionId.value ? (
+          // Compact selected view
+          <div class="border border-blue-500 bg-blue-50 rounded-lg p-4">
+            <div class="flex items-start justify-between">
+              <div class="flex items-start gap-2 flex-1">
+                <span class="text-xl">💳</span>
+                <div class="flex-1">
+                  {(() => {
+                    const selectedSub = filteredSubscriptions.value.find(s => s.id === lagoSubscriptionId.value);
+                    return selectedSub && (
+                      <>
+                        <h3 class="font-semibold text-gray-900">
+                          {selectedSub.name}
+                        </h3>
+                        <p class="text-xs text-gray-500 mt-1 font-mono">
+                          {selectedSub.id}
+                        </p>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  lagoSubscriptionId.value = "";
+                }}
+                class="text-sm text-blue-600 hover:text-blue-800 font-medium underline"
+              >
+                Change
+              </button>
+            </div>
+          </div>
+        ) : (
+          // Full selection view
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
+            {filteredSubscriptions.value.map((sub) => {
+              return (
+                <div
+                  key={sub.id}
+                  onClick={() => {
+                    lagoSubscriptionId.value = sub.id;
+                  }}
+                  class="border border-gray-300 hover:border-blue-300 hover:bg-gray-50 rounded-lg p-4 cursor-pointer transition-all"
+                >
+                  <div class="flex items-start gap-2">
+                    <span class="text-xl">💳</span>
+                    <div class="flex-1">
+                      <h3 class="font-semibold text-gray-900 text-sm">
+                        {sub.name}
+                      </h3>
+                      <p class="text-xs text-gray-500 mt-1 font-mono">
+                        {sub.id}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div>

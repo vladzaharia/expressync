@@ -21,9 +21,10 @@ export const handler = define.handlers({
       const body = await ctx.req.json();
       const { ocppTagId, ocppTagPk, lagoCustomerId, lagoSubscriptionId, isActive, displayName, notes } = body;
 
-      if (!ocppTagId || !ocppTagPk || !lagoCustomerId || !lagoSubscriptionId) {
+      // Subscription is now optional - will be auto-selected at sync time if not provided
+      if (!ocppTagId || !ocppTagPk || !lagoCustomerId) {
         return new Response(
-          JSON.stringify({ error: "Missing required fields" }),
+          JSON.stringify({ error: "Missing required fields (ocppTagId, ocppTagPk, lagoCustomerId)" }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
@@ -39,7 +40,7 @@ export const handler = define.handlers({
           steveOcppTagPk: ocppTagPk,
           steveOcppIdTag: ocppTagId,
           lagoCustomerExternalId: lagoCustomerId,
-          lagoSubscriptionExternalId: lagoSubscriptionId,
+          lagoSubscriptionExternalId: lagoSubscriptionId || null,
           displayName: displayName || null,
           notes: notes || null,
           isActive: isActive ?? true,
@@ -56,7 +57,7 @@ export const handler = define.handlers({
               steveOcppTagPk: childTag.ocppTagPk,
               steveOcppIdTag: childTag.idTag,
               lagoCustomerExternalId: lagoCustomerId,
-              lagoSubscriptionExternalId: lagoSubscriptionId,
+              lagoSubscriptionExternalId: lagoSubscriptionId || null,
               displayName: `${displayName || ocppTagId} (child of ${ocppTagId})`,
               notes: `Auto-created from parent tag ${ocppTagId}. ${notes || ''}`.trim(),
               isActive: isActive ?? true,
