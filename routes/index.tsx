@@ -10,17 +10,11 @@ import {
   CardHeader,
   CardTitle,
 } from "../components/ui/card.tsx";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../components/ui/table.tsx";
-import { Badge } from "../components/ui/badge.tsx";
 import { DotPattern } from "../components/magicui/dot-pattern.tsx";
 import { SparklesText } from "../components/magicui/sparkles-text.tsx";
+import { BlurFade } from "../components/magicui/blur-fade.tsx";
+import SyncRunsTable from "../islands/SyncRunsTable.tsx";
+import type { SyncRun } from "../src/db/schema.ts";
 
 interface DashboardData {
   stats: {
@@ -31,13 +25,7 @@ interface DashboardData {
     weekTransactions: number;
     weekKwh: number;
   };
-  recentSyncRuns: Array<{
-    id: number;
-    startedAt: Date;
-    status: string;
-    transactionsProcessed: number;
-    eventsCreated: number;
-  }>;
+  recentSyncRuns: SyncRun[];
 }
 
 export const handler = define.handlers({
@@ -71,7 +59,7 @@ export const handler = define.handlers({
     const weekTransactions = weekEvents.length;
     const weekKwh = weekEvents.reduce((sum, ev) => sum + ev.kwhDelta, 0);
 
-    // Get recent sync runs
+    // Get recent sync runs (full data for table)
     const recentSyncRuns = await db
       .select()
       .from(schema.syncRuns)
@@ -96,22 +84,9 @@ export const handler = define.handlers({
 
 export default define.page<typeof handler>(
   function DashboardPage({ data, url, state }) {
-    const getStatusVariant = (status: string) => {
-      switch (status) {
-        case "completed":
-          return "success";
-        case "failed":
-          return "destructive";
-        default:
-          return "warning";
-      }
-    };
-
     return (
       <SidebarLayout
         currentPath={url.pathname}
-        title="Dashboard"
-        description="Overview of your EV billing system"
         user={state.user}
       >
         <div className="space-y-6 relative">
@@ -123,58 +98,28 @@ export default define.page<typeof handler>(
             cr={1}
           />
 
-          <DashboardStats stats={data.stats} />
+          <BlurFade delay={0} duration={0.4} direction="up">
+            <DashboardStats stats={data.stats} />
+          </BlurFade>
 
-          <Card className="overflow-hidden relative">
-            <CardHeader className="border-b border-border/50">
-              <CardTitle className="flex items-center gap-2">
-                <SparklesText sparklesCount={6}>
-                  Recent Sync Runs
-                </SparklesText>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Processed</TableHead>
-                    <TableHead>Events</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.recentSyncRuns.length === 0
-                    ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={4}
-                          className="text-center text-muted-foreground"
-                        >
-                          No sync runs yet
-                        </TableCell>
-                      </TableRow>
-                    )
-                    : (
-                      data.recentSyncRuns.map((run) => (
-                        <TableRow key={run.id}>
-                          <TableCell className="font-medium">
-                            {new Date(run.startedAt).toLocaleString()}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={getStatusVariant(run.status)}>
-                              {run.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{run.transactionsProcessed}</TableCell>
-                          <TableCell>{run.eventsCreated}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <BlurFade delay={0.15} duration={0.4} direction="up">
+            <Card className="overflow-hidden relative">
+              <CardHeader className="border-b border-border/50">
+                <CardTitle className="flex items-center gap-2">
+                  <SparklesText sparklesCount={6}>
+                    Recent Sync Runs
+                  </SparklesText>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 pt-4">
+                <SyncRunsTable
+                  syncRuns={data.recentSyncRuns}
+                  pageSize={5}
+                  showLoadMore={false}
+                />
+              </CardContent>
+            </Card>
+          </BlurFade>
         </div>
       </SidebarLayout>
     );

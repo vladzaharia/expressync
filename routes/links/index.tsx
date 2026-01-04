@@ -25,12 +25,12 @@ export default define.page<typeof handler>(
     return (
       <SidebarLayout
         currentPath={url.pathname}
-        title="OCPP Tag Mappings"
+        title="OCPP Tag Linking"
         description="Manage mappings between OCPP tags and Lago billing customers"
         user={state.user}
         actions={
           <Button asChild>
-            <a href="/mappings/new">
+            <a href="/links/new">
               <Plus className="size-4 mr-2" />
               Add Mapping
             </a>
@@ -39,7 +39,7 @@ export default define.page<typeof handler>(
       >
         <Card>
           <CardHeader>
-            <CardTitle>All Mappings</CardTitle>
+            <CardTitle>All Links</CardTitle>
             <CardDescription>
               {data.mappings.length}{" "}
               mapping{data.mappings.length !== 1 ? "s" : ""} configured

@@ -13,7 +13,7 @@ import {
   type UserMapping,
   userMappings,
 } from "../db/schema.ts";
-import { desc, eq, inArray } from "drizzle-orm";
+import { count, desc, eq, inArray } from "drizzle-orm";
 import { logger } from "../lib/utils/logger.ts";
 
 /**
@@ -244,6 +244,16 @@ export async function getSyncRuns(
   logger.debug("SyncDB", "Sync runs fetched", { count: runs.length });
 
   return runs;
+}
+
+/**
+ * Get total count of sync runs
+ */
+export async function getSyncRunsCount(): Promise<number> {
+  const [{ value }] = await db
+    .select({ value: count() })
+    .from(syncRuns);
+  return value;
 }
 
 /**

@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
-import { Textarea } from "@/components/ui/textarea.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 import {
   AlertTriangle,
@@ -27,7 +26,6 @@ interface Props {
     lagoCustomerExternalId: string;
     lagoSubscriptionExternalId: string;
     displayName?: string;
-    notes?: string;
     isActive: boolean;
   };
 }
@@ -46,7 +44,6 @@ interface UserMapping {
   lagoCustomerExternalId: string;
   lagoSubscriptionExternalId: string;
   displayName?: string;
-  notes?: string;
   isActive: boolean;
 }
 
@@ -58,7 +55,6 @@ export default function MappingForm({ mapping }: Props) {
     mapping?.lagoSubscriptionExternalId || "",
   );
   const displayName = useSignal(mapping?.displayName || "");
-  const notes = useSignal(mapping?.notes || "");
   const isActive = useSignal(mapping?.isActive ?? true);
   const loading = useSignal(false);
   const error = useSignal("");
@@ -178,7 +174,7 @@ export default function MappingForm({ mapping }: Props) {
       .catch(console.error);
 
     // Fetch existing mappings
-    fetch("/api/mappings")
+    fetch("/api/links")
       .then((res) => res.json())
       .then((data) => (existingMappings.value = data))
       .catch(console.error);
@@ -258,7 +254,7 @@ export default function MappingForm({ mapping }: Props) {
     successMessage.value = "";
 
     try {
-      const url = mapping ? `/api/mappings?id=${mapping.id}` : "/api/mappings";
+      const url = mapping ? `/api/links?id=${mapping.id}` : "/api/links";
       const method = mapping ? "PUT" : "POST";
 
       const res = await fetch(url, {
@@ -270,7 +266,6 @@ export default function MappingForm({ mapping }: Props) {
           lagoCustomerId: lagoCustomerId.value,
           lagoSubscriptionId: lagoSubscriptionId.value,
           displayName: displayName.value || null,
-          notes: notes.value || null,
           isActive: isActive.value,
         }),
       });
@@ -758,22 +753,6 @@ export default function MappingForm({ mapping }: Props) {
             e,
           ) => (displayName.value = (e.target as HTMLInputElement).value)}
           placeholder="Friendly name for this mapping"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="notes">
-          Notes{" "}
-          <span className="text-muted-foreground text-xs">(Optional)</span>
-        </Label>
-        <Textarea
-          id="notes"
-          value={notes.value}
-          onInput={(
-            e,
-          ) => (notes.value = (e.target as HTMLTextAreaElement).value)}
-          rows={3}
-          placeholder="Additional notes about this mapping"
         />
       </div>
 

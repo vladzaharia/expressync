@@ -17,10 +17,10 @@ export default function Navbar({ user }: Props) {
         <div class="flex justify-between h-16">
           <div class="flex items-center space-x-8">
             <a href="/" class="text-xl font-bold text-gray-900">
-              EV Billing
+              ExpresSync
             </a>
-            <a href="/mappings" class="text-gray-600 hover:text-gray-900">
-              Mappings
+            <a href="/links" class="text-gray-600 hover:text-gray-900">
+              Tag Linking
             </a>
             <a href="/transactions" class="text-gray-600 hover:text-gray-900">
               Transactions

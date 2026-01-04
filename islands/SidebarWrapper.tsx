@@ -2,10 +2,12 @@ import type { ComponentChildren } from "preact";
 import {
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar.tsx";
-import { AppSidebar } from "@/components/AppSidebar.tsx";
-import { Separator } from "@/components/ui/separator.tsx";
+import { AppSidebar, CHROME_SIZE } from "@/components/AppSidebar.tsx";
+import { PanelLeft } from "lucide-preact";
+import { cn } from "@/src/lib/utils/cn.ts";
+import { type AccentColor, accentTailwindClasses } from "@/src/lib/colors.ts";
 
 interface User {
   id: string;
@@ -20,39 +22,65 @@ interface SidebarWrapperProps {
   title?: string;
   description?: string;
   actions?: ComponentChildren;
+  accentColor?: AccentColor;
   user?: User;
+}
+
+function TopBarContent({
+  actions,
+  accentColor = "blue",
+}: Pick<SidebarWrapperProps, "actions" | "accentColor">) {
+  const { toggleSidebar } = useSidebar();
+
+  // Get accent color classes from centralized config
+  const colorClasses = accentTailwindClasses[accentColor];
+  const accentBgClass = `${colorClasses.bg} ${colorClasses.bgHover} ${colorClasses.text}`;
+
+  return (
+    <header
+      className="flex shrink-0 items-stretch border-b bg-background sticky top-0 z-10"
+      style={{ height: CHROME_SIZE }}
+    >
+      {/* Sidebar toggle section - full block */}
+      <button
+        onClick={toggleSidebar}
+        className="flex items-center justify-center border-r hover:bg-muted/50 transition-colors cursor-pointer"
+        style={{ width: CHROME_SIZE }}
+        aria-label="Toggle sidebar"
+      >
+        <PanelLeft className="size-5" />
+      </button>
+
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Page action section - full block with accent background */}
+      {actions && (
+        <div
+          className={cn(
+            "flex items-center justify-center border-l transition-colors",
+            accentBgClass,
+          )}
+        >
+          {actions}
+        </div>
+      )}
+    </header>
+  );
 }
 
 export default function SidebarWrapper({
   children,
   currentPath,
-  title,
-  description,
   actions,
+  accentColor,
   user,
 }: SidebarWrapperProps) {
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={false}>
       <AppSidebar currentPath={currentPath} user={user} />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <div className="flex flex-1 items-center justify-between">
-            {title && (
-              <div className="flex flex-col">
-                <h1 className="text-lg font-semibold">{title}</h1>
-                {description && (
-                  <p className="text-sm text-muted-foreground">
-                    {description}
-                  </p>
-                )}
-              </div>
-            )}
-            {actions && <div className="flex items-center gap-2">{actions}
-            </div>}
-          </div>
-        </header>
+        <TopBarContent actions={actions} accentColor={accentColor} />
         <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
       </SidebarInset>
     </SidebarProvider>

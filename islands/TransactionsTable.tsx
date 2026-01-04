@@ -1,142 +1,100 @@
-import { useSignal } from "@preact/signals";
+import { Badge } from "@/components/ui/badge.tsx";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table.tsx";
-import { Button } from "@/components/ui/button.tsx";
-import { Input } from "@/components/ui/input.tsx";
-import { Label } from "@/components/ui/label.tsx";
-import { Card, CardContent } from "@/components/ui/card.tsx";
-import { Filter, Loader2 } from "lucide-preact";
+  PaginatedTable,
+  type PaginatedTableColumn,
+} from "@/components/ui/paginated-table.tsx";
+import { CheckCircle2, Clock, Zap, Hash, Calendar } from "lucide-preact";
+import type { TransactionSummary } from "@/routes/transactions/index.tsx";
 
 interface Props {
-  events: Array<{
-    id: number;
-    transactionId: number;
-    ocppTagId: string;
-    lagoEventId: string;
-    kwhDelta: number;
-    syncedAt: Date;
-  }>;
+  transactions: TransactionSummary[];
+  totalCount?: number;
+  pageSize?: number;
+  showLoadMore?: boolean;
 }
 
-export default function TransactionsTable({ events: initialEvents }: Props) {
-  const events = useSignal(initialEvents);
-  const startDate = useSignal("");
-  const endDate = useSignal("");
-  const loading = useSignal(false);
+const columns: PaginatedTableColumn<TransactionSummary>[] = [
+  {
+    key: "steveTransactionId",
+    header: "StEvE Transaction ID",
+    render: (tx) => (
+      <div className="flex items-center gap-2">
+        <Zap className="size-4 text-primary" />
+        <span className="font-mono font-medium">{tx.steveTransactionId}</span>
+      </div>
+    ),
+  },
+  {
+    key: "ocppTagId",
+    header: "OCPP Tag",
+    render: (tx) =>
+      tx.ocppTagId ? (
+        <div className="flex items-center gap-2">
+          <Hash className="size-4 text-muted-foreground" />
+          <span className="font-mono text-sm">{tx.ocppTagId}</span>
+        </div>
+      ) : (
+        <span className="text-muted-foreground text-sm">—</span>
+      ),
+  },
+  {
+    key: "totalKwhBilled",
+    header: "kWh Billed",
+    className: "text-right",
+    render: (tx) => (
+      <span className="font-medium tabular-nums">{tx.totalKwhBilled.toFixed(2)}</span>
+    ),
+  },
+  {
+    key: "status",
+    header: "Status",
+    render: (tx) =>
+      tx.isFinalized ? (
+        <Badge variant="outline" className="gap-1 text-success border-success/30 bg-success/10">
+          <CheckCircle2 className="size-3" />
+          Complete
+        </Badge>
+      ) : (
+        <Badge variant="outline" className="gap-1 text-warning border-warning/30 bg-warning/10">
+          <Clock className="size-3" />
+          In Progress
+        </Badge>
+      ),
+  },
+  {
+    key: "lastSyncedAt",
+    header: "Last Synced",
+    className: "whitespace-nowrap",
+    render: (tx) => (
+      <div className="flex items-center gap-2 text-muted-foreground text-sm">
+        <Calendar className="size-4" />
+        {tx.lastSyncedAt ? new Date(tx.lastSyncedAt).toLocaleString() : "—"}
+      </div>
+    ),
+  },
+];
 
-  const handleFilter = async () => {
-    loading.value = true;
-    try {
-      const params = new URLSearchParams();
-      if (startDate.value) params.set("start", startDate.value);
-      if (endDate.value) params.set("end", endDate.value);
-
-      const res = await fetch(`/api/billing-events?${params}`);
-      if (res.ok) {
-        events.value = await res.json();
-      }
-    } catch (_e) {
-      alert("Failed to filter events");
-    } finally {
-      loading.value = false;
-    }
+export default function TransactionsTable({
+  transactions,
+  totalCount,
+  pageSize = 15,
+  showLoadMore = true,
+}: Props) {
+  const handleRowClick = (tx: TransactionSummary) => {
+    globalThis.location.href = `/transactions/${tx.steveTransactionId}`;
   };
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardContent className="pt-4">
-          <div className="flex flex-wrap gap-4 items-end">
-            <div className="space-y-1">
-              <Label htmlFor="startDate">Start Date</Label>
-              <Input
-                id="startDate"
-                type="date"
-                value={startDate.value}
-                onInput={(
-                  e,
-                ) => (startDate.value = (e.target as HTMLInputElement).value)}
-                className="w-auto"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="endDate">End Date</Label>
-              <Input
-                id="endDate"
-                type="date"
-                value={endDate.value}
-                onInput={(
-                  e,
-                ) => (endDate.value = (e.target as HTMLInputElement).value)}
-                className="w-auto"
-              />
-            </div>
-            <Button onClick={handleFilter} disabled={loading.value}>
-              {loading.value
-                ? (
-                  <>
-                    <Loader2 className="mr-2 size-4 animate-spin" />
-                    Filtering...
-                  </>
-                )
-                : (
-                  <>
-                    <Filter className="mr-2 size-4" />
-                    Filter
-                  </>
-                )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Transaction ID</TableHead>
-            <TableHead>OCPP Tag</TableHead>
-            <TableHead>kWh</TableHead>
-            <TableHead>Lago Event ID</TableHead>
-            <TableHead>Synced At</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {events.value.length === 0
-            ? (
-              <TableRow>
-                <TableCell
-                  colSpan={5}
-                  className="text-center text-muted-foreground"
-                >
-                  No billing events found
-                </TableCell>
-              </TableRow>
-            )
-            : (
-              events.value.map((event) => (
-                <TableRow key={event.id}>
-                  <TableCell className="font-medium">
-                    {event.transactionId}
-                  </TableCell>
-                  <TableCell className="font-mono">{event.ocppTagId}</TableCell>
-                  <TableCell>{event.kwhDelta.toFixed(2)}</TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {event.lagoEventId}
-                  </TableCell>
-                  <TableCell>
-                    {new Date(event.syncedAt).toLocaleString()}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-        </TableBody>
-      </Table>
-    </div>
+    <PaginatedTable
+      initialItems={transactions}
+      columns={columns}
+      totalCount={totalCount}
+      pageSize={pageSize}
+      fetchUrl="/api/transaction-summaries"
+      showLoadMore={showLoadMore}
+      emptyMessage="No transactions found. Transactions will appear here after syncing."
+      onRowClick={handleRowClick}
+      getItemKey={(tx) => tx.id}
+    />
   );
 }

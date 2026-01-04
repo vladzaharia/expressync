@@ -2,10 +2,10 @@ import { define } from "../utils.ts";
 import LoginForm from "../islands/LoginForm.tsx";
 import { GridPattern } from "../components/magicui/grid-pattern.tsx";
 import { Particles } from "../components/magicui/particles.tsx";
-import { AuroraText } from "../components/magicui/aurora-text.tsx";
 import { Ripple } from "../components/magicui/ripple.tsx";
 import { ShineBorder } from "../components/magicui/shine-border.tsx";
-import { Zap } from "lucide-preact";
+import { ExpresyncBrand } from "../components/brand/ExpresyncBrand.tsx";
+import { BlurFade } from "../components/magicui/blur-fade.tsx";
 
 export default define.page(function LoginPage() {
   return (
@@ -35,37 +35,37 @@ export default define.page(function LoginPage() {
 
       <div class="relative z-10 w-full max-w-md px-4">
         {/* Logo with Ripple effect */}
-        <div class="flex justify-center mb-8">
-          <div class="flex items-center gap-3">
+        <BlurFade delay={0} duration={0.5} direction="down">
+          <div class="flex justify-center mb-8">
             <div class="relative">
               <Ripple
-                mainCircleSize={80}
+                mainCircleSize={100}
                 mainCircleOpacity={0.15}
                 numCircles={4}
                 color="oklch(0.75 0.15 200)"
               />
-              <div class="relative flex size-14 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-lg animate-pulse-glow">
-                <Zap class="size-7" />
-              </div>
-            </div>
-            <div class="flex flex-col">
-              <AuroraText className="text-3xl font-bold">
-                EV Billing
-              </AuroraText>
-              <span class="text-sm text-muted-foreground">OCPP Portal</span>
+              <ExpresyncBrand
+                variant="login"
+                showParticles={true}
+                showBorderBeam={true}
+              />
             </div>
           </div>
-        </div>
+        </BlurFade>
 
         {/* Login form with shine border */}
-        <ShineBorder borderRadius={12} borderWidth={1} duration={10}>
-          <LoginForm />
-        </ShineBorder>
+        <BlurFade delay={0.2} duration={0.5} direction="up">
+          <ShineBorder borderRadius={12} borderWidth={1} duration={10}>
+            <LoginForm />
+          </ShineBorder>
+        </BlurFade>
 
         {/* Footer */}
-        <p class="mt-8 text-center text-xs text-muted-foreground">
-          Secure access to your EV charging management system
-        </p>
+        <BlurFade delay={0.4} duration={0.5} direction="up">
+          <p class="mt-8 text-center text-xs text-muted-foreground">
+            Secure access to ExpresSync
+          </p>
+        </BlurFade>
       </div>
     </div>
   );
