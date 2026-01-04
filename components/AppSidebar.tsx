@@ -42,8 +42,8 @@ const mainNavItems = [
     icon: LayoutDashboard,
   },
   {
-    title: "Mappings",
-    url: "/mappings",
+    title: "Tag Linking",
+    url: "/tag-linking",
     icon: Link2,
   },
   {

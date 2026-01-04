@@ -26,4 +26,51 @@ export const handler = define.handlers({
       );
     }
   },
+
+  async POST(ctx) {
+    try {
+      const body = await ctx.req.json();
+      const { idTag, note, parentIdTag, maxActiveTransactionCount } = body;
+
+      if (!idTag || typeof idTag !== "string") {
+        return new Response(
+          JSON.stringify({ error: "idTag is required and must be a string" }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      // Validate idTag format (alphanumeric, max 20 chars per OCPP spec)
+      if (!/^[a-zA-Z0-9_-]{1,20}$/.test(idTag)) {
+        return new Response(
+          JSON.stringify({
+            error: "idTag must be 1-20 alphanumeric characters (including _ and -)",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      const result = await steveClient.createOcppTag(idTag, {
+        note,
+        parentIdTag,
+        maxActiveTransactionCount,
+      });
+
+      return new Response(
+        JSON.stringify({
+          id: idTag,
+          ocppTagPk: result.ocppTagPk,
+          note: note || "",
+          parentIdTag: parentIdTag || null,
+        }),
+        { status: 201, headers: { "Content-Type": "application/json" } },
+      );
+    } catch (error) {
+      console.error("Failed to create StEvE OCPP tag:", error);
+      const message = error instanceof Error ? error.message : "Failed to create OCPP tag";
+      return new Response(
+        JSON.stringify({ error: message }),
+        { status: 500, headers: { "Content-Type": "application/json" } },
+      );
+    }
+  },
 });

@@ -155,6 +155,52 @@ class StEvEClient {
   }
 
   /**
+   * Create a new OCPP tag
+   *
+   * @param idTag - The OCPP ID tag string (unique identifier)
+   * @param options - Optional fields for the tag
+   * @returns The created tag's primary key
+   */
+  async createOcppTag(
+    idTag: string,
+    options: {
+      note?: string;
+      parentIdTag?: string;
+      maxActiveTransactionCount?: number;
+      expiryDate?: string;
+    } = {},
+  ): Promise<{ ocppTagPk: number }> {
+    logger.info("StEvE", "Creating OCPP tag", { idTag, options });
+
+    const formData: Record<string, unknown> = {
+      idTag,
+      maxActiveTransactionCount: options.maxActiveTransactionCount ?? 1,
+    };
+
+    if (options.note) formData.note = options.note;
+    if (options.parentIdTag) formData.parentIdTag = options.parentIdTag;
+    if (options.expiryDate) formData.expiryDate = options.expiryDate;
+
+    logger.debug("StEvE", "Sending tag create request", { formData });
+
+    const result = await this.request(
+      "/v1/ocppTags",
+      z.object({ ocppTagPk: z.number() }),
+      {
+        method: "POST",
+        body: JSON.stringify(formData),
+      },
+    );
+
+    logger.info("StEvE", "OCPP tag created successfully", {
+      idTag,
+      ocppTagPk: result.ocppTagPk,
+    });
+
+    return result;
+  }
+
+  /**
    * Update an OCPP tag
    *
    * StEvE's PUT endpoint requires the complete tag object (OcppTagForm),

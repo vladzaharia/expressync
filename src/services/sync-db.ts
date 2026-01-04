@@ -5,12 +5,15 @@ import {
   type NewTransactionSyncState,
   syncedTransactionEvents,
   syncRuns,
+  syncRunLogs,
+  type SyncRun,
+  type SyncRunLog,
   type TransactionSyncState,
   transactionSyncState,
   type UserMapping,
   userMappings,
 } from "../db/schema.ts";
-import { eq, inArray } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { logger } from "../lib/utils/logger.ts";
 
 /**
@@ -220,4 +223,85 @@ export async function batchUpsertSyncStates(
   }
 
   logger.debug("SyncDB", "Sync states upserted", { count: states.length });
+}
+
+/**
+ * Get recent sync runs with pagination
+ */
+export async function getSyncRuns(
+  limit: number = 20,
+  offset: number = 0,
+): Promise<SyncRun[]> {
+  logger.debug("SyncDB", "Fetching sync runs", { limit, offset });
+
+  const runs = await db
+    .select()
+    .from(syncRuns)
+    .orderBy(desc(syncRuns.startedAt))
+    .limit(limit)
+    .offset(offset);
+
+  logger.debug("SyncDB", "Sync runs fetched", { count: runs.length });
+
+  return runs;
+}
+
+/**
+ * Get a single sync run by ID
+ */
+export async function getSyncRunById(id: number): Promise<SyncRun | null> {
+  logger.debug("SyncDB", "Fetching sync run by ID", { id });
+
+  const [run] = await db
+    .select()
+    .from(syncRuns)
+    .where(eq(syncRuns.id, id))
+    .limit(1);
+
+  return run || null;
+}
+
+/**
+ * Get logs for a sync run, optionally filtered by segment
+ */
+export async function getSyncRunLogs(
+  syncRunId: number,
+  segment?: string,
+): Promise<SyncRunLog[]> {
+  logger.debug("SyncDB", "Fetching sync run logs", { syncRunId, segment });
+
+  let query = db
+    .select()
+    .from(syncRunLogs)
+    .where(eq(syncRunLogs.syncRunId, syncRunId))
+    .orderBy(syncRunLogs.createdAt);
+
+  if (segment) {
+    query = db
+      .select()
+      .from(syncRunLogs)
+      .where(eq(syncRunLogs.syncRunId, syncRunId))
+      .where(eq(syncRunLogs.segment, segment))
+      .orderBy(syncRunLogs.createdAt);
+  }
+
+  const logs = await query;
+
+  logger.debug("SyncDB", "Sync run logs fetched", { count: logs.length });
+
+  return logs;
+}
+
+/**
+ * Get sync run with all its logs
+ */
+export async function getSyncRunWithLogs(
+  id: number,
+): Promise<{ run: SyncRun; logs: SyncRunLog[] } | null> {
+  const run = await getSyncRunById(id);
+  if (!run) return null;
+
+  const logs = await getSyncRunLogs(id);
+
+  return { run, logs };
 }

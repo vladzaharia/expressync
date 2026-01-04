@@ -41,7 +41,7 @@ services:
         condition: service_completed_successfully
     environment:
       DATABASE_URL: postgresql://ocpp_user:ocpp_password@postgres:5432/ocpp_billing
-      STEVE_API_URL: ${STEVE_API_URL}
+      STEVE_BASE_URL: ${STEVE_BASE_URL}
       STEVE_API_KEY: ${STEVE_API_KEY}
       LAGO_API_URL: ${LAGO_API_URL}
       LAGO_API_KEY: ${LAGO_API_KEY}
@@ -67,7 +67,7 @@ services:
         condition: service_completed_successfully
     environment:
       DATABASE_URL: postgresql://ocpp_user:ocpp_password@postgres:5432/ocpp_billing
-      STEVE_API_URL: ${STEVE_API_URL}
+      STEVE_BASE_URL: ${STEVE_BASE_URL}
       STEVE_API_KEY: ${STEVE_API_KEY}
       LAGO_API_URL: ${LAGO_API_URL}
       LAGO_API_KEY: ${LAGO_API_KEY}
