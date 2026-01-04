@@ -189,7 +189,8 @@ export const LagoCustomerSchema = z.object({
   net_payment_term: z.number().nullable(),
 
   /** Finalize zero amount invoice - enum */
-  finalize_zero_amount_invoice: z.enum(["inherit", "skip", "finalize"]).optional(),
+  finalize_zero_amount_invoice: z.enum(["inherit", "skip", "finalize"])
+    .optional(),
 
   /** Skip invoice custom sections */
   skip_invoice_custom_sections: z.boolean().optional(),
@@ -207,7 +208,8 @@ export const LagoCustomerSchema = z.object({
     payment_provider_code: z.string().nullable().optional(),
     document_locale: z.string().nullable(),
     subscription_invoice_issuing_date_anchor: z.string().nullable().optional(),
-    subscription_invoice_issuing_date_adjustment: z.string().nullable().optional(),
+    subscription_invoice_issuing_date_adjustment: z.string().nullable()
+      .optional(),
   }).optional(),
 
   /** Shipping address */
@@ -228,7 +230,7 @@ export const LagoCustomerSchema = z.object({
       value: z.string(),
       display_in_invoice: z.boolean().optional(),
       created_at: z.string().optional(),
-    })
+    }),
   ).optional(),
 
   /** Taxes */
@@ -259,7 +261,7 @@ export const LagoCurrentUsageSchema = z.object({
       }),
       units: z.string(),
       amount_cents: z.number(),
-    })
+    }),
   ),
 });
 
@@ -278,4 +280,3 @@ export interface CreateEventRequest {
 export interface CreateBatchEventsRequest {
   events: LagoEvent[];
 }
-

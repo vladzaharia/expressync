@@ -1,5 +1,12 @@
 import { useSignal } from "@preact/signals";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table.tsx";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -52,7 +59,9 @@ export default function TransactionsTable({ events: initialEvents }: Props) {
                 id="startDate"
                 type="date"
                 value={startDate.value}
-                onInput={(e) => (startDate.value = (e.target as HTMLInputElement).value)}
+                onInput={(
+                  e,
+                ) => (startDate.value = (e.target as HTMLInputElement).value)}
                 className="w-auto"
               />
             </div>
@@ -62,22 +71,26 @@ export default function TransactionsTable({ events: initialEvents }: Props) {
                 id="endDate"
                 type="date"
                 value={endDate.value}
-                onInput={(e) => (endDate.value = (e.target as HTMLInputElement).value)}
+                onInput={(
+                  e,
+                ) => (endDate.value = (e.target as HTMLInputElement).value)}
                 className="w-auto"
               />
             </div>
             <Button onClick={handleFilter} disabled={loading.value}>
-              {loading.value ? (
-                <>
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                  Filtering...
-                </>
-              ) : (
-                <>
-                  <Filter className="mr-2 size-4" />
-                  Filter
-                </>
-              )}
+              {loading.value
+                ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                    Filtering...
+                  </>
+                )
+                : (
+                  <>
+                    <Filter className="mr-2 size-4" />
+                    Filter
+                  </>
+                )}
             </Button>
           </div>
         </CardContent>
@@ -94,26 +107,36 @@ export default function TransactionsTable({ events: initialEvents }: Props) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {events.value.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground">
-                No billing events found
-              </TableCell>
-            </TableRow>
-          ) : (
-            events.value.map((event) => (
-              <TableRow key={event.id}>
-                <TableCell className="font-medium">{event.transactionId}</TableCell>
-                <TableCell className="font-mono">{event.ocppTagId}</TableCell>
-                <TableCell>{event.kwhDelta.toFixed(2)}</TableCell>
-                <TableCell className="font-mono text-xs">{event.lagoEventId}</TableCell>
-                <TableCell>{new Date(event.syncedAt).toLocaleString()}</TableCell>
+          {events.value.length === 0
+            ? (
+              <TableRow>
+                <TableCell
+                  colSpan={5}
+                  className="text-center text-muted-foreground"
+                >
+                  No billing events found
+                </TableCell>
               </TableRow>
-            ))
-          )}
+            )
+            : (
+              events.value.map((event) => (
+                <TableRow key={event.id}>
+                  <TableCell className="font-medium">
+                    {event.transactionId}
+                  </TableCell>
+                  <TableCell className="font-mono">{event.ocppTagId}</TableCell>
+                  <TableCell>{event.kwhDelta.toFixed(2)}</TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {event.lagoEventId}
+                  </TableCell>
+                  <TableCell>
+                    {new Date(event.syncedAt).toLocaleString()}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
         </TableBody>
       </Table>
     </div>
   );
 }
-

@@ -33,7 +33,7 @@ export const handler = define.handlers({
         {
           status: 200,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     } catch (error) {
       console.error("[API] Failed to get sync status:", error);
@@ -45,9 +45,8 @@ export const handler = define.handlers({
         {
           status: 500,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
   },
 });
-

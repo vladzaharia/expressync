@@ -19,12 +19,23 @@ export const handler = define.handlers({
   async POST(ctx) {
     try {
       const body = await ctx.req.json();
-      const { ocppTagId, ocppTagPk, lagoCustomerId, lagoSubscriptionId, isActive, displayName, notes } = body;
+      const {
+        ocppTagId,
+        ocppTagPk,
+        lagoCustomerId,
+        lagoSubscriptionId,
+        isActive,
+        displayName,
+        notes,
+      } = body;
 
       // Subscription is now optional - will be auto-selected at sync time if not provided
       if (!ocppTagId || !ocppTagPk || !lagoCustomerId) {
         return new Response(
-          JSON.stringify({ error: "Missing required fields (ocppTagId, ocppTagPk, lagoCustomerId)" }),
+          JSON.stringify({
+            error:
+              "Missing required fields (ocppTagId, ocppTagPk, lagoCustomerId)",
+          }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
@@ -58,26 +69,35 @@ export const handler = define.handlers({
               steveOcppIdTag: childTag.idTag,
               lagoCustomerExternalId: lagoCustomerId,
               lagoSubscriptionExternalId: lagoSubscriptionId || null,
-              displayName: `${displayName || ocppTagId} (child of ${ocppTagId})`,
-              notes: `Auto-created from parent tag ${ocppTagId}. ${notes || ''}`.trim(),
+              displayName: `${
+                displayName || ocppTagId
+              } (child of ${ocppTagId})`,
+              notes: `Auto-created from parent tag ${ocppTagId}. ${notes || ""}`
+                .trim(),
               isActive: isActive ?? true,
             })
             .returning();
           childMappings.push(childMapping);
         } catch (error) {
           // Skip if child mapping already exists
-          console.warn(`Failed to create mapping for child tag ${childTag.idTag}:`, error);
+          console.warn(
+            `Failed to create mapping for child tag ${childTag.idTag}:`,
+            error,
+          );
         }
       }
 
-      return new Response(JSON.stringify({
-        parentMapping,
-        childMappings,
-        totalCreated: 1 + childMappings.length,
-      }), {
-        status: 201,
-        headers: { "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          parentMapping,
+          childMappings,
+          totalCreated: 1 + childMappings.length,
+        }),
+        {
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     } catch (error) {
       console.error("Failed to create mapping:", error);
       return new Response(
@@ -110,7 +130,9 @@ export const handler = define.handlers({
       if (body.lagoSubscriptionExternalId !== undefined) {
         updates.lagoSubscriptionExternalId = body.lagoSubscriptionExternalId;
       }
-      if (body.displayName !== undefined) updates.displayName = body.displayName;
+      if (body.displayName !== undefined) {
+        updates.displayName = body.displayName;
+      }
       if (body.notes !== undefined) updates.notes = body.notes;
       if (body.isActive !== undefined) updates.isActive = body.isActive;
 
@@ -135,16 +157,24 @@ export const handler = define.handlers({
         .returning();
 
       // If Lago customer/subscription changed, update child mappings too
-      if (body.lagoCustomerExternalId !== undefined || body.lagoSubscriptionExternalId !== undefined) {
+      if (
+        body.lagoCustomerExternalId !== undefined ||
+        body.lagoSubscriptionExternalId !== undefined
+      ) {
         const allTags = await steveClient.getOcppTags();
-        const childTags = getAllChildTags(currentMapping.steveOcppIdTag, allTags);
+        const childTags = getAllChildTags(
+          currentMapping.steveOcppIdTag,
+          allTags,
+        );
 
         for (const childTag of childTags) {
           await db
             .update(schema.userMappings)
             .set({
-              lagoCustomerExternalId: body.lagoCustomerExternalId ?? currentMapping.lagoCustomerExternalId,
-              lagoSubscriptionExternalId: body.lagoSubscriptionExternalId ?? currentMapping.lagoSubscriptionExternalId,
+              lagoCustomerExternalId: body.lagoCustomerExternalId ??
+                currentMapping.lagoCustomerExternalId,
+              lagoSubscriptionExternalId: body.lagoSubscriptionExternalId ??
+                currentMapping.lagoSubscriptionExternalId,
             })
             .where(eq(schema.userMappings.steveOcppTagPk, childTag.ocppTagPk));
         }
@@ -204,12 +234,15 @@ export const handler = define.handlers({
           .where(eq(schema.userMappings.steveOcppTagPk, childTag.ocppTagPk));
       }
 
-      return new Response(JSON.stringify({
-        success: true,
-        deletedCount: 1 + childTags.length,
-      }), {
-        headers: { "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          success: true,
+          deletedCount: 1 + childTags.length,
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     } catch (error) {
       console.error("Failed to delete mapping:", error);
       return new Response(
@@ -219,4 +252,3 @@ export const handler = define.handlers({
     }
   },
 });
-

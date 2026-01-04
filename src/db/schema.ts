@@ -1,11 +1,11 @@
 import {
-  pgTable,
-  text,
-  integer,
-  serial,
   boolean,
-  timestamp,
+  integer,
+  pgTable,
   real,
+  serial,
+  text,
+  timestamp,
 } from "drizzle-orm/pg-core";
 
 // ============================================================================
@@ -194,7 +194,7 @@ export const syncedTransactionEvents = pgTable("synced_transaction_events", {
 
   // Meter values at time of this event
   meterValueFrom: integer("meter_value_from").notNull(), // Base (Wh)
-  meterValueTo: integer("meter_value_to").notNull(),     // Current (Wh)
+  meterValueTo: integer("meter_value_to").notNull(), // Current (Wh)
 
   // Whether this was the final event for the transaction
   isFinal: boolean("is_final").default(false),
@@ -232,6 +232,7 @@ export type NewSyncRun = typeof syncRuns.$inferInsert;
 export type TransactionSyncState = typeof transactionSyncState.$inferSelect;
 export type NewTransactionSyncState = typeof transactionSyncState.$inferInsert;
 
-export type SyncedTransactionEvent = typeof syncedTransactionEvents.$inferSelect;
-export type NewSyncedTransactionEvent = typeof syncedTransactionEvents.$inferInsert;
-
+export type SyncedTransactionEvent =
+  typeof syncedTransactionEvents.$inferSelect;
+export type NewSyncedTransactionEvent =
+  typeof syncedTransactionEvents.$inferInsert;

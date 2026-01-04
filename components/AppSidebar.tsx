@@ -11,17 +11,28 @@ import {
   SidebarMenuItem,
 } from "./ui/sidebar.tsx";
 import ThemeToggle from "../islands/ThemeToggle.tsx";
+import { AuroraText } from "./magicui/aurora-text.tsx";
 import {
   LayoutDashboard,
   Link2,
+  LogOut,
   Receipt,
   RefreshCw,
-  LogOut,
+  User,
   Zap,
 } from "lucide-preact";
+import { Separator } from "./ui/separator.tsx";
+
+interface UserInfo {
+  id: string;
+  name: string | null;
+  email: string;
+  image: string | null;
+}
 
 interface AppSidebarProps {
   currentPath: string;
+  user?: UserInfo;
 }
 
 const mainNavItems = [
@@ -47,26 +58,34 @@ const mainNavItems = [
   },
 ];
 
-export function AppSidebar({ currentPath }: AppSidebarProps) {
+export function AppSidebar({ currentPath, user }: AppSidebarProps) {
   const isActive = (url: string) => {
     if (url === "/") return currentPath === "/";
     return currentPath.startsWith(url);
   };
 
+  const handleSignOut = async () => {
+    await fetch("/api/auth/sign-out", { method: "POST" });
+    window.location.href = "/login";
+  };
+
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border">
-        <div className="flex items-center gap-2 px-2 py-3">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Zap className="size-4" />
+        <div className="flex items-center gap-3 px-2 py-3">
+          <div className="relative flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-md">
+            <Zap className="size-5" />
+            <div className="absolute inset-0 rounded-xl animate-pulse-glow opacity-50" />
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-semibold">EV Billing</span>
+            <AuroraText className="text-sm font-bold">
+              EV Billing
+            </AuroraText>
             <span className="text-xs text-muted-foreground">OCPP Portal</span>
           </div>
         </div>
       </SidebarHeader>
-      
+
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
@@ -90,7 +109,7 @@ export function AppSidebar({ currentPath }: AppSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      
+
       <SidebarFooter className="border-t border-sidebar-border">
         <SidebarMenu>
           <SidebarMenuItem>
@@ -99,12 +118,38 @@ export function AppSidebar({ currentPath }: AppSidebarProps) {
               <ThemeToggle />
             </div>
           </SidebarMenuItem>
+        </SidebarMenu>
+
+        {user && (
+          <>
+            <Separator className="my-2" />
+            <div className="px-2 py-2">
+              <div className="flex items-center gap-3">
+                <div className="flex size-9 items-center justify-center rounded-full bg-primary/10">
+                  <User className="size-4 text-primary" />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-sm font-medium truncate">
+                    {user.name || "User"}
+                  </span>
+                  <span className="text-xs text-muted-foreground truncate">
+                    {user.email}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Sign Out">
-              <a href="/api/auth/logout">
-                <LogOut />
-                <span>Sign Out</span>
-              </a>
+            <SidebarMenuButton
+              tooltip="Sign Out"
+              onClick={handleSignOut}
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <LogOut />
+              <span>Sign Out</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -112,4 +157,3 @@ export function AppSidebar({ currentPath }: AppSidebarProps) {
     </Sidebar>
   );
 }
-

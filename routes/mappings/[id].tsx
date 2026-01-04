@@ -4,7 +4,13 @@ import * as schema from "../../src/db/schema.ts";
 import { eq } from "drizzle-orm";
 import MappingForm from "../../islands/MappingForm.tsx";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card.tsx";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/card.tsx";
 
 export const handler = define.handlers({
   async GET(ctx) {
@@ -22,25 +28,27 @@ export const handler = define.handlers({
   },
 });
 
-export default define.page<typeof handler>(function EditMappingPage({ data, url }) {
-  return (
-    <SidebarLayout
-      currentPath={url.pathname}
-      title="Edit Mapping"
-      description={`Editing mapping for ${data.mapping.steveOcppIdTag}`}
-    >
-      <Card className="max-w-2xl">
-        <CardHeader>
-          <CardTitle>Mapping Details</CardTitle>
-          <CardDescription>
-            Update the OCPP tag and Lago customer information.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <MappingForm mapping={data.mapping} />
-        </CardContent>
-      </Card>
-    </SidebarLayout>
-  );
-});
-
+export default define.page<typeof handler>(
+  function EditMappingPage({ data, url, state }) {
+    return (
+      <SidebarLayout
+        currentPath={url.pathname}
+        title="Edit Mapping"
+        description={`Editing mapping for ${data.mapping.steveOcppIdTag}`}
+        user={state.user}
+      >
+        <Card className="max-w-2xl">
+          <CardHeader>
+            <CardTitle>Mapping Details</CardTitle>
+            <CardDescription>
+              Update the OCPP tag and Lago customer information.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <MappingForm mapping={data.mapping} />
+          </CardContent>
+        </Card>
+      </SidebarLayout>
+    );
+  },
+);

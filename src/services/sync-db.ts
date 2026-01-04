@@ -1,14 +1,14 @@
 import { db } from "../db/index.ts";
 import {
-  type NewSyncRun,
   type NewSyncedTransactionEvent,
+  type NewSyncRun,
   type NewTransactionSyncState,
   syncedTransactionEvents,
   syncRuns,
-  transactionSyncState,
   type TransactionSyncState,
-  userMappings,
+  transactionSyncState,
   type UserMapping,
+  userMappings,
 } from "../db/schema.ts";
 import { eq, inArray } from "drizzle-orm";
 import { logger } from "../lib/utils/logger.ts";
@@ -57,7 +57,7 @@ export async function markSyncComplete(
   syncRunId: number,
   transactionsProcessed: number,
   eventsCreated: number,
-  errors?: string[]
+  errors?: string[],
 ): Promise<void> {
   logger.debug("SyncDB", "Marking sync run as complete", {
     syncRunId,
@@ -85,7 +85,7 @@ export async function markSyncComplete(
  */
 export async function markSyncFailed(
   syncRunId: number,
-  errors: string[]
+  errors: string[],
 ): Promise<void> {
   logger.error("SyncDB", "Marking sync run as failed", {
     syncRunId,
@@ -108,7 +108,7 @@ export async function markSyncFailed(
  * Get sync states for multiple transactions
  */
 export async function getSyncStates(
-  transactionIds: number[]
+  transactionIds: number[],
 ): Promise<TransactionSyncState[]> {
   if (transactionIds.length === 0) {
     logger.debug("SyncDB", "No transaction IDs provided for sync states");
@@ -154,7 +154,7 @@ export async function getActiveMappings(): Promise<UserMapping[]> {
  * Upsert transaction sync state
  */
 export async function upsertSyncState(
-  data: NewTransactionSyncState
+  data: NewTransactionSyncState,
 ): Promise<void> {
   await db
     .insert(transactionSyncState)
@@ -175,7 +175,7 @@ export async function upsertSyncState(
  * Create a synced transaction event record
  */
 export async function createSyncedEvent(
-  data: NewSyncedTransactionEvent
+  data: NewSyncedTransactionEvent,
 ): Promise<void> {
   await db.insert(syncedTransactionEvents).values(data);
 }
@@ -184,7 +184,7 @@ export async function createSyncedEvent(
  * Batch create synced transaction events
  */
 export async function batchCreateSyncedEvents(
-  events: NewSyncedTransactionEvent[]
+  events: NewSyncedTransactionEvent[],
 ): Promise<void> {
   if (events.length === 0) {
     logger.debug("SyncDB", "No synced events to create");
@@ -204,7 +204,7 @@ export async function batchCreateSyncedEvents(
  * Batch upsert sync states
  */
 export async function batchUpsertSyncStates(
-  states: NewTransactionSyncState[]
+  states: NewTransactionSyncState[],
 ): Promise<void> {
   if (states.length === 0) {
     logger.debug("SyncDB", "No sync states to upsert");
@@ -221,4 +221,3 @@ export async function batchUpsertSyncStates(
 
   logger.debug("SyncDB", "Sync states upserted", { count: states.length });
 }
-

@@ -17,4 +17,3 @@ export const handler = define.handlers({
   DELETE: (ctx) => auth.handler(ctx.req),
   PATCH: (ctx) => auth.handler(ctx.req),
 });
-

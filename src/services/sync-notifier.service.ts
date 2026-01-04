@@ -68,4 +68,3 @@ export async function closeNotifier(): Promise<void> {
     notifyClient = null;
   }
 }
-

@@ -7,10 +7,10 @@ import { lagoClient } from "../lib/lago-client.ts";
 
 /**
  * Resolve a mapping for an OCPP tag, checking parent tags if no direct mapping exists
- * 
+ *
  * This enables inheritance: if a child tag doesn't have a mapping, it will use
  * the mapping from its parent tag (or grandparent, etc.)
- * 
+ *
  * @param ocppIdTag - The OCPP tag to find a mapping for
  * @param mappingsByTag - Map of direct mappings by OCPP tag ID
  * @param allTags - All available OCPP tags (for hierarchy lookup)
@@ -19,7 +19,7 @@ import { lagoClient } from "../lib/lago-client.ts";
 export function resolveMappingWithInheritance(
   ocppIdTag: string,
   mappingsByTag: Map<string, UserMapping>,
-  allTags: StEvEOcppTag[]
+  allTags: StEvEOcppTag[],
 ): UserMapping | undefined {
   // First, check for a direct mapping
   const directMapping = mappingsByTag.get(ocppIdTag);
@@ -47,7 +47,7 @@ export function resolveMappingWithInheritance(
 
   // Get all ancestor tags (parent, grandparent, etc.)
   const ancestors = getAllAncestorTags(tag, allTags);
-  
+
   logger.debug("MappingResolver", "Checking ancestor tags for mapping", {
     ocppIdTag,
     ancestorCount: ancestors.length,
@@ -77,23 +77,23 @@ export function resolveMappingWithInheritance(
 
 /**
  * Build an enhanced mapping lookup that includes inherited mappings
- * 
+ *
  * This creates a Map where child tags without direct mappings will
  * automatically resolve to their parent's mapping
- * 
+ *
  * @param directMappings - Array of user mappings from database
  * @param allTags - All available OCPP tags
  * @returns Map of OCPP tag ID to mapping (including inherited)
  */
 export function buildMappingLookupWithInheritance(
   directMappings: UserMapping[],
-  allTags: StEvEOcppTag[]
+  allTags: StEvEOcppTag[],
 ): Map<string, UserMapping> {
   // First, create a map of direct mappings
   const directMappingsByTag = new Map(
     directMappings
       .filter((m) => m.lagoSubscriptionExternalId) // Only mappings with subscriptions
-      .map((m) => [m.steveOcppIdTag, m])
+      .map((m) => [m.steveOcppIdTag, m]),
   );
 
   logger.debug("MappingResolver", "Building mapping lookup with inheritance", {
@@ -115,7 +115,7 @@ export function buildMappingLookupWithInheritance(
       const resolvedMapping = resolveMappingWithInheritance(
         tag.idTag,
         directMappingsByTag,
-        allTags
+        allTags,
       );
       if (resolvedMapping) {
         enhancedMap.set(tag.idTag, resolvedMapping);
@@ -144,22 +144,30 @@ export function buildMappingLookupWithInheritance(
  * @returns The subscription external ID, or null if none found
  */
 export async function resolveSubscriptionId(
-  mapping: UserMapping
+  mapping: UserMapping,
 ): Promise<string | null> {
   // If mapping already has a subscription, use it
   if (mapping.lagoSubscriptionExternalId) {
-    logger.debug("MappingResolver", "Using explicit subscription from mapping", {
-      mappingId: mapping.id,
-      subscriptionId: mapping.lagoSubscriptionExternalId,
-    });
+    logger.debug(
+      "MappingResolver",
+      "Using explicit subscription from mapping",
+      {
+        mappingId: mapping.id,
+        subscriptionId: mapping.lagoSubscriptionExternalId,
+      },
+    );
     return mapping.lagoSubscriptionExternalId;
   }
 
   // No subscription specified, try to auto-select
   if (!mapping.lagoCustomerExternalId) {
-    logger.warn("MappingResolver", "Cannot auto-select subscription: no customer ID", {
-      mappingId: mapping.id,
-    });
+    logger.warn(
+      "MappingResolver",
+      "Cannot auto-select subscription: no customer ID",
+      {
+        mappingId: mapping.id,
+      },
+    );
     return null;
   }
 
@@ -176,7 +184,7 @@ export async function resolveSubscriptionId(
 
     // Find first active subscription
     const activeSubscription = subscriptions.find(
-      (sub: LagoSubscription) => sub.status === "active"
+      (sub: LagoSubscription) => sub.status === "active",
     );
 
     if (activeSubscription) {
@@ -188,18 +196,26 @@ export async function resolveSubscriptionId(
       return activeSubscription.external_id;
     }
 
-    logger.warn("MappingResolver", "No active subscription found for customer", {
-      mappingId: mapping.id,
-      customerId: mapping.lagoCustomerExternalId,
-      totalSubscriptions: subscriptions.length,
-    });
+    logger.warn(
+      "MappingResolver",
+      "No active subscription found for customer",
+      {
+        mappingId: mapping.id,
+        customerId: mapping.lagoCustomerExternalId,
+        totalSubscriptions: subscriptions.length,
+      },
+    );
     return null;
   } catch (error) {
-    logger.error("MappingResolver", "Failed to fetch subscriptions for auto-selection", {
-      mappingId: mapping.id,
-      customerId: mapping.lagoCustomerExternalId,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    logger.error(
+      "MappingResolver",
+      "Failed to fetch subscriptions for auto-selection",
+      {
+        mappingId: mapping.id,
+        customerId: mapping.lagoCustomerExternalId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+    );
     return null;
   }
 }

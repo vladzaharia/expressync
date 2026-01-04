@@ -76,9 +76,15 @@ services:
       SYNC_ON_STARTUP: ${SYNC_ON_STARTUP:-false}
       DEBUG_LEVEL: ${DEBUG_LEVEL:-ERROR}
       DENO_ENV: production
-    command: ["deno", "run", "--allow-net", "--allow-env", "--allow-read", "sync-worker.ts"]
+    command: [
+      "deno",
+      "run",
+      "--allow-net",
+      "--allow-env",
+      "--allow-read",
+      "sync-worker.ts",
+    ]
     restart: unless-stopped
 
 volumes:
   postgres_data:
-

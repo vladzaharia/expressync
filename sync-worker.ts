@@ -68,11 +68,14 @@ async function handleSync() {
     console.log(
       `[Sync Worker] Sync completed in ${duration}s: ` +
         `${result.eventsCreated} events created, ` +
-        `${result.transactionsProcessed} transactions processed`
+        `${result.transactionsProcessed} transactions processed`,
     );
 
     if (result.errors.length > 0) {
-      console.error(`[Sync Worker] Sync had ${result.errors.length} errors:`, result.errors);
+      console.error(
+        `[Sync Worker] Sync had ${result.errors.length} errors:`,
+        result.errors,
+      );
     }
   } catch (error) {
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -92,7 +95,7 @@ const job = new Cron(
     // Use UTC timezone for consistency
     timezone: "UTC",
   },
-  handleSync
+  handleSync,
 );
 
 console.log("[Sync Worker] Cron job scheduled successfully");
@@ -105,17 +108,24 @@ await listenClient.listen(
   (payload) => {
     try {
       const data = JSON.parse(payload);
-      console.log(`[Sync Worker] Received sync trigger notification from ${data.source}`);
+      console.log(
+        `[Sync Worker] Received sync trigger notification from ${data.source}`,
+      );
       handleSync().catch((error) => {
         console.error("[Sync Worker] Manual sync failed:", error);
       });
     } catch (error) {
-      console.error("[Sync Worker] Failed to parse notification payload:", error);
+      console.error(
+        "[Sync Worker] Failed to parse notification payload:",
+        error,
+      );
     }
   },
   () => {
-    console.log(`[Sync Worker] LISTEN connection established on channel: ${SYNC_CHANNEL}`);
-  }
+    console.log(
+      `[Sync Worker] LISTEN connection established on channel: ${SYNC_CHANNEL}`,
+    );
+  },
 );
 
 // Run sync immediately on startup (optional, but useful for testing)
@@ -145,4 +155,3 @@ console.log("[Sync Worker] Worker is running. Press Ctrl+C to stop.");
 
 // Prevent the process from exiting
 await new Promise(() => {});
-

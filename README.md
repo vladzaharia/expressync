@@ -1,13 +1,15 @@
 # OCPP Billing Sync
 
-A billing synchronization system that bridges StEvE OCPP management system with Lago billing platform.
+A billing synchronization system that bridges StEvE OCPP management system with
+Lago billing platform.
 
 ## Architecture
 
 This application consists of two services:
 
 1. **Web Application** (`app`) - Fresh framework UI and API
-2. **Sync Worker** (`sync-worker`) - Dedicated service for scheduled synchronization
+2. **Sync Worker** (`sync-worker`) - Dedicated service for scheduled
+   synchronization
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────┐
@@ -105,7 +107,8 @@ This will watch the project directory and restart as necessary.
 - **Purpose**: Automated billing synchronization
 - **Manual Trigger**: PostgreSQL LISTEN/NOTIFY for instant sync triggers
 
-See [docs/SYNC-WORKER.md](docs/SYNC-WORKER.md) and [docs/SYNC-TRIGGER.md](docs/SYNC-TRIGGER.md) for detailed documentation.
+See [docs/SYNC-WORKER.md](docs/SYNC-WORKER.md) and
+[docs/SYNC-TRIGGER.md](docs/SYNC-TRIGGER.md) for detailed documentation.
 
 ## Configuration
 
@@ -138,22 +141,26 @@ See `.env.example` for all available options.
 ## Portal Features
 
 ### Dashboard
+
 - Total and active mappings count
 - Today's and this week's transaction statistics
 - Recent sync runs with status
 
 ### OCPP Tag Mappings
+
 - Create, edit, and delete mappings
 - Map OCPP tags to Lago customers and subscriptions
 - Toggle active/inactive status
 - Automatic dropdown population from StEvE and Lago APIs
 
 ### Billing Events
+
 - View all synced transactions
 - Filter by date range
 - See kWh consumption and Lago event IDs
 
 ### Sync Status
+
 - View sync run history
 - Manual sync trigger
 - Error tracking and debugging

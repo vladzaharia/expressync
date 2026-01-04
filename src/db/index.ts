@@ -24,4 +24,3 @@ export * from "./schema.ts";
 export async function closeDatabase() {
   await queryClient.end();
 }
-

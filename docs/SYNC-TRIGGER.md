@@ -1,10 +1,12 @@
 # Sync Worker Manual Trigger
 
-This document explains how the manual sync trigger works using PostgreSQL LISTEN/NOTIFY.
+This document explains how the manual sync trigger works using PostgreSQL
+LISTEN/NOTIFY.
 
 ## Architecture
 
-The system uses PostgreSQL's built-in LISTEN/NOTIFY feature for inter-process communication between the web app and the sync worker.
+The system uses PostgreSQL's built-in LISTEN/NOTIFY feature for inter-process
+communication between the web app and the sync worker.
 
 ```
 ┌─────────────┐                    ┌──────────────┐                    ┌─────────────┐
@@ -32,6 +34,7 @@ await triggerSync("api"); // Sends notification to sync worker
 ### 2. Sync Worker (`sync-worker.ts`)
 
 The sync worker:
+
 - Creates a dedicated LISTEN connection on startup
 - Listens to the `sync_trigger` channel
 - Calls `handleSync()` when notification received
@@ -40,6 +43,7 @@ The sync worker:
 ### 3. API Endpoint (`routes/api/sync.ts`)
 
 The `/api/sync` endpoint:
+
 - Calls `triggerSync("api")` instead of `runSync()` directly
 - Returns immediately after sending notification
 - Does not wait for sync to complete
@@ -65,6 +69,7 @@ curl -X POST http://localhost:8000/api/sync
 ```
 
 Response:
+
 ```json
 {
   "success": true,
@@ -85,7 +90,8 @@ await triggerSync("webhook"); // Custom source identifier
 1. User clicks "Trigger Sync" button
 2. Web app calls `POST /api/sync`
 3. API endpoint calls `triggerSync("api")`
-4. Notification sent via `NOTIFY sync_trigger '{"source":"api","timestamp":"..."}'`
+4. Notification sent via
+   `NOTIFY sync_trigger '{"source":"api","timestamp":"..."}'`
 5. Sync worker receives notification via LISTEN
 6. Sync worker calls `handleSync()` asynchronously
 7. API returns success immediately (doesn't wait for sync)
@@ -109,6 +115,6 @@ Check sync worker logs to see when notifications are received:
 
 - **Channel**: `sync_trigger`
 - **Payload**: JSON with `{ source, timestamp }`
-- **Connection**: Dedicated postgres connection for LISTEN (separate from Drizzle)
+- **Connection**: Dedicated postgres connection for LISTEN (separate from
+  Drizzle)
 - **Reconnection**: Automatic reconnection handled by postgres.js library
-

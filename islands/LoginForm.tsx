@@ -2,7 +2,13 @@ import { useSignal } from "@preact/signals";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card.tsx";
 import { Loader2 } from "lucide-preact";
 
 export default function LoginForm() {
@@ -32,7 +38,7 @@ export default function LoginForm() {
         window.location.href = "/";
       } else {
         error.value = data.error?.message || data.message ||
-                     `Login failed (${res.status}). Please check your credentials.`;
+          `Login failed (${res.status}). Please check your credentials.`;
       }
     } catch (e) {
       console.error("Login error:", e);
@@ -45,7 +51,9 @@ export default function LoginForm() {
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold text-center">Welcome back</CardTitle>
+        <CardTitle className="text-2xl font-bold text-center">
+          Welcome back
+        </CardTitle>
         <CardDescription className="text-center">
           Enter your credentials to access the portal
         </CardDescription>
@@ -67,7 +75,9 @@ export default function LoginForm() {
               placeholder="admin@example.com"
               required
               value={email.value}
-              onInput={(e) => (email.value = (e.target as HTMLInputElement).value)}
+              onInput={(
+                e,
+              ) => (email.value = (e.target as HTMLInputElement).value)}
               autoComplete="email"
             />
           </div>
@@ -81,7 +91,9 @@ export default function LoginForm() {
               placeholder="••••••••"
               required
               value={password.value}
-              onInput={(e) => (password.value = (e.target as HTMLInputElement).value)}
+              onInput={(
+                e,
+              ) => (password.value = (e.target as HTMLInputElement).value)}
               autoComplete="current-password"
             />
           </div>
@@ -91,18 +103,19 @@ export default function LoginForm() {
             disabled={loading.value}
             className="w-full"
           >
-            {loading.value ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Signing in...
-              </>
-            ) : (
-              "Sign in"
-            )}
+            {loading.value
+              ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              )
+              : (
+                "Sign in"
+              )}
           </Button>
         </form>
       </CardContent>
     </Card>
   );
 }
-

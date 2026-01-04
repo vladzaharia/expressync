@@ -41,7 +41,7 @@ export function buildLagoEvent(processed: ProcessedTransaction): LagoEvent {
  * @returns Array of Lago events
  */
 export function buildLagoEvents(
-  processedTransactions: ProcessedTransaction[]
+  processedTransactions: ProcessedTransaction[],
 ): LagoEvent[] {
   logger.info("LagoEventBuilder", "Building Lago events", {
     count: processedTransactions.length,
@@ -66,7 +66,7 @@ export function buildLagoEvents(
  */
 export function batchEvents(
   events: LagoEvent[],
-  batchSize: number = 100
+  batchSize: number = 100,
 ): LagoEvent[][] {
   logger.debug("LagoEventBuilder", "Batching events", {
     totalEvents: events.length,
@@ -87,4 +87,3 @@ export function batchEvents(
 
   return batches;
 }
-

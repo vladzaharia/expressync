@@ -43,4 +43,3 @@ export const handler = define.handlers({
     }
   },
 });
-

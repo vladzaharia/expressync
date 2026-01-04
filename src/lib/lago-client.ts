@@ -1,9 +1,9 @@
 import { config } from "./config.ts";
 import {
-  type LagoCustomer,
-  LagoCustomerSchema,
   type LagoCurrentUsage,
   LagoCurrentUsageSchema,
+  type LagoCustomer,
+  LagoCustomerSchema,
   type LagoEvent,
   LagoEventSchema,
   type LagoSubscription,
@@ -31,7 +31,7 @@ class LagoClient {
   private async request<T>(
     path: string,
     schema: z.ZodSchema<T>,
-    options: RequestInit = {}
+    options: RequestInit = {},
   ): Promise<T> {
     return retry(async () => {
       const url = `${this.baseUrl}${path}`;
@@ -74,7 +74,7 @@ class LagoClient {
           errorBody: errorText,
         });
         throw new Error(
-          `Lago API error: ${response.status} ${response.statusText} - ${errorText}`
+          `Lago API error: ${response.status} ${response.statusText} - ${errorText}`,
         );
       }
 
@@ -128,7 +128,7 @@ class LagoClient {
       {
         method: "POST",
         body: JSON.stringify({ event }),
-      }
+      },
     );
 
     logger.debug("Lago", "Event created successfully", {
@@ -156,7 +156,7 @@ class LagoClient {
         limit: 100,
       });
       throw new Error(
-        "Lago batch limit is 100 events. Split into smaller batches."
+        "Lago batch limit is 100 events. Split into smaller batches.",
       );
     }
 
@@ -171,7 +171,7 @@ class LagoClient {
       {
         method: "POST",
         body: JSON.stringify({ events }),
-      }
+      },
     );
 
     logger.debug("Lago", "Batch events created successfully", {
@@ -187,7 +187,7 @@ class LagoClient {
   async getCustomers(): Promise<{ customers: LagoCustomer[] }> {
     return this.request(
       "/customers",
-      z.object({ customers: z.array(LagoCustomerSchema) })
+      z.object({ customers: z.array(LagoCustomerSchema) }),
     );
   }
 
@@ -200,7 +200,7 @@ class LagoClient {
   async getCustomer(externalId: string): Promise<{ customer: LagoCustomer }> {
     return this.request(
       `/customers/${encodeURIComponent(externalId)}`,
-      z.object({ customer: LagoCustomerSchema })
+      z.object({ customer: LagoCustomerSchema }),
     );
   }
 
@@ -211,14 +211,14 @@ class LagoClient {
    * @returns Object with subscriptions array
    */
   async getSubscriptions(
-    externalCustomerId?: string
+    externalCustomerId?: string,
   ): Promise<{ subscriptions: LagoSubscription[] }> {
     const params = externalCustomerId
       ? `?external_customer_id=${encodeURIComponent(externalCustomerId)}`
       : "";
     return this.request(
       `/subscriptions${params}`,
-      z.object({ subscriptions: z.array(LagoSubscriptionSchema) })
+      z.object({ subscriptions: z.array(LagoSubscriptionSchema) }),
     );
   }
 
@@ -231,17 +231,16 @@ class LagoClient {
    */
   async getCurrentUsage(
     externalCustomerId: string,
-    externalSubscriptionId: string
+    externalSubscriptionId: string,
   ): Promise<LagoCurrentUsage> {
     const customerId = encodeURIComponent(externalCustomerId);
     const subId = encodeURIComponent(externalSubscriptionId);
     return this.request(
       `/customers/${customerId}/current_usage?external_subscription_id=${subId}`,
-      LagoCurrentUsageSchema
+      LagoCurrentUsageSchema,
     );
   }
 }
 
 // Export singleton instance
 export const lagoClient = new LagoClient();
-
