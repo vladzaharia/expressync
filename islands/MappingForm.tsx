@@ -13,8 +13,10 @@ import {
   FileText,
   Loader2,
   Package,
+  Plus,
   Tag,
   User,
+  X,
 } from "lucide-preact";
 
 interface Props {
@@ -61,6 +63,13 @@ export default function MappingForm({ mapping }: Props) {
   const loading = useSignal(false);
   const error = useSignal("");
   const successMessage = useSignal("");
+
+  // State for creating new OCPP tag
+  const showCreateTag = useSignal(false);
+  const newTagId = useSignal("");
+  const newTagNote = useSignal("");
+  const newTagParent = useSignal("");
+  const creatingTag = useSignal(false);
 
   // Fetch options from APIs
   const ocppTags = useSignal<Array<OcppTag>>([]);
@@ -187,6 +196,49 @@ export default function MappingForm({ mapping }: Props) {
       .catch(console.error);
   }, []);
 
+  const handleCreateTag = async () => {
+    if (!newTagId.value.trim()) {
+      error.value = "Please enter a tag ID";
+      return;
+    }
+
+    creatingTag.value = true;
+    error.value = "";
+
+    try {
+      const res = await fetch("/api/steve/ocpp-tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          idTag: newTagId.value.trim(),
+          note: newTagNote.value.trim() || undefined,
+          parentIdTag: newTagParent.value || undefined,
+        }),
+      });
+
+      if (res.ok) {
+        const newTag = await res.json();
+        // Add to tags list and select it
+        ocppTags.value = [...ocppTags.value, newTag];
+        ocppTagId.value = newTag.id;
+        ocppTagPk.value = newTag.ocppTagPk;
+        // Reset create form
+        showCreateTag.value = false;
+        newTagId.value = "";
+        newTagNote.value = "";
+        newTagParent.value = "";
+        successMessage.value = `Tag "${newTag.id}" created successfully`;
+      } else {
+        const data = await res.json();
+        error.value = data.error || "Failed to create tag";
+      }
+    } catch (_e) {
+      error.value = "An error occurred while creating the tag";
+    } finally {
+      creatingTag.value = false;
+    }
+  };
+
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
 
@@ -231,10 +283,10 @@ export default function MappingForm({ mapping }: Props) {
               data.totalCreated - 1
             } children)`;
           setTimeout(() => {
-            window.location.href = "/mappings";
+            window.location.href = "/tag-linking";
           }, 2000);
         } else {
-          window.location.href = "/mappings";
+          window.location.href = "/tag-linking";
         }
       } else {
         const data = await res.json();
@@ -333,98 +385,195 @@ export default function MappingForm({ mapping }: Props) {
       )}
 
       <div className="space-y-2">
-        <Label>Select OCPP Tag</Label>
-
-        {availableTags.value.length === 0
-          ? (
-            <div className="bg-muted rounded-lg p-4 text-center text-muted-foreground">
-              No available tags to map. All tags have been mapped.
-            </div>
-          )
-          : ocppTagId.value
-          ? (
-            <div className="border border-primary bg-primary/5 rounded-lg p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3 flex-1">
-                  <Tag className="size-5 text-primary mt-0.5" />
-                  <div className="flex-1">
-                    <h3 className="font-semibold font-mono">
-                      {ocppTagId.value}
-                    </h3>
-                    {(() => {
-                      const selectedTag = availableTags.value.find((t) =>
-                        t.id === ocppTagId.value
-                      );
-                      return selectedTag?.note && (
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {selectedTag.note}
-                        </p>
-                      );
-                    })()}
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    ocppTagId.value = "";
-                    ocppTagPk.value = 0;
-                  }}
-                >
-                  Change
-                </Button>
-              </div>
-            </div>
-          )
-          : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto p-1">
-              {availableTags.value.map((tag) => {
-                const info = tagInfoMap.value.get(tag.id);
-                return (
-                  <div
-                    key={tag.id}
-                    onClick={() => {
-                      ocppTagId.value = tag.id;
-                      ocppTagPk.value = tag.ocppTagPk;
-                    }}
-                    className="border border-border hover:border-primary/50 hover:bg-accent rounded-lg p-3 cursor-pointer transition-all"
-                  >
-                    <div className="flex items-start gap-2">
-                      <Tag className="size-4 text-muted-foreground mt-0.5" />
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium font-mono text-sm truncate">
-                          {tag.id}
-                        </h3>
-                        {tag.note && (
-                          <p className="text-xs text-muted-foreground mt-1 truncate">
-                            {tag.note}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    {info && info.childCount > 0 && (
-                      <div className="mt-2 pt-2 border-t border-border">
-                        <p className="text-xs text-primary font-medium flex items-center gap-1">
-                          <Package className="size-3" />
-                          {info.childCount}{" "}
-                          child{info.childCount > 1 ? "ren" : ""}
-                        </p>
-                      </div>
-                    )}
-                    {info && info.mappedParent && (
-                      <div className="mt-2 pt-2 border-t border-yellow-500/30 bg-yellow-500/10 -mx-3 -mb-3 px-3 py-2 rounded-b-lg">
-                        <p className="text-xs text-yellow-600 font-medium flex items-center gap-1">
-                          <AlertTriangle className="size-3" />
-                          Parent mapped - will override
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+        <div className="flex items-center justify-between">
+          <Label>Select OCPP Tag</Label>
+          {!mapping && !ocppTagId.value && !showCreateTag.value && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => (showCreateTag.value = true)}
+            >
+              <Plus className="size-4 mr-1" />
+              Create New Tag
+            </Button>
           )}
+        </div>
+
+        {/* Create new tag form */}
+        {showCreateTag.value && (
+          <div className="border border-dashed border-primary rounded-lg p-4 space-y-4 bg-primary/5">
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium flex items-center gap-2">
+                <Plus className="size-4" />
+                Create New OCPP Tag
+              </h4>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  showCreateTag.value = false;
+                  newTagId.value = "";
+                  newTagNote.value = "";
+                  newTagParent.value = "";
+                }}
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="newTagId" className="text-sm">Tag ID *</Label>
+                <Input
+                  id="newTagId"
+                  value={newTagId.value}
+                  onInput={(e) => (newTagId.value = (e.target as HTMLInputElement).value)}
+                  placeholder="e.g., CARD-001"
+                  className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  1-20 alphanumeric characters (including _ and -)
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="newTagNote" className="text-sm">Note (optional)</Label>
+                <Input
+                  id="newTagNote"
+                  value={newTagNote.value}
+                  onInput={(e) => (newTagNote.value = (e.target as HTMLInputElement).value)}
+                  placeholder="Description for this tag"
+                />
+              </div>
+              <div>
+                <Label htmlFor="newTagParent" className="text-sm">Parent Tag (optional)</Label>
+                <select
+                  id="newTagParent"
+                  value={newTagParent.value}
+                  onChange={(e) => (newTagParent.value = (e.target as HTMLSelectElement).value)}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+                >
+                  <option value="">No parent</option>
+                  {ocppTags.value.map((tag) => (
+                    <option key={tag.id} value={tag.id}>{tag.id}</option>
+                  ))}
+                </select>
+              </div>
+              <Button
+                type="button"
+                onClick={handleCreateTag}
+                disabled={creatingTag.value}
+                className="w-full"
+              >
+                {creatingTag.value ? (
+                  <>
+                    <Loader2 className="size-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="size-4 mr-2" />
+                    Create Tag
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Existing tag selection */}
+        {!showCreateTag.value && (
+          availableTags.value.length === 0
+            ? (
+              <div className="bg-muted rounded-lg p-4 text-center text-muted-foreground">
+                No available tags to map. All tags have been mapped.
+              </div>
+            )
+            : ocppTagId.value
+            ? (
+              <div className="border border-primary bg-primary/5 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 flex-1">
+                    <Tag className="size-5 text-primary shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold font-mono truncate">
+                        {ocppTagId.value}
+                      </h3>
+                      {(() => {
+                        const selectedTag = availableTags.value.find((t) =>
+                          t.id === ocppTagId.value
+                        );
+                        return selectedTag?.note && (
+                          <p className="text-sm text-muted-foreground truncate">
+                            {selectedTag.note}
+                          </p>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      ocppTagId.value = "";
+                      ocppTagPk.value = 0;
+                    }}
+                  >
+                    Change
+                  </Button>
+                </div>
+              </div>
+            )
+            : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto p-1">
+                {availableTags.value.map((tag) => {
+                  const info = tagInfoMap.value.get(tag.id);
+                  return (
+                    <div
+                      key={tag.id}
+                      onClick={() => {
+                        ocppTagId.value = tag.id;
+                        ocppTagPk.value = tag.ocppTagPk;
+                      }}
+                      className="border border-border hover:border-primary/50 hover:bg-accent rounded-lg p-3 cursor-pointer transition-all"
+                    >
+                      <div className="flex items-start gap-2">
+                        <Tag className="size-4 text-muted-foreground mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium font-mono text-sm truncate">
+                            {tag.id}
+                          </h3>
+                          {tag.note && (
+                            <p className="text-xs text-muted-foreground mt-1 truncate">
+                              {tag.note}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {info && info.childCount > 0 && (
+                        <div className="mt-2 pt-2 border-t border-border">
+                          <p className="text-xs text-primary font-medium flex items-center gap-1">
+                            <Package className="size-3" />
+                            {info.childCount}{" "}
+                            child{info.childCount > 1 ? "ren" : ""}
+                          </p>
+                        </div>
+                      )}
+                      {info && info.mappedParent && (
+                        <div className="mt-2 pt-2 border-t border-yellow-500/30 bg-yellow-500/10 -mx-3 -mb-3 px-3 py-2 rounded-b-lg">
+                          <p className="text-xs text-yellow-600 font-medium flex items-center gap-1">
+                            <AlertTriangle className="size-3" />
+                            Parent mapped - will override
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )
+        )}
       </div>
 
       <div className="space-y-2">
@@ -440,16 +589,16 @@ export default function MappingForm({ mapping }: Props) {
           : lagoCustomerId.value
           ? (
             <div className="border border-primary bg-primary/5 rounded-lg p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3 flex-1">
-                  <User className="size-5 text-primary mt-0.5" />
-                  <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 flex-1">
+                  <User className="size-5 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
                     {(() => {
                       const selectedCustomer = lagoCustomers.value.find((c) =>
                         c.id === lagoCustomerId.value
                       );
                       return selectedCustomer && (
-                        <h3 className="font-semibold">
+                        <h3 className="font-semibold truncate">
                           {selectedCustomer.name}
                         </h3>
                       );
@@ -537,18 +686,18 @@ export default function MappingForm({ mapping }: Props) {
           : lagoSubscriptionId.value
           ? (
             <div className="border border-primary bg-primary/5 rounded-lg p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3 flex-1">
-                  <CreditCard className="size-5 text-primary mt-0.5" />
-                  <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 flex-1">
+                  <CreditCard className="size-5 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
                     {(() => {
                       const selectedSub = filteredSubscriptions.value.find(
                         (s) => s.id === lagoSubscriptionId.value,
                       );
                       return selectedSub && (
                         <>
-                          <h3 className="font-semibold">{selectedSub.name}</h3>
-                          <p className="text-xs text-muted-foreground mt-1 font-mono">
+                          <h3 className="font-semibold truncate">{selectedSub.name}</h3>
+                          <p className="text-xs text-muted-foreground font-mono truncate">
                             {selectedSub.id}
                           </p>
                         </>
@@ -651,7 +800,7 @@ export default function MappingForm({ mapping }: Props) {
             )}
         </Button>
         <Button variant="outline" asChild>
-          <a href="/mappings">Cancel</a>
+          <a href="/tag-linking">Cancel</a>
         </Button>
       </div>
     </form>

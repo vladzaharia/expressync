@@ -20,6 +20,7 @@ import type {
 import { logger } from "../lib/utils/logger.ts";
 import { buildMappingLookupWithInheritance } from "./mapping-resolver.ts";
 import { syncTagStatus } from "./tag-sync.service.ts";
+import { SyncLogger } from "./sync-logger.ts";
 
 export interface SyncResult {
   syncRunId: number;
@@ -61,6 +62,7 @@ export async function runSync(): Promise<SyncResult> {
 
   // 1. Create sync run record
   const syncRun = await createSyncRun();
+  const syncLogger = new SyncLogger(syncRun.id);
   logger.info("Sync", "Sync run created", { syncRunId: syncRun.id });
 
   try {
@@ -106,22 +108,27 @@ export async function runSync(): Promise<SyncResult> {
       logger.info("Sync", "No transactions to process, completing sync");
 
       // Sync tag status even when there are no transactions
+      syncLogger.startSegment("tag_linking");
       try {
-        logger.info("Sync", "Starting tag status synchronization");
+        syncLogger.info("Starting tag status synchronization");
         const tagSyncResult = await syncTagStatus(mappings, allTags);
-        logger.info("Sync", "Tag status synchronization completed", {
+        syncLogger.info("Tag status synchronization completed", {
           totalTags: tagSyncResult.totalTags,
           enabledTags: tagSyncResult.enabledTags,
           disabledTags: tagSyncResult.disabledTags,
           unchangedTags: tagSyncResult.unchangedTags,
           errorCount: tagSyncResult.errors.length,
         });
+        await syncLogger.endSegment();
       } catch (error) {
-        logger.error("Sync", "Tag sync failed (non-fatal)", {
+        syncLogger.error("Tag sync failed", {
           error: error instanceof Error ? error.message : String(error),
         });
-        // Don't fail the entire sync if tag sync fails
+        await syncLogger.endSegment("error");
       }
+
+      // Skip transaction sync segment
+      await syncLogger.skipSegment("transaction_sync", "No transactions to process");
 
       await markSyncComplete(syncRun.id, 0, 0);
       return {
@@ -204,14 +211,33 @@ export async function runSync(): Promise<SyncResult> {
     }
 
     if (transactionsToSend.length === 0) {
-      logger.info("Sync", "No events to send to Lago, completing sync");
+      // Tag linking segment
+      syncLogger.startSegment("tag_linking");
+      try {
+        syncLogger.info("Starting tag status synchronization");
+        const tagSyncResult = await syncTagStatus(mappings, allTags);
+        syncLogger.info("Tag status synchronization completed", {
+          totalTags: tagSyncResult.totalTags,
+          enabledTags: tagSyncResult.enabledTags,
+          disabledTags: tagSyncResult.disabledTags,
+          unchangedTags: tagSyncResult.unchangedTags,
+          errorCount: tagSyncResult.errors.length,
+        });
+        await syncLogger.endSegment();
+      } catch (error) {
+        syncLogger.error("Tag sync failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        await syncLogger.endSegment("error");
+      }
 
-      // Still save sync states for transactions without subscriptions
+      // Transaction sync segment - still save sync states for transactions without subscriptions
+      syncLogger.startSegment("transaction_sync");
+      syncLogger.info("No events to send to Lago", { transactionsProcessed });
       if (transactionsWithoutSubscription.length > 0) {
-        logger.info(
-          "Sync",
-          "Saving sync states for transactions without subscriptions",
-        );
+        syncLogger.info("Saving sync states for transactions without subscriptions", {
+          count: transactionsWithoutSubscription.length,
+        });
         const syncStateUpdates = transactionsWithoutSubscription.map((pt) => ({
           steveTransactionId: pt.steveTransactionId,
           lastSyncedMeterValue: pt.meterValueTo,
@@ -222,25 +248,9 @@ export async function runSync(): Promise<SyncResult> {
           isFinalized: pt.isFinal,
         }));
         await batchUpsertSyncStates(syncStateUpdates);
+        syncLogger.info("Sync states saved");
       }
-
-      // Sync tag status even when there are no transactions
-      try {
-        logger.info("Sync", "Starting tag status synchronization");
-        const tagSyncResult = await syncTagStatus(mappings, allTags);
-        logger.info("Sync", "Tag status synchronization completed", {
-          totalTags: tagSyncResult.totalTags,
-          enabledTags: tagSyncResult.enabledTags,
-          disabledTags: tagSyncResult.disabledTags,
-          unchangedTags: tagSyncResult.unchangedTags,
-          errorCount: tagSyncResult.errors.length,
-        });
-      } catch (error) {
-        logger.error("Sync", "Tag sync failed (non-fatal)", {
-          error: error instanceof Error ? error.message : String(error),
-        });
-        // Don't fail the entire sync if tag sync fails
-      }
+      await syncLogger.endSegment();
 
       await markSyncComplete(syncRun.id, transactionsProcessed, 0);
       return {
@@ -251,14 +261,36 @@ export async function runSync(): Promise<SyncResult> {
       };
     }
 
+    // Tag linking segment
+    syncLogger.startSegment("tag_linking");
+    try {
+      syncLogger.info("Starting tag status synchronization");
+      const tagSyncResult = await syncTagStatus(mappings, allTags);
+      syncLogger.info("Tag status synchronization completed", {
+        totalTags: tagSyncResult.totalTags,
+        enabledTags: tagSyncResult.enabledTags,
+        disabledTags: tagSyncResult.disabledTags,
+        unchangedTags: tagSyncResult.unchangedTags,
+        errorCount: tagSyncResult.errors.length,
+      });
+      await syncLogger.endSegment();
+    } catch (error) {
+      syncLogger.error("Tag sync failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      await syncLogger.endSegment("error");
+    }
+
+    // Transaction sync segment
+    syncLogger.startSegment("transaction_sync");
+
     // 8. Build Lago events (only for transactions with subscriptions)
-    logger.debug("Sync", "Building Lago events");
+    syncLogger.info("Building Lago events", { count: transactionsToSend.length });
     const lagoEvents = buildLagoEvents(transactionsToSend);
-    logger.debug("Sync", "Lago events built", { count: lagoEvents.length });
 
     // 9. Send events to Lago in batches
     const eventBatches = batchEvents(lagoEvents);
-    logger.info("Sync", "Sending events to Lago", {
+    syncLogger.info("Sending events to Lago", {
       totalEvents: lagoEvents.length,
       batchCount: eventBatches.length,
     });
@@ -266,25 +298,22 @@ export async function runSync(): Promise<SyncResult> {
     for (let i = 0; i < eventBatches.length; i++) {
       const batch = eventBatches[i];
       try {
-        logger.debug("Sync", `Sending batch ${i + 1}/${eventBatches.length}`, {
+        syncLogger.debug(`Sending batch ${i + 1}/${eventBatches.length}`, {
           batchSize: batch.length,
         });
         await lagoClient.createBatchEvents(batch);
-        logger.debug(
-          "Sync",
-          `Batch ${i + 1}/${eventBatches.length} sent successfully`,
-        );
+        syncLogger.info(`Batch ${i + 1}/${eventBatches.length} sent successfully`);
       } catch (error) {
         const errorMsg = `Failed to send batch ${i + 1}: ${
           (error as Error).message
         }`;
-        logger.error("Sync", errorMsg, error as Error);
+        syncLogger.error(errorMsg);
         errors.push(errorMsg);
       }
     }
 
     // 10. Update sync states in database (for ALL processed transactions)
-    logger.info("Sync", "Updating sync states in database");
+    syncLogger.info("Updating sync states in database");
     const syncStateUpdates: NewTransactionSyncState[] = processedTransactions
       .map((pt) => ({
         steveTransactionId: pt.steveTransactionId,
@@ -295,16 +324,17 @@ export async function runSync(): Promise<SyncResult> {
         isFinalized: pt.isFinal,
       }));
 
-    logger.debug("Sync", "Sync state updates prepared", {
+    syncLogger.debug("Sync state updates prepared", {
       count: syncStateUpdates.length,
       sentToLago: transactionsToSend.length,
       savedWithoutSubscription: transactionsWithoutSubscription.length,
     });
     await batchUpsertSyncStates(syncStateUpdates);
-    logger.debug("Sync", "Sync states updated successfully");
 
     // 11. Create synced event records
-    logger.info("Sync", "Creating synced event records");
+    syncLogger.info("Creating synced event records", {
+      count: processedTransactions.length,
+    });
     const syncedEventRecords: NewSyncedTransactionEvent[] =
       processedTransactions.map((pt) => ({
         steveTransactionId: pt.steveTransactionId,
@@ -318,31 +348,12 @@ export async function runSync(): Promise<SyncResult> {
         syncRunId: syncRun.id,
       }));
 
-    logger.debug("Sync", "Synced event records prepared", {
-      count: syncedEventRecords.length,
-    });
     await batchCreateSyncedEvents(syncedEventRecords);
-    logger.debug("Sync", "Synced event records created successfully");
+    syncLogger.info("Synced event records created successfully");
 
-    // 12. Sync tag status (enable/disable tags based on mappings)
-    try {
-      logger.info("Sync", "Starting tag status synchronization");
-      const tagSyncResult = await syncTagStatus(mappings, allTags);
-      logger.info("Sync", "Tag status synchronization completed", {
-        totalTags: tagSyncResult.totalTags,
-        enabledTags: tagSyncResult.enabledTags,
-        disabledTags: tagSyncResult.disabledTags,
-        unchangedTags: tagSyncResult.unchangedTags,
-        errorCount: tagSyncResult.errors.length,
-      });
-    } catch (error) {
-      logger.error("Sync", "Tag sync failed (non-fatal)", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      // Don't fail the entire sync if tag sync fails
-    }
+    await syncLogger.endSegment(errors.length > 0 ? "warning" : undefined);
 
-    // 13. Mark sync as complete
+    // 12. Mark sync as complete
     await markSyncComplete(
       syncRun.id,
       transactionsProcessed,

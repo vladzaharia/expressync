@@ -1,20 +1,32 @@
 import "@std/dotenv/load";
 
+// Helper to strip trailing slashes from URLs
+const stripTrailingSlash = (url: string) => url.replace(/\/+$/, "");
+
 /**
  * Application configuration loaded from environment variables
  */
+const steveBaseUrl = stripTrailingSlash(Deno.env.get("STEVE_BASE_URL") || "");
+const lagoApiBaseUrl = stripTrailingSlash(Deno.env.get("LAGO_API_URL") || "");
+
 export const config = {
   // Database
   DATABASE_URL: Deno.env.get("DATABASE_URL")!,
 
   // StEvE OCPP Management System
-  STEVE_API_URL: Deno.env.get("STEVE_API_URL")!,
+  // User provides base URL (e.g., http://localhost:8080/steve)
+  // Dashboard URL = base URL, API URL = base URL + /api
+  STEVE_BASE_URL: steveBaseUrl,
+  STEVE_API_URL: steveBaseUrl ? `${steveBaseUrl}/api` : "",
   STEVE_API_KEY: Deno.env.get("STEVE_API_KEY")!,
 
   // Lago Billing Platform
-  LAGO_API_URL: Deno.env.get("LAGO_API_URL")!,
+  // API and dashboard have separate base URLs
+  // API URL = LAGO_API_URL + /api/v1
+  LAGO_API_URL: lagoApiBaseUrl ? `${lagoApiBaseUrl}/api/v1` : "",
   LAGO_API_KEY: Deno.env.get("LAGO_API_KEY")!,
   LAGO_METRIC_CODE: Deno.env.get("LAGO_METRIC_CODE") || "ev_charging_kwh",
+  LAGO_DASHBOARD_URL: stripTrailingSlash(Deno.env.get("LAGO_DASHBOARD_URL") || ""),
 
   // Sync Configuration
   SYNC_CRON_SCHEDULE: Deno.env.get("SYNC_CRON_SCHEDULE") || "*/15 * * * *",
@@ -38,7 +50,7 @@ export const config = {
 export function validateConfig() {
   const required = [
     "DATABASE_URL",
-    "STEVE_API_URL",
+    "STEVE_BASE_URL",
     "STEVE_API_KEY",
     "LAGO_API_URL",
     "LAGO_API_KEY",
@@ -61,7 +73,7 @@ export function validateConfig() {
 export function validateSyncWorkerConfig() {
   const required = [
     "DATABASE_URL",
-    "STEVE_API_URL",
+    "STEVE_BASE_URL",
     "STEVE_API_KEY",
     "LAGO_API_URL",
     "LAGO_API_KEY",

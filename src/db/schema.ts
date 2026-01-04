@@ -125,12 +125,50 @@ export const syncRuns = pgTable("sync_runs", {
   // Status: "running" | "completed" | "failed"
   status: text("status").notNull().default("running"),
 
+  // Segment statuses: "success" | "warning" | "error" | "skipped" | null (not run yet)
+  tagLinkingStatus: text("tag_linking_status"),
+  transactionSyncStatus: text("transaction_sync_status"),
+
   // Statistics
   transactionsProcessed: integer("transactions_processed").default(0),
   eventsCreated: integer("events_created").default(0),
 
+  // Tag linking statistics
+  tagsValidated: integer("tags_validated").default(0),
+  tagsWithIssues: integer("tags_with_issues").default(0),
+
   // Error tracking (JSON array of error messages)
   errors: text("errors"),
+});
+
+/**
+ * Sync Run Logs - Detailed logs for each sync run segment
+ *
+ * Tracks individual operations within each sync segment for debugging.
+ * Logs are timestamped and colored by status level.
+ */
+export const syncRunLogs = pgTable("sync_run_logs", {
+  id: serial("id").primaryKey(),
+
+  // Reference to parent sync run
+  syncRunId: integer("sync_run_id")
+    .notNull()
+    .references(() => syncRuns.id, { onDelete: "cascade" }),
+
+  // Segment: "tag_linking" | "transaction_sync"
+  segment: text("segment").notNull(),
+
+  // Log level: "info" | "warn" | "error" | "debug"
+  level: text("level").notNull().default("info"),
+
+  // Log message
+  message: text("message").notNull(),
+
+  // Additional context (JSON)
+  context: text("context"),
+
+  // Timestamp
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 /**
@@ -236,3 +274,11 @@ export type SyncedTransactionEvent =
   typeof syncedTransactionEvents.$inferSelect;
 export type NewSyncedTransactionEvent =
   typeof syncedTransactionEvents.$inferInsert;
+
+export type SyncRunLog = typeof syncRunLogs.$inferSelect;
+export type NewSyncRunLog = typeof syncRunLogs.$inferInsert;
+
+// Sync segment types
+export type SyncSegment = "tag_linking" | "transaction_sync";
+export type SyncSegmentStatus = "success" | "warning" | "error" | "skipped";
+export type SyncLogLevel = "info" | "warn" | "error" | "debug";
