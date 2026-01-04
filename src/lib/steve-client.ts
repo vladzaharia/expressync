@@ -32,7 +32,7 @@ class StEvEClient {
   private async request<T>(
     path: string,
     schema: z.ZodSchema<T>,
-    options: RequestInit = {}
+    options: RequestInit = {},
   ): Promise<T> {
     return retry(async () => {
       const url = `${this.baseUrl}${path}`;
@@ -75,7 +75,7 @@ class StEvEClient {
           errorBody: errorText,
         });
         throw new Error(
-          `StEvE API error: ${response.status} ${response.statusText} - ${errorText}`
+          `StEvE API error: ${response.status} ${response.statusText} - ${errorText}`,
         );
       }
 
@@ -93,9 +93,7 @@ class StEvEClient {
       } catch (error) {
         logger.error("StEvE", "Response validation failed", {
           error: error instanceof Error ? error.message : String(error),
-          receivedDataSample: Array.isArray(data)
-            ? data.slice(0, 2)
-            : data,
+          receivedDataSample: Array.isArray(data) ? data.slice(0, 2) : data,
         });
         throw new Error(`StEvE API response validation failed: ${error}`);
       }
@@ -110,7 +108,7 @@ class StEvEClient {
    * Fetch transactions with optional filters
    */
   async getTransactions(
-    filters: TransactionFilters = {}
+    filters: TransactionFilters = {},
   ): Promise<StEvETransaction[]> {
     const params = new URLSearchParams();
 
@@ -129,7 +127,10 @@ class StEvEClient {
 
     logger.info("StEvE", "Fetching transactions", { filters, queryString });
 
-    const transactions = await this.request(path, z.array(StEvETransactionSchema));
+    const transactions = await this.request(
+      path,
+      z.array(StEvETransactionSchema),
+    );
 
     logger.debug("StEvE", "Transactions fetched", {
       count: transactions.length,
@@ -197,7 +198,7 @@ class StEvEClient {
       {
         method: "PUT",
         body: JSON.stringify(formData),
-      }
+      },
     );
 
     logger.debug("StEvE", "OCPP tag updated successfully", {
@@ -249,7 +250,7 @@ class StEvEClient {
    * StEvE expects: 2022-10-10T09:00:00 (no Z, no milliseconds)
    */
   private formatDateForStEvE(date: Date): string {
-    return date.toISOString().split('.')[0]; // Remove milliseconds and Z
+    return date.toISOString().split(".")[0]; // Remove milliseconds and Z
   }
 
   /**
@@ -258,7 +259,7 @@ class StEvEClient {
    * @param minutesAgo - How far back to look (default 24 hours)
    */
   async getRecentlyCompletedTransactions(
-    minutesAgo: number = 1440
+    minutesAgo: number = 1440,
   ): Promise<StEvETransaction[]> {
     const fromDate = new Date(Date.now() - minutesAgo * 60 * 1000);
     const toDate = new Date();
@@ -291,4 +292,3 @@ class StEvEClient {
 
 // Export singleton instance
 export const steveClient = new StEvEClient();
-

@@ -2,14 +2,14 @@ import type { StEvEOcppTag } from "./types/steve.ts";
 
 /**
  * Get all child tags (direct and indirect descendants) of a parent tag
- * 
+ *
  * @param parentIdTag - The parent tag ID to find children for
  * @param allTags - All available OCPP tags
  * @returns Array of all descendant tags
  */
 export function getAllChildTags(
   parentIdTag: string,
-  allTags: StEvEOcppTag[]
+  allTags: StEvEOcppTag[],
 ): StEvEOcppTag[] {
   const children: StEvEOcppTag[] = [];
   const visited = new Set<string>();
@@ -23,7 +23,7 @@ export function getAllChildTags(
 
     // Find direct children
     const directChildren = allTags.filter(
-      (tag) => tag.parentIdTag === currentParentId
+      (tag) => tag.parentIdTag === currentParentId,
     );
 
     for (const child of directChildren) {
@@ -39,14 +39,14 @@ export function getAllChildTags(
 
 /**
  * Get the parent tag of a given tag
- * 
+ *
  * @param tag - The tag to find parent for
  * @param allTags - All available OCPP tags
  * @returns The parent tag or null if no parent exists
  */
 export function getParentTag(
   tag: StEvEOcppTag,
-  allTags: StEvEOcppTag[]
+  allTags: StEvEOcppTag[],
 ): StEvEOcppTag | null {
   if (!tag.parentIdTag) {
     return null;
@@ -56,14 +56,14 @@ export function getParentTag(
 
 /**
  * Get all ancestor tags (parent, grandparent, etc.) of a given tag
- * 
+ *
  * @param tag - The tag to find ancestors for
  * @param allTags - All available OCPP tags
  * @returns Array of ancestor tags, ordered from immediate parent to root
  */
 export function getAllAncestorTags(
   tag: StEvEOcppTag,
-  allTags: StEvEOcppTag[]
+  allTags: StEvEOcppTag[],
 ): StEvEOcppTag[] {
   const ancestors: StEvEOcppTag[] = [];
   const visited = new Set<string>();
@@ -89,7 +89,7 @@ export function getAllAncestorTags(
 
 /**
  * Check if a tag is a descendant of another tag
- * 
+ *
  * @param tag - The potential child tag
  * @param potentialAncestorIdTag - The potential ancestor tag ID
  * @param allTags - All available OCPP tags
@@ -98,15 +98,17 @@ export function getAllAncestorTags(
 export function isDescendantOf(
   tag: StEvEOcppTag,
   potentialAncestorIdTag: string,
-  allTags: StEvEOcppTag[]
+  allTags: StEvEOcppTag[],
 ): boolean {
   const ancestors = getAllAncestorTags(tag, allTags);
-  return ancestors.some((ancestor) => ancestor.idTag === potentialAncestorIdTag);
+  return ancestors.some((ancestor) =>
+    ancestor.idTag === potentialAncestorIdTag
+  );
 }
 
 /**
  * Build a hierarchical tree structure from flat tag list
- * 
+ *
  * @param tags - All available OCPP tags
  * @returns Array of root tags with nested children
  */
@@ -126,7 +128,7 @@ export function buildTagTree(tags: StEvEOcppTag[]): TagNode[] {
   // Build the tree structure
   for (const tag of tags) {
     const node = tagMap.get(tag.idTag)!;
-    
+
     if (tag.parentIdTag) {
       const parent = tagMap.get(tag.parentIdTag);
       if (parent) {
@@ -143,4 +145,3 @@ export function buildTagTree(tags: StEvEOcppTag[]): TagNode[] {
 
   return rootTags;
 }
-

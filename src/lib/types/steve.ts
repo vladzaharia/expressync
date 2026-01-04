@@ -119,4 +119,3 @@ export interface TransactionFilters {
   /** Transaction status filter */
   type?: "ACTIVE" | "ALL";
 }
-

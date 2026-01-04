@@ -142,16 +142,22 @@ export async function runSync(): Promise<SyncResult> {
 
     // Create lookup map
     const syncStateByTxId = new Map(
-      existingSyncStates.map((s) => [s.steveTransactionId, s])
+      existingSyncStates.map((s) => [s.steveTransactionId, s]),
     );
 
     // 6. Build mapping lookup with inheritance (child tags inherit parent mappings)
-    const mappingByOcppTag = buildMappingLookupWithInheritance(mappings, allTags);
+    const mappingByOcppTag = buildMappingLookupWithInheritance(
+      mappings,
+      allTags,
+    );
 
     logger.info("Sync", "User mappings loaded with inheritance", {
-      directMappings: mappings.filter((m) => m.lagoSubscriptionExternalId).length,
+      directMappings: mappings.filter((m) =>
+        m.lagoSubscriptionExternalId
+      ).length,
       totalMappingsWithInheritance: mappingByOcppTag.size,
-      inheritedMappings: mappingByOcppTag.size - mappings.filter((m) => m.lagoSubscriptionExternalId).length,
+      inheritedMappings: mappingByOcppTag.size -
+        mappings.filter((m) => m.lagoSubscriptionExternalId).length,
     });
 
     // 7. Process each transaction
@@ -162,14 +168,18 @@ export async function runSync(): Promise<SyncResult> {
       allTransactions,
       syncStateByTxId,
       mappingByOcppTag,
-      syncRun.id
+      syncRun.id,
     );
 
     transactionsProcessed = allTransactions.size;
 
     // Separate transactions that should be sent to Lago from those that shouldn't
-    const transactionsToSend = processedTransactions.filter(pt => pt.shouldSendToLago);
-    const transactionsWithoutSubscription = processedTransactions.filter(pt => !pt.shouldSendToLago);
+    const transactionsToSend = processedTransactions.filter((pt) =>
+      pt.shouldSendToLago
+    );
+    const transactionsWithoutSubscription = processedTransactions.filter((pt) =>
+      !pt.shouldSendToLago
+    );
 
     eventsCreated = transactionsToSend.length;
 
@@ -181,10 +191,16 @@ export async function runSync(): Promise<SyncResult> {
 
     // Log warning if some transactions couldn't be sent
     if (transactionsWithoutSubscription.length > 0) {
-      logger.warn("Sync", "Some transactions have no subscription and will not be sent to Lago", {
-        count: transactionsWithoutSubscription.length,
-        transactionIds: transactionsWithoutSubscription.map(pt => pt.steveTransactionId),
-      });
+      logger.warn(
+        "Sync",
+        "Some transactions have no subscription and will not be sent to Lago",
+        {
+          count: transactionsWithoutSubscription.length,
+          transactionIds: transactionsWithoutSubscription.map((pt) =>
+            pt.steveTransactionId
+          ),
+        },
+      );
     }
 
     if (transactionsToSend.length === 0) {
@@ -192,11 +208,16 @@ export async function runSync(): Promise<SyncResult> {
 
       // Still save sync states for transactions without subscriptions
       if (transactionsWithoutSubscription.length > 0) {
-        logger.info("Sync", "Saving sync states for transactions without subscriptions");
+        logger.info(
+          "Sync",
+          "Saving sync states for transactions without subscriptions",
+        );
         const syncStateUpdates = transactionsWithoutSubscription.map((pt) => ({
           steveTransactionId: pt.steveTransactionId,
           lastSyncedMeterValue: pt.meterValueTo,
-          totalKwhBilled: (syncStateByTxId.get(pt.steveTransactionId)?.totalKwhBilled || 0) + pt.kwhDelta,
+          totalKwhBilled:
+            (syncStateByTxId.get(pt.steveTransactionId)?.totalKwhBilled || 0) +
+            pt.kwhDelta,
           lastSyncRunId: syncRun.id,
           isFinalized: pt.isFinal,
         }));
@@ -249,7 +270,10 @@ export async function runSync(): Promise<SyncResult> {
           batchSize: batch.length,
         });
         await lagoClient.createBatchEvents(batch);
-        logger.debug("Sync", `Batch ${i + 1}/${eventBatches.length} sent successfully`);
+        logger.debug(
+          "Sync",
+          `Batch ${i + 1}/${eventBatches.length} sent successfully`,
+        );
       } catch (error) {
         const errorMsg = `Failed to send batch ${i + 1}: ${
           (error as Error).message
@@ -319,7 +343,12 @@ export async function runSync(): Promise<SyncResult> {
     }
 
     // 13. Mark sync as complete
-    await markSyncComplete(syncRun.id, transactionsProcessed, eventsCreated, errors);
+    await markSyncComplete(
+      syncRun.id,
+      transactionsProcessed,
+      eventsCreated,
+      errors,
+    );
 
     logger.info("Sync", "Sync run completed successfully", {
       syncRunId: syncRun.id,
@@ -342,4 +371,3 @@ export async function runSync(): Promise<SyncResult> {
     throw error;
   }
 }
-

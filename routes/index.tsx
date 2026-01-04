@@ -4,9 +4,23 @@ import * as schema from "../src/db/schema.ts";
 import { desc, gte } from "drizzle-orm";
 import DashboardStats from "../islands/DashboardStats.tsx";
 import { SidebarLayout } from "../components/SidebarLayout.tsx";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.tsx";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.tsx";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card.tsx";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../components/ui/table.tsx";
 import { Badge } from "../components/ui/badge.tsx";
+import { DotPattern } from "../components/magicui/dot-pattern.tsx";
+import { SparklesText } from "../components/magicui/sparkles-text.tsx";
 
 interface DashboardData {
   stats: {
@@ -80,62 +94,89 @@ export const handler = define.handlers({
   },
 });
 
-export default define.page<typeof handler>(function DashboardPage({ data, url }) {
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case "completed": return "success";
-      case "failed": return "destructive";
-      default: return "warning";
-    }
-  };
+export default define.page<typeof handler>(
+  function DashboardPage({ data, url, state }) {
+    const getStatusVariant = (status: string) => {
+      switch (status) {
+        case "completed":
+          return "success";
+        case "failed":
+          return "destructive";
+        default:
+          return "warning";
+      }
+    };
 
-  return (
-    <SidebarLayout currentPath={url.pathname} title="Dashboard" description="Overview of your EV billing system">
-      <div className="space-y-6">
-        <DashboardStats stats={data.stats} />
+    return (
+      <SidebarLayout
+        currentPath={url.pathname}
+        title="Dashboard"
+        description="Overview of your EV billing system"
+        user={state.user}
+      >
+        <div className="space-y-6 relative">
+          {/* Subtle background pattern */}
+          <DotPattern
+            className="absolute inset-0 -z-10 opacity-[0.03] [mask-image:radial-gradient(600px_circle_at_center,white,transparent)]"
+            width={20}
+            height={20}
+            cr={1}
+          />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Sync Runs</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Processed</TableHead>
-                  <TableHead>Events</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.recentSyncRuns.length === 0 ? (
+          <DashboardStats stats={data.stats} />
+
+          <Card className="overflow-hidden relative">
+            <CardHeader className="border-b border-border/50">
+              <CardTitle className="flex items-center gap-2">
+                <SparklesText sparklesCount={6}>
+                  Recent Sync Runs
+                </SparklesText>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
-                      No sync runs yet
-                    </TableCell>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Processed</TableHead>
+                    <TableHead>Events</TableHead>
                   </TableRow>
-                ) : (
-                  data.recentSyncRuns.map((run) => (
-                    <TableRow key={run.id}>
-                      <TableCell className="font-medium">
-                        {new Date(run.startedAt).toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusVariant(run.status)}>
-                          {run.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{run.transactionsProcessed}</TableCell>
-                      <TableCell>{run.eventsCreated}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
-    </SidebarLayout>
-  );
-});
+                </TableHeader>
+                <TableBody>
+                  {data.recentSyncRuns.length === 0
+                    ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={4}
+                          className="text-center text-muted-foreground"
+                        >
+                          No sync runs yet
+                        </TableCell>
+                      </TableRow>
+                    )
+                    : (
+                      data.recentSyncRuns.map((run) => (
+                        <TableRow key={run.id}>
+                          <TableCell className="font-medium">
+                            {new Date(run.startedAt).toLocaleString()}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={getStatusVariant(run.status)}>
+                              {run.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{run.transactionsProcessed}</TableCell>
+                          <TableCell>{run.eventsCreated}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+      </SidebarLayout>
+    );
+  },
+);

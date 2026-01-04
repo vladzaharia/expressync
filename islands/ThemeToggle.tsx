@@ -13,7 +13,9 @@ export default function ThemeToggle() {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "light" || stored === "dark") {
       theme.value = stored;
-    } else if (globalThis.matchMedia?.("(prefers-color-scheme: light)").matches) {
+    } else if (
+      globalThis.matchMedia?.("(prefers-color-scheme: light)").matches
+    ) {
       theme.value = "light";
     }
 
@@ -36,12 +38,9 @@ export default function ThemeToggle() {
       className="size-8"
       aria-label={`Switch to ${theme.value === "dark" ? "light" : "dark"} mode`}
     >
-      {theme.value === "dark" ? (
-        <Sun className="size-4" />
-      ) : (
-        <Moon className="size-4" />
-      )}
+      {theme.value === "dark"
+        ? <Sun className="size-4" />
+        : <Moon className="size-4" />}
     </Button>
   );
 }
-

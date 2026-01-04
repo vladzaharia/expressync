@@ -30,7 +30,7 @@ const buttonVariants = cva(
       variant: "default",
       size: "default",
     },
-  }
+  },
 );
 
 function Button({
@@ -39,8 +39,10 @@ function Button({
   size,
   asChild = false,
   ...props
-}: ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
+}:
+  & ComponentProps<"button">
+  & VariantProps<typeof buttonVariants>
+  & {
     asChild?: boolean;
   }) {
   const Comp = asChild ? Slot : "button";
@@ -55,4 +57,3 @@ function Button({
 }
 
 export { Button, buttonVariants };
-

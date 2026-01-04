@@ -61,7 +61,7 @@ function sleep(ms: number): Promise<void> {
  */
 export async function retry<T>(
   fn: () => Promise<T>,
-  options: RetryOptions = {}
+  options: RetryOptions = {},
 ): Promise<T> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
   let lastError: Error;
@@ -81,7 +81,7 @@ export async function retry<T>(
       // Log retry attempt
       if (opts.logAttempts) {
         console.warn(
-          `[Retry] Attempt ${attempt}/${opts.maxAttempts} failed: ${lastError.message}. Retrying in ${delay}ms...`
+          `[Retry] Attempt ${attempt}/${opts.maxAttempts} failed: ${lastError.message}. Retrying in ${delay}ms...`,
         );
       }
 
@@ -108,7 +108,7 @@ export async function retry<T>(
 export async function retryIf<T>(
   fn: () => Promise<T>,
   shouldRetry: (error: Error, attempt: number) => boolean,
-  maxAttempts: number = 3
+  maxAttempts: number = 3,
 ): Promise<T> {
   let lastError: Error;
 
@@ -123,11 +123,10 @@ export async function retryIf<T>(
       }
 
       console.warn(
-        `[RetryIf] Attempt ${attempt}/${maxAttempts} failed: ${lastError.message}. Retrying...`
+        `[RetryIf] Attempt ${attempt}/${maxAttempts} failed: ${lastError.message}. Retrying...`,
       );
     }
   }
 
   throw lastError!;
 }
-

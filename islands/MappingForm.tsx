@@ -1,4 +1,4 @@
-import { useSignal, useComputed } from "@preact/signals";
+import { useComputed, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -6,7 +6,16 @@ import { Label } from "@/components/ui/label.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
-import { Check, Tag, User, CreditCard, FileText, AlertTriangle, Loader2, Package } from "lucide-preact";
+import {
+  AlertTriangle,
+  Check,
+  CreditCard,
+  FileText,
+  Loader2,
+  Package,
+  Tag,
+  User,
+} from "lucide-preact";
 
 interface Props {
   mapping?: {
@@ -43,7 +52,9 @@ export default function MappingForm({ mapping }: Props) {
   const ocppTagId = useSignal(mapping?.steveOcppIdTag || "");
   const ocppTagPk = useSignal(mapping?.steveOcppTagPk || 0);
   const lagoCustomerId = useSignal(mapping?.lagoCustomerExternalId || "");
-  const lagoSubscriptionId = useSignal(mapping?.lagoSubscriptionExternalId || "");
+  const lagoSubscriptionId = useSignal(
+    mapping?.lagoSubscriptionExternalId || "",
+  );
   const displayName = useSignal(mapping?.displayName || "");
   const notes = useSignal(mapping?.notes || "");
   const isActive = useSignal(mapping?.isActive ?? true);
@@ -73,7 +84,9 @@ export default function MappingForm({ mapping }: Props) {
   // Helper function to get all child tags recursively
   const getAllChildTags = (parentId: string): OcppTag[] => {
     const children: OcppTag[] = [];
-    const directChildren = ocppTags.value.filter(t => t.parentIdTag === parentId);
+    const directChildren = ocppTags.value.filter((t) =>
+      t.parentIdTag === parentId
+    );
 
     for (const child of directChildren) {
       children.push(child);
@@ -88,7 +101,7 @@ export default function MappingForm({ mapping }: Props) {
     if (!tag.parentIdTag) return null;
 
     const parentMapping = existingMappings.value.find(
-      m => m.steveOcppIdTag === tag.parentIdTag
+      (m) => m.steveOcppIdTag === tag.parentIdTag,
     );
 
     if (parentMapping) {
@@ -96,7 +109,7 @@ export default function MappingForm({ mapping }: Props) {
     }
 
     // Check grandparents recursively
-    const parent = ocppTags.value.find(t => t.id === tag.parentIdTag);
+    const parent = ocppTags.value.find((t) => t.id === tag.parentIdTag);
     if (parent) {
       return hasMappedParent(parent);
     }
@@ -106,7 +119,7 @@ export default function MappingForm({ mapping }: Props) {
 
   // Filter tags to show only unmapped tags (or tags with mapped parents for override)
   const availableTags = useComputed(() => {
-    return ocppTags.value.filter(tag => {
+    return ocppTags.value.filter((tag) => {
       // If editing, allow the current tag
       if (mapping && tag.id === mapping.steveOcppIdTag) {
         return true;
@@ -114,7 +127,7 @@ export default function MappingForm({ mapping }: Props) {
 
       // Check if tag already has a direct mapping
       const hasDirectMapping = existingMappings.value.some(
-        m => m.steveOcppIdTag === tag.id
+        (m) => m.steveOcppIdTag === tag.id,
       );
 
       if (hasDirectMapping) {
@@ -213,7 +226,10 @@ export default function MappingForm({ mapping }: Props) {
       if (res.ok) {
         const data = await res.json();
         if (data.totalCreated && data.totalCreated > 1) {
-          successMessage.value = `Successfully created ${data.totalCreated} mappings (1 parent + ${data.totalCreated - 1} children)`;
+          successMessage.value =
+            `Successfully created ${data.totalCreated} mappings (1 parent + ${
+              data.totalCreated - 1
+            } children)`;
           setTimeout(() => {
             window.location.href = "/mappings";
           }, 2000);
@@ -236,22 +252,43 @@ export default function MappingForm({ mapping }: Props) {
     if (!ocppTagId.value) return 1;
     if (!lagoCustomerId.value) return 2;
     // Subscription is optional, so we move to step 3 once customer is selected
-    if (lagoCustomerId.value && !lagoSubscriptionId.value && hasActiveSubscriptions.value) return 3;
+    if (
+      lagoCustomerId.value && !lagoSubscriptionId.value &&
+      hasActiveSubscriptions.value
+    ) return 3;
     return 4;
   });
 
-  const StepIndicator = ({ step, label, icon: Icon }: { step: number; label: string; icon: typeof Tag }) => (
+  const StepIndicator = (
+    { step, label, icon: Icon }: {
+      step: number;
+      label: string;
+      icon: typeof Tag;
+    },
+  ) => (
     <div className="flex items-center gap-2">
-      <div className={cn(
-        "flex items-center justify-center size-8 rounded-full transition-colors",
-        currentStep.value >= step ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-      )}>
-        {currentStep.value > step ? <Check className="size-4" /> : <Icon className="size-4" />}
+      <div
+        className={cn(
+          "flex items-center justify-center size-8 rounded-full transition-colors",
+          currentStep.value >= step
+            ? "bg-primary text-primary-foreground"
+            : "bg-muted text-muted-foreground",
+        )}
+      >
+        {currentStep.value > step
+          ? <Check className="size-4" />
+          : <Icon className="size-4" />}
       </div>
-      <span className={cn(
-        "text-sm font-medium hidden sm:inline",
-        currentStep.value >= step ? "text-foreground" : "text-muted-foreground"
-      )}>{label}</span>
+      <span
+        className={cn(
+          "text-sm font-medium hidden sm:inline",
+          currentStep.value >= step
+            ? "text-foreground"
+            : "text-muted-foreground",
+        )}
+      >
+        {label}
+      </span>
     </div>
   );
 
@@ -260,11 +297,26 @@ export default function MappingForm({ mapping }: Props) {
       {/* Progress indicator */}
       <div className="flex items-center justify-between mb-8">
         <StepIndicator step={1} label="Tag" icon={Tag} />
-        <div className={cn("flex-1 h-0.5 mx-2 transition-colors", currentStep.value >= 2 ? "bg-primary" : "bg-muted")} />
+        <div
+          className={cn(
+            "flex-1 h-0.5 mx-2 transition-colors",
+            currentStep.value >= 2 ? "bg-primary" : "bg-muted",
+          )}
+        />
         <StepIndicator step={2} label="Customer" icon={User} />
-        <div className={cn("flex-1 h-0.5 mx-2 transition-colors", currentStep.value >= 3 ? "bg-primary" : "bg-muted")} />
+        <div
+          className={cn(
+            "flex-1 h-0.5 mx-2 transition-colors",
+            currentStep.value >= 3 ? "bg-primary" : "bg-muted",
+          )}
+        />
         <StepIndicator step={3} label="Subscription" icon={CreditCard} />
-        <div className={cn("flex-1 h-0.5 mx-2 transition-colors", currentStep.value >= 4 ? "bg-primary" : "bg-muted")} />
+        <div
+          className={cn(
+            "flex-1 h-0.5 mx-2 transition-colors",
+            currentStep.value >= 4 ? "bg-primary" : "bg-muted",
+          )}
+        />
         <StepIndicator step={4} label="Details" icon={FileText} />
       </div>
 
@@ -283,225 +335,294 @@ export default function MappingForm({ mapping }: Props) {
       <div className="space-y-2">
         <Label>Select OCPP Tag</Label>
 
-        {availableTags.value.length === 0 ? (
-          <div className="bg-muted rounded-lg p-4 text-center text-muted-foreground">
-            No available tags to map. All tags have been mapped.
-          </div>
-        ) : ocppTagId.value ? (
-          <div className="border border-primary bg-primary/5 rounded-lg p-4">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-3 flex-1">
-                <Tag className="size-5 text-primary mt-0.5" />
-                <div className="flex-1">
-                  <h3 className="font-semibold font-mono">{ocppTagId.value}</h3>
-                  {(() => {
-                    const selectedTag = availableTags.value.find(t => t.id === ocppTagId.value);
-                    return selectedTag?.note && (
-                      <p className="text-sm text-muted-foreground mt-1">{selectedTag.note}</p>
-                    );
-                  })()}
-                </div>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  ocppTagId.value = "";
-                  ocppTagPk.value = 0;
-                }}
-              >
-                Change
-              </Button>
+        {availableTags.value.length === 0
+          ? (
+            <div className="bg-muted rounded-lg p-4 text-center text-muted-foreground">
+              No available tags to map. All tags have been mapped.
             </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto p-1">
-            {availableTags.value.map((tag) => {
-              const info = tagInfoMap.value.get(tag.id);
-              return (
-                <div
-                  key={tag.id}
-                  onClick={() => {
-                    ocppTagId.value = tag.id;
-                    ocppTagPk.value = tag.ocppTagPk;
-                  }}
-                  className="border border-border hover:border-primary/50 hover:bg-accent rounded-lg p-3 cursor-pointer transition-all"
-                >
-                  <div className="flex items-start gap-2">
-                    <Tag className="size-4 text-muted-foreground mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium font-mono text-sm truncate">{tag.id}</h3>
-                      {tag.note && (
-                        <p className="text-xs text-muted-foreground mt-1 truncate">{tag.note}</p>
-                      )}
-                    </div>
+          )
+          : ocppTagId.value
+          ? (
+            <div className="border border-primary bg-primary/5 rounded-lg p-4">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3 flex-1">
+                  <Tag className="size-5 text-primary mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="font-semibold font-mono">
+                      {ocppTagId.value}
+                    </h3>
+                    {(() => {
+                      const selectedTag = availableTags.value.find((t) =>
+                        t.id === ocppTagId.value
+                      );
+                      return selectedTag?.note && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {selectedTag.note}
+                        </p>
+                      );
+                    })()}
                   </div>
-                  {info && info.childCount > 0 && (
-                    <div className="mt-2 pt-2 border-t border-border">
-                      <p className="text-xs text-primary font-medium flex items-center gap-1">
-                        <Package className="size-3" />
-                        {info.childCount} child{info.childCount > 1 ? "ren" : ""}
-                      </p>
-                    </div>
-                  )}
-                  {info && info.mappedParent && (
-                    <div className="mt-2 pt-2 border-t border-yellow-500/30 bg-yellow-500/10 -mx-3 -mb-3 px-3 py-2 rounded-b-lg">
-                      <p className="text-xs text-yellow-600 font-medium flex items-center gap-1">
-                        <AlertTriangle className="size-3" />
-                        Parent mapped - will override
-                      </p>
-                    </div>
-                  )}
                 </div>
-              );
-            })}
-          </div>
-        )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    ocppTagId.value = "";
+                    ocppTagPk.value = 0;
+                  }}
+                >
+                  Change
+                </Button>
+              </div>
+            </div>
+          )
+          : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto p-1">
+              {availableTags.value.map((tag) => {
+                const info = tagInfoMap.value.get(tag.id);
+                return (
+                  <div
+                    key={tag.id}
+                    onClick={() => {
+                      ocppTagId.value = tag.id;
+                      ocppTagPk.value = tag.ocppTagPk;
+                    }}
+                    className="border border-border hover:border-primary/50 hover:bg-accent rounded-lg p-3 cursor-pointer transition-all"
+                  >
+                    <div className="flex items-start gap-2">
+                      <Tag className="size-4 text-muted-foreground mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium font-mono text-sm truncate">
+                          {tag.id}
+                        </h3>
+                        {tag.note && (
+                          <p className="text-xs text-muted-foreground mt-1 truncate">
+                            {tag.note}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {info && info.childCount > 0 && (
+                      <div className="mt-2 pt-2 border-t border-border">
+                        <p className="text-xs text-primary font-medium flex items-center gap-1">
+                          <Package className="size-3" />
+                          {info.childCount}{" "}
+                          child{info.childCount > 1 ? "ren" : ""}
+                        </p>
+                      </div>
+                    )}
+                    {info && info.mappedParent && (
+                      <div className="mt-2 pt-2 border-t border-yellow-500/30 bg-yellow-500/10 -mx-3 -mb-3 px-3 py-2 rounded-b-lg">
+                        <p className="text-xs text-yellow-600 font-medium flex items-center gap-1">
+                          <AlertTriangle className="size-3" />
+                          Parent mapped - will override
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
       </div>
 
       <div className="space-y-2">
         <Label>Select Lago Customer</Label>
 
-        {lagoCustomers.value.length === 0 ? (
-          <div className="bg-muted rounded-lg p-4 text-center text-muted-foreground flex items-center justify-center gap-2">
-            <Loader2 className="size-4 animate-spin" />
-            Loading customers...
-          </div>
-        ) : lagoCustomerId.value ? (
-          <div className="border border-primary bg-primary/5 rounded-lg p-4">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-3 flex-1">
-                <User className="size-5 text-primary mt-0.5" />
-                <div className="flex-1">
-                  {(() => {
-                    const selectedCustomer = lagoCustomers.value.find(c => c.id === lagoCustomerId.value);
-                    return selectedCustomer && (
-                      <h3 className="font-semibold">{selectedCustomer.name}</h3>
-                    );
-                  })()}
-                </div>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  lagoCustomerId.value = "";
-                  lagoSubscriptionId.value = "";
-                }}
-              >
-                Change
-              </Button>
+        {lagoCustomers.value.length === 0
+          ? (
+            <div className="bg-muted rounded-lg p-4 text-center text-muted-foreground flex items-center justify-center gap-2">
+              <Loader2 className="size-4 animate-spin" />
+              Loading customers...
             </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto p-1">
-            {lagoCustomers.value.map((customer) => (
-              <div
-                key={customer.id}
-                onClick={() => {
-                  lagoCustomerId.value = customer.id;
-                  lagoSubscriptionId.value = "";
-                }}
-                className="border border-border hover:border-primary/50 hover:bg-accent rounded-lg p-3 cursor-pointer transition-all"
-              >
-                <div className="flex items-start gap-2">
-                  <User className="size-4 text-muted-foreground mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-sm truncate">{customer.name}</h3>
-                    <p className="text-xs text-muted-foreground mt-1 font-mono truncate">{customer.id}</p>
+          )
+          : lagoCustomerId.value
+          ? (
+            <div className="border border-primary bg-primary/5 rounded-lg p-4">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3 flex-1">
+                  <User className="size-5 text-primary mt-0.5" />
+                  <div className="flex-1">
+                    {(() => {
+                      const selectedCustomer = lagoCustomers.value.find((c) =>
+                        c.id === lagoCustomerId.value
+                      );
+                      return selectedCustomer && (
+                        <h3 className="font-semibold">
+                          {selectedCustomer.name}
+                        </h3>
+                      );
+                    })()}
                   </div>
                 </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    lagoCustomerId.value = "";
+                    lagoSubscriptionId.value = "";
+                  }}
+                >
+                  Change
+                </Button>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          )
+          : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto p-1">
+              {lagoCustomers.value.map((customer) => (
+                <div
+                  key={customer.id}
+                  onClick={() => {
+                    lagoCustomerId.value = customer.id;
+                    lagoSubscriptionId.value = "";
+                  }}
+                  className="border border-border hover:border-primary/50 hover:bg-accent rounded-lg p-3 cursor-pointer transition-all"
+                >
+                  <div className="flex items-start gap-2">
+                    <User className="size-4 text-muted-foreground mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-sm truncate">
+                        {customer.name}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1 font-mono truncate">
+                        {customer.id}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
       </div>
 
       <div className="space-y-2">
-        <Label>Select Lago Subscription <span className="text-muted-foreground text-xs">(Optional)</span></Label>
+        <Label>
+          Select Lago Subscription{" "}
+          <span className="text-muted-foreground text-xs">(Optional)</span>
+        </Label>
 
-        {!lagoCustomerId.value ? (
-          <div className="bg-muted rounded-lg p-4 text-center text-muted-foreground">
-            Please select a customer first
-          </div>
-        ) : filteredSubscriptions.value.length === 0 ? (
-          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="size-5 text-yellow-600 mt-0.5" />
-              <div className="flex-1">
-                <h4 className="font-semibold text-yellow-600 mb-1">No Active Subscriptions</h4>
-                <p className="text-sm text-yellow-600/80 mb-2">
-                  This customer has no active subscriptions. You can still save this mapping, but:
-                </p>
-                <ul className="text-sm text-yellow-600/80 list-disc list-inside space-y-1">
-                  <li>Transactions will be saved but not sent to Lago</li>
-                  <li>The first active subscription will be auto-selected when syncing</li>
-                </ul>
-              </div>
+        {!lagoCustomerId.value
+          ? (
+            <div className="bg-muted rounded-lg p-4 text-center text-muted-foreground">
+              Please select a customer first
             </div>
-          </div>
-        ) : lagoSubscriptionId.value ? (
-          <div className="border border-primary bg-primary/5 rounded-lg p-4">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-3 flex-1">
-                <CreditCard className="size-5 text-primary mt-0.5" />
+          )
+          : filteredSubscriptions.value.length === 0
+          ? (
+            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="size-5 text-yellow-600 mt-0.5" />
                 <div className="flex-1">
-                  {(() => {
-                    const selectedSub = filteredSubscriptions.value.find(s => s.id === lagoSubscriptionId.value);
-                    return selectedSub && (
-                      <>
-                        <h3 className="font-semibold">{selectedSub.name}</h3>
-                        <p className="text-xs text-muted-foreground mt-1 font-mono">{selectedSub.id}</p>
-                      </>
-                    );
-                  })()}
+                  <h4 className="font-semibold text-yellow-600 mb-1">
+                    No Active Subscriptions
+                  </h4>
+                  <p className="text-sm text-yellow-600/80 mb-2">
+                    This customer has no active subscriptions. You can still
+                    save this mapping, but:
+                  </p>
+                  <ul className="text-sm text-yellow-600/80 list-disc list-inside space-y-1">
+                    <li>Transactions will be saved but not sent to Lago</li>
+                    <li>
+                      The first active subscription will be auto-selected when
+                      syncing
+                    </li>
+                  </ul>
                 </div>
               </div>
-              <Button type="button" variant="ghost" size="sm" onClick={() => { lagoSubscriptionId.value = ""; }}>
-                Change
-              </Button>
             </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto p-1">
-            {filteredSubscriptions.value.map((sub) => (
-              <div
-                key={sub.id}
-                onClick={() => { lagoSubscriptionId.value = sub.id; }}
-                className="border border-border hover:border-primary/50 hover:bg-accent rounded-lg p-3 cursor-pointer transition-all"
-              >
-                <div className="flex items-start gap-2">
-                  <CreditCard className="size-4 text-muted-foreground mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-sm truncate">{sub.name}</h3>
-                    <p className="text-xs text-muted-foreground mt-1 font-mono truncate">{sub.id}</p>
+          )
+          : lagoSubscriptionId.value
+          ? (
+            <div className="border border-primary bg-primary/5 rounded-lg p-4">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3 flex-1">
+                  <CreditCard className="size-5 text-primary mt-0.5" />
+                  <div className="flex-1">
+                    {(() => {
+                      const selectedSub = filteredSubscriptions.value.find(
+                        (s) => s.id === lagoSubscriptionId.value,
+                      );
+                      return selectedSub && (
+                        <>
+                          <h3 className="font-semibold">{selectedSub.name}</h3>
+                          <p className="text-xs text-muted-foreground mt-1 font-mono">
+                            {selectedSub.id}
+                          </p>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    lagoSubscriptionId.value = "";
+                  }}
+                >
+                  Change
+                </Button>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          )
+          : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto p-1">
+              {filteredSubscriptions.value.map((sub) => (
+                <div
+                  key={sub.id}
+                  onClick={() => {
+                    lagoSubscriptionId.value = sub.id;
+                  }}
+                  className="border border-border hover:border-primary/50 hover:bg-accent rounded-lg p-3 cursor-pointer transition-all"
+                >
+                  <div className="flex items-start gap-2">
+                    <CreditCard className="size-4 text-muted-foreground mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-sm truncate">
+                        {sub.name}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1 font-mono truncate">
+                        {sub.id}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="displayName">Display Name <span className="text-muted-foreground text-xs">(Optional)</span></Label>
+        <Label htmlFor="displayName">
+          Display Name{" "}
+          <span className="text-muted-foreground text-xs">(Optional)</span>
+        </Label>
         <Input
           id="displayName"
           type="text"
           value={displayName.value}
-          onInput={(e) => (displayName.value = (e.target as HTMLInputElement).value)}
+          onInput={(
+            e,
+          ) => (displayName.value = (e.target as HTMLInputElement).value)}
           placeholder="Friendly name for this mapping"
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="notes">Notes <span className="text-muted-foreground text-xs">(Optional)</span></Label>
+        <Label htmlFor="notes">
+          Notes{" "}
+          <span className="text-muted-foreground text-xs">(Optional)</span>
+        </Label>
         <Textarea
           id="notes"
           value={notes.value}
-          onInput={(e) => (notes.value = (e.target as HTMLTextAreaElement).value)}
+          onInput={(
+            e,
+          ) => (notes.value = (e.target as HTMLTextAreaElement).value)}
           rows={3}
           placeholder="Additional notes about this mapping"
         />
@@ -518,14 +639,16 @@ export default function MappingForm({ mapping }: Props) {
 
       <div className="flex gap-3 pt-4">
         <Button type="submit" disabled={loading.value}>
-          {loading.value ? (
-            <>
-              <Loader2 className="mr-2 size-4 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            mapping ? "Update Mapping" : "Create Mapping"
-          )}
+          {loading.value
+            ? (
+              <>
+                <Loader2 className="mr-2 size-4 animate-spin" />
+                Saving...
+              </>
+            )
+            : (
+              mapping ? "Update Mapping" : "Create Mapping"
+            )}
         </Button>
         <Button variant="outline" asChild>
           <a href="/mappings">Cancel</a>
@@ -534,4 +657,3 @@ export default function MappingForm({ mapping }: Props) {
     </form>
   );
 }
-

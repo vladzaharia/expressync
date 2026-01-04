@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "preact/hooks";
+import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import type { ComponentProps } from "preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 
@@ -22,29 +22,34 @@ export function NumberTicker({
   ...props
 }: NumberTickerProps) {
   const ref = useRef<HTMLSpanElement>(null);
-  const [displayValue, setDisplayValue] = useState(direction === "down" ? value : startValue);
+  const [displayValue, setDisplayValue] = useState(
+    direction === "down" ? value : startValue,
+  );
   const [hasAnimated, setHasAnimated] = useState(false);
 
-  const animateValue = useCallback((start: number, end: number, dur: number) => {
-    const startTime = performance.now();
-    
-    const tick = (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / dur, 1);
-      
-      // Easing function (ease-out)
-      const easeOut = 1 - Math.pow(1 - progress, 3);
-      const current = start + (end - start) * easeOut;
-      
-      setDisplayValue(current);
-      
-      if (progress < 1) {
-        requestAnimationFrame(tick);
-      }
-    };
-    
-    requestAnimationFrame(tick);
-  }, []);
+  const animateValue = useCallback(
+    (start: number, end: number, dur: number) => {
+      const startTime = performance.now();
+
+      const tick = (currentTime: number) => {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / dur, 1);
+
+        // Easing function (ease-out)
+        const easeOut = 1 - Math.pow(1 - progress, 3);
+        const current = start + (end - start) * easeOut;
+
+        setDisplayValue(current);
+
+        if (progress < 1) {
+          requestAnimationFrame(tick);
+        }
+      };
+
+      requestAnimationFrame(tick);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (hasAnimated) return;
@@ -61,7 +66,7 @@ export function NumberTicker({
           return () => clearTimeout(timer);
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     if (ref.current) {
@@ -69,7 +74,15 @@ export function NumberTicker({
     }
 
     return () => observer.disconnect();
-  }, [value, direction, startValue, delay, duration, hasAnimated, animateValue]);
+  }, [
+    value,
+    direction,
+    startValue,
+    delay,
+    duration,
+    hasAnimated,
+    animateValue,
+  ]);
 
   const formattedValue = Intl.NumberFormat("en-US", {
     minimumFractionDigits: decimalPlaces,
@@ -81,7 +94,7 @@ export function NumberTicker({
       ref={ref}
       className={cn(
         "inline-block tracking-wider tabular-nums",
-        className
+        className,
       )}
       {...props}
     >
@@ -89,4 +102,3 @@ export function NumberTicker({
     </span>
   );
 }
-

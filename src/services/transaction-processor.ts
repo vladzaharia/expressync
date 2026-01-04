@@ -28,7 +28,7 @@ export interface TransactionWithCompletion extends StEvETransaction {
  */
 export function calculateDelta(
   tx: TransactionWithCompletion,
-  syncState: TransactionSyncState | null
+  syncState: TransactionSyncState | null,
 ): { kwhDelta: number; meterValueFrom: number; meterValueTo: number } | null {
   // Determine current meter value
   const currentValue = tx.isCompleted
@@ -71,7 +71,7 @@ export async function processTransaction(
   tx: TransactionWithCompletion,
   syncState: TransactionSyncState | null,
   mapping: UserMapping | undefined,
-  syncRunId: number
+  syncRunId: number,
 ): Promise<ProcessedTransaction | null> {
   logger.debug("TransactionProcessor", "Processing transaction", {
     transactionId: tx.id,
@@ -83,18 +83,26 @@ export async function processTransaction(
 
   // Skip if already finalized
   if (syncState?.isFinalized) {
-    logger.debug("TransactionProcessor", "Transaction already finalized, skipping", {
-      transactionId: tx.id,
-    });
+    logger.debug(
+      "TransactionProcessor",
+      "Transaction already finalized, skipping",
+      {
+        transactionId: tx.id,
+      },
+    );
     return null;
   }
 
   // Skip if no mapping found
   if (!mapping) {
-    logger.warn("TransactionProcessor", "No mapping found for OCPP tag, skipping", {
-      transactionId: tx.id,
-      ocppIdTag: tx.ocppIdTag,
-    });
+    logger.warn(
+      "TransactionProcessor",
+      "No mapping found for OCPP tag, skipping",
+      {
+        transactionId: tx.id,
+        ocppIdTag: tx.ocppIdTag,
+      },
+    );
     return null;
   }
 
@@ -102,12 +110,16 @@ export async function processTransaction(
   const subscriptionId = await resolveSubscriptionId(mapping);
 
   if (!subscriptionId) {
-    logger.warn("TransactionProcessor", "No subscription available for mapping", {
-      transactionId: tx.id,
-      ocppIdTag: tx.ocppIdTag,
-      mappingId: mapping.id,
-      hasExplicitSubscription: !!mapping.lagoSubscriptionExternalId,
-    });
+    logger.warn(
+      "TransactionProcessor",
+      "No subscription available for mapping",
+      {
+        transactionId: tx.id,
+        ocppIdTag: tx.ocppIdTag,
+        mappingId: mapping.id,
+        hasExplicitSubscription: !!mapping.lagoSubscriptionExternalId,
+      },
+    );
     // Continue processing but mark as not ready for Lago
   }
 
@@ -168,7 +180,7 @@ export async function processTransactions(
   transactions: Map<number, TransactionWithCompletion>,
   syncStates: Map<number, TransactionSyncState>,
   mappings: Map<string, UserMapping>,
-  syncRunId: number
+  syncRunId: number,
 ): Promise<ProcessedTransaction[]> {
   logger.info("TransactionProcessor", "Processing batch of transactions", {
     totalTransactions: transactions.size,
@@ -198,4 +210,3 @@ export async function processTransactions(
 
   return processed;
 }
-

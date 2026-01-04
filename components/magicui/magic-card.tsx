@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from "preact/hooks";
+import { useCallback, useRef, useState } from "preact/hooks";
 import type { ComponentProps } from "preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 
@@ -45,7 +45,7 @@ export function MagicCard({
       onMouseLeave={handleMouseLeave}
       className={cn(
         "relative flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-xl border bg-card text-card-foreground",
-        className
+        className,
       )}
       {...props}
     >
@@ -53,11 +53,13 @@ export function MagicCard({
         className="pointer-events-none absolute -inset-px opacity-0 transition duration-300"
         style={{
           opacity,
-          background: `radial-gradient(${gradientSize}px circle at ${position.x}px ${position.y}px, ${gradientColor}, transparent ${gradientOpacity * 100}%)`,
+          background:
+            `radial-gradient(${gradientSize}px circle at ${position.x}px ${position.y}px, ${gradientColor}, transparent ${
+              gradientOpacity * 100
+            }%)`,
         }}
       />
       {children}
     </div>
   );
 }
-

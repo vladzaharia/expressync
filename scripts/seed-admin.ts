@@ -35,4 +35,3 @@ async function seedAdmin() {
 }
 
 seedAdmin();
-

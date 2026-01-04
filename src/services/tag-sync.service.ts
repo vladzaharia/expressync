@@ -25,7 +25,7 @@ export interface TagSyncResult {
  */
 export async function syncTagStatus(
   mappings: UserMapping[],
-  allTags: StEvEOcppTag[]
+  allTags: StEvEOcppTag[],
 ): Promise<TagSyncResult> {
   logger.info("TagSync", "Starting tag status synchronization", {
     totalMappings: mappings.length,
@@ -108,7 +108,7 @@ export async function syncTagStatus(
 export async function syncSingleTagStatus(
   tagPk: number,
   tagId: string,
-  hasMapping: boolean
+  hasMapping: boolean,
 ): Promise<void> {
   const desiredLimit = hasMapping ? -1 : 0;
 
@@ -136,4 +136,3 @@ export async function syncSingleTagStatus(
     throw error;
   }
 }
-

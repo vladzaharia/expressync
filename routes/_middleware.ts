@@ -139,4 +139,3 @@ export const handler = define.middleware(async (ctx) => {
 
   return ctx.next();
 });
-

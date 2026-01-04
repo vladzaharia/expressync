@@ -1,8 +1,15 @@
 import { useSignal } from "@preact/signals";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table.tsx";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { Pencil, Trash2, Loader2, CornerDownRight } from "lucide-preact";
+import { CornerDownRight, Loader2, Pencil, Trash2 } from "lucide-preact";
 
 interface Props {
   mappings: Array<{
@@ -36,7 +43,11 @@ export default function MappingsTable({ mappings: initialMappings }: Props) {
       if (res.ok) {
         const data = await res.json();
         if (data.deletedCount && data.deletedCount > 1) {
-          alert(`Deleted ${data.deletedCount} mappings (1 parent + ${data.deletedCount - 1} children)`);
+          alert(
+            `Deleted ${data.deletedCount} mappings (1 parent + ${
+              data.deletedCount - 1
+            } children)`,
+          );
         }
         window.location.reload();
       } else {
@@ -90,28 +101,43 @@ export default function MappingsTable({ mappings: initialMappings }: Props) {
       </TableHeader>
       <TableBody>
         {mappings.value.map((mapping) => {
-          const isChildMapping = mapping.notes?.includes("Auto-created from parent");
+          const isChildMapping = mapping.notes?.includes(
+            "Auto-created from parent",
+          );
           return (
-            <TableRow key={mapping.id} className={isChildMapping ? "bg-muted/30" : ""}>
+            <TableRow
+              key={mapping.id}
+              className={isChildMapping ? "bg-muted/30" : ""}
+            >
               <TableCell className="font-mono">
                 <div className="flex items-center gap-1">
-                  {isChildMapping && <CornerDownRight className="size-3 text-muted-foreground" />}
+                  {isChildMapping && (
+                    <CornerDownRight className="size-3 text-muted-foreground" />
+                  )}
                   {mapping.steveOcppIdTag}
                 </div>
               </TableCell>
               <TableCell>{mapping.displayName || "-"}</TableCell>
-              <TableCell className="font-mono text-xs">{mapping.lagoCustomerExternalId}</TableCell>
-              <TableCell className="font-mono text-xs">{mapping.lagoSubscriptionExternalId}</TableCell>
+              <TableCell className="font-mono text-xs">
+                {mapping.lagoCustomerExternalId}
+              </TableCell>
+              <TableCell className="font-mono text-xs">
+                {mapping.lagoSubscriptionExternalId}
+              </TableCell>
               <TableCell>
                 <Badge
                   variant={mapping.isActive ? "success" : "secondary"}
                   className="cursor-pointer"
-                  onClick={() => handleToggleActive(mapping.id, mapping.isActive)}
+                  onClick={() =>
+                    handleToggleActive(mapping.id, mapping.isActive)}
                 >
                   {mapping.isActive ? "Active" : "Inactive"}
                 </Badge>
               </TableCell>
-              <TableCell className="max-w-[200px] truncate text-muted-foreground" title={mapping.notes || ""}>
+              <TableCell
+                className="max-w-[200px] truncate text-muted-foreground"
+                title={mapping.notes || ""}
+              >
                 {mapping.notes || "-"}
               </TableCell>
               <TableCell className="text-right">
@@ -129,11 +155,9 @@ export default function MappingsTable({ mappings: initialMappings }: Props) {
                     disabled={deleting.value === mapping.id}
                     className="text-destructive hover:text-destructive"
                   >
-                    {deleting.value === mapping.id ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="size-4" />
-                    )}
+                    {deleting.value === mapping.id
+                      ? <Loader2 className="size-4 animate-spin" />
+                      : <Trash2 className="size-4" />}
                     <span className="sr-only">Delete</span>
                   </Button>
                 </div>
@@ -145,4 +169,3 @@ export default function MappingsTable({ mappings: initialMappings }: Props) {
     </Table>
   );
 }
-

@@ -72,4 +72,3 @@ export type AuthUser = typeof auth.$Infer.Session.user;
  * Type for the session
  */
 export type AuthSession = typeof auth.$Infer.Session.session;
-

@@ -1,77 +1,110 @@
 /* TailwindCSS v4 - CSS-first configuration */
 @import "tailwindcss";
 
-/* ===== shadcn/ui CSS Variables (New York style - Zinc) ===== */
+/* ===== EV Billing "Electric Volt" Theme ===== */
+/* A modern, electric-inspired theme for EV charging platforms */
 @layer base {
   :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
+    /* Light mode - Clean energy feel */
+    --background: oklch(0.985 0.002 220);
+    --foreground: oklch(0.15 0.02 240);
     --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
+    --card-foreground: oklch(0.15 0.02 240);
     --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.965 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.965 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.965 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --destructive-foreground: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.646 0.222 41.116);
-    --chart-2: oklch(0.6 0.118 184.704);
-    --chart-3: oklch(0.398 0.07 227.392);
-    --chart-4: oklch(0.828 0.189 84.429);
-    --chart-5: oklch(0.769 0.188 70.08);
+    --popover-foreground: oklch(0.15 0.02 240);
+    /* Primary: Electric Cyan */
+    --primary: oklch(0.65 0.18 220);
+    --primary-foreground: oklch(0.98 0 0);
+    /* Secondary: Soft electric */
+    --secondary: oklch(0.95 0.02 220);
+    --secondary-foreground: oklch(0.25 0.05 220);
+    --muted: oklch(0.96 0.01 220);
+    --muted-foreground: oklch(0.50 0.02 240);
+    /* Accent: Volt Green */
+    --accent: oklch(0.72 0.19 145);
+    --accent-foreground: oklch(0.18 0.05 145);
+    --destructive: oklch(0.55 0.22 25);
+    --destructive-foreground: oklch(0.98 0 0);
+    /* Success: Green energy */
+    --success: oklch(0.72 0.19 145);
+    --success-foreground: oklch(0.98 0 0);
+    /* Warning: Amber glow */
+    --warning: oklch(0.80 0.16 85);
+    --warning-foreground: oklch(0.25 0.05 85);
+    --border: oklch(0.90 0.02 220);
+    --input: oklch(0.92 0.01 220);
+    --ring: oklch(0.65 0.18 220);
+    /* Chart colors - Electric spectrum */
+    --chart-1: oklch(0.65 0.18 220);
+    --chart-2: oklch(0.72 0.19 145);
+    --chart-3: oklch(0.60 0.20 280);
+    --chart-4: oklch(0.80 0.16 85);
+    --chart-5: oklch(0.70 0.20 30);
     --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.965 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    /* Sidebar - Subtle electric */
+    --sidebar: oklch(0.97 0.01 220);
+    --sidebar-foreground: oklch(0.15 0.02 240);
+    --sidebar-primary: oklch(0.65 0.18 220);
+    --sidebar-primary-foreground: oklch(0.98 0 0);
+    --sidebar-accent: oklch(0.94 0.03 220);
+    --sidebar-accent-foreground: oklch(0.25 0.05 220);
+    --sidebar-border: oklch(0.90 0.02 220);
+    --sidebar-ring: oklch(0.65 0.18 220);
+    /* Electric glow colors */
+    --glow-cyan: oklch(0.75 0.18 220);
+    --glow-green: oklch(0.80 0.20 145);
+    --glow-violet: oklch(0.65 0.22 280);
   }
 
   .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.145 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.145 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.985 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.396 0.141 25.723);
-    --destructive-foreground: oklch(0.637 0.237 25.331);
-    --border: oklch(0.269 0 0);
-    --input: oklch(0.269 0 0);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.488 0.243 264.376);
-    --chart-2: oklch(0.696 0.17 162.48);
-    --chart-3: oklch(0.985 0 0);
-    --chart-4: oklch(0.828 0.189 84.429);
-    --chart-5: oklch(0.769 0.188 70.08);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(0.269 0 0);
-    --sidebar-ring: oklch(0.556 0 0);
+    /* Dark mode - Premium electric feel */
+    --background: oklch(0.12 0.02 240);
+    --foreground: oklch(0.95 0.01 220);
+    --card: oklch(0.15 0.02 240);
+    --card-foreground: oklch(0.95 0.01 220);
+    --popover: oklch(0.15 0.02 240);
+    --popover-foreground: oklch(0.95 0.01 220);
+    /* Primary: Bright Electric Cyan */
+    --primary: oklch(0.75 0.15 200);
+    --primary-foreground: oklch(0.12 0.02 220);
+    /* Secondary: Deep electric */
+    --secondary: oklch(0.22 0.03 240);
+    --secondary-foreground: oklch(0.95 0.01 220);
+    --muted: oklch(0.22 0.02 240);
+    --muted-foreground: oklch(0.65 0.02 220);
+    /* Accent: Neon Volt Green */
+    --accent: oklch(0.75 0.22 145);
+    --accent-foreground: oklch(0.12 0.05 145);
+    --destructive: oklch(0.45 0.18 25);
+    --destructive-foreground: oklch(0.90 0.15 25);
+    /* Success: Bright Green */
+    --success: oklch(0.75 0.22 145);
+    --success-foreground: oklch(0.12 0.05 145);
+    /* Warning: Bright Amber */
+    --warning: oklch(0.85 0.18 85);
+    --warning-foreground: oklch(0.20 0.05 85);
+    --border: oklch(0.28 0.03 240);
+    --input: oklch(0.22 0.02 240);
+    --ring: oklch(0.75 0.15 200);
+    /* Chart colors - Vibrant electric */
+    --chart-1: oklch(0.75 0.15 200);
+    --chart-2: oklch(0.75 0.22 145);
+    --chart-3: oklch(0.70 0.22 280);
+    --chart-4: oklch(0.85 0.18 85);
+    --chart-5: oklch(0.75 0.20 30);
+    /* Sidebar - Deep electric */
+    --sidebar: oklch(0.10 0.02 240);
+    --sidebar-foreground: oklch(0.95 0.01 220);
+    --sidebar-primary: oklch(0.75 0.15 200);
+    --sidebar-primary-foreground: oklch(0.12 0.02 220);
+    --sidebar-accent: oklch(0.20 0.03 240);
+    --sidebar-accent-foreground: oklch(0.95 0.01 220);
+    --sidebar-border: oklch(0.25 0.02 240);
+    --sidebar-ring: oklch(0.75 0.15 200);
+    /* Electric glow colors */
+    --glow-cyan: oklch(0.80 0.18 200);
+    --glow-green: oklch(0.85 0.22 145);
+    --glow-violet: oklch(0.72 0.25 280);
   }
 
   * {
@@ -138,6 +171,14 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  /* Glow colors for MagicUI effects */
+  --color-glow-cyan: var(--glow-cyan);
+  --color-glow-green: var(--glow-green);
+  --color-glow-violet: var(--glow-violet);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
 }
 
 /* Custom components */
@@ -150,6 +191,35 @@
       rgb(187, 247, 208),
       rgb(254, 249, 195)
     );
+  }
+
+  /* Electric gradient for EV theme */
+  .electric-gradient {
+    background: linear-gradient(
+      135deg,
+      oklch(0.75 0.15 200) 0%,
+      oklch(0.75 0.22 145) 50%,
+      oklch(0.70 0.22 280) 100%
+    );
+  }
+
+  /* Glow effects */
+  .glow-cyan {
+    box-shadow:
+      0 0 20px oklch(0.75 0.15 200 / 0.4),
+      0 0 40px oklch(0.75 0.15 200 / 0.2);
+  }
+
+  .glow-green {
+    box-shadow:
+      0 0 20px oklch(0.75 0.22 145 / 0.4),
+      0 0 40px oklch(0.75 0.22 145 / 0.2);
+  }
+
+  .glow-violet {
+    box-shadow:
+      0 0 20px oklch(0.70 0.22 280 / 0.4),
+      0 0 40px oklch(0.70 0.22 280 / 0.2);
   }
 }
 
@@ -205,6 +275,86 @@
   }
 }
 
+/* Aurora text animation */
+@keyframes aurora {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Ripple animation */
+@keyframes ripple {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2);
+    opacity: 0;
+  }
+}
+
+/* Pulse glow animation */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 5px var(--glow-cyan),
+      0 0 10px var(--glow-cyan),
+      0 0 15px var(--glow-cyan);
+  }
+  50% {
+    box-shadow:
+      0 0 10px var(--glow-cyan),
+      0 0 20px var(--glow-cyan),
+      0 0 30px var(--glow-cyan);
+  }
+}
+
+/* Border beam animation */
+@keyframes border-beam {
+  0% {
+    offset-distance: 0%;
+  }
+  100% {
+    offset-distance: 100%;
+  }
+}
+
+/* Shine effect */
+@keyframes shine {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Sparkle animation */
+@keyframes sparkle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2) rotate(180deg);
+  }
+}
+
+/* Background position spin for neon cards */
+@keyframes background-position-spin {
+  0% {
+    background-position: top center;
+  }
+  100% {
+    background-position: bottom center;
+  }
+}
+
 @layer utilities {
   .animate-shimmer-slide {
     animation: shimmer-slide var(--speed) ease-in-out infinite alternate;
@@ -225,5 +375,34 @@
 
   .animate-grid {
     animation: grid 15s linear infinite;
+  }
+
+  .animate-aurora {
+    animation: aurora var(--aurora-speed, 8s) ease-in-out infinite;
+    background-size: 200% auto;
+  }
+
+  .animate-ripple {
+    animation: ripple 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .animate-border-beam {
+    animation: border-beam var(--duration, 6s) linear infinite;
+  }
+
+  .animate-shine {
+    animation: shine var(--duration, 14s) linear infinite;
+  }
+
+  .animate-sparkle {
+    animation: sparkle 1.5s ease-in-out infinite;
+  }
+
+  .animate-background-position-spin {
+    animation: background-position-spin 3s linear infinite alternate;
   }
 }

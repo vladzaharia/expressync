@@ -68,7 +68,7 @@ class Logger {
     level: LogLevel,
     category: string,
     message: string,
-    context?: LogContext | Error
+    context?: LogContext | Error,
   ): string {
     const timestamp = new Date().toISOString();
     const prefix = `[${timestamp}] [${level}] [${category}]`;
@@ -147,4 +147,3 @@ const DEBUG_LEVEL = (Deno.env.get("DEBUG_LEVEL") || "ERROR") as LogLevel;
 
 // Export singleton logger instance
 export const logger = new Logger(DEBUG_LEVEL);
-
