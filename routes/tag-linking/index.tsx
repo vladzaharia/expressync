@@ -2,14 +2,15 @@ import { define } from "../../utils.ts";
 import { db } from "../../src/db/index.ts";
 import * as schema from "../../src/db/schema.ts";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
-import { Button } from "../../components/ui/button.tsx";
 import { Plus } from "lucide-preact";
 import TagLinkingGrid from "../../islands/TagLinkingGrid.tsx";
 import { config } from "../../src/lib/config.ts";
 import { lagoClient } from "../../src/lib/lago-client.ts";
+import { PageCard } from "../../components/PageCard.tsx";
+import { CHROME_SIZE } from "../../components/AppSidebar.tsx";
 
 export const handler = define.handlers({
-  async GET(ctx) {
+  async GET(_ctx) {
     const mappings = await db.select().from(schema.userMappings);
 
     // Fetch subscription names from Lago
@@ -29,6 +30,19 @@ export const handler = define.handlers({
   },
 });
 
+function LinkTagsAction() {
+  return (
+    <a
+      href="/tag-linking/new"
+      className="flex items-center justify-center gap-2 px-4 transition-colors"
+      style={{ height: CHROME_SIZE }}
+    >
+      <Plus className="size-5" />
+      <span className="text-sm font-medium hidden sm:inline">Link Tags</span>
+    </a>
+  );
+}
+
 export default define.page<typeof handler>(
   function TagLinkingPage({ data, url, state }) {
     // Group mappings by customer/subscription
@@ -37,23 +51,21 @@ export default define.page<typeof handler>(
     return (
       <SidebarLayout
         currentPath={url.pathname}
-        title="Tag Linking"
-        description="Link OCPP tags to Lago billing customers and subscriptions"
         user={state.user}
-        actions={
-          <Button asChild>
-            <a href="/tag-linking/new">
-              <Plus className="size-4 mr-2" />
-              Link Tags
-            </a>
-          </Button>
-        }
+        accentColor="violet"
+        actions={<LinkTagsAction />}
       >
-        <TagLinkingGrid
-          groups={groupedMappings}
-          lagoDashboardUrl={config.LAGO_DASHBOARD_URL}
-          steveDashboardUrl={config.STEVE_BASE_URL}
-        />
+        <PageCard
+          title="Tag Linking"
+          description={`${groupedMappings.length} customer${groupedMappings.length !== 1 ? "s" : ""} linked`}
+          colorScheme="violet"
+        >
+          <TagLinkingGrid
+            groups={groupedMappings}
+            lagoDashboardUrl={config.LAGO_DASHBOARD_URL}
+            steveDashboardUrl={config.STEVE_BASE_URL}
+          />
+        </PageCard>
       </SidebarLayout>
     );
   },

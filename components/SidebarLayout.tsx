@@ -12,27 +12,26 @@ interface User {
 interface SidebarLayoutProps {
   children: ComponentChildren;
   currentPath: string;
-  title?: string;
-  description?: string;
+  title?: string; // Kept for backwards compatibility but no longer displayed in top bar
+  description?: string; // Kept for backwards compatibility but no longer displayed in top bar
   actions?: ComponentChildren;
+  accentColor?: import("@/src/lib/colors.ts").AccentColor;
   user?: User;
 }
 
 export function SidebarLayout({
   children,
   currentPath,
-  title,
-  description,
   actions,
+  accentColor,
   user,
 }: SidebarLayoutProps) {
   return (
     <ThemeProvider defaultTheme="dark">
       <SidebarWrapper
         currentPath={currentPath}
-        title={title}
-        description={description}
         actions={actions}
+        accentColor={accentColor}
         user={user}
       >
         {children}

@@ -1,4 +1,4 @@
-import { forwardRef } from "preact/compat";
+import { forwardRef, JSX } from "preact/compat";
 import { cn } from "@/src/lib/utils/cn.ts";
 
 export interface TextareaProps

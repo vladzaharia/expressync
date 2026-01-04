@@ -33,13 +33,13 @@ export default function MappingsTable({ mappings: initialMappings }: Props) {
     const mapping = mappings.value.find((m) => m.id === id);
     const confirmMsg = mapping?.notes?.includes("Auto-created from parent")
       ? "This mapping was auto-created from a parent tag. Are you sure you want to delete it?"
-      : "Are you sure you want to delete this mapping? This will also delete all child tag mappings.";
+      : "Are you sure you want to delete this mapping? This will also delete all child tag links.";
 
     if (!confirm(confirmMsg)) return;
 
     deleting.value = id;
     try {
-      const res = await fetch(`/api/mappings?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/links?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         const data = await res.json();
         if (data.deletedCount && data.deletedCount > 1) {
@@ -62,7 +62,7 @@ export default function MappingsTable({ mappings: initialMappings }: Props) {
 
   const handleToggleActive = async (id: number, isActive: boolean) => {
     try {
-      const res = await fetch(`/api/mappings?id=${id}`, {
+      const res = await fetch(`/api/links?id=${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: !isActive }),
@@ -143,7 +143,7 @@ export default function MappingsTable({ mappings: initialMappings }: Props) {
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-1">
                   <Button variant="ghost" size="icon" asChild>
-                    <a href={`/mappings/${mapping.id}`}>
+                    <a href={`/links/${mapping.id}`}>
                       <Pencil className="size-4" />
                       <span className="sr-only">Edit</span>
                     </a>

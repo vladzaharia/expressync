@@ -3,14 +3,10 @@ import { db } from "../../src/db/index.ts";
 import * as schema from "../../src/db/schema.ts";
 import { eq } from "drizzle-orm";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../../components/ui/card.tsx";
+import { PageCard } from "../../components/PageCard.tsx";
 import MappingForm from "../../islands/MappingForm.tsx";
+import { ArrowLeft } from "lucide-preact";
+import { CHROME_SIZE } from "../../components/AppSidebar.tsx";
 
 export const handler = define.handlers({
   async GET(ctx) {
@@ -33,26 +29,35 @@ export const handler = define.handlers({
   },
 });
 
+function BackAction() {
+  return (
+    <a
+      href="/tag-linking"
+      className="flex items-center justify-center gap-2 px-4 transition-colors"
+      style={{ height: CHROME_SIZE }}
+    >
+      <ArrowLeft className="size-5" />
+      <span className="text-sm font-medium hidden sm:inline">Back</span>
+    </a>
+  );
+}
+
 export default define.page<typeof handler>(
   function EditTagLinkingPage({ data, url, state }) {
     return (
       <SidebarLayout
         currentPath={url.pathname}
-        title="Edit Tag Link"
-        description="Update the link between an OCPP tag and Lago customer"
         user={state.user}
+        accentColor="violet"
+        actions={<BackAction />}
       >
-        <Card>
-          <CardHeader>
-            <CardTitle>Edit Tag Link</CardTitle>
-            <CardDescription>
-              Update the billing configuration for this OCPP tag.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <MappingForm mapping={data.mapping} />
-          </CardContent>
-        </Card>
+        <PageCard
+          title="Edit Tag Link"
+          description="Update the billing configuration for this OCPP tag."
+          colorScheme="violet"
+        >
+          <MappingForm mapping={data.mapping} />
+        </PageCard>
       </SidebarLayout>
     );
   },

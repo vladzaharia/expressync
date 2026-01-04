@@ -10,7 +10,6 @@ import {
   ArrowRight,
   CornerDownRight,
   CreditCard,
-  ExternalLink,
   Pencil,
   Tag,
   Trash2,
@@ -60,14 +59,14 @@ export default function TagLinkingGrid({
     const tagCount = group?.tags.length || 1;
 
     const confirmMsg = tagCount > 1
-      ? `This will delete ${tagCount} tag mappings (1 parent + ${tagCount - 1} children). Are you sure?`
+      ? `This will delete ${tagCount} tag links (1 parent + ${tagCount - 1} children). Are you sure?`
       : "Are you sure you want to delete this tag mapping?";
 
     if (!confirm(confirmMsg)) return;
 
     deleting.value = mappingId;
     try {
-      const res = await fetch(`/api/mappings?id=${mappingId}`, {
+      const res = await fetch(`/api/links?id=${mappingId}`, {
         method: "DELETE",
       });
       if (res.ok) {
@@ -90,7 +89,7 @@ export default function TagLinkingGrid({
 
   const handleToggleActive = async (mappingId: number, isActive: boolean) => {
     try {
-      const res = await fetch(`/api/mappings?id=${mappingId}`, {
+      const res = await fetch(`/api/links?id=${mappingId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: !isActive }),
@@ -118,15 +117,7 @@ export default function TagLinkingGrid({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {groups.value.length} customer{groups.value.length !== 1 ? "s" : ""} linked
-        </p>
-      </div>
-
-      {/* Table-like rows */}
-      <div className="space-y-3">
+      <div className="space-y-4">
         {groups.value.map((group) => {
           const parentTags = group.tags.filter((t) => !t.isChild);
           const childTags = group.tags.filter((t) => t.isChild);
@@ -160,9 +151,9 @@ export default function TagLinkingGrid({
                 }
 
                 const cardContent = (
-                  <CardContent className="px-6 py-2 h-full flex flex-col justify-center">
+                  <CardContent className="px-4 py-3 h-full flex flex-col justify-center">
                     <div className="flex items-center gap-3">
-                      <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 shrink-0">
+                      <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 shrink-0">
                         <Icon className="size-4 text-primary" />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -173,15 +164,12 @@ export default function TagLinkingGrid({
                           </p>
                         )}
                       </div>
-                      {customerUrl && (
-                        <ExternalLink className="size-3 text-muted-foreground shrink-0" />
-                      )}
                     </div>
                   </CardContent>
                 );
                 return customerUrl ? (
-                  <a href={customerUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 self-stretch cursor-pointer">
-                    <Card className="min-w-56 h-full hover:bg-muted/50 transition-colors">
+                  <a href={customerUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 self-stretch">
+                    <Card className="min-w-56 h-full hover:bg-accent/50 hover:border-primary/30 transition-colors cursor-pointer">
                       {cardContent}
                     </Card>
                   </a>
@@ -202,20 +190,19 @@ export default function TagLinkingGrid({
                 {parentTags.map((tag) => {
                   const tagUrl = getOcppTagUrl(tag.ocppTagPk);
                   const cardContent = (
-                    <CardContent className="px-6 py-2 h-full flex items-center gap-2">
+                    <CardContent className="px-4 py-3 h-full flex items-center gap-2">
                       <Tag className="size-4 text-primary" />
                       <span className="font-mono text-sm font-medium">{tag.id}</span>
-                      {tagUrl && <ExternalLink className="size-3 text-muted-foreground" />}
                     </CardContent>
                   );
                   return tagUrl ? (
-                    <a key={tag.id} href={tagUrl} target="_blank" rel="noopener noreferrer" className="cursor-pointer">
-                      <Card className="shrink-0 min-w-48 h-full hover:bg-muted/50 transition-colors">
+                    <a key={tag.id} href={tagUrl} target="_blank" rel="noopener noreferrer">
+                      <Card className="shrink-0 min-w-44 h-full hover:bg-accent/50 hover:border-primary/30 transition-colors cursor-pointer">
                         {cardContent}
                       </Card>
                     </a>
                   ) : (
-                    <Card key={tag.id} className="shrink-0 min-w-48">
+                    <Card key={tag.id} className="shrink-0 min-w-44">
                       {cardContent}
                     </Card>
                   );
@@ -223,20 +210,19 @@ export default function TagLinkingGrid({
                 {childTags.map((tag) => {
                   const tagUrl = getOcppTagUrl(tag.ocppTagPk);
                   const cardContent = (
-                    <CardContent className="px-6 py-2 h-full flex items-center gap-2">
+                    <CardContent className="px-4 py-3 h-full flex items-center gap-2">
                       <CornerDownRight className="size-4 text-muted-foreground" />
                       <span className="font-mono text-sm">{tag.id}</span>
-                      {tagUrl && <ExternalLink className="size-3 text-muted-foreground" />}
                     </CardContent>
                   );
                   return tagUrl ? (
-                    <a key={tag.id} href={tagUrl} target="_blank" rel="noopener noreferrer" className="cursor-pointer">
-                      <Card className="shrink-0 min-w-48 bg-muted/50 h-full hover:bg-muted transition-colors">
+                    <a key={tag.id} href={tagUrl} target="_blank" rel="noopener noreferrer">
+                      <Card className="shrink-0 min-w-44 bg-muted/30 h-full hover:bg-accent/50 hover:border-primary/30 transition-colors cursor-pointer">
                         {cardContent}
                       </Card>
                     </a>
                   ) : (
-                    <Card key={tag.id} className="shrink-0 min-w-48 bg-muted/50">
+                    <Card key={tag.id} className="shrink-0 min-w-44 bg-muted/30">
                       {cardContent}
                     </Card>
                   );
@@ -271,7 +257,6 @@ export default function TagLinkingGrid({
           );
         })}
       </div>
-    </div>
   );
 }
 

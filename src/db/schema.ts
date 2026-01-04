@@ -78,7 +78,7 @@ export const verifications = pgTable("verifications", {
 
 // ============================================================================
 // APPLICATION TABLES
-// Custom tables for the EV Billing Portal
+// Custom tables for the ExpresSync OCPP Portal
 // ============================================================================
 
 /**

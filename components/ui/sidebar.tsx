@@ -17,7 +17,7 @@ import {
 
 const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
-const SIDEBAR_WIDTH_ICON = "3rem";
+const SIDEBAR_WIDTH_ICON = "3.5rem"; // Match CHROME_SIZE from AppSidebar
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
 type SidebarContextType = {
@@ -142,6 +142,7 @@ function Sidebar({
   collapsible = "offcanvas",
   className,
   children,
+  style,
   ...props
 }: ComponentProps<"div"> & {
   side?: "left" | "right";
@@ -206,6 +207,7 @@ function Sidebar({
       data-collapsible={state === "collapsed" ? collapsible : ""}
       data-variant={variant}
       data-side={side}
+      style={style}
     >
       <div
         className={cn(

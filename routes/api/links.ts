@@ -108,7 +108,7 @@ export const handler = define.handlers({
   },
 
   // Update mapping
-  // When updating a parent tag mapping, also updates all child tag mappings
+  // When updating a parent tag mapping, also updates all child tag links
   async PUT(ctx) {
     try {
       const url = new URL(ctx.req.url);
@@ -193,7 +193,7 @@ export const handler = define.handlers({
   },
 
   // Delete mapping
-  // When deleting a parent tag mapping, also deletes all child tag mappings
+  // When deleting a parent tag mapping, also deletes all child tag links
   async DELETE(ctx) {
     try {
       const url = new URL(ctx.req.url);
