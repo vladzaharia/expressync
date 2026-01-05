@@ -4,7 +4,7 @@ import { GridPattern } from "../components/magicui/grid-pattern.tsx";
 import { Particles } from "../components/magicui/particles.tsx";
 import { Ripple } from "../components/magicui/ripple.tsx";
 import { ShineBorder } from "../components/magicui/shine-border.tsx";
-import { ExpresyncBrand } from "../components/brand/ExpresyncBrand.tsx";
+import { ExpresSyncBrand } from "../components/brand/ExpresSyncBrand.tsx";
 import { BlurFade } from "../components/magicui/blur-fade.tsx";
 
 export default define.page(function LoginPage() {
@@ -38,16 +38,9 @@ export default define.page(function LoginPage() {
         <BlurFade delay={0} duration={0.5} direction="down">
           <div class="flex justify-center mb-8">
             <div class="relative">
-              <Ripple
-                mainCircleSize={100}
-                mainCircleOpacity={0.15}
-                numCircles={4}
-                color="oklch(0.75 0.15 200)"
-              />
-              <ExpresyncBrand
+              <ExpresSyncBrand
                 variant="login"
                 showParticles={true}
-                showBorderBeam={true}
               />
             </div>
           </div>

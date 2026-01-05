@@ -7,7 +7,7 @@ import { BorderBeam } from "../magicui/border-beam.tsx";
 
 type BrandVariant = "logo-only" | "sidebar-collapsed" | "sidebar-expanded" | "login";
 
-interface ExpresyncBrandProps {
+interface ExpresSyncBrandProps {
   variant?: BrandVariant;
   className?: string;
   showBorderBeam?: boolean;
@@ -29,15 +29,13 @@ const syncColors = [
 ];
 
 // Logo component - squircle with thunderbolt
-function ExpresyncLogo({
+function ExpresSyncLogo({
   size = "md",
   showParticles = false,
-  showBorderBeam = false,
   className,
 }: {
   size?: "sm" | "md" | "lg";
   showParticles?: boolean;
-  showBorderBeam?: boolean;
   className?: string;
 }) {
   const sizeClasses = {
@@ -87,26 +85,22 @@ function ExpresyncLogo({
         />
 
         {/* Border beam effect */}
-        {showBorderBeam && (
-          <>
-            <BorderBeam
-              size={40}
-              duration={2}
-              colorFrom="rgba(255,255,255,0.8)"
-              colorTo="rgba(255,255,255,0.2)"
-              className="opacity-80"
-            />
-            <BorderBeam
-              size={40}
-              duration={2}
-              delay={1}
-              colorFrom="rgba(255,255,255,0.2)"
-              colorTo="rgba(255,255,255,0.8)"
-              className="opacity-60"
-              reverse
-            />
-          </>
-        )}
+        <BorderBeam
+          size={40}
+          duration={2}
+          colorFrom="rgba(255,255,255,0.8)"
+          colorTo="rgba(255,255,255,0.2)"
+          className="opacity-80"
+        />
+        <BorderBeam
+          size={40}
+          duration={2}
+          delay={1}
+          colorFrom="rgba(255,255,255,0.2)"
+          colorTo="rgba(255,255,255,0.8)"
+          className="opacity-60"
+          reverse
+        />
       </div>
 
       {/* Outer glow */}
@@ -116,32 +110,16 @@ function ExpresyncLogo({
 }
 
 // Wordmark component
-function ExpresyncWordmark({
+function ExpresSyncWordmark({
   size = "md",
-  animated = true,
 }: {
   size?: "sm" | "md" | "lg";
-  animated?: boolean;
 }) {
   const sizeClasses = {
     sm: "text-sm",
     md: "text-base",
     lg: "text-3xl",
   };
-
-  if (!animated) {
-    // Static gradient version for large/login variant
-    return (
-      <span className={cn("font-bold", sizeClasses[size])}>
-        <span className="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
-          Expres
-        </span>
-        <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-          Sync
-        </span>
-      </span>
-    );
-  }
 
   return (
     <span className={cn("font-bold", sizeClasses[size])}>
@@ -156,20 +134,18 @@ function ExpresyncWordmark({
 }
 
 // Main component with variants
-export function ExpresyncBrand({
+export function ExpresSyncBrand({
   variant = "sidebar-expanded",
   className,
-  showBorderBeam = false,
   showParticles = false,
-}: ExpresyncBrandProps) {
+}: ExpresSyncBrandProps) {
   switch (variant) {
     case "logo-only":
     case "sidebar-collapsed":
       return (
-        <ExpresyncLogo
+        <ExpresSyncLogo
           size="sm"
           showParticles={showParticles}
-          showBorderBeam={showBorderBeam}
           className={className}
         />
       );
@@ -177,16 +153,16 @@ export function ExpresyncBrand({
     case "sidebar-expanded":
       return (
         <div className={cn("flex items-center gap-3", className)}>
-          <ExpresyncLogo size="sm" showParticles={showParticles} showBorderBeam={showBorderBeam} />
-          <ExpresyncWordmark size="sm" animated={true} />
+          <ExpresSyncLogo size="sm" showParticles={showParticles} />
+          <ExpresSyncWordmark size="sm" />
         </div>
       );
 
     case "login":
       return (
         <div className={cn("flex items-center gap-3", className)}>
-          <ExpresyncLogo size="lg" showParticles={showParticles} showBorderBeam={showBorderBeam} />
-          <ExpresyncWordmark size="lg" animated={false} />
+          <ExpresSyncLogo size="lg" showParticles={showParticles} />
+          <ExpresSyncWordmark size="lg" />
         </div>
       );
 
@@ -195,5 +171,5 @@ export function ExpresyncBrand({
   }
 }
 
-export { ExpresyncLogo, ExpresyncWordmark };
+export { ExpresSyncLogo, ExpresSyncWordmark };
 
