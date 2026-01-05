@@ -22,7 +22,7 @@ import {
 } from "./ui/tooltip.tsx";
 import { BorderBeam } from "./magicui/border-beam.tsx";
 import { Particles } from "./magicui/particles.tsx";
-import { ExpresyncBrand } from "./brand/ExpresyncBrand.tsx";
+import { ExpresSyncBrand } from "./brand/ExpresSyncBrand.tsx";
 import { type AccentColor, accentTailwindClasses } from "@/src/lib/colors.ts";
 
 // Shared chrome size - used by both sidebar and top bar
@@ -207,10 +207,8 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
       />
 
       {/* ExpresSync brand */}
-      <ExpresyncBrand
+      <ExpresSyncBrand
         variant={isCollapsed ? "sidebar-collapsed" : "sidebar-expanded"}
-        showParticles={false}
-        showBorderBeam={false}
       />
 
       {/* Border beam effect */}
