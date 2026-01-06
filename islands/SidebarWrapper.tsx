@@ -37,6 +37,19 @@ function TopBarContent({
   const accentBgClass =
     `${colorClasses.bg} ${colorClasses.bgHover} ${colorClasses.text}`;
 
+  // Hide on mobile if no actions, show on desktop always
+  if (!actions) {
+    return (
+      <header
+        className="hidden md:flex shrink-0 items-stretch border-b bg-background sticky top-0 z-10"
+        style={{ height: CHROME_SIZE }}
+      >
+        <div className="flex-1" />
+      </header>
+    );
+  }
+
+  // Show on all screen sizes when there are actions
   return (
     <header
       className="flex shrink-0 items-stretch border-b bg-background sticky top-0 z-10"
@@ -46,16 +59,14 @@ function TopBarContent({
       <div className="flex-1" />
 
       {/* Page action section - full block with accent background */}
-      {actions && (
-        <div
-          className={cn(
-            "flex items-center justify-center border-l transition-colors",
-            accentBgClass,
-          )}
-        >
-          {actions}
-        </div>
-      )}
+      <div
+        className={cn(
+          "flex items-center justify-center border-l transition-colors",
+          accentBgClass,
+        )}
+      >
+        {actions}
+      </div>
     </header>
   );
 }

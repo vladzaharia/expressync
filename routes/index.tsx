@@ -12,6 +12,7 @@ import {
 import { DotPattern } from "../components/magicui/dot-pattern.tsx";
 import { SparklesText } from "../components/magicui/sparkles-text.tsx";
 import { BlurFade } from "../components/magicui/blur-fade.tsx";
+import { BorderBeam } from "../components/magicui/border-beam.tsx";
 import SyncRunsTable from "../islands/SyncRunsTable.tsx";
 import RecentTransactionsTable from "../islands/RecentTransactionsTable.tsx";
 import DashboardStatsCards from "../islands/DashboardStatsCards.tsx";
@@ -19,6 +20,11 @@ import type { SyncedTransactionEvent, SyncRun } from "../src/db/schema.ts";
 import { steveClient } from "../src/lib/steve-client.ts";
 import { lagoClient } from "../src/lib/lago-client.ts";
 import { ArrowRight } from "lucide-preact";
+import {
+  accentTailwindClasses,
+  borderBeamColors,
+} from "../src/lib/colors.ts";
+import { cn } from "../src/lib/utils/cn.ts";
 
 interface DashboardStats {
   tags: {
@@ -218,7 +224,7 @@ export default define.page<typeof handler>(
 
             {/* Right column: Tables (2/3) - 2 tables each 1/2 height */}
             <div className="lg:col-span-2 flex flex-col gap-3 lg:h-full">
-              {/* Recent Transactions Table (top half) */}
+              {/* Recent Transactions Table (top half) - Green accent */}
               <BlurFade
                 delay={0.1}
                 duration={0.4}
@@ -226,6 +232,13 @@ export default define.page<typeof handler>(
                 className="lg:flex-1 lg:min-h-0"
               >
                 <Card className="overflow-hidden relative lg:h-full flex flex-col">
+                  <BorderBeam
+                    size={300}
+                    duration={15}
+                    delay={0}
+                    colorFrom={borderBeamColors.green.from}
+                    colorTo={borderBeamColors.green.to}
+                  />
                   <CardHeader className="border-b border-border/50 flex-shrink-0 py-1">
                     <CardTitle className="flex items-center justify-between text-base">
                       <SparklesText sparklesCount={6}>
@@ -233,14 +246,18 @@ export default define.page<typeof handler>(
                       </SparklesText>
                       <a
                         href="/transactions"
-                        className="text-sm font-normal text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                        className={cn(
+                          "text-sm font-normal flex items-center gap-1 transition-colors",
+                          accentTailwindClasses.green.text,
+                          "hover:opacity-80",
+                        )}
                       >
                         View all
                         <ArrowRight className="size-4" />
                       </a>
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="p-0 px-2 lg:flex-1 lg:overflow-auto">
+                  <CardContent className="p-0 px-4 lg:flex-1 lg:overflow-auto">
                     <RecentTransactionsTable
                       transactions={data.recentTransactions}
                       hideHeader
@@ -249,7 +266,7 @@ export default define.page<typeof handler>(
                 </Card>
               </BlurFade>
 
-              {/* Recent Sync Runs Table (bottom half) */}
+              {/* Recent Sync Runs Table (bottom half) - Blue accent */}
               <BlurFade
                 delay={0.2}
                 duration={0.4}
@@ -257,6 +274,13 @@ export default define.page<typeof handler>(
                 className="lg:flex-1 lg:min-h-0"
               >
                 <Card className="overflow-hidden relative lg:h-full flex flex-col">
+                  <BorderBeam
+                    size={300}
+                    duration={15}
+                    delay={7}
+                    colorFrom={borderBeamColors.blue.from}
+                    colorTo={borderBeamColors.blue.to}
+                  />
                   <CardHeader className="border-b border-border/50 flex-shrink-0 py-1">
                     <CardTitle className="flex items-center justify-between text-base">
                       <SparklesText sparklesCount={6}>
@@ -264,14 +288,18 @@ export default define.page<typeof handler>(
                       </SparklesText>
                       <a
                         href="/sync"
-                        className="text-sm font-normal text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                        className={cn(
+                          "text-sm font-normal flex items-center gap-1 transition-colors",
+                          accentTailwindClasses.blue.text,
+                          "hover:opacity-80",
+                        )}
                       >
                         View all
                         <ArrowRight className="size-4" />
                       </a>
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="p-0 px-2 lg:flex-1 lg:overflow-auto">
+                  <CardContent className="p-0 px-4 lg:flex-1 lg:overflow-auto">
                     <SyncRunsTable
                       syncRuns={data.recentSyncRuns}
                       pageSize={5}

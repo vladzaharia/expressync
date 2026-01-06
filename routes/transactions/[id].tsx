@@ -84,7 +84,7 @@ function BackAction() {
       style={{ height: CHROME_SIZE }}
     >
       <ArrowLeft className="size-5" />
-      <span className="text-sm font-medium hidden sm:inline">Back</span>
+      <span className="text-sm font-medium">Back</span>
     </a>
   );
 }
