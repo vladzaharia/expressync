@@ -1,9 +1,9 @@
-import { define } from "../../utils.ts";
-import { db } from "../../src/db/index.ts";
-import * as schema from "../../src/db/schema.ts";
+import { define } from "../../../utils.ts";
+import { db } from "../../../src/db/index.ts";
+import * as schema from "../../../src/db/schema.ts";
 import { eq } from "drizzle-orm";
-import { steveClient } from "../../src/lib/steve-client.ts";
-import { getAllChildTags } from "../../src/lib/tag-hierarchy.ts";
+import { steveClient } from "../../../src/lib/steve-client.ts";
+import { getAllChildTags } from "../../../src/lib/tag-hierarchy.ts";
 
 export const handler = define.handlers({
   // Get all mappings
@@ -25,8 +25,6 @@ export const handler = define.handlers({
         lagoCustomerId,
         lagoSubscriptionId,
         isActive,
-        displayName,
-        notes,
       } = body;
 
       // Subscription is now optional - will be auto-selected at sync time if not provided
@@ -52,8 +50,6 @@ export const handler = define.handlers({
           steveOcppIdTag: ocppTagId,
           lagoCustomerExternalId: lagoCustomerId,
           lagoSubscriptionExternalId: lagoSubscriptionId || null,
-          displayName: displayName || null,
-          notes: notes || null,
           isActive: isActive ?? true,
         })
         .returning();
@@ -69,11 +65,6 @@ export const handler = define.handlers({
               steveOcppIdTag: childTag.idTag,
               lagoCustomerExternalId: lagoCustomerId,
               lagoSubscriptionExternalId: lagoSubscriptionId || null,
-              displayName: `${
-                displayName || ocppTagId
-              } (child of ${ocppTagId})`,
-              notes: `Auto-created from parent tag ${ocppTagId}. ${notes || ""}`
-                .trim(),
               isActive: isActive ?? true,
             })
             .returning();
@@ -130,10 +121,6 @@ export const handler = define.handlers({
       if (body.lagoSubscriptionExternalId !== undefined) {
         updates.lagoSubscriptionExternalId = body.lagoSubscriptionExternalId;
       }
-      if (body.displayName !== undefined) {
-        updates.displayName = body.displayName;
-      }
-      if (body.notes !== undefined) updates.notes = body.notes;
       if (body.isActive !== undefined) updates.isActive = body.isActive;
 
       // Get the current mapping to find its tag

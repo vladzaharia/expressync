@@ -1,11 +1,14 @@
 import { cn } from "@/src/lib/utils/cn.ts";
 import { Zap } from "lucide-preact";
 import { AuroraText } from "../magicui/aurora-text.tsx";
-import { LineShadowText } from "../magicui/line-shadow-text.tsx";
 import { Particles } from "../magicui/particles.tsx";
 import { BorderBeam } from "../magicui/border-beam.tsx";
 
-type BrandVariant = "logo-only" | "sidebar-collapsed" | "sidebar-expanded" | "login";
+type BrandVariant =
+  | "logo-only"
+  | "sidebar-collapsed"
+  | "sidebar-expanded"
+  | "login";
 
 interface ExpresSyncBrandProps {
   variant?: BrandVariant;
@@ -14,18 +17,12 @@ interface ExpresSyncBrandProps {
   showParticles?: boolean;
 }
 
-// Electric theme colors - blue to green gradient
-const expresColors = [
+// Electric theme colors - flowing cyan to green gradient
+const brandColors = [
   "oklch(0.75 0.15 200)", // Electric cyan
   "oklch(0.75 0.22 145)", // Volt green
+  "oklch(0.70 0.20 180)", // Teal
   "oklch(0.75 0.15 200)", // Back to cyan
-];
-
-// Reversed - green to blue gradient
-const syncColors = [
-  "oklch(0.75 0.22 145)", // Volt green
-  "oklch(0.75 0.15 200)", // Electric cyan
-  "oklch(0.75 0.22 145)", // Back to green
 ];
 
 // Logo component - squircle with thunderbolt
@@ -123,11 +120,8 @@ function ExpresSyncWordmark({
 
   return (
     <span className={cn("font-bold", sizeClasses[size])}>
-      <AuroraText colors={expresColors} speed={5}>
-        Expres
-      </AuroraText>
-      <AuroraText colors={syncColors} speed={7}>
-        Sync
+      <AuroraText colors={brandColors} speed={6}>
+        ExpresSync
       </AuroraText>
     </span>
   );
@@ -172,4 +166,3 @@ export function ExpresSyncBrand({
 }
 
 export { ExpresSyncLogo, ExpresSyncWordmark };
-

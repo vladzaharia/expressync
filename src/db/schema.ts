@@ -78,7 +78,7 @@ export const verifications = pgTable("verifications", {
 
 // ============================================================================
 // APPLICATION TABLES
-// Custom tables for the ExpresSync OCPP Portal
+// Custom tables for ExpresSync
 // ============================================================================
 
 /**
@@ -134,8 +134,9 @@ export const syncRuns = pgTable("sync_runs", {
   eventsCreated: integer("events_created").default(0),
 
   // Tag linking statistics
-  tagsValidated: integer("tags_validated").default(0),
-  tagsWithIssues: integer("tags_with_issues").default(0),
+  tagsActivated: integer("tags_activated").default(0),
+  tagsDeactivated: integer("tags_deactivated").default(0),
+  tagsUnchanged: integer("tags_unchanged").default(0),
 
   // Error tracking (JSON array of error messages)
   errors: text("errors"),

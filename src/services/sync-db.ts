@@ -4,10 +4,10 @@ import {
   type NewSyncRun,
   type NewTransactionSyncState,
   syncedTransactionEvents,
-  syncRuns,
-  syncRunLogs,
   type SyncRun,
   type SyncRunLog,
+  syncRunLogs,
+  syncRuns,
   type TransactionSyncState,
   transactionSyncState,
   type UserMapping,
@@ -53,6 +53,12 @@ export async function getRunningSync(): Promise<{ id: number } | null> {
   return runningSync || null;
 }
 
+interface TagSyncStats {
+  activatedTags: number;
+  deactivatedTags: number;
+  unchangedTags: number;
+}
+
 /**
  * Mark a sync run as completed
  */
@@ -61,12 +67,14 @@ export async function markSyncComplete(
   transactionsProcessed: number,
   eventsCreated: number,
   errors?: string[],
+  tagStats?: TagSyncStats,
 ): Promise<void> {
   logger.debug("SyncDB", "Marking sync run as complete", {
     syncRunId,
     transactionsProcessed,
     eventsCreated,
     errorCount: errors?.length || 0,
+    tagStats,
   });
 
   await db
@@ -77,6 +85,9 @@ export async function markSyncComplete(
       transactionsProcessed,
       eventsCreated,
       errors: errors && errors.length > 0 ? JSON.stringify(errors) : null,
+      tagsActivated: tagStats?.activatedTags ?? 0,
+      tagsDeactivated: tagStats?.deactivatedTags ?? 0,
+      tagsUnchanged: tagStats?.unchangedTags ?? 0,
     })
     .where(eq(syncRuns.id, syncRunId));
 

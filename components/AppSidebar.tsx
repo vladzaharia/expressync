@@ -10,16 +10,14 @@ import {
   LayoutDashboard,
   Link2,
   LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
   Receipt,
   RefreshCw,
   User,
 } from "lucide-preact";
 import { cn } from "@/src/lib/utils/cn.ts";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "./ui/tooltip.tsx";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip.tsx";
 import { BorderBeam } from "./magicui/border-beam.tsx";
 import { Particles } from "./magicui/particles.tsx";
 import { ExpresSyncBrand } from "./brand/ExpresSyncBrand.tsx";
@@ -58,7 +56,7 @@ const mainNavItems: Array<{
   },
   {
     title: "Tag Linking",
-    url: "/tag-linking",
+    url: "/links",
     icon: Link2,
     accentColor: "violet",
   },
@@ -77,7 +75,10 @@ const mainNavItems: Array<{
 ];
 
 // Accent color to Tailwind class mappings - extends centralized config with "primary"
-const accentClasses: Record<NavAccentColor, { bg: string; bgHover: string; text: string; tooltip: string }> = {
+const accentClasses: Record<
+  NavAccentColor,
+  { bg: string; bgHover: string; text: string; tooltip: string }
+> = {
   ...accentTailwindClasses,
   primary: {
     bg: "bg-primary/20",
@@ -151,7 +152,9 @@ function ThemeToggleSection({ isCollapsed }: { isCollapsed: boolean }) {
     >
       <ThemeToggle />
       {!isCollapsed && (
-        <span className="text-sm font-medium">Toggle Theme</span>
+        <span className="text-sm font-medium">
+          Toggle Theme
+        </span>
       )}
     </button>
   );
@@ -171,7 +174,7 @@ function ThemeToggleSection({ isCollapsed }: { isCollapsed: boolean }) {
 }
 
 export function AppSidebar({ currentPath, user }: AppSidebarProps) {
-  const { state } = useSidebar();
+  const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
 
   const isActive = (url: string) => {
@@ -184,15 +187,15 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
     window.location.href = "/login";
   };
 
-  // Logo content - ExpresSync brand
+  // Logo content - ExpresSync brand that morphs to sidebar toggle on hover
   const logoContent = (
-    <a
-      href="/"
+    <button
+      onClick={toggleSidebar}
       className={cn(
-        "relative flex items-center border-b transition-colors shrink-0 overflow-hidden group/logo",
+        "relative flex items-center border-b transition-colors shrink-0 overflow-hidden group/logo cursor-pointer w-full",
         isCollapsed ? "justify-center" : "justify-start gap-3 px-4",
         "bg-gradient-to-br from-primary/5 via-accent/5 to-primary/5",
-        !isCollapsed && "hover:from-primary/10 hover:via-accent/10 hover:to-primary/10",
+        "hover:from-primary/10 hover:via-accent/10 hover:to-primary/10",
       )}
       style={{ height: CHROME_SIZE, minHeight: CHROME_SIZE }}
     >
@@ -206,10 +209,27 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
         ease={80}
       />
 
-      {/* ExpresSync brand */}
-      <ExpresSyncBrand
-        variant={isCollapsed ? "sidebar-collapsed" : "sidebar-expanded"}
-      />
+      {/* Default state: ExpresSync brand */}
+      <div className="flex items-center gap-3 transition-all duration-200 group-hover/logo:opacity-0 group-hover/logo:scale-90">
+        <ExpresSyncBrand
+          variant={isCollapsed ? "sidebar-collapsed" : "sidebar-expanded"}
+        />
+      </div>
+
+      {/* Hover state: Sidebar toggle */}
+      <div
+        className={cn(
+          "absolute inset-0 flex items-center transition-all duration-200 opacity-0 scale-110 group-hover/logo:opacity-100 group-hover/logo:scale-100",
+          isCollapsed ? "justify-center" : "justify-start gap-3 px-4",
+        )}
+      >
+        {isCollapsed ? <PanelLeftOpen className="size-5 text-primary" /> : (
+          <>
+            <PanelLeftClose className="size-5 text-primary shrink-0" />
+            <span className="text-sm font-medium">Close Sidebar</span>
+          </>
+        )}
+      </div>
 
       {/* Border beam effect */}
       <BorderBeam
@@ -226,9 +246,8 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
         colorFrom="hsl(var(--accent))"
         colorTo="hsl(var(--primary))"
         className="opacity-60"
-        reverse
       />
-    </a>
+    </button>
   );
 
   return (
@@ -239,17 +258,17 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
         "--sidebar-width-icon": CHROME_SIZE,
       } as React.CSSProperties}
     >
-      {/* Logo section with glow effect */}
-      {isCollapsed ? (
-        <Tooltip>
-          <TooltipTrigger asChild>{logoContent}</TooltipTrigger>
-          <TooltipContent side="right" sideOffset={8}>
-            ExpresSync
-          </TooltipContent>
-        </Tooltip>
-      ) : (
-        logoContent
-      )}
+      {/* Logo section with sidebar toggle on hover */}
+      {isCollapsed
+        ? (
+          <Tooltip>
+            <TooltipTrigger asChild>{logoContent}</TooltipTrigger>
+            <TooltipContent side="right" sideOffset={8}>
+              Open Sidebar
+            </TooltipContent>
+          </Tooltip>
+        )
+        : logoContent}
 
       {/* Main nav sections */}
       <SidebarContent className="flex flex-col p-0 gap-0">
@@ -306,18 +325,22 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
               style={{ height: CHROME_SIZE, minHeight: CHROME_SIZE }}
             >
               <LogOut className="size-5 shrink-0" />
-              {!isCollapsed && <span className="text-sm font-medium">Sign Out</span>}
+              {!isCollapsed && (
+                <span className="text-sm font-medium">Sign Out</span>
+              )}
             </button>
           );
 
-          return isCollapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>{signOutContent}</TooltipTrigger>
-              <TooltipContent side="right" sideOffset={8}>
-                Sign Out
-              </TooltipContent>
-            </Tooltip>
-          ) : signOutContent;
+          return isCollapsed
+            ? (
+              <Tooltip>
+                <TooltipTrigger asChild>{signOutContent}</TooltipTrigger>
+                <TooltipContent side="right" sideOffset={8}>
+                  Sign Out
+                </TooltipContent>
+              </Tooltip>
+            )
+            : signOutContent;
         })()}
       </SidebarFooter>
     </Sidebar>

@@ -6,14 +6,28 @@
       "idx": 0,
       "version": "7",
       "when": 1767401551186,
-      "tag": "0000_small_impossible_man",
+      "tag": "0000_initial_schema",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
       "when": 1767500768663,
-      "tag": "0001_confused_chameleon",
+      "tag": "0001_add_sync_logging",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1767657357038,
+      "tag": "0002_add_tag_stats",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1767697873737,
+      "tag": "0003_drop_old_tag_columns",
       "breakpoints": true
     }
   ]

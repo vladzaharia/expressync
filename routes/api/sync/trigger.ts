@@ -1,8 +1,8 @@
-import { define } from "../../utils.ts";
-import { triggerSync } from "../../src/services/sync-notifier.service.ts";
+import { define } from "../../../utils.ts";
+import { triggerSync } from "../../../src/services/sync-notifier.service.ts";
 
 /**
- * POST /api/sync
+ * POST /api/sync/trigger
  *
  * Manually trigger a sync run by sending a notification to the sync worker.
  * This uses PostgreSQL LISTEN/NOTIFY to signal the sync worker.

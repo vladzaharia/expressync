@@ -60,7 +60,8 @@ function SegmentStatusBadge({
     skipped: { variant: "secondary", icon: MinusCircle },
   };
 
-  const config = variants[status] || { variant: "outline" as const, icon: Info };
+  const config = variants[status] ||
+    { variant: "outline" as const, icon: Info };
   const Icon = config.icon;
 
   return (
@@ -112,37 +113,43 @@ function SegmentCard({
         </div>
       </AccordionTrigger>
       <AccordionContent>
-        {logs.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4">No logs recorded for this segment.</p>
-        ) : (
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {logs.map((log) => (
-              <div
-                key={log.id}
-                className="flex items-start gap-3 p-2 rounded-md bg-muted/50 text-sm"
-              >
-                <LogLevelIcon level={log.level} />
-                <div className="flex-1 min-w-0">
-                  <p className="break-words">{log.message}</p>
-                  {log.context && (
-                    <pre className="mt-1 text-xs text-muted-foreground overflow-x-auto">
+        {logs.length === 0
+          ? (
+            <p className="text-sm text-muted-foreground py-4">
+              No logs recorded for this segment.
+            </p>
+          )
+          : (
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {logs.map((log) => (
+                <div
+                  key={log.id}
+                  className="flex items-start gap-3 p-2 rounded-md bg-muted/50 text-sm"
+                >
+                  <LogLevelIcon level={log.level} />
+                  <div className="flex-1 min-w-0">
+                    <p className="break-words">{log.message}</p>
+                    {log.context && (
+                      <pre className="mt-1 text-xs text-muted-foreground overflow-x-auto">
                       {JSON.stringify(JSON.parse(log.context), null, 2)}
-                    </pre>
-                  )}
+                      </pre>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {new Date(log.createdAt).toLocaleTimeString()}
+                  </span>
                 </div>
-                <span className="text-xs text-muted-foreground whitespace-nowrap">
-                  {new Date(log.createdAt).toLocaleTimeString()}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
       </AccordionContent>
     </AccordionItem>
   );
 }
 
-export default function SyncDetailAccordion({ run, tagLinkingLogs, transactionSyncLogs }: SyncDetailAccordionProps) {
+export default function SyncDetailAccordion(
+  { run, tagLinkingLogs, transactionSyncLogs }: SyncDetailAccordionProps,
+) {
   const isCompleted = run.status === "completed" || run.status === "failed";
 
   return (
@@ -164,4 +171,3 @@ export default function SyncDetailAccordion({ run, tagLinkingLogs, transactionSy
     </Accordion>
   );
 }
-

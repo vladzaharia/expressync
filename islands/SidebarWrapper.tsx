@@ -34,23 +34,14 @@ function TopBarContent({
 
   // Get accent color classes from centralized config
   const colorClasses = accentTailwindClasses[accentColor];
-  const accentBgClass = `${colorClasses.bg} ${colorClasses.bgHover} ${colorClasses.text}`;
+  const accentBgClass =
+    `${colorClasses.bg} ${colorClasses.bgHover} ${colorClasses.text}`;
 
   return (
     <header
       className="flex shrink-0 items-stretch border-b bg-background sticky top-0 z-10"
       style={{ height: CHROME_SIZE }}
     >
-      {/* Sidebar toggle section - full block */}
-      <button
-        onClick={toggleSidebar}
-        className="flex items-center justify-center border-r hover:bg-muted/50 transition-colors cursor-pointer"
-        style={{ width: CHROME_SIZE }}
-        aria-label="Toggle sidebar"
-      >
-        <PanelLeft className="size-5" />
-      </button>
-
       {/* Spacer */}
       <div className="flex-1" />
 

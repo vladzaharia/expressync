@@ -1,7 +1,7 @@
 import { define } from "../../utils.ts";
 import { db } from "../../src/db/index.ts";
 import * as schema from "../../src/db/schema.ts";
-import { eq, desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
 import { Badge } from "../../components/ui/badge.tsx";
@@ -14,13 +14,13 @@ import {
   TableRow,
 } from "../../components/ui/table.tsx";
 import {
+  Activity,
   ArrowLeft,
+  Calendar,
   CheckCircle2,
   Clock,
-  Zap,
   Tag,
-  Calendar,
-  Activity,
+  Zap,
 } from "lucide-preact";
 import { CHROME_SIZE } from "../../components/AppSidebar.tsx";
 
@@ -35,25 +35,34 @@ export const handler = define.handlers({
     const [syncState] = await db
       .select()
       .from(schema.transactionSyncState)
-      .where(eq(schema.transactionSyncState.steveTransactionId, steveTransactionId))
+      .where(
+        eq(schema.transactionSyncState.steveTransactionId, steveTransactionId),
+      )
       .limit(1);
 
     // Get all billing events for this transaction
     const billingEvents = await db
       .select()
       .from(schema.syncedTransactionEvents)
-      .where(eq(schema.syncedTransactionEvents.steveTransactionId, steveTransactionId))
+      .where(
+        eq(
+          schema.syncedTransactionEvents.steveTransactionId,
+          steveTransactionId,
+        ),
+      )
       .orderBy(desc(schema.syncedTransactionEvents.syncedAt));
 
     // Get unique sync run IDs from billing events
-    const syncRunIds = [...new Set(billingEvents.map((e) => e.syncRunId).filter(Boolean))];
+    const syncRunIds = [
+      ...new Set(billingEvents.map((e) => e.syncRunId).filter(Boolean)),
+    ];
 
     // Get sync runs
     const syncRuns = syncRunIds.length > 0
       ? await db
-          .select()
-          .from(schema.syncRuns)
-          .where(eq(schema.syncRuns.id, syncRunIds[0]!))
+        .select()
+        .from(schema.syncRuns)
+        .where(eq(schema.syncRuns.id, syncRunIds[0]!))
       : [];
 
     return {
@@ -122,7 +131,9 @@ export default define.page<typeof handler>(function TransactionDetailsPage({
                 <Activity className="size-5 text-accent" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Total kWh Billed</p>
+                <p className="text-xs text-muted-foreground">
+                  Total kWh Billed
+                </p>
                 <p className="font-semibold tabular-nums">
                   {(syncState?.totalKwhBilled ?? 0).toFixed(2)} kWh
                 </p>
@@ -130,23 +141,29 @@ export default define.page<typeof handler>(function TransactionDetailsPage({
             </div>
             <div className="flex items-center gap-3">
               <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
-                {syncState?.isFinalized ? (
-                  <CheckCircle2 className="size-5 text-success" />
-                ) : (
-                  <Clock className="size-5 text-warning" />
-                )}
+                {syncState?.isFinalized
+                  ? <CheckCircle2 className="size-5 text-success" />
+                  : <Clock className="size-5 text-warning" />}
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Status</p>
-                {syncState?.isFinalized ? (
-                  <Badge variant="outline" className="text-success border-success/30 bg-success/10">
-                    Complete
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10">
-                    In Progress
-                  </Badge>
-                )}
+                {syncState?.isFinalized
+                  ? (
+                    <Badge
+                      variant="outline"
+                      className="text-success border-success/30 bg-success/10"
+                    >
+                      Complete
+                    </Badge>
+                  )
+                  : (
+                    <Badge
+                      variant="outline"
+                      className="text-warning border-warning/30 bg-warning/10"
+                    >
+                      In Progress
+                    </Badge>
+                  )}
               </div>
             </div>
           </div>
@@ -155,7 +172,9 @@ export default define.page<typeof handler>(function TransactionDetailsPage({
         {/* Billing Events Table */}
         <PageCard
           title="Billing Events"
-          description={`${billingEvents.length} event${billingEvents.length !== 1 ? "s" : ""} sent to Lago`}
+          description={`${billingEvents.length} event${
+            billingEvents.length !== 1 ? "s" : ""
+          } sent to Lago`}
           colorScheme="green"
         >
           <BillingEventsTable events={billingEvents} />
@@ -209,28 +228,31 @@ function BillingEventsTable({ events }: BillingEventsTableProps) {
               {(event.meterValueTo / 1000).toFixed(3)} kWh
             </TableCell>
             <TableCell>
-              {event.isFinal ? (
-                <Badge variant="outline" className="text-success border-success/30 bg-success/10">
-                  Yes
-                </Badge>
-              ) : (
-                <span className="text-muted-foreground">—</span>
-              )}
+              {event.isFinal
+                ? (
+                  <Badge
+                    variant="outline"
+                    className="text-success border-success/30 bg-success/10"
+                  >
+                    Yes
+                  </Badge>
+                )
+                : <span className="text-muted-foreground">—</span>}
             </TableCell>
             <TableCell className="text-muted-foreground text-sm">
               {event.syncedAt ? new Date(event.syncedAt).toLocaleString() : "—"}
             </TableCell>
             <TableCell>
-              {event.syncRunId ? (
-                <a
-                  href={`/sync/${event.syncRunId}`}
-                  className="text-primary hover:underline text-sm"
-                >
-                  #{event.syncRunId}
-                </a>
-              ) : (
-                <span className="text-muted-foreground">—</span>
-              )}
+              {event.syncRunId
+                ? (
+                  <a
+                    href={`/sync/${event.syncRunId}`}
+                    className="text-primary hover:underline text-sm"
+                  >
+                    #{event.syncRunId}
+                  </a>
+                )
+                : <span className="text-muted-foreground">—</span>}
             </TableCell>
           </TableRow>
         ))}

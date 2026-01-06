@@ -58,10 +58,20 @@ export default function ThemeToggle({ iconOnly = true }: ThemeToggleProps) {
 // Export the toggle function for use in parent components
 export function useThemeToggle() {
   const toggleTheme = () => {
-    const current = document.documentElement.classList.contains("dark") ? "dark" : "light";
+    const html = document.documentElement;
+    const current = html.classList.contains("dark") ? "dark" : "light";
     const newTheme = current === "dark" ? "light" : "dark";
+
+    // Add transitioning class for smooth animation
+    html.classList.add("theme-transitioning");
+
     localStorage.setItem(STORAGE_KEY, newTheme);
-    document.documentElement.classList.toggle("dark", newTheme === "dark");
+    html.classList.toggle("dark", newTheme === "dark");
+
+    // Remove transitioning class after animation completes
+    setTimeout(() => {
+      html.classList.remove("theme-transitioning");
+    }, 350);
   };
   return toggleTheme;
 }

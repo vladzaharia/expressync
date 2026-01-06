@@ -1,10 +1,10 @@
-import { define } from "../../utils.ts";
-import { db } from "../../src/db/index.ts";
-import * as schema from "../../src/db/schema.ts";
-import { desc, count, and, gte, lte } from "drizzle-orm";
+import { define } from "../../../utils.ts";
+import { db } from "../../../src/db/index.ts";
+import * as schema from "../../../src/db/schema.ts";
+import { and, count, desc, gte, lte } from "drizzle-orm";
 
 /**
- * GET /api/transactions
+ * GET /api/transaction
  *
  * Get paginated transaction events.
  * Query params:
@@ -41,7 +41,9 @@ export const handler = define.handlers({
         );
       }
 
-      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+      const whereClause = conditions.length > 0
+        ? and(...conditions)
+        : undefined;
 
       // Get total count (with filters)
       const [{ value: total }] = await db
@@ -82,4 +84,3 @@ export const handler = define.handlers({
     }
   },
 });
-

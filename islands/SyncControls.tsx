@@ -11,7 +11,7 @@ export default function SyncControls() {
     loading.value = true;
 
     try {
-      const res = await fetch("/api/sync", { method: "POST" });
+      const res = await fetch("/api/sync/trigger", { method: "POST" });
       if (res.ok) {
         setTimeout(() => {
           globalThis.location.reload();

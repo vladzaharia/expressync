@@ -5,57 +5,57 @@
 /* A modern, electric-inspired theme for EV charging and billing platforms */
 @layer base {
   :root {
-    /* Light mode - Clean energy feel */
-    --background: oklch(0.985 0.002 220);
-    --foreground: oklch(0.15 0.02 240);
+    /* Light mode - Vibrant, clean energy feel */
+    --background: oklch(0.98 0.005 220);
+    --foreground: oklch(0.18 0.03 240);
     --card: oklch(1 0 0);
-    --card-foreground: oklch(0.15 0.02 240);
+    --card-foreground: oklch(0.18 0.03 240);
     --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.15 0.02 240);
-    /* Primary: Electric Cyan */
-    --primary: oklch(0.65 0.18 220);
+    --popover-foreground: oklch(0.18 0.03 240);
+    /* Primary: Deeper Electric Cyan for better contrast */
+    --primary: oklch(0.55 0.20 220);
     --primary-foreground: oklch(0.98 0 0);
-    /* Secondary: Soft electric */
-    --secondary: oklch(0.95 0.02 220);
-    --secondary-foreground: oklch(0.25 0.05 220);
-    --muted: oklch(0.96 0.01 220);
-    --muted-foreground: oklch(0.50 0.02 240);
-    /* Accent: Volt Green */
-    --accent: oklch(0.72 0.19 145);
-    --accent-foreground: oklch(0.18 0.05 145);
-    --destructive: oklch(0.55 0.22 25);
+    /* Secondary: Subtle electric tint */
+    --secondary: oklch(0.94 0.03 220);
+    --secondary-foreground: oklch(0.25 0.06 220);
+    --muted: oklch(0.95 0.015 220);
+    --muted-foreground: oklch(0.45 0.03 240);
+    /* Accent: Vibrant Volt Green */
+    --accent: oklch(0.60 0.22 145);
+    --accent-foreground: oklch(0.98 0 0);
+    --destructive: oklch(0.50 0.24 25);
     --destructive-foreground: oklch(0.98 0 0);
-    /* Success: Green energy */
-    --success: oklch(0.72 0.19 145);
+    /* Success: Vibrant Green */
+    --success: oklch(0.60 0.22 145);
     --success-foreground: oklch(0.98 0 0);
-    /* Warning: Amber glow */
-    --warning: oklch(0.80 0.16 85);
-    --warning-foreground: oklch(0.25 0.05 85);
-    --border: oklch(0.90 0.02 220);
-    --input: oklch(0.92 0.01 220);
-    --ring: oklch(0.65 0.18 220);
-    /* Chart colors - Electric spectrum */
-    --chart-1: oklch(0.65 0.18 220);
-    --chart-2: oklch(0.72 0.19 145);
-    --chart-3: oklch(0.60 0.20 280);
-    --chart-4: oklch(0.80 0.16 85);
-    --chart-5: oklch(0.70 0.20 30);
+    /* Warning: Rich Amber */
+    --warning: oklch(0.75 0.18 85);
+    --warning-foreground: oklch(0.20 0.05 85);
+    --border: oklch(0.88 0.025 220);
+    --input: oklch(0.92 0.015 220);
+    --ring: oklch(0.55 0.20 220);
+    /* Chart colors - Vibrant electric spectrum */
+    --chart-1: oklch(0.55 0.20 220);
+    --chart-2: oklch(0.60 0.22 145);
+    --chart-3: oklch(0.55 0.22 280);
+    --chart-4: oklch(0.75 0.18 85);
+    --chart-5: oklch(0.65 0.22 30);
     --radius: 0.625rem;
-    /* Sidebar - Subtle electric */
-    --sidebar: oklch(0.97 0.01 220);
-    --sidebar-foreground: oklch(0.15 0.02 240);
-    --sidebar-primary: oklch(0.65 0.18 220);
+    /* Sidebar - Clean with subtle electric accent */
+    --sidebar: oklch(0.96 0.015 220);
+    --sidebar-foreground: oklch(0.18 0.03 240);
+    --sidebar-primary: oklch(0.55 0.20 220);
     --sidebar-primary-foreground: oklch(0.98 0 0);
-    --sidebar-accent: oklch(0.94 0.03 220);
-    --sidebar-accent-foreground: oklch(0.25 0.05 220);
-    --sidebar-border: oklch(0.90 0.02 220);
-    --sidebar-ring: oklch(0.65 0.18 220);
-    /* Electric glow colors */
-    --glow-cyan: oklch(0.75 0.18 220);
-    --glow-green: oklch(0.80 0.20 145);
-    --glow-violet: oklch(0.65 0.22 280);
-    --glow-amber: oklch(0.80 0.16 85);
-    --glow-orange: oklch(0.75 0.18 55);
+    --sidebar-accent: oklch(0.92 0.04 220);
+    --sidebar-accent-foreground: oklch(0.25 0.06 220);
+    --sidebar-border: oklch(0.88 0.025 220);
+    --sidebar-ring: oklch(0.55 0.20 220);
+    /* Electric glow colors - More saturated for light mode */
+    --glow-cyan: oklch(0.65 0.20 220);
+    --glow-green: oklch(0.70 0.22 145);
+    --glow-violet: oklch(0.60 0.24 280);
+    --glow-amber: oklch(0.75 0.18 85);
+    --glow-orange: oklch(0.70 0.20 55);
   }
 
   .dark {
@@ -123,6 +123,20 @@
       Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif,
       "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
       "Noto Color Emoji";
+  }
+
+  /* Theme transition - smooth color changes */
+  html.theme-transitioning,
+  html.theme-transitioning *,
+  html.theme-transitioning *::before,
+  html.theme-transitioning *::after {
+    transition:
+      background-color 300ms ease-out,
+      border-color 300ms ease-out,
+      color 200ms ease-out,
+      fill 200ms ease-out,
+      stroke 200ms ease-out,
+      box-shadow 300ms ease-out !important;
   }
 
   body {
@@ -441,6 +455,8 @@
   }
 
   .animate-blur-fade {
-    animation: blur-fade var(--blur-fade-duration, 0.4s) ease-out var(--blur-fade-delay, 0s) forwards;
+    opacity: 0;
+    animation: blur-fade var(--blur-fade-duration, 0.4s) ease-out
+      var(--blur-fade-delay, 0s) forwards;
   }
 }

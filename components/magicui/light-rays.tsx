@@ -69,7 +69,8 @@ export function LightRays({
           style={{
             width: `${ray.width}px`,
             height: "100%",
-            background: `linear-gradient(to bottom, ${color} 0%, transparent 80%)`,
+            background:
+              `linear-gradient(to bottom, ${color} 0%, transparent 80%)`,
             opacity: ray.opacity,
             transform: `translateX(-50%) rotate(${ray.angle}deg)`,
             animationDelay: `${ray.delay}s`,
@@ -82,7 +83,8 @@ export function LightRays({
       <div
         className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2"
         style={{
-          background: `radial-gradient(ellipse 80% 50% at 50% 0%, ${color} 0%, transparent 60%)`,
+          background:
+            `radial-gradient(ellipse 80% 50% at 50% 0%, ${color} 0%, transparent 60%)`,
           opacity: 0.1,
         }}
       />
@@ -102,4 +104,3 @@ export function SubtleLightRays({ className }: { className?: string }) {
     />
   );
 }
-

@@ -18,6 +18,8 @@ interface Props {
   totalCount?: number;
   pageSize?: number;
   showLoadMore?: boolean;
+  hideHeader?: boolean;
+  hideFooterText?: boolean;
 }
 
 function formatDate(date: Date | null): string {
@@ -145,17 +147,29 @@ const columns: PaginatedTableColumn<SyncRun>[] = [
   {
     key: "tagLinking",
     header: "Tag Linking",
+    hideOnMobile: true,
     render: (run) => {
       const isCompleted = run.status === "completed" || run.status === "failed";
-      return <SegmentStatusBadge status={run.tagLinkingStatus} runCompleted={isCompleted} />;
+      return (
+        <SegmentStatusBadge
+          status={run.tagLinkingStatus}
+          runCompleted={isCompleted}
+        />
+      );
     },
   },
   {
     key: "transactionSync",
     header: "Transaction Sync",
+    hideOnMobile: true,
     render: (run) => {
       const isCompleted = run.status === "completed" || run.status === "failed";
-      return <SegmentStatusBadge status={run.transactionSyncStatus} runCompleted={isCompleted} />;
+      return (
+        <SegmentStatusBadge
+          status={run.transactionSyncStatus}
+          runCompleted={isCompleted}
+        />
+      );
     },
   },
 ];
@@ -165,6 +179,8 @@ export default function SyncRunsTable({
   totalCount,
   pageSize = 15,
   showLoadMore = true,
+  hideHeader = false,
+  hideFooterText = false,
 }: Props) {
   const handleRowClick = (run: SyncRun) => {
     globalThis.location.href = `/sync/${run.id}`;
@@ -176,12 +192,13 @@ export default function SyncRunsTable({
       columns={columns}
       totalCount={totalCount}
       pageSize={pageSize}
-      fetchUrl="/api/sync/runs"
+      fetchUrl="/api/sync"
       showLoadMore={showLoadMore}
       emptyMessage="No sync events recorded yet. Sync runs will appear here after the first sync."
       onRowClick={handleRowClick}
-      getItemKey={(run) => run.id}
+      getItemKey={(run: SyncRun) => run.id}
+      hideHeader={hideHeader}
+      hideFooterText={hideFooterText}
     />
   );
 }
-

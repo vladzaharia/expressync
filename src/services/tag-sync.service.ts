@@ -9,6 +9,7 @@
  */
 
 import { steveClient } from "../lib/steve-client.ts";
+import { lagoClient } from "../lib/lago-client.ts";
 import { logger } from "../lib/utils/logger.ts";
 import { config } from "../lib/config.ts";
 import type { StEvEOcppTag } from "../lib/types/steve.ts";
@@ -17,37 +18,137 @@ import { buildMappingLookupWithInheritance } from "./mapping-resolver.ts";
 
 export interface TagSyncResult {
   totalTags: number;
-  enabledTags: number;
-  disabledTags: number;
+  activatedTags: number;
+  deactivatedTags: number;
   unchangedTags: number;
   errors: Array<{ tagId: string; error: string }>;
 }
 
 /**
- * Generate note for a tag WITH an active mapping
+ * Info about a customer/subscription for note generation
  */
-function generateLinkedNote(mapping: UserMapping, timestamp: string): string {
+interface EntityInfo {
+  customerName: string;
+  subscriptionName: string;
+  customerUrl: string | null;
+  subscriptionUrl: string | null;
+}
+
+/**
+ * Fetch customer and subscription names for all mappings
+ */
+async function fetchEntityInfo(
+  mappings: UserMapping[],
+): Promise<Map<string, EntityInfo>> {
+  const infoMap = new Map<string, EntityInfo>();
   const lagoDashboard = config.LAGO_DASHBOARD_URL;
 
-  const customerDisplay = mapping.lagoCustomerExternalId || "Unknown";
-  const subscriptionDisplay = mapping.lagoSubscriptionExternalId || "Unknown";
+  // Get unique customer IDs
+  const customerIds = [
+    ...new Set(mappings.map((m) => m.lagoCustomerExternalId).filter(Boolean)),
+  ] as string[];
 
-  const lines: string[] = [
-    `Linked to ${customerDisplay} > ${subscriptionDisplay}`,
-  ];
+  // Fetch all customers and subscriptions
+  // Maps: external_id -> display name
+  const customerNames = new Map<string, string>();
+  const subscriptionNames = new Map<string, string>();
+  // Maps: external_id -> lago_id (internal ID for URLs)
+  const customerLagoIds = new Map<string, string>();
+  const subscriptionLagoIds = new Map<string, string>();
 
-  // Add customer link
-  if (lagoDashboard && mapping.lagoCustomerExternalId) {
-    lines.push(`Customer: ${lagoDashboard}/customers/${mapping.lagoCustomerExternalId}`);
-  } else if (mapping.lagoCustomerExternalId) {
-    lines.push(`Customer: ${mapping.lagoCustomerExternalId}`);
+  try {
+    // Fetch customers
+    const { customers } = await lagoClient.getCustomers();
+    for (const customer of customers) {
+      const displayName = customer.name || customer.external_id;
+      customerNames.set(customer.external_id, displayName);
+      customerLagoIds.set(customer.external_id, customer.lago_id);
+    }
+
+    // Fetch subscriptions for each customer
+    for (const customerId of customerIds) {
+      try {
+        const { subscriptions } = await lagoClient.getSubscriptions(customerId);
+        for (const sub of subscriptions) {
+          const displayName = sub.name || sub.external_id;
+          subscriptionNames.set(sub.external_id, displayName);
+          subscriptionLagoIds.set(sub.external_id, sub.lago_id);
+        }
+      } catch {
+        logger.warn("TagSync", `Failed to fetch subscriptions for customer`, {
+          customerId,
+        });
+      }
+    }
+  } catch (error) {
+    logger.warn("TagSync", "Failed to fetch Lago entities for note generation", {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
-  // Add subscription link
-  if (lagoDashboard && mapping.lagoSubscriptionExternalId) {
-    lines.push(`Subscription: ${lagoDashboard}/subscriptions/${mapping.lagoSubscriptionExternalId}`);
-  } else if (mapping.lagoSubscriptionExternalId) {
-    lines.push(`Subscription: ${mapping.lagoSubscriptionExternalId}`);
+  // Build info map for each mapping
+  for (const mapping of mappings) {
+    if (!mapping.lagoCustomerExternalId || !mapping.lagoSubscriptionExternalId) {
+      continue;
+    }
+
+    const key = `${mapping.lagoCustomerExternalId}:${mapping.lagoSubscriptionExternalId}`;
+    const customerName = customerNames.get(mapping.lagoCustomerExternalId) ||
+      mapping.lagoCustomerExternalId;
+    const subscriptionName =
+      subscriptionNames.get(mapping.lagoSubscriptionExternalId) ||
+      mapping.lagoSubscriptionExternalId;
+
+    // Get Lago internal IDs for URL generation
+    const customerLagoId = customerLagoIds.get(mapping.lagoCustomerExternalId);
+    const subscriptionLagoId = subscriptionLagoIds.get(mapping.lagoSubscriptionExternalId);
+
+    // Lago URL format uses internal lago_id: /customer/{lagoId} and /customer/{lagoId}/subscription/{lagoSubId}/overview
+    infoMap.set(key, {
+      customerName,
+      subscriptionName,
+      customerUrl: lagoDashboard && customerLagoId
+        ? `${lagoDashboard}/customer/${customerLagoId}`
+        : null,
+      subscriptionUrl: lagoDashboard && customerLagoId && subscriptionLagoId
+        ? `${lagoDashboard}/customer/${customerLagoId}/subscription/${subscriptionLagoId}/overview`
+        : null,
+    });
+  }
+
+  return infoMap;
+}
+
+/**
+ * Generate note for a tag WITH an active mapping
+ *
+ * Format:
+ * Linked to {Customer Name} > {Subscription Name}
+ * Customer: {Customer URL}
+ * Subscription: {Subscription URL}
+ * ---
+ * Last synced on {timestamp}
+ */
+function generateLinkedNote(
+  mapping: UserMapping,
+  entityInfo: EntityInfo | undefined,
+  timestamp: string,
+): string {
+  const customerName = entityInfo?.customerName ||
+    mapping.lagoCustomerExternalId || "Unknown";
+  const subscriptionName = entityInfo?.subscriptionName ||
+    mapping.lagoSubscriptionExternalId || "Unknown";
+
+  const lines: string[] = [
+    `Linked to ${customerName} > ${subscriptionName}`,
+  ];
+
+  // Only include URLs if we have them (requires Lago internal IDs)
+  if (entityInfo?.customerUrl) {
+    lines.push(`Customer: ${entityInfo.customerUrl}`);
+  }
+  if (entityInfo?.subscriptionUrl) {
+    lines.push(`Subscription: ${entityInfo.subscriptionUrl}`);
   }
 
   lines.push("---");
@@ -60,7 +161,7 @@ function generateLinkedNote(mapping: UserMapping, timestamp: string): string {
  * Generate note for a tag WITHOUT an active mapping
  */
 function generateUnlinkedNote(timestamp: string): string {
-  return `No active Lago mapping\n---\nLast synced on ${timestamp}`;
+  return `No active subscription\n---\nLast synced on ${timestamp}`;
 }
 
 /**
@@ -77,8 +178,8 @@ export async function syncTagStatus(
 
   const result: TagSyncResult = {
     totalTags: allTags.length,
-    enabledTags: 0,
-    disabledTags: 0,
+    activatedTags: 0,
+    deactivatedTags: 0,
     unchangedTags: 0,
     errors: [],
   };
@@ -89,6 +190,9 @@ export async function syncTagStatus(
   logger.debug("TagSync", "Built mapping lookup", {
     mappedTagsCount: mappingLookup.size,
   });
+
+  // Fetch customer/subscription names for notes
+  const entityInfoMap = await fetchEntityInfo(mappings);
 
   // Generate sync timestamp once for all tags
   const syncTimestamp = new Date().toISOString();
@@ -102,9 +206,15 @@ export async function syncTagStatus(
       const currentLimit = tag.maxActiveTransactionCount ?? -1;
       const statusChanged = currentLimit !== desiredLimit;
 
+      // Get entity info for this mapping (if exists)
+      const entityKey = mapping
+        ? `${mapping.lagoCustomerExternalId}:${mapping.lagoSubscriptionExternalId}`
+        : null;
+      const entityInfo = entityKey ? entityInfoMap.get(entityKey) : undefined;
+
       // Generate note based on mapping status - ALWAYS update this
       const desiredNote = hasMapping && mapping
-        ? generateLinkedNote(mapping, syncTimestamp)
+        ? generateLinkedNote(mapping, entityInfo, syncTimestamp)
         : generateUnlinkedNote(syncTimestamp);
 
       // Always update the tag to keep the sync timestamp current
@@ -127,9 +237,9 @@ export async function syncTagStatus(
 
       if (statusChanged) {
         if (desiredLimit === -1) {
-          result.enabledTags++;
+          result.activatedTags++;
         } else {
-          result.disabledTags++;
+          result.deactivatedTags++;
         }
       } else {
         result.unchangedTags++;
@@ -146,42 +256,11 @@ export async function syncTagStatus(
     }
   }
 
-  logger.info("TagSync", "Tag status synchronization complete", result);
+  logger.info("TagSync", "Tag status synchronization complete", {
+    ...result,
+  });
 
   return result;
 }
 
-/**
- * Sync a single tag's status based on mapping
- */
-export async function syncSingleTagStatus(
-  tagPk: number,
-  tagId: string,
-  hasMapping: boolean,
-): Promise<void> {
-  const desiredLimit = hasMapping ? -1 : 0;
 
-  logger.info("TagSync", "Syncing single tag status", {
-    tagId,
-    tagPk,
-    hasMapping,
-    desiredLimit,
-  });
-
-  try {
-    await steveClient.updateOcppTag(tagPk, {
-      maxActiveTransactionCount: desiredLimit,
-    });
-
-    logger.info("TagSync", "Successfully synced tag status", {
-      tagId,
-      limit: desiredLimit,
-    });
-  } catch (error) {
-    logger.error("TagSync", "Failed to sync tag status", {
-      tagId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    throw error;
-  }
-}

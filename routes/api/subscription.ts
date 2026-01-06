@@ -1,5 +1,5 @@
-import { define } from "../../../utils.ts";
-import { lagoClient } from "../../../src/lib/lago-client.ts";
+import { define } from "../../utils.ts";
+import { lagoClient } from "../../src/lib/lago-client.ts";
 
 export const handler = define.handlers({
   async GET(_ctx) {
@@ -17,7 +17,7 @@ export const handler = define.handlers({
         headers: { "Content-Type": "application/json" },
       });
     } catch (error) {
-      console.error("Failed to fetch Lago subscriptions:", error);
+      console.error("Failed to fetch subscriptions:", error);
       return new Response(
         JSON.stringify({ error: "Failed to fetch subscriptions" }),
         { status: 500, headers: { "Content-Type": "application/json" } },

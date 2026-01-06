@@ -1,6 +1,6 @@
-import { define } from "../../utils.ts";
-import { db } from "../../src/db/index.ts";
-import * as schema from "../../src/db/schema.ts";
+import { define } from "../../../utils.ts";
+import { db } from "../../../src/db/index.ts";
+import * as schema from "../../../src/db/schema.ts";
 
 export const handler = define.handlers({
   async GET(_ctx) {

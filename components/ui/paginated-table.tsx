@@ -1,4 +1,4 @@
-import { useSignal, useComputed } from "@preact/signals";
+import { useComputed, useSignal } from "@preact/signals";
 import { Button } from "./button.tsx";
 import {
   Table,
@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "./table.tsx";
-import { Loader2, ChevronDown } from "lucide-preact";
+import { ChevronDown, Loader2 } from "lucide-preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 import type { ComponentChildren, VNode } from "preact";
 
@@ -16,6 +16,8 @@ export interface PaginatedTableColumn<T> {
   key: string;
   header: string;
   className?: string;
+  /** Hide this column on mobile devices */
+  hideOnMobile?: boolean;
   render: (item: T, index: number) => ComponentChildren;
 }
 
@@ -42,6 +44,10 @@ export interface PaginatedTableProps<T> {
   className?: string;
   /** Row class name function */
   rowClassName?: (item: T, index: number) => string;
+  /** Hide the table header row */
+  hideHeader?: boolean;
+  /** Hide the "Showing X items" footer text */
+  hideFooterText?: boolean;
 }
 
 export function PaginatedTable<T>({
@@ -56,6 +62,8 @@ export function PaginatedTable<T>({
   getItemKey,
   className,
   rowClassName,
+  hideHeader = false,
+  hideFooterText = false,
 }: PaginatedTableProps<T>) {
   const items = useSignal<T[]>(initialItems);
   const loading = useSignal(false);
@@ -97,15 +105,23 @@ export function PaginatedTable<T>({
   return (
     <div className={cn("space-y-4", className)}>
       <Table>
-        <TableHeader>
-          <TableRow>
-            {columns.map((col) => (
-              <TableHead key={col.key} className={col.className}>
-                {col.header}
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
+        {!hideHeader && (
+          <TableHeader>
+            <TableRow>
+              {columns.map((col) => (
+                <TableHead
+                  key={col.key}
+                  className={cn(
+                    col.className,
+                    col.hideOnMobile && "hidden md:table-cell",
+                  )}
+                >
+                  {col.header}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+        )}
         <TableBody>
           {items.value.map((item, index) => (
             <TableRow
@@ -117,7 +133,13 @@ export function PaginatedTable<T>({
               onClick={() => onRowClick?.(item, index)}
             >
               {columns.map((col) => (
-                <TableCell key={col.key} className={col.className}>
+                <TableCell
+                  key={col.key}
+                  className={cn(
+                    col.className,
+                    col.hideOnMobile && "hidden md:table-cell",
+                  )}
+                >
                   {col.render(item, index)}
                 </TableCell>
               ))}
@@ -127,11 +149,15 @@ export function PaginatedTable<T>({
       </Table>
 
       {/* Footer with count and Load More */}
-      <div className="flex items-center justify-between px-2">
-        <p className="text-sm text-muted-foreground">
-          Showing {items.value.length}
-          {totalCount !== undefined && ` of ${totalCount}`} items
-        </p>
+      <div className="flex items-center justify-between px-4">
+        {!hideFooterText
+          ? (
+            <p className="text-sm text-muted-foreground">
+              Showing {items.value.length}
+              {totalCount !== undefined && ` of ${totalCount}`} items
+            </p>
+          )
+          : <div />}
 
         {showLoadMore && hasMore.value && fetchUrl && (
           <Button
@@ -141,21 +167,22 @@ export function PaginatedTable<T>({
             disabled={loading.value}
             className="gap-2"
           >
-            {loading.value ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                Loading...
-              </>
-            ) : (
-              <>
-                <ChevronDown className="size-4" />
-                Load More
-              </>
-            )}
+            {loading.value
+              ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Loading...
+                </>
+              )
+              : (
+                <>
+                  <ChevronDown className="size-4" />
+                  Load More
+                </>
+              )}
           </Button>
         )}
       </div>
     </div>
   );
 }
-

@@ -1,6 +1,6 @@
 {
-  "id": "ef1af2dd-5704-4ef4-bae0-e606f59ac051",
-  "prevId": "b3a6528f-d94c-4635-bcaa-6548e8136e4c",
+  "id": "83fbd221-5167-4674-a5a7-68ee3a81c7f3",
+  "prevId": "ef1af2dd-5704-4ef4-bae0-e606f59ac051",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -326,6 +326,27 @@
         },
         "tags_with_issues": {
           "name": "tags_with_issues",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "tags_activated": {
+          "name": "tags_activated",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "tags_deactivated": {
+          "name": "tags_deactivated",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "tags_unchanged": {
+          "name": "tags_unchanged",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,

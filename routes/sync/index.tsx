@@ -29,7 +29,9 @@ export default define.page<typeof handler>(function SyncPage(
     >
       <PageCard
         title="Sync History"
-        description={`${data.totalCount} sync run${data.totalCount !== 1 ? "s" : ""} recorded`}
+        description={`${data.totalCount} sync run${
+          data.totalCount !== 1 ? "s" : ""
+        } recorded`}
         colorScheme="blue"
       >
         <SyncRunsTable

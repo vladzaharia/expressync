@@ -3,7 +3,7 @@ import {
   PaginatedTable,
   type PaginatedTableColumn,
 } from "@/components/ui/paginated-table.tsx";
-import { CheckCircle2, Clock, Zap, Hash, Calendar } from "lucide-preact";
+import { Calendar, CheckCircle2, Clock, Hash, Zap } from "lucide-preact";
 import type { TransactionSummary } from "@/routes/transactions/index.tsx";
 
 interface Props {
@@ -28,38 +28,48 @@ const columns: PaginatedTableColumn<TransactionSummary>[] = [
     key: "ocppTagId",
     header: "OCPP Tag",
     render: (tx) =>
-      tx.ocppTagId ? (
-        <div className="flex items-center gap-2">
-          <Hash className="size-4 text-muted-foreground" />
-          <span className="font-mono text-sm">{tx.ocppTagId}</span>
-        </div>
-      ) : (
-        <span className="text-muted-foreground text-sm">—</span>
-      ),
+      tx.ocppTagId
+        ? (
+          <div className="flex items-center gap-2">
+            <Hash className="size-4 text-muted-foreground" />
+            <span className="font-mono text-sm">{tx.ocppTagId}</span>
+          </div>
+        )
+        : <span className="text-muted-foreground text-sm">—</span>,
   },
   {
     key: "totalKwhBilled",
     header: "kWh Billed",
     className: "text-right",
     render: (tx) => (
-      <span className="font-medium tabular-nums">{tx.totalKwhBilled.toFixed(2)}</span>
+      <span className="font-medium tabular-nums">
+        {tx.totalKwhBilled.toFixed(2)}
+      </span>
     ),
   },
   {
     key: "status",
     header: "Status",
     render: (tx) =>
-      tx.isFinalized ? (
-        <Badge variant="outline" className="gap-1 text-success border-success/30 bg-success/10">
-          <CheckCircle2 className="size-3" />
-          Complete
-        </Badge>
-      ) : (
-        <Badge variant="outline" className="gap-1 text-warning border-warning/30 bg-warning/10">
-          <Clock className="size-3" />
-          In Progress
-        </Badge>
-      ),
+      tx.isFinalized
+        ? (
+          <Badge
+            variant="outline"
+            className="gap-1 text-success border-success/30 bg-success/10"
+          >
+            <CheckCircle2 className="size-3" />
+            Complete
+          </Badge>
+        )
+        : (
+          <Badge
+            variant="outline"
+            className="gap-1 text-warning border-warning/30 bg-warning/10"
+          >
+            <Clock className="size-3" />
+            In Progress
+          </Badge>
+        ),
   },
   {
     key: "lastSyncedAt",
@@ -90,7 +100,7 @@ export default function TransactionsTable({
       columns={columns}
       totalCount={totalCount}
       pageSize={pageSize}
-      fetchUrl="/api/transaction-summaries"
+      fetchUrl="/api/transaction/summary"
       showLoadMore={showLoadMore}
       emptyMessage="No transactions found. Transactions will appear here after syncing."
       onRowClick={handleRowClick}

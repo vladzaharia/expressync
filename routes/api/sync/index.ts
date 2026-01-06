@@ -1,10 +1,10 @@
 import { define } from "../../../utils.ts";
 import { db } from "../../../src/db/index.ts";
 import * as schema from "../../../src/db/schema.ts";
-import { desc, count } from "drizzle-orm";
+import { count, desc } from "drizzle-orm";
 
 /**
- * GET /api/sync/runs
+ * GET /api/sync
  *
  * Get paginated sync runs.
  * Query params:
@@ -59,4 +59,3 @@ export const handler = define.handlers({
     }
   },
 });
-
