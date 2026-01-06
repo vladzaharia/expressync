@@ -642,11 +642,8 @@ export default function MappingForm({ mapping }: Props) {
                     save this mapping, but:
                   </p>
                   <ul className="text-sm text-yellow-600/80 list-disc list-inside space-y-1">
-                    <li>Transactions will be saved but not sent to Lago</li>
-                    <li>
-                      The first active subscription will be auto-selected when
-                      syncing
-                    </li>
+                    <li>The first active subscription will be auto-selected</li>
+                    <li>The OCPP tag(s) will not be activated until an active subscription exists</li>
                   </ul>
                 </div>
               </div>

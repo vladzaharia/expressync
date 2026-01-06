@@ -51,7 +51,7 @@ const ToggleGroupItem = React.forwardRef<
     <ToggleGroupPrimitive.Item
       ref={ref}
       className={cn(
-        "inline-flex items-center justify-center text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground",
+        "inline-flex items-center justify-center text-sm font-medium ring-offset-background transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground",
         // Default rounded corners
         effectiveVariant !== "outline-joined" && "rounded-md",
         // Default hover (not for outline-joined)
@@ -60,7 +60,7 @@ const ToggleGroupItem = React.forwardRef<
         // Standard outline variant
         effectiveVariant === "outline" &&
           "border border-input bg-transparent hover:bg-accent hover:text-accent-foreground",
-        // Joined outline variant - connected buttons with shared borders, no hover background
+        // Joined outline variant - connected buttons with shared borders, hover uses accent text
         effectiveVariant === "outline-joined" &&
           "border border-input bg-transparent -ml-px first:ml-0 first:rounded-l-md last:rounded-r-md",
         // Sizes
