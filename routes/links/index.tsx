@@ -56,7 +56,7 @@ function LinkTagsAction() {
       style={{ height: CHROME_SIZE }}
     >
       <Plus className="size-5" />
-      <span className="text-sm font-medium hidden sm:inline">Link Tags</span>
+      <span className="text-sm font-medium">Link Tags</span>
     </a>
   );
 }

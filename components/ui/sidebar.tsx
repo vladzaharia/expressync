@@ -19,6 +19,7 @@ const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3.5rem"; // Match CHROME_SIZE from AppSidebar
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
+const MOBILE_NAV_HEIGHT = "3.5rem"; // Same as CHROME_SIZE for consistency
 
 type SidebarContextType = {
   state: "expanded" | "collapsed";
@@ -124,7 +125,9 @@ function SidebarProvider({
             ...style,
           } as React.CSSProperties}
           className={cn(
-            "group/sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex min-h-svh w-full",
+            // On mobile: flex-col for top nav bar layout
+            // On desktop: flex-row for sidebar layout
+            "group/sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex min-h-svh w-full flex-col md:flex-row",
             className,
           )}
           {...props}
@@ -166,37 +169,25 @@ function Sidebar({
     );
   }
 
+  // Mobile: render as horizontal top navigation bar
   if (isMobile) {
     return (
-      <>
-        {openMobile && (
-          <div
-            className="fixed inset-0 z-50 bg-black/50"
-            onClick={() => setOpenMobile(false)}
-          />
+      <div
+        data-slot="sidebar"
+        data-mobile="true"
+        data-layout="horizontal"
+        className={cn(
+          "bg-sidebar text-sidebar-foreground sticky top-0 z-40 flex w-full flex-row items-stretch border-b",
+          className,
         )}
-        <div
-          data-slot="sidebar"
-          data-mobile="true"
-          data-state={openMobile ? "open" : "closed"}
-          className={cn(
-            "bg-sidebar text-sidebar-foreground fixed inset-y-0 z-50 flex h-svh w-(--sidebar-width-mobile) flex-col transition-transform duration-200",
-            side === "left" ? "left-0" : "right-0",
-            openMobile
-              ? "translate-x-0"
-              : side === "left"
-              ? "-translate-x-full"
-              : "translate-x-full",
-            className,
-          )}
-          style={{
-            "--sidebar-width-mobile": SIDEBAR_WIDTH_MOBILE,
-          } as React.CSSProperties}
-          {...props}
-        >
-          {children}
-        </div>
-      </>
+        style={{
+          height: MOBILE_NAV_HEIGHT,
+          minHeight: MOBILE_NAV_HEIGHT,
+        }}
+        {...props}
+      >
+        {children}
+      </div>
     );
   }
 
@@ -420,7 +411,12 @@ function SidebarInset({ className, ...props }: ComponentProps<"main">) {
     <main
       data-slot="sidebar-inset"
       className={cn(
-        "bg-background relative flex w-full flex-1 flex-col md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm",
+        // Base: fill available space, flex column for content
+        "bg-background relative flex w-full flex-1 flex-col",
+        // Mobile: ensure content fills remaining height below top nav
+        "min-h-0",
+        // Desktop: inset variant styling
+        "md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm",
         className,
       )}
       {...props}

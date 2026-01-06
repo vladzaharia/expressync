@@ -40,9 +40,9 @@ interface AppSidebarProps {
 }
 
 // Extended accent type to include "primary" for dashboard
-type NavAccentColor = AccentColor | "primary";
+export type NavAccentColor = AccentColor | "primary";
 
-const mainNavItems: Array<{
+export const mainNavItems: Array<{
   title: string;
   url: string;
   icon: typeof LayoutDashboard;
@@ -75,7 +75,7 @@ const mainNavItems: Array<{
 ];
 
 // Accent color to Tailwind class mappings - extends centralized config with "primary"
-const accentClasses: Record<
+export const accentClasses: Record<
   NavAccentColor,
   { bg: string; bgHover: string; text: string; tooltip: string }
 > = {
@@ -174,7 +174,7 @@ function ThemeToggleSection({ isCollapsed }: { isCollapsed: boolean }) {
 }
 
 export function AppSidebar({ currentPath, user }: AppSidebarProps) {
-  const { state, toggleSidebar } = useSidebar();
+  const { state, toggleSidebar, isMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
 
   const isActive = (url: string) => {
@@ -187,6 +187,124 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
     window.location.href = "/login";
   };
 
+  const toggleTheme = useThemeToggle();
+
+  // Mobile layout - horizontal navigation bar
+  if (isMobile) {
+    return (
+      <Sidebar
+        collapsible="icon"
+        style={{
+          "--sidebar-width": SIDEBAR_EXPANDED_WIDTH,
+          "--sidebar-width-icon": CHROME_SIZE,
+        } as React.CSSProperties}
+      >
+        {/* Left section: Logo + Nav items */}
+        <div className="flex items-center h-full">
+          {/* Compact logo - no toggle functionality */}
+          <a
+            href="/"
+            className={cn(
+              "relative flex items-center justify-center shrink-0",
+              "bg-gradient-to-br from-primary/5 via-accent/5 to-primary/5",
+            )}
+            style={{ width: CHROME_SIZE, height: CHROME_SIZE }}
+          >
+            <ExpresSyncBrand variant="sidebar-collapsed" />
+          </a>
+
+          {/* Nav items as icons - square buttons */}
+          {mainNavItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.url);
+            const accent = accentClasses[item.accentColor];
+
+            return (
+              <Tooltip key={item.title}>
+                <TooltipTrigger asChild>
+                  <a
+                    href={item.url}
+                    className={cn(
+                      "flex items-center justify-center shrink-0 transition-colors",
+                      active
+                        ? cn(accent.bg, accent.text)
+                        : cn(
+                            "text-muted-foreground hover:text-foreground",
+                            accent.bgHover,
+                          ),
+                    )}
+                    style={{ width: CHROME_SIZE, height: CHROME_SIZE }}
+                  >
+                    <Icon className="size-5" />
+                  </a>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" sideOffset={8}>
+                  {item.title}
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
+        </div>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Right section: Theme, User, Logout - square buttons */}
+        <div className="flex items-center h-full">
+          {/* Theme toggle */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={toggleTheme}
+                className="flex items-center justify-center shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                style={{ width: CHROME_SIZE, height: CHROME_SIZE }}
+              >
+                <ThemeToggle />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={8}>
+              Toggle Theme
+            </TooltipContent>
+          </Tooltip>
+
+          {/* User icon */}
+          {user && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className="flex items-center justify-center shrink-0 text-primary bg-primary/5"
+                  style={{ width: CHROME_SIZE, height: CHROME_SIZE }}
+                >
+                  <User className="size-5" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={8}>
+                {user.name || user.email}
+              </TooltipContent>
+            </Tooltip>
+          )}
+
+          {/* Sign out */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={handleSignOut}
+                className="flex items-center justify-center shrink-0 bg-red-950/50 hover:bg-red-950/70 text-red-400 hover:text-red-300 transition-colors"
+                style={{ width: CHROME_SIZE, height: CHROME_SIZE }}
+              >
+                <LogOut className="size-5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={8} className={accentClasses.red.tooltip}>
+              Sign Out
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      </Sidebar>
+    );
+  }
+
+  // Desktop layout - vertical sidebar (existing code)
   // Logo content - ExpresSync brand that morphs to sidebar toggle on hover
   const logoContent = (
     <button

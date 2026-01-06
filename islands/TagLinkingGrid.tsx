@@ -173,8 +173,10 @@ export default function TagLinkingGrid({
         );
 
         // OCPP Tag card component
+        // isLastOdd: true if this is the last tag and there's an odd total count
         const renderTagCard = (
           tag: { id: string; ocppTagPk: number; isChild: boolean },
+          isLastOdd: boolean,
         ) => {
           const tagUrl = getOcppTagUrl(tag.ocppTagPk);
           const tagCardContent = (
@@ -194,6 +196,13 @@ export default function TagLinkingGrid({
             tagUrl && "hover:border-violet-500/70 cursor-pointer",
           );
 
+          // Mobile: last odd tag spans full width (col-span-2), others take 1 column
+          // Desktop: auto width with min-w-44
+          const wrapperClasses = cn(
+            "md:w-auto md:min-w-44",
+            isLastOdd ? "col-span-2" : "col-span-1",
+          );
+
           return tagUrl
             ? (
               <a
@@ -201,13 +210,13 @@ export default function TagLinkingGrid({
                 href={tagUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-[calc(50%-0.25rem)] md:w-auto md:min-w-44"
+                className={wrapperClasses}
               >
                 <Card className={cardClasses}>{tagCardContent}</Card>
               </a>
             )
             : (
-              <Card key={tag.id} className={cn(cardClasses, "w-[calc(50%-0.25rem)] md:w-auto md:min-w-44")}>
+              <Card key={tag.id} className={cn(cardClasses, wrapperClasses)}>
                 {tagCardContent}
               </Card>
             );
@@ -249,11 +258,24 @@ export default function TagLinkingGrid({
               <ArrowDown className="size-5" />
             </div>
 
-            {/* OCPP Tags - wrap to multiple lines as needed */}
-            <div className="flex-1 flex flex-wrap items-stretch content-start gap-2 min-w-0 overflow-hidden">
-              {parentTags.map((tag) => renderTagCard({ ...tag, isChild: false }))}
-              {childTags.map((tag) => renderTagCard({ ...tag, isChild: true }))}
-            </div>
+            {/* OCPP Tags - grid on mobile (max 2 per row), flex wrap on desktop */}
+            {(() => {
+              const allTags = [
+                ...parentTags.map((t) => ({ ...t, isChild: false })),
+                ...childTags.map((t) => ({ ...t, isChild: true })),
+              ];
+              const totalTags = allTags.length;
+              const hasOddCount = totalTags % 2 === 1;
+
+              return (
+                <div className="flex-1 grid grid-cols-2 md:flex md:flex-wrap items-stretch content-start gap-2 min-w-0 overflow-hidden">
+                  {allTags.map((tag, index) => {
+                    const isLastOdd = hasOddCount && index === totalTags - 1;
+                    return renderTagCard(tag, isLastOdd);
+                  })}
+                </div>
+              );
+            })()}
 
             {/* Status & Actions */}
             <div className="flex items-center justify-between gap-2 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-border w-full md:w-auto md:ml-auto">
