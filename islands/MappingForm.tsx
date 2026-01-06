@@ -372,6 +372,7 @@ export default function MappingForm({ mapping }: Props) {
               variant="outline"
               size="sm"
               onClick={() => (showCreateTag.value = true)}
+              className="border-purple-500 text-purple-600 hover:bg-purple-500/10 hover:text-purple-600 dark:text-purple-400 dark:hover:text-purple-400"
             >
               <Plus className="size-4 mr-1" />
               Create New Tag
@@ -396,6 +397,7 @@ export default function MappingForm({ mapping }: Props) {
                   newTagId.value = "";
                   newTagParent.value = "";
                 }}
+                className="text-red-600 hover:text-red-600 hover:bg-red-500/10 dark:text-red-400 dark:hover:text-red-400"
               >
                 <X className="size-4" />
               </Button>
@@ -417,6 +419,7 @@ export default function MappingForm({ mapping }: Props) {
                     type="button"
                     variant="outline"
                     onClick={() => (showTapToAdd.value = true)}
+                    className="border-purple-500 text-purple-600 hover:bg-purple-500/10 hover:text-purple-600 dark:text-purple-400 dark:hover:text-purple-400"
                   >
                     <Radio className="size-4 mr-1" />
                     Tap to Add
@@ -449,7 +452,7 @@ export default function MappingForm({ mapping }: Props) {
                 type="button"
                 onClick={handleCreateTag}
                 disabled={creatingTag.value}
-                className="w-full"
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white"
               >
                 {creatingTag.value
                   ? (
@@ -495,6 +498,7 @@ export default function MappingForm({ mapping }: Props) {
                       ocppTagId.value = "";
                       ocppTagPk.value = 0;
                     }}
+                    className="text-purple-600 hover:text-purple-600 hover:bg-purple-500/10 dark:text-purple-400 dark:hover:text-purple-400"
                   >
                     Change
                   </Button>
@@ -582,6 +586,7 @@ export default function MappingForm({ mapping }: Props) {
                     lagoCustomerId.value = "";
                     lagoSubscriptionId.value = "";
                   }}
+                  className="text-purple-600 hover:text-purple-600 hover:bg-purple-500/10 dark:text-purple-400 dark:hover:text-purple-400"
                 >
                   Change
                 </Button>
@@ -680,6 +685,7 @@ export default function MappingForm({ mapping }: Props) {
                   onClick={() => {
                     lagoSubscriptionId.value = "";
                   }}
+                  className="text-purple-600 hover:text-purple-600 hover:bg-purple-500/10 dark:text-purple-400 dark:hover:text-purple-400"
                 >
                   Change
                 </Button>
@@ -718,12 +724,13 @@ export default function MappingForm({ mapping }: Props) {
           id="isActive"
           checked={isActive.value}
           onCheckedChange={(checked) => (isActive.value = checked)}
+          className="border-purple-500 data-[state=checked]:bg-purple-600 data-[state=checked]:text-white"
         />
         <Label htmlFor="isActive" className="cursor-pointer">Active</Label>
       </div>
 
       <div className="flex gap-3 pt-4">
-        <Button type="submit" disabled={loading.value}>
+        <Button type="submit" disabled={loading.value} className="bg-purple-600 hover:bg-purple-700 text-white">
           {loading.value
             ? (
               <>
@@ -735,7 +742,7 @@ export default function MappingForm({ mapping }: Props) {
               mapping ? "Update Mapping" : "Create Mapping"
             )}
         </Button>
-        <Button variant="outline" asChild>
+        <Button variant="outline" asChild className="border-red-500 text-red-600 hover:bg-red-500/10 hover:text-red-600 dark:text-red-400 dark:hover:text-red-400">
           <a href="/links">Cancel</a>
         </Button>
       </div>
