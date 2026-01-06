@@ -24,8 +24,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    environment:
-      DATABASE_URL: postgresql://ocpp_user:ocpp_password@postgres:5432/ocpp_billing
+    env_file: .env
     command: ["deno", "task", "db:migrate"]
     restart: "no"
 
@@ -39,19 +38,7 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-    environment:
-      DATABASE_URL: postgresql://ocpp_user:ocpp_password@postgres:5432/ocpp_billing
-      STEVE_BASE_URL: ${STEVE_BASE_URL}
-      STEVE_API_KEY: ${STEVE_API_KEY}
-      LAGO_API_URL: ${LAGO_API_URL}
-      LAGO_DASHBOARD_URL: ${LAGO_DASHBOARD_URL}
-      LAGO_API_KEY: ${LAGO_API_KEY}
-      LAGO_METRIC_CODE: ${LAGO_METRIC_CODE}
-      PORT: 8000
-      DENO_ENV: production
-      AUTH_SECRET: ${AUTH_SECRET}
-      AUTH_URL: ${AUTH_URL:-http://localhost:8000}
-      DEBUG_LEVEL: ${DEBUG_LEVEL:-ERROR}
+    env_file: .env
     ports:
       - "8000:8000"
     restart: unless-stopped
@@ -66,18 +53,7 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-    environment:
-      DATABASE_URL: postgresql://ocpp_user:ocpp_password@postgres:5432/ocpp_billing
-      STEVE_BASE_URL: ${STEVE_BASE_URL}
-      STEVE_API_KEY: ${STEVE_API_KEY}
-      LAGO_API_URL: ${LAGO_API_URL}
-      LAGO_DASHBOARD_URL: ${LAGO_DASHBOARD_URL}
-      LAGO_API_KEY: ${LAGO_API_KEY}
-      LAGO_METRIC_CODE: ${LAGO_METRIC_CODE}
-      SYNC_CRON_SCHEDULE: ${SYNC_CRON_SCHEDULE:-*/15 * * * *}
-      SYNC_ON_STARTUP: ${SYNC_ON_STARTUP:-false}
-      DEBUG_LEVEL: ${DEBUG_LEVEL:-ERROR}
-      DENO_ENV: production
+    env_file: .env
     command: [
       "deno",
       "run",
