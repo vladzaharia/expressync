@@ -8,10 +8,10 @@ export const handler = define.handlers({
       const tags = await steveClient.getOcppTags();
 
       // Transform to format for the UI, including parent information
+      // Note: OCPP tag notes are not user-visible, used only for sync metadata
       const simplifiedTags = tags.map((tag) => ({
         id: tag.idTag,
         ocppTagPk: tag.ocppTagPk,
-        note: tag.note || "",
         parentIdTag: tag.parentIdTag,
       }));
 
@@ -19,7 +19,7 @@ export const handler = define.handlers({
         headers: { "Content-Type": "application/json" },
       });
     } catch (error) {
-      console.error("Failed to fetch StEvE OCPP tags:", error);
+      console.error("Failed to fetch OCPP tags:", error);
       return new Response(
         JSON.stringify({ error: "Failed to fetch OCPP tags" }),
         { status: 500, headers: { "Content-Type": "application/json" } },
@@ -30,7 +30,7 @@ export const handler = define.handlers({
   async POST(ctx) {
     try {
       const body = await ctx.req.json();
-      const { idTag, note, parentIdTag, maxActiveTransactionCount } = body;
+      const { idTag, parentIdTag, maxActiveTransactionCount } = body;
 
       if (!idTag || typeof idTag !== "string") {
         return new Response(
@@ -43,14 +43,14 @@ export const handler = define.handlers({
       if (!/^[a-zA-Z0-9_-]{1,20}$/.test(idTag)) {
         return new Response(
           JSON.stringify({
-            error: "idTag must be 1-20 alphanumeric characters (including _ and -)",
+            error:
+              "idTag must be 1-20 alphanumeric characters (including _ and -)",
           }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
 
       const result = await steveClient.createOcppTag(idTag, {
-        note,
         parentIdTag,
         maxActiveTransactionCount,
       });
@@ -59,14 +59,15 @@ export const handler = define.handlers({
         JSON.stringify({
           id: idTag,
           ocppTagPk: result.ocppTagPk,
-          note: note || "",
           parentIdTag: parentIdTag || null,
         }),
         { status: 201, headers: { "Content-Type": "application/json" } },
       );
     } catch (error) {
-      console.error("Failed to create StEvE OCPP tag:", error);
-      const message = error instanceof Error ? error.message : "Failed to create OCPP tag";
+      console.error("Failed to create OCPP tag:", error);
+      const message = error instanceof Error
+        ? error.message
+        : "Failed to create OCPP tag";
       return new Response(
         JSON.stringify({ error: message }),
         { status: 500, headers: { "Content-Type": "application/json" } },

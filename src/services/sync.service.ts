@@ -109,14 +109,18 @@ export async function runSync(): Promise<SyncResult> {
 
       // Sync tag status even when there are no transactions
       syncLogger.startSegment("tag_linking");
+      let tagStats = { activatedTags: 0, deactivatedTags: 0, unchangedTags: 0 };
       try {
         syncLogger.info("Starting tag status synchronization");
         const tagSyncResult = await syncTagStatus(mappings, allTags);
+        tagStats = {
+          activatedTags: tagSyncResult.activatedTags,
+          deactivatedTags: tagSyncResult.deactivatedTags,
+          unchangedTags: tagSyncResult.unchangedTags,
+        };
         syncLogger.info("Tag status synchronization completed", {
           totalTags: tagSyncResult.totalTags,
-          enabledTags: tagSyncResult.enabledTags,
-          disabledTags: tagSyncResult.disabledTags,
-          unchangedTags: tagSyncResult.unchangedTags,
+          ...tagStats,
           errorCount: tagSyncResult.errors.length,
         });
         await syncLogger.endSegment();
@@ -128,9 +132,12 @@ export async function runSync(): Promise<SyncResult> {
       }
 
       // Skip transaction sync segment
-      await syncLogger.skipSegment("transaction_sync", "No transactions to process");
+      await syncLogger.skipSegment(
+        "transaction_sync",
+        "No transactions to process",
+      );
 
-      await markSyncComplete(syncRun.id, 0, 0);
+      await markSyncComplete(syncRun.id, 0, 0, undefined, tagStats);
       return {
         syncRunId: syncRun.id,
         transactionsProcessed: 0,
@@ -213,14 +220,18 @@ export async function runSync(): Promise<SyncResult> {
     if (transactionsToSend.length === 0) {
       // Tag linking segment
       syncLogger.startSegment("tag_linking");
+      let tagStats = { activatedTags: 0, deactivatedTags: 0, unchangedTags: 0 };
       try {
         syncLogger.info("Starting tag status synchronization");
         const tagSyncResult = await syncTagStatus(mappings, allTags);
+        tagStats = {
+          activatedTags: tagSyncResult.activatedTags,
+          deactivatedTags: tagSyncResult.deactivatedTags,
+          unchangedTags: tagSyncResult.unchangedTags,
+        };
         syncLogger.info("Tag status synchronization completed", {
           totalTags: tagSyncResult.totalTags,
-          enabledTags: tagSyncResult.enabledTags,
-          disabledTags: tagSyncResult.disabledTags,
-          unchangedTags: tagSyncResult.unchangedTags,
+          ...tagStats,
           errorCount: tagSyncResult.errors.length,
         });
         await syncLogger.endSegment();
@@ -235,9 +246,12 @@ export async function runSync(): Promise<SyncResult> {
       syncLogger.startSegment("transaction_sync");
       syncLogger.info("No events to send to Lago", { transactionsProcessed });
       if (transactionsWithoutSubscription.length > 0) {
-        syncLogger.info("Saving sync states for transactions without subscriptions", {
-          count: transactionsWithoutSubscription.length,
-        });
+        syncLogger.info(
+          "Saving sync states for transactions without subscriptions",
+          {
+            count: transactionsWithoutSubscription.length,
+          },
+        );
         const syncStateUpdates = transactionsWithoutSubscription.map((pt) => ({
           steveTransactionId: pt.steveTransactionId,
           lastSyncedMeterValue: pt.meterValueTo,
@@ -252,7 +266,7 @@ export async function runSync(): Promise<SyncResult> {
       }
       await syncLogger.endSegment();
 
-      await markSyncComplete(syncRun.id, transactionsProcessed, 0);
+      await markSyncComplete(syncRun.id, transactionsProcessed, 0, undefined, tagStats);
       return {
         syncRunId: syncRun.id,
         transactionsProcessed,
@@ -263,14 +277,18 @@ export async function runSync(): Promise<SyncResult> {
 
     // Tag linking segment
     syncLogger.startSegment("tag_linking");
+    let tagStats = { activatedTags: 0, deactivatedTags: 0, unchangedTags: 0 };
     try {
       syncLogger.info("Starting tag status synchronization");
       const tagSyncResult = await syncTagStatus(mappings, allTags);
+      tagStats = {
+        activatedTags: tagSyncResult.activatedTags,
+        deactivatedTags: tagSyncResult.deactivatedTags,
+        unchangedTags: tagSyncResult.unchangedTags,
+      };
       syncLogger.info("Tag status synchronization completed", {
         totalTags: tagSyncResult.totalTags,
-        enabledTags: tagSyncResult.enabledTags,
-        disabledTags: tagSyncResult.disabledTags,
-        unchangedTags: tagSyncResult.unchangedTags,
+        ...tagStats,
         errorCount: tagSyncResult.errors.length,
       });
       await syncLogger.endSegment();
@@ -285,7 +303,9 @@ export async function runSync(): Promise<SyncResult> {
     syncLogger.startSegment("transaction_sync");
 
     // 8. Build Lago events (only for transactions with subscriptions)
-    syncLogger.info("Building Lago events", { count: transactionsToSend.length });
+    syncLogger.info("Building Lago events", {
+      count: transactionsToSend.length,
+    });
     const lagoEvents = buildLagoEvents(transactionsToSend);
 
     // 9. Send events to Lago in batches
@@ -302,7 +322,9 @@ export async function runSync(): Promise<SyncResult> {
           batchSize: batch.length,
         });
         await lagoClient.createBatchEvents(batch);
-        syncLogger.info(`Batch ${i + 1}/${eventBatches.length} sent successfully`);
+        syncLogger.info(
+          `Batch ${i + 1}/${eventBatches.length} sent successfully`,
+        );
       } catch (error) {
         const errorMsg = `Failed to send batch ${i + 1}: ${
           (error as Error).message
@@ -359,6 +381,7 @@ export async function runSync(): Promise<SyncResult> {
       transactionsProcessed,
       eventsCreated,
       errors,
+      tagStats,
     );
 
     logger.info("Sync", "Sync run completed successfully", {

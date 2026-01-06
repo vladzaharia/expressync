@@ -31,78 +31,81 @@ export type AccentColor = (typeof ACCENT_COLORS)[number];
  * Border beam gradient colors using oklch for vibrant, consistent colors
  * Each color has a "from" and "to" for the animated gradient
  */
-export const borderBeamColors: Record<AccentColor, { from: string; to: string }> = {
+export const borderBeamColors: Record<
+  AccentColor,
+  { from: string; to: string }
+> = {
   red: {
-    from: "oklch(0.65 0.25 25)",   // Bright red
-    to: "oklch(0.60 0.28 15)",     // Deep red
+    from: "oklch(0.65 0.25 25)", // Bright red
+    to: "oklch(0.60 0.28 15)", // Deep red
   },
   orange: {
-    from: "oklch(0.75 0.20 50)",   // Bright orange
-    to: "oklch(0.70 0.22 35)",     // Deep orange
+    from: "oklch(0.75 0.20 50)", // Bright orange
+    to: "oklch(0.70 0.22 35)", // Deep orange
   },
   amber: {
-    from: "oklch(0.80 0.18 75)",   // Bright amber
-    to: "oklch(0.75 0.20 60)",     // Deep amber
+    from: "oklch(0.80 0.18 75)", // Bright amber
+    to: "oklch(0.75 0.20 60)", // Deep amber
   },
   yellow: {
-    from: "oklch(0.90 0.15 95)",   // Bright yellow
-    to: "oklch(0.85 0.18 85)",     // Deep yellow
+    from: "oklch(0.90 0.15 95)", // Bright yellow
+    to: "oklch(0.85 0.18 85)", // Deep yellow
   },
   lime: {
-    from: "oklch(0.85 0.22 125)",  // Bright lime
-    to: "oklch(0.80 0.25 115)",    // Deep lime
+    from: "oklch(0.85 0.22 125)", // Bright lime
+    to: "oklch(0.80 0.25 115)", // Deep lime
   },
   green: {
-    from: "oklch(0.75 0.22 145)",  // Volt green
-    to: "oklch(0.70 0.20 155)",    // Deep green
+    from: "oklch(0.75 0.22 145)", // Volt green
+    to: "oklch(0.70 0.20 155)", // Deep green
   },
   emerald: {
-    from: "oklch(0.75 0.18 160)",  // Bright emerald
-    to: "oklch(0.70 0.20 170)",    // Deep emerald
+    from: "oklch(0.75 0.18 160)", // Bright emerald
+    to: "oklch(0.70 0.20 170)", // Deep emerald
   },
   teal: {
-    from: "oklch(0.75 0.15 180)",  // Bright teal
-    to: "oklch(0.70 0.18 190)",    // Deep teal
+    from: "oklch(0.75 0.15 180)", // Bright teal
+    to: "oklch(0.70 0.18 190)", // Deep teal
   },
   cyan: {
-    from: "oklch(0.80 0.15 200)",  // Electric cyan
-    to: "oklch(0.75 0.18 210)",    // Deep cyan
+    from: "oklch(0.80 0.15 200)", // Electric cyan
+    to: "oklch(0.75 0.18 210)", // Deep cyan
   },
   sky: {
-    from: "oklch(0.75 0.15 220)",  // Bright sky
-    to: "oklch(0.70 0.18 230)",    // Deep sky
+    from: "oklch(0.75 0.15 220)", // Bright sky
+    to: "oklch(0.70 0.18 230)", // Deep sky
   },
   blue: {
-    from: "oklch(0.70 0.18 240)",  // Electric blue
-    to: "oklch(0.65 0.22 250)",    // Deep blue
+    from: "oklch(0.70 0.18 240)", // Electric blue
+    to: "oklch(0.65 0.22 250)", // Deep blue
   },
   indigo: {
-    from: "oklch(0.65 0.22 265)",  // Bright indigo
-    to: "oklch(0.60 0.25 275)",    // Deep indigo
+    from: "oklch(0.65 0.22 265)", // Bright indigo
+    to: "oklch(0.60 0.25 275)", // Deep indigo
   },
   violet: {
-    from: "oklch(0.70 0.25 290)",  // Bright violet
-    to: "oklch(0.65 0.28 300)",    // Magenta-violet
+    from: "oklch(0.70 0.25 290)", // Bright violet
+    to: "oklch(0.65 0.28 300)", // Magenta-violet
   },
   purple: {
-    from: "oklch(0.65 0.28 305)",  // Bright purple
-    to: "oklch(0.60 0.30 315)",    // Deep purple
+    from: "oklch(0.65 0.28 305)", // Bright purple
+    to: "oklch(0.60 0.30 315)", // Deep purple
   },
   fuchsia: {
-    from: "oklch(0.70 0.28 320)",  // Bright fuchsia
-    to: "oklch(0.65 0.30 330)",    // Deep fuchsia
+    from: "oklch(0.70 0.28 320)", // Bright fuchsia
+    to: "oklch(0.65 0.30 330)", // Deep fuchsia
   },
   pink: {
-    from: "oklch(0.75 0.22 345)",  // Bright pink
-    to: "oklch(0.70 0.25 355)",    // Deep pink
+    from: "oklch(0.75 0.22 345)", // Bright pink
+    to: "oklch(0.70 0.25 355)", // Deep pink
   },
   rose: {
-    from: "oklch(0.70 0.22 10)",   // Bright rose
-    to: "oklch(0.65 0.25 0)",      // Deep rose
+    from: "oklch(0.70 0.22 10)", // Bright rose
+    to: "oklch(0.65 0.25 0)", // Deep rose
   },
   slate: {
-    from: "oklch(0.60 0.02 260)",  // Bright slate
-    to: "oklch(0.55 0.03 250)",    // Deep slate
+    from: "oklch(0.60 0.02 260)", // Bright slate
+    to: "oklch(0.55 0.03 250)", // Deep slate
   },
 };
 
@@ -223,4 +226,3 @@ export const accentTailwindClasses: Record<
     tooltip: "bg-slate-500/90 text-white",
   },
 };
-

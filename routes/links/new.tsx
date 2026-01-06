@@ -1,34 +1,46 @@
 import { define } from "../../utils.ts";
-import MappingForm from "../../islands/MappingForm.tsx";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../../components/ui/card.tsx";
+import { PageCard } from "../../components/PageCard.tsx";
+import MappingForm from "../../islands/MappingForm.tsx";
+import { ArrowLeft } from "lucide-preact";
+import { CHROME_SIZE } from "../../components/AppSidebar.tsx";
 
-export default define.page(function NewMappingPage({ url, state }) {
-  return (
-    <SidebarLayout
-      currentPath={url.pathname}
-      title="Create New Mapping"
-      description="Link an OCPP tag to a Lago billing customer"
-      user={state.user}
-    >
-      <Card className="max-w-2xl">
-        <CardHeader>
-          <CardTitle>Mapping Details</CardTitle>
-          <CardDescription>
-            Enter the OCPP tag and Lago customer information to create a new
-            billing mapping.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <MappingForm />
-        </CardContent>
-      </Card>
-    </SidebarLayout>
-  );
+export const handler = define.handlers({
+  GET(_ctx) {
+    return { data: {} };
+  },
 });
+
+function BackAction() {
+  return (
+    <a
+      href="/links"
+      className="flex items-center justify-center gap-2 px-4 transition-colors"
+      style={{ height: CHROME_SIZE }}
+    >
+      <ArrowLeft className="size-5" />
+      <span className="text-sm font-medium hidden sm:inline">Back</span>
+    </a>
+  );
+}
+
+export default define.page<typeof handler>(
+  function NewTagLinkingPage({ url, state }) {
+    return (
+      <SidebarLayout
+        currentPath={url.pathname}
+        user={state.user}
+        accentColor="violet"
+        actions={<BackAction />}
+      >
+        <PageCard
+          title="New Tag Link"
+          description="Select an OCPP tag and link it to a Lago customer and subscription. Child tags will automatically inherit the parent's billing configuration."
+          colorScheme="violet"
+        >
+          <MappingForm />
+        </PageCard>
+      </SidebarLayout>
+    );
+  },
+);

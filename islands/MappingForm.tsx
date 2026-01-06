@@ -9,14 +9,15 @@ import {
   AlertTriangle,
   Check,
   CreditCard,
-  FileText,
   Loader2,
   Package,
   Plus,
+  Radio,
   Tag,
   User,
   X,
 } from "lucide-preact";
+import TapToAddModal from "./TapToAddModal.tsx";
 
 interface Props {
   mapping?: {
@@ -25,7 +26,6 @@ interface Props {
     steveOcppTagPk: number;
     lagoCustomerExternalId: string;
     lagoSubscriptionExternalId: string;
-    displayName?: string;
     isActive: boolean;
   };
 }
@@ -33,7 +33,6 @@ interface Props {
 interface OcppTag {
   id: string;
   ocppTagPk: number;
-  note: string;
   parentIdTag: string | null;
 }
 
@@ -43,7 +42,6 @@ interface UserMapping {
   steveOcppTagPk: number;
   lagoCustomerExternalId: string;
   lagoSubscriptionExternalId: string;
-  displayName?: string;
   isActive: boolean;
 }
 
@@ -54,7 +52,6 @@ export default function MappingForm({ mapping }: Props) {
   const lagoSubscriptionId = useSignal(
     mapping?.lagoSubscriptionExternalId || "",
   );
-  const displayName = useSignal(mapping?.displayName || "");
   const isActive = useSignal(mapping?.isActive ?? true);
   const loading = useSignal(false);
   const error = useSignal("");
@@ -63,9 +60,11 @@ export default function MappingForm({ mapping }: Props) {
   // State for creating new OCPP tag
   const showCreateTag = useSignal(false);
   const newTagId = useSignal("");
-  const newTagNote = useSignal("");
   const newTagParent = useSignal("");
   const creatingTag = useSignal(false);
+
+  // State for tap-to-add modal
+  const showTapToAdd = useSignal(false);
 
   // Fetch options from APIs
   const ocppTags = useSignal<Array<OcppTag>>([]);
@@ -168,25 +167,25 @@ export default function MappingForm({ mapping }: Props) {
 
   useEffect(() => {
     // Fetch OCPP tags
-    fetch("/api/steve/ocpp-tags")
+    fetch("/api/tag")
       .then((res) => res.json())
       .then((data) => (ocppTags.value = data))
       .catch(console.error);
 
     // Fetch existing mappings
-    fetch("/api/links")
+    fetch("/api/tag/link")
       .then((res) => res.json())
       .then((data) => (existingMappings.value = data))
       .catch(console.error);
 
-    // Fetch Lago customers
-    fetch("/api/lago/customers")
+    // Fetch customers
+    fetch("/api/customer")
       .then((res) => res.json())
       .then((data) => (lagoCustomers.value = data))
       .catch(console.error);
 
-    // Fetch Lago subscriptions
-    fetch("/api/lago/subscriptions")
+    // Fetch subscriptions
+    fetch("/api/subscription")
       .then((res) => res.json())
       .then((data) => (lagoSubscriptions.value = data))
       .catch(console.error);
@@ -202,12 +201,11 @@ export default function MappingForm({ mapping }: Props) {
     error.value = "";
 
     try {
-      const res = await fetch("/api/steve/ocpp-tags", {
+      const res = await fetch("/api/tag", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           idTag: newTagId.value.trim(),
-          note: newTagNote.value.trim() || undefined,
           parentIdTag: newTagParent.value || undefined,
         }),
       });
@@ -221,7 +219,6 @@ export default function MappingForm({ mapping }: Props) {
         // Reset create form
         showCreateTag.value = false;
         newTagId.value = "";
-        newTagNote.value = "";
         newTagParent.value = "";
         successMessage.value = `Tag "${newTag.id}" created successfully`;
       } else {
@@ -254,7 +251,7 @@ export default function MappingForm({ mapping }: Props) {
     successMessage.value = "";
 
     try {
-      const url = mapping ? `/api/links?id=${mapping.id}` : "/api/links";
+      const url = mapping ? `/api/tag/link?id=${mapping.id}` : "/api/tag/link";
       const method = mapping ? "PUT" : "POST";
 
       const res = await fetch(url, {
@@ -265,7 +262,6 @@ export default function MappingForm({ mapping }: Props) {
           ocppTagPk: ocppTagPk.value,
           lagoCustomerId: lagoCustomerId.value,
           lagoSubscriptionId: lagoSubscriptionId.value,
-          displayName: displayName.value || null,
           isActive: isActive.value,
         }),
       });
@@ -278,10 +274,10 @@ export default function MappingForm({ mapping }: Props) {
               data.totalCreated - 1
             } children)`;
           setTimeout(() => {
-            window.location.href = "/tag-linking";
+            window.location.href = "/links";
           }, 2000);
         } else {
-          window.location.href = "/tag-linking";
+          window.location.href = "/links";
         }
       } else {
         const data = await res.json();
@@ -294,16 +290,11 @@ export default function MappingForm({ mapping }: Props) {
     }
   };
 
-  // Compute progress
+  // Compute progress - 3 steps: Tag, Customer, Subscription
   const currentStep = useComputed(() => {
     if (!ocppTagId.value) return 1;
     if (!lagoCustomerId.value) return 2;
-    // Subscription is optional, so we move to step 3 once customer is selected
-    if (
-      lagoCustomerId.value && !lagoSubscriptionId.value &&
-      hasActiveSubscriptions.value
-    ) return 3;
-    return 4;
+    return 3;
   });
 
   const StepIndicator = (
@@ -318,7 +309,7 @@ export default function MappingForm({ mapping }: Props) {
         className={cn(
           "flex items-center justify-center size-8 rounded-full transition-colors",
           currentStep.value >= step
-            ? "bg-primary text-primary-foreground"
+            ? "bg-violet-500 text-white"
             : "bg-muted text-muted-foreground",
         )}
       >
@@ -347,24 +338,17 @@ export default function MappingForm({ mapping }: Props) {
         <div
           className={cn(
             "flex-1 h-0.5 mx-2 transition-colors",
-            currentStep.value >= 2 ? "bg-primary" : "bg-muted",
+            currentStep.value >= 2 ? "bg-violet-500" : "bg-muted",
           )}
         />
         <StepIndicator step={2} label="Customer" icon={User} />
         <div
           className={cn(
             "flex-1 h-0.5 mx-2 transition-colors",
-            currentStep.value >= 3 ? "bg-primary" : "bg-muted",
+            currentStep.value >= 3 ? "bg-violet-500" : "bg-muted",
           )}
         />
         <StepIndicator step={3} label="Subscription" icon={CreditCard} />
-        <div
-          className={cn(
-            "flex-1 h-0.5 mx-2 transition-colors",
-            currentStep.value >= 4 ? "bg-primary" : "bg-muted",
-          )}
-        />
-        <StepIndicator step={4} label="Details" icon={FileText} />
       </div>
 
       {error.value && (
@@ -397,7 +381,7 @@ export default function MappingForm({ mapping }: Props) {
 
         {/* Create new tag form */}
         {showCreateTag.value && (
-          <div className="border border-dashed border-primary rounded-lg p-4 space-y-4 bg-primary/5">
+          <div className="border border-dashed border-violet-500 rounded-lg p-4 space-y-4 bg-violet-500/5">
             <div className="flex items-center justify-between">
               <h4 className="font-medium flex items-center gap-2">
                 <Plus className="size-4" />
@@ -410,7 +394,6 @@ export default function MappingForm({ mapping }: Props) {
                 onClick={() => {
                   showCreateTag.value = false;
                   newTagId.value = "";
-                  newTagNote.value = "";
                   newTagParent.value = "";
                 }}
               >
@@ -420,32 +403,40 @@ export default function MappingForm({ mapping }: Props) {
             <div className="space-y-3">
               <div>
                 <Label htmlFor="newTagId" className="text-sm">Tag ID *</Label>
-                <Input
-                  id="newTagId"
-                  value={newTagId.value}
-                  onInput={(e) => (newTagId.value = (e.target as HTMLInputElement).value)}
-                  placeholder="e.g., CARD-001"
-                  className="font-mono"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="newTagId"
+                    value={newTagId.value}
+                    onInput={(
+                      e,
+                    ) => (newTagId.value = (e.target as HTMLInputElement).value)}
+                    placeholder="e.g., CARD-001"
+                    className="font-mono flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => (showTapToAdd.value = true)}
+                  >
+                    <Radio className="size-4 mr-1" />
+                    Tap to Add
+                  </Button>
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   1-20 alphanumeric characters (including _ and -)
                 </p>
               </div>
               <div>
-                <Label htmlFor="newTagNote" className="text-sm">Note (optional)</Label>
-                <Input
-                  id="newTagNote"
-                  value={newTagNote.value}
-                  onInput={(e) => (newTagNote.value = (e.target as HTMLInputElement).value)}
-                  placeholder="Description for this tag"
-                />
-              </div>
-              <div>
-                <Label htmlFor="newTagParent" className="text-sm">Parent Tag (optional)</Label>
+                <Label htmlFor="newTagParent" className="text-sm">
+                  Parent Tag (optional)
+                </Label>
                 <select
                   id="newTagParent"
                   value={newTagParent.value}
-                  onChange={(e) => (newTagParent.value = (e.target as HTMLSelectElement).value)}
+                  onChange={(
+                    e,
+                  ) => (newTagParent.value =
+                    (e.target as HTMLSelectElement).value)}
                   className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
                 >
                   <option value="">No parent</option>
@@ -460,17 +451,19 @@ export default function MappingForm({ mapping }: Props) {
                 disabled={creatingTag.value}
                 className="w-full"
               >
-                {creatingTag.value ? (
-                  <>
-                    <Loader2 className="size-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="size-4 mr-2" />
-                    Create Tag
-                  </>
-                )}
+                {creatingTag.value
+                  ? (
+                    <>
+                      <Loader2 className="size-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  )
+                  : (
+                    <>
+                      <Plus className="size-4 mr-2" />
+                      Create Tag
+                    </>
+                  )}
               </Button>
             </div>
           </div>
@@ -486,25 +479,13 @@ export default function MappingForm({ mapping }: Props) {
             )
             : ocppTagId.value
             ? (
-              <div className="border border-primary bg-primary/5 rounded-lg p-4">
+              <div className="border-2 border-violet-500 bg-violet-500/5 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3 flex-1">
-                    <Tag className="size-5 text-primary shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold font-mono truncate">
-                        {ocppTagId.value}
-                      </h3>
-                      {(() => {
-                        const selectedTag = availableTags.value.find((t) =>
-                          t.id === ocppTagId.value
-                        );
-                        return selectedTag?.note && (
-                          <p className="text-sm text-muted-foreground truncate">
-                            {selectedTag.note}
-                          </p>
-                        );
-                      })()}
-                    </div>
+                    <Tag className="size-5 text-violet-500 shrink-0" />
+                    <h3 className="font-semibold font-mono truncate">
+                      {ocppTagId.value}
+                    </h3>
                   </div>
                   <Button
                     type="button"
@@ -531,24 +512,17 @@ export default function MappingForm({ mapping }: Props) {
                         ocppTagId.value = tag.id;
                         ocppTagPk.value = tag.ocppTagPk;
                       }}
-                      className="border border-border hover:border-primary/50 hover:bg-accent rounded-lg p-3 cursor-pointer transition-all"
+                      className="border-2 border-border hover:border-violet-500/70 rounded-lg p-3 cursor-pointer transition-all"
                     >
-                      <div className="flex items-start gap-2">
-                        <Tag className="size-4 text-muted-foreground mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-medium font-mono text-sm truncate">
-                            {tag.id}
-                          </h3>
-                          {tag.note && (
-                            <p className="text-xs text-muted-foreground mt-1 truncate">
-                              {tag.note}
-                            </p>
-                          )}
-                        </div>
+                      <div className="flex items-center gap-3">
+                        <Tag className="size-4 text-muted-foreground" />
+                        <h3 className="font-medium font-mono text-sm truncate flex-1">
+                          {tag.id}
+                        </h3>
                       </div>
                       {info && info.childCount > 0 && (
                         <div className="mt-2 pt-2 border-t border-border">
-                          <p className="text-xs text-primary font-medium flex items-center gap-1">
+                          <p className="text-xs text-violet-500 font-medium flex items-center gap-1">
                             <Package className="size-3" />
                             {info.childCount}{" "}
                             child{info.childCount > 1 ? "ren" : ""}
@@ -583,10 +557,10 @@ export default function MappingForm({ mapping }: Props) {
           )
           : lagoCustomerId.value
           ? (
-            <div className="border border-primary bg-primary/5 rounded-lg p-4">
+            <div className="border-2 border-violet-500 bg-violet-500/5 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 flex-1">
-                  <User className="size-5 text-primary shrink-0" />
+                  <User className="size-5 text-violet-500 shrink-0" />
                   <div className="flex-1 min-w-0">
                     {(() => {
                       const selectedCustomer = lagoCustomers.value.find((c) =>
@@ -623,9 +597,9 @@ export default function MappingForm({ mapping }: Props) {
                     lagoCustomerId.value = customer.id;
                     lagoSubscriptionId.value = "";
                   }}
-                  className="border border-border hover:border-primary/50 hover:bg-accent rounded-lg p-3 cursor-pointer transition-all"
+                  className="border-2 border-border hover:border-violet-500/70 rounded-lg p-3 cursor-pointer transition-all"
                 >
-                  <div className="flex items-start gap-2">
+                  <div className="flex items-start gap-3">
                     <User className="size-4 text-muted-foreground mt-0.5" />
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium text-sm truncate">
@@ -680,10 +654,10 @@ export default function MappingForm({ mapping }: Props) {
           )
           : lagoSubscriptionId.value
           ? (
-            <div className="border border-primary bg-primary/5 rounded-lg p-4">
+            <div className="border-2 border-violet-500 bg-violet-500/5 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 flex-1">
-                  <CreditCard className="size-5 text-primary shrink-0" />
+                  <CreditCard className="size-5 text-violet-500 shrink-0" />
                   <div className="flex-1 min-w-0">
                     {(() => {
                       const selectedSub = filteredSubscriptions.value.find(
@@ -691,7 +665,9 @@ export default function MappingForm({ mapping }: Props) {
                       );
                       return selectedSub && (
                         <>
-                          <h3 className="font-semibold truncate">{selectedSub.name}</h3>
+                          <h3 className="font-semibold truncate">
+                            {selectedSub.name}
+                          </h3>
                           <p className="text-xs text-muted-foreground font-mono truncate">
                             {selectedSub.id}
                           </p>
@@ -721,9 +697,9 @@ export default function MappingForm({ mapping }: Props) {
                   onClick={() => {
                     lagoSubscriptionId.value = sub.id;
                   }}
-                  className="border border-border hover:border-primary/50 hover:bg-accent rounded-lg p-3 cursor-pointer transition-all"
+                  className="border-2 border-border hover:border-violet-500/70 rounded-lg p-3 cursor-pointer transition-all"
                 >
-                  <div className="flex items-start gap-2">
+                  <div className="flex items-start gap-3">
                     <CreditCard className="size-4 text-muted-foreground mt-0.5" />
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium text-sm truncate">
@@ -738,22 +714,6 @@ export default function MappingForm({ mapping }: Props) {
               ))}
             </div>
           )}
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="displayName">
-          Display Name{" "}
-          <span className="text-muted-foreground text-xs">(Optional)</span>
-        </Label>
-        <Input
-          id="displayName"
-          type="text"
-          value={displayName.value}
-          onInput={(
-            e,
-          ) => (displayName.value = (e.target as HTMLInputElement).value)}
-          placeholder="Friendly name for this mapping"
-        />
       </div>
 
       <div className="flex items-center space-x-2">
@@ -779,9 +739,28 @@ export default function MappingForm({ mapping }: Props) {
             )}
         </Button>
         <Button variant="outline" asChild>
-          <a href="/tag-linking">Cancel</a>
+          <a href="/links">Cancel</a>
         </Button>
       </div>
+
+      {/* Tap to Add Modal */}
+      <TapToAddModal
+        open={showTapToAdd.value}
+        onOpenChange={(open) => (showTapToAdd.value = open)}
+        onTagDetected={(tagId) => {
+          // Check if this tag already exists
+          const existingTag = ocppTags.value.find((t) => t.id === tagId);
+          if (existingTag) {
+            // Select the existing tag
+            ocppTagId.value = existingTag.id;
+            ocppTagPk.value = existingTag.ocppTagPk;
+          } else {
+            // Pre-fill the create new tag form
+            showCreateTag.value = true;
+            newTagId.value = tagId;
+          }
+        }}
+      />
     </form>
   );
 }

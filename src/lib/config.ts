@@ -23,10 +23,13 @@ export const config = {
   // Lago Billing Platform
   // API and dashboard have separate base URLs
   // API URL = LAGO_API_URL + /api/v1
+  // Dashboard URL is required for generating links in notes and UI
   LAGO_API_URL: lagoApiBaseUrl ? `${lagoApiBaseUrl}/api/v1` : "",
   LAGO_API_KEY: Deno.env.get("LAGO_API_KEY")!,
   LAGO_METRIC_CODE: Deno.env.get("LAGO_METRIC_CODE") || "ev_charging_kwh",
-  LAGO_DASHBOARD_URL: stripTrailingSlash(Deno.env.get("LAGO_DASHBOARD_URL") || ""),
+  LAGO_DASHBOARD_URL: stripTrailingSlash(
+    Deno.env.get("LAGO_DASHBOARD_URL") || "",
+  ),
 
   // Sync Configuration
   SYNC_CRON_SCHEDULE: Deno.env.get("SYNC_CRON_SCHEDULE") || "*/15 * * * *",
@@ -38,6 +41,11 @@ export const config = {
 
   // Debug/Logging
   DEBUG_LEVEL: Deno.env.get("DEBUG_LEVEL") || "ERROR",
+
+  // Docker (for log streaming)
+  DOCKER_SOCKET_PATH: Deno.env.get("DOCKER_SOCKET_PATH") ||
+    "/var/run/docker.sock",
+  STEVE_CONTAINER_NAME: Deno.env.get("STEVE_CONTAINER_NAME") || "steve",
 
   // BetterAuth
   AUTH_SECRET: Deno.env.get("AUTH_SECRET")!,
@@ -54,6 +62,7 @@ export function validateConfig() {
     "STEVE_API_KEY",
     "LAGO_API_URL",
     "LAGO_API_KEY",
+    "LAGO_DASHBOARD_URL",
     "AUTH_SECRET",
   ];
 
@@ -77,6 +86,7 @@ export function validateSyncWorkerConfig() {
     "STEVE_API_KEY",
     "LAGO_API_URL",
     "LAGO_API_KEY",
+    "LAGO_DASHBOARD_URL",
   ];
 
   const missing = required.filter((key) => !Deno.env.get(key));

@@ -116,7 +116,11 @@ export function PageCardSimple({
   disableAnimation = false,
 }: Omit<
   PageCardProps,
-  "title" | "description" | "headerClassName" | "contentClassName" | "headerActions"
+  | "title"
+  | "description"
+  | "headerClassName"
+  | "contentClassName"
+  | "headerActions"
 >) {
   const colors = borderBeamColors[colorScheme];
 
@@ -153,4 +157,3 @@ export function PageCardSimple({
     </BlurFade>
   );
 }
-

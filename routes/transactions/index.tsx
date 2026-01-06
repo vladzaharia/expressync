@@ -1,7 +1,7 @@
 import { define } from "../../utils.ts";
 import { db } from "../../src/db/index.ts";
 import * as schema from "../../src/db/schema.ts";
-import { desc, sql, eq, count } from "drizzle-orm";
+import { count, desc, eq, sql } from "drizzle-orm";
 import TransactionsTable from "../../islands/TransactionsTable.tsx";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
@@ -46,10 +46,17 @@ export const handler = define.handlers({
           .select({
             count: sql<number>`count(*)`,
             ocppTagId: schema.syncedTransactionEvents.ocppTagId,
-            lastSyncedAt: sql<Date>`max(${schema.syncedTransactionEvents.syncedAt})`,
+            lastSyncedAt: sql<
+              Date
+            >`max(${schema.syncedTransactionEvents.syncedAt})`,
           })
           .from(schema.syncedTransactionEvents)
-          .where(eq(schema.syncedTransactionEvents.steveTransactionId, tx.steveTransactionId))
+          .where(
+            eq(
+              schema.syncedTransactionEvents.steveTransactionId,
+              tx.steveTransactionId,
+            ),
+          )
           .groupBy(schema.syncedTransactionEvents.ocppTagId);
 
         const firstEvent = events[0];
@@ -62,7 +69,7 @@ export const handler = define.handlers({
           lastSyncedAt: firstEvent?.lastSyncedAt ?? tx.updatedAt,
           eventCount: Number(firstEvent?.count ?? 0),
         };
-      })
+      }),
     );
 
     return { data: { transactions: transactionSummaries, totalCount } };
@@ -79,7 +86,9 @@ export default define.page<typeof handler>(
       >
         <PageCard
           title="Charging Transactions"
-          description={`${data.totalCount} transaction${data.totalCount !== 1 ? "s" : ""} recorded`}
+          description={`${data.totalCount} transaction${
+            data.totalCount !== 1 ? "s" : ""
+          } recorded`}
           colorScheme="green"
         >
           <TransactionsTable

@@ -1,5 +1,11 @@
 import { createContext } from "preact";
-import { useContext, useState, useCallback, useRef, useEffect } from "preact/hooks";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "preact/hooks";
 import type { ComponentChildren, JSX } from "preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { ChevronDown } from "lucide-preact";
@@ -19,7 +25,9 @@ interface AccordionItemContextType {
   isOpen: boolean;
 }
 
-const AccordionItemContext = createContext<AccordionItemContextType | null>(null);
+const AccordionItemContext = createContext<AccordionItemContextType | null>(
+  null,
+);
 
 // Hook to use accordion context
 function useAccordion() {
@@ -31,7 +39,9 @@ function useAccordion() {
 // Hook to use accordion item context
 function useAccordionItem() {
   const context = useContext(AccordionItemContext);
-  if (!context) throw new Error("useAccordionItem must be used within AccordionItem");
+  if (!context) {
+    throw new Error("useAccordionItem must be used within AccordionItem");
+  }
   return context;
 }
 
@@ -85,7 +95,9 @@ interface AccordionItemProps {
   children: ComponentChildren;
 }
 
-export function AccordionItem({ value, className, children }: AccordionItemProps) {
+export function AccordionItem(
+  { value, className, children }: AccordionItemProps,
+) {
   const { openItems } = useAccordion();
   const isOpen = openItems.has(value);
 
@@ -104,7 +116,9 @@ interface AccordionTriggerProps {
   children: ComponentChildren;
 }
 
-export function AccordionTrigger({ className, children }: AccordionTriggerProps) {
+export function AccordionTrigger(
+  { className, children }: AccordionTriggerProps,
+) {
   const { toggleItem } = useAccordion();
   const { value, isOpen } = useAccordionItem();
 
@@ -136,7 +150,9 @@ interface AccordionContentProps {
   children: ComponentChildren;
 }
 
-export function AccordionContent({ className, children }: AccordionContentProps) {
+export function AccordionContent(
+  { className, children }: AccordionContentProps,
+) {
   const { isOpen } = useAccordionItem();
   const contentRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number | "auto">(isOpen ? "auto" : 0);
@@ -158,4 +174,3 @@ export function AccordionContent({ className, children }: AccordionContentProps)
     </div>
   );
 }
-

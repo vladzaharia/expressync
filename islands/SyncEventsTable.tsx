@@ -125,7 +125,8 @@ export default function SyncEventsTable({ syncRuns }: Props) {
   if (syncRuns.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
-        No sync events recorded yet. Sync runs will appear here after the first sync.
+        No sync events recorded yet. Sync runs will appear here after the first
+        sync.
       </div>
     );
   }
@@ -147,7 +148,8 @@ export default function SyncEventsTable({ syncRuns }: Props) {
       </TableHeader>
       <TableBody>
         {syncRuns.map((run) => {
-          const isCompleted = run.status === "completed" || run.status === "failed";
+          const isCompleted = run.status === "completed" ||
+            run.status === "failed";
           return (
             <TableRow
               key={run.id}
@@ -185,4 +187,3 @@ export default function SyncEventsTable({ syncRuns }: Props) {
     </Table>
   );
 }
-

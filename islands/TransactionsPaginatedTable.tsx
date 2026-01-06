@@ -3,7 +3,7 @@ import {
   type PaginatedTableColumn,
 } from "@/components/ui/paginated-table.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
-import { Zap, Hash, Calendar, Activity } from "lucide-preact";
+import { Activity, Calendar, Hash, Zap } from "lucide-preact";
 import type { SyncedTransactionEvent } from "@/src/db/schema.ts";
 
 interface Props {
@@ -91,7 +91,7 @@ export default function TransactionsPaginatedTable({
       columns={columns}
       totalCount={totalCount}
       pageSize={pageSize}
-      fetchUrl="/api/transactions"
+      fetchUrl="/api/transaction"
       showLoadMore={showLoadMore}
       emptyMessage="No billing events found"
       onRowClick={handleRowClick}
@@ -99,4 +99,3 @@ export default function TransactionsPaginatedTable({
     />
   );
 }
-

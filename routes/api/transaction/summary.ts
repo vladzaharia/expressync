@@ -1,7 +1,7 @@
-import { define } from "../../utils.ts";
-import { db } from "../../src/db/index.ts";
-import * as schema from "../../src/db/schema.ts";
-import { desc, sql, eq, count } from "drizzle-orm";
+import { define } from "../../../utils.ts";
+import { db } from "../../../src/db/index.ts";
+import * as schema from "../../../src/db/schema.ts";
+import { count, desc, eq, sql } from "drizzle-orm";
 
 // Transaction summary type for the table
 export interface TransactionSummary {
@@ -15,7 +15,7 @@ export interface TransactionSummary {
 }
 
 /**
- * GET /api/transaction-summaries
+ * GET /api/transaction/summary
  *
  * Get paginated transaction summaries.
  * Query params:
@@ -55,27 +55,56 @@ export const handler = define.handlers({
       // Get event counts and OCPP tags for each transaction
       const items: TransactionSummary[] = await Promise.all(
         transactions.map(async (tx) => {
-          const events = await db
+          // Get event count and last synced time
+          const [eventStats] = await db
             .select({
               count: sql<number>`count(*)`,
-              ocppTagId: schema.syncedTransactionEvents.ocppTagId,
-              lastSyncedAt: sql<Date>`max(${schema.syncedTransactionEvents.syncedAt})`,
+              lastSyncedAt: sql<
+                Date
+              >`max(${schema.syncedTransactionEvents.syncedAt})`,
             })
             .from(schema.syncedTransactionEvents)
-            .where(eq(schema.syncedTransactionEvents.steveTransactionId, tx.steveTransactionId))
-            .groupBy(schema.syncedTransactionEvents.ocppTagId);
+            .where(
+              eq(
+                schema.syncedTransactionEvents.steveTransactionId,
+                tx.steveTransactionId,
+              ),
+            );
 
-          const firstEvent = events[0];
+          // Get OCPP tag from the first event's user mapping
+          const [firstEvent] = await db
+            .select({
+              userMappingId: schema.syncedTransactionEvents.userMappingId,
+            })
+            .from(schema.syncedTransactionEvents)
+            .where(
+              eq(
+                schema.syncedTransactionEvents.steveTransactionId,
+                tx.steveTransactionId,
+              ),
+            )
+            .limit(1);
+
+          let ocppTagId: string | null = null;
+          if (firstEvent?.userMappingId) {
+            const [mapping] = await db
+              .select({ steveOcppIdTag: schema.userMappings.steveOcppIdTag })
+              .from(schema.userMappings)
+              .where(eq(schema.userMappings.id, firstEvent.userMappingId))
+              .limit(1);
+            ocppTagId = mapping?.steveOcppIdTag ?? null;
+          }
+
           return {
             id: tx.id,
             steveTransactionId: tx.steveTransactionId,
-            ocppTagId: firstEvent?.ocppTagId ?? null,
+            ocppTagId,
             totalKwhBilled: tx.totalKwhBilled ?? 0,
             isFinalized: tx.isFinalized ?? false,
-            lastSyncedAt: firstEvent?.lastSyncedAt ?? tx.updatedAt,
-            eventCount: Number(firstEvent?.count ?? 0),
+            lastSyncedAt: eventStats?.lastSyncedAt ?? tx.updatedAt,
+            eventCount: Number(eventStats?.count ?? 0),
           };
-        })
+        }),
       );
 
       return new Response(
@@ -102,4 +131,3 @@ export const handler = define.handlers({
     }
   },
 });
-

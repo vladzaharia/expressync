@@ -1,11 +1,11 @@
 import { db } from "../db/index.ts";
 import {
+  type NewSyncRunLog,
+  type SyncLogLevel,
   syncRunLogs,
   syncRuns,
   type SyncSegment,
   type SyncSegmentStatus,
-  type SyncLogLevel,
-  type NewSyncRunLog,
 } from "../db/schema.ts";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/utils/logger.ts";
@@ -102,7 +102,11 @@ export class SyncLogger {
     this.segmentLogs.set(this.currentSegment, logs);
 
     // Also log to console
-    const logFn = level === "error" ? logger.error : level === "warn" ? logger.warn : logger.debug;
+    const logFn = level === "error"
+      ? logger.error
+      : level === "warn"
+      ? logger.warn
+      : logger.debug;
     logFn.call(logger, `Sync:${this.currentSegment}`, message, context);
   }
 
@@ -125,7 +129,9 @@ export class SyncLogger {
       }
     }
 
-    this.info(`Completed ${segment.replace("_", " ")} segment`, { status: finalStatus });
+    this.info(`Completed ${segment.replace("_", " ")} segment`, {
+      status: finalStatus,
+    });
 
     // Persist logs to database
     if (logs.length > 0) {
@@ -133,7 +139,9 @@ export class SyncLogger {
     }
 
     // Update segment status on sync run
-    const statusField = segment === "tag_linking" ? "tagLinkingStatus" : "transactionSyncStatus";
+    const statusField = segment === "tag_linking"
+      ? "tagLinkingStatus"
+      : "transactionSyncStatus";
     await db
       .update(syncRuns)
       .set({ [statusField]: finalStatus })
@@ -151,4 +159,3 @@ export class SyncLogger {
     await this.endSegment("skipped");
   }
 }
-

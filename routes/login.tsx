@@ -52,13 +52,6 @@ export default define.page(function LoginPage() {
             <LoginForm />
           </ShineBorder>
         </BlurFade>
-
-        {/* Footer */}
-        <BlurFade delay={0.4} duration={0.5} direction="up">
-          <p class="mt-8 text-center text-xs text-muted-foreground">
-            Secure access to ExpresSync
-          </p>
-        </BlurFade>
       </div>
     </div>
   );
