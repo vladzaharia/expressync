@@ -7,6 +7,8 @@ import { logger } from "../../../src/lib/utils/logger.ts";
  * These patterns match StEvE log entries for unauthorized tags
  */
 const TAG_REJECTION_PATTERNS = [
+  // Pattern: "The user with idTag 'ABC123' is INVALID (not present in DB)." - StEvE actual format
+  /The user with idTag ['"]?([^'"]+)['"]? is INVALID/i,
   // Pattern: "Authorization rejected for idTag: ABC123"
   /Authorization rejected for idTag:\s*(\S+)/i,
   // Pattern: "Unknown idTag: ABC123"

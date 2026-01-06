@@ -1,17 +1,18 @@
 import { useSignal } from "@preact/signals";
-import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 import {
   ArrowDown,
   ArrowRight,
+  Check,
   CornerDownRight,
   CreditCard,
   Pencil,
   Tag,
   Trash2,
   User,
+  X,
 } from "lucide-preact";
 
 interface MappingGroup {
@@ -278,20 +279,26 @@ export default function TagLinkingGrid({
             })()}
 
             {/* Status & Actions */}
-            <div className="flex items-center justify-between gap-2 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-border w-full md:w-auto md:ml-auto">
-              {/* Status badge - left on mobile */}
-              <Badge
-                variant={group.isActive ? "success" : "secondary"}
-                className="cursor-pointer"
-                onClick={() =>
-                  primaryMappingId &&
-                  handleToggleActive(primaryMappingId, group.isActive)}
-              >
-                {group.isActive ? "Active" : "Inactive"}
-              </Badge>
-              {/* Action buttons - right on mobile, icon-only on desktop */}
+            <div className="flex items-center justify-center md:justify-end gap-2 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-border w-full md:w-auto md:ml-auto">
+              {/* Action buttons */}
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" asChild className="gap-2 md:gap-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    "gap-2 md:gap-0",
+                    group.isActive
+                      ? "border-green-500 text-green-600 hover:bg-green-500/10 hover:text-green-600 dark:text-green-400 dark:hover:text-green-400"
+                      : "border-muted-foreground/50 text-muted-foreground hover:bg-muted/50"
+                  )}
+                  onClick={() =>
+                    primaryMappingId &&
+                    handleToggleActive(primaryMappingId, group.isActive)}
+                >
+                  {group.isActive ? <Check className="size-4" /> : <X className="size-4" />}
+                  <span className="md:hidden">{group.isActive ? "Active" : "Inactive"}</span>
+                </Button>
+                <Button variant="outline" size="sm" asChild className="gap-2 md:gap-0 border-purple-500 text-purple-600 hover:bg-purple-500/10 hover:text-purple-600 dark:text-purple-400 dark:hover:text-purple-400">
                   <a href={`/links/${primaryMappingId}`}>
                     <Pencil className="size-4" />
                     <span className="md:hidden">Edit</span>
@@ -300,7 +307,7 @@ export default function TagLinkingGrid({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-2 md:gap-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  className="gap-2 md:gap-0 border-red-500 text-red-600 hover:bg-red-500/10 hover:text-red-600 dark:text-red-400 dark:hover:text-red-400"
                   onClick={() =>
                     primaryMappingId && handleDelete(primaryMappingId)}
                   disabled={deleting.value === primaryMappingId}

@@ -270,7 +270,7 @@ export default function TapToAddModal({
         {/* Footer - only show "Try again" on error */}
         {isError && (
           <div className="flex justify-center">
-            <Button onClick={handleRetry}>
+            <Button onClick={handleRetry} className="bg-purple-600 hover:bg-purple-700 text-white">
               Try again
             </Button>
           </div>
