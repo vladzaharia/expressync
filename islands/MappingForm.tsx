@@ -169,25 +169,41 @@ export default function MappingForm({ mapping }: Props) {
     // Fetch OCPP tags
     fetch("/api/tag")
       .then((res) => res.json())
-      .then((data) => (ocppTags.value = data))
+      .then((data) => {
+        if (Array.isArray(data)) {
+          ocppTags.value = data;
+        }
+      })
       .catch(console.error);
 
     // Fetch existing mappings
     fetch("/api/tag/link")
       .then((res) => res.json())
-      .then((data) => (existingMappings.value = data))
+      .then((data) => {
+        if (Array.isArray(data)) {
+          existingMappings.value = data;
+        }
+      })
       .catch(console.error);
 
     // Fetch customers
     fetch("/api/customer")
       .then((res) => res.json())
-      .then((data) => (lagoCustomers.value = data))
+      .then((data) => {
+        if (Array.isArray(data)) {
+          lagoCustomers.value = data;
+        }
+      })
       .catch(console.error);
 
     // Fetch subscriptions
     fetch("/api/subscription")
       .then((res) => res.json())
-      .then((data) => (lagoSubscriptions.value = data))
+      .then((data) => {
+        if (Array.isArray(data)) {
+          lagoSubscriptions.value = data;
+        }
+      })
       .catch(console.error);
   }, []);
 
@@ -371,7 +387,9 @@ export default function MappingForm({ mapping }: Props) {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => (showCreateTag.value = true)}
+              onClick={() => {
+                showCreateTag.value = true;
+              }}
               className="border-purple-500 text-purple-600 hover:bg-purple-500/10 hover:text-purple-600 dark:text-purple-400 dark:hover:text-purple-400"
             >
               <Plus className="size-4 mr-1" />
@@ -418,7 +436,9 @@ export default function MappingForm({ mapping }: Props) {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => (showTapToAdd.value = true)}
+                    onClick={() => {
+                      showTapToAdd.value = true;
+                    }}
                     className="border-purple-500 text-purple-600 hover:bg-purple-500/10 hover:text-purple-600 dark:text-purple-400 dark:hover:text-purple-400"
                   >
                     <Radio className="size-4 mr-1" />
