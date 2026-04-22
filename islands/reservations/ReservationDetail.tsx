@@ -20,9 +20,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { Input } from "@/components/ui/input.tsx";
-import { Label } from "@/components/ui/label.tsx";
 import { ConflictWarning } from "@/components/reservations/ConflictWarning.tsx";
+import {
+  DateTimeRangePicker,
+  type PickerConflict,
+} from "@/components/reservations/DateTimeRangePicker.tsx";
 import type { ReservationStatus } from "@/src/db/schema.ts";
 
 interface Props {
@@ -41,10 +43,6 @@ interface Conflict {
   steveOcppIdTag: string;
 }
 
-function isoAt(d: Date): string {
-  return d.toISOString().slice(0, 16);
-}
-
 export default function ReservationDetail(
   { reservationId, status, startAtIso, endAtIso, tz }: Props,
 ) {
@@ -53,13 +51,10 @@ export default function ReservationDetail(
   const [cancelBusy, setCancelBusy] = useState(false);
   const [rescheduleBusy, setRescheduleBusy] = useState(false);
 
-  const [newStart, setNewStart] = useState<string>(() =>
-    isoAt(new Date(startAtIso))
+  const [newStartDate, setNewStartDate] = useState<Date>(
+    () => new Date(startAtIso),
   );
-  const [newDuration, setNewDuration] = useState<number>(() => {
-    const ms = new Date(endAtIso).getTime() - new Date(startAtIso).getTime();
-    return Math.max(15, Math.round(ms / 60_000));
-  });
+  const [newEndDate, setNewEndDate] = useState<Date>(() => new Date(endAtIso));
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
 
   const keepButtonRef = useRef<HTMLButtonElement>(null);
@@ -96,12 +91,15 @@ export default function ReservationDetail(
   };
 
   const doReschedule = async () => {
-    const start = new Date(newStart);
-    if (Number.isNaN(start.getTime())) {
-      toast.error("Invalid start time");
+    const start = newStartDate;
+    const end = newEndDate;
+    if (
+      Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) ||
+      end.getTime() <= start.getTime()
+    ) {
+      toast.error("Invalid time window");
       return;
     }
-    const end = new Date(start.getTime() + newDuration * 60_000);
     setRescheduleBusy(true);
     try {
       const res = await fetch(`/api/reservations/${reservationId}`, {
@@ -199,42 +197,27 @@ export default function ReservationDetail(
             </DialogDescription>
           </DialogHeader>
           <div class="flex flex-col gap-3">
-            <div class="flex flex-col gap-2">
-              <Label htmlFor="reschedule-start">Start</Label>
-              <Input
-                id="reschedule-start"
-                type="datetime-local"
-                value={newStart}
-                onInput={(e) => {
-                  setNewStart((e.target as HTMLInputElement).value);
-                  setConflicts([]);
-                }}
-              />
-            </div>
-            <div class="flex flex-col gap-2">
-              <Label htmlFor="reschedule-duration">Duration (minutes)</Label>
-              <Input
-                id="reschedule-duration"
-                type="number"
-                min={15}
-                step={15}
-                value={newDuration}
-                onInput={(e) => {
-                  const v = parseInt(
-                    (e.target as HTMLInputElement).value || "0",
-                    10,
-                  );
-                  setNewDuration(Number.isFinite(v) && v > 0 ? v : 15);
-                  setConflicts([]);
-                }}
-              />
-            </div>
+            <DateTimeRangePicker
+              value={{ startAt: newStartDate, endAt: newEndDate }}
+              onChange={(next) => {
+                setNewStartDate(next.startAt);
+                setNewEndDate(next.endAt);
+                setConflicts([]);
+              }}
+              tz={tz ?? undefined}
+              minuteStep={15}
+              conflicts={conflicts satisfies PickerConflict[]}
+              variant="compact"
+              idPrefix="reschedule"
+            />
             <ConflictWarning
               conflicts={conflicts}
               tz={tz ?? undefined}
               onPickSuggestion={(iso) => {
                 const d = new Date(iso);
-                setNewStart(isoAt(d));
+                const durMs = newEndDate.getTime() - newStartDate.getTime();
+                setNewStartDate(d);
+                setNewEndDate(new Date(d.getTime() + durMs));
                 setConflicts([]);
               }}
             />

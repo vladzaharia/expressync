@@ -53,6 +53,7 @@
     "npm:better-auth@^1.4.0": "1.4.10_drizzle-kit@0.31.8__esbuild@0.25.12_drizzle-orm@0.45.1__@opentelemetry+api@1.9.0__postgres@3.4.7_@better-auth+utils@0.3.0_@better-fetch+fetch@1.1.21_better-call@1.1.7__zod@4.3.4_jose@6.1.3_kysely@0.28.9_nanostores@1.1.0_@better-auth+core@1.4.10__@better-auth+utils@0.3.0__@better-fetch+fetch@1.1.21__better-call@1.1.7___zod@4.3.4__jose@6.1.3__kysely@0.28.9__nanostores@1.1.0__zod@4.3.4_zod@4.3.4_@opentelemetry+api@1.9.0_postgres@3.4.7",
     "npm:class-variance-authority@~0.7.1": "0.7.1",
     "npm:clsx@^2.1.1": "2.1.1",
+    "npm:cmdk@1": "1.1.1_react@19.2.3_react-dom@19.2.3__react@19.2.3",
     "npm:drizzle-kit@~0.31.8": "0.31.8_esbuild@0.25.12",
     "npm:drizzle-orm@~0.45.1": "0.45.1_@opentelemetry+api@1.9.0_postgres@3.4.7",
     "npm:esbuild-wasm@~0.25.11": "0.25.12",
@@ -1772,6 +1773,17 @@
     "clsx@2.1.1": {
       "integrity": "sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA=="
     },
+    "cmdk@1.1.1_react@19.2.3_react-dom@19.2.3__react@19.2.3": {
+      "integrity": "sha512-Vsv7kFaXm+ptHDMZ7izaRsP70GgrW9NBNGswt9OZaVBLlE0SNpDq8eu/VGXyF9r7M0azK3Wy7OlYXsuyYLFzHg==",
+      "dependencies": [
+        "@radix-ui/react-compose-refs",
+        "@radix-ui/react-dialog",
+        "@radix-ui/react-id",
+        "@radix-ui/react-primitive@2.1.4_react@19.2.3_react-dom@19.2.3__react@19.2.3",
+        "react",
+        "react-dom"
+      ]
+    },
     "convert-source-map@2.0.0": {
       "integrity": "sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg=="
     },
@@ -2388,6 +2400,7 @@
       "npm:better-auth@^1.4.0",
       "npm:class-variance-authority@~0.7.1",
       "npm:clsx@^2.1.1",
+      "npm:cmdk@1",
       "npm:drizzle-kit@~0.31.8",
       "npm:drizzle-orm@~0.45.1",
       "npm:lucide-preact@0.511",
