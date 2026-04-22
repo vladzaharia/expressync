@@ -3,8 +3,7 @@ import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
 import NewTagForm from "../../islands/NewTagForm.tsx";
 import { steveClient } from "../../src/lib/steve-client.ts";
-import { ArrowLeft } from "lucide-preact";
-import { CHROME_SIZE } from "../../components/AppSidebar.tsx";
+import { BackAction } from "../../components/shared/BackAction.tsx";
 
 export const handler = define.handlers({
   async GET(ctx) {
@@ -17,19 +16,6 @@ export const handler = define.handlers({
   },
 });
 
-function BackAction() {
-  return (
-    <a
-      href="/tags"
-      className="flex items-center justify-center gap-2 px-4 transition-colors"
-      style={{ height: CHROME_SIZE }}
-    >
-      <ArrowLeft className="size-5" />
-      <span className="text-sm font-medium">Back</span>
-    </a>
-  );
-}
-
 export default define.page<typeof handler>(
   function NewTagPage({ data, url, state }) {
     return (
@@ -37,7 +23,7 @@ export default define.page<typeof handler>(
         currentPath={url.pathname}
         user={state.user}
         accentColor="cyan"
-        actions={<BackAction />}
+        actions={<BackAction href="/tags" />}
       >
         <PageCard
           title="Create Tag"
