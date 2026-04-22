@@ -7,7 +7,8 @@
  *
  * Actions render via the shadcn Button primitive so we inherit focus rings
  * and variant styling. Use `primaryAction.external: true` to open in a new
- * tab (adds rel=noopener + external-link icon).
+ * tab (adds rel=noopener + external-link icon). Use `icon` on the action
+ * for a leading lucide glyph.
  */
 
 import type { ComponentChildren } from "preact";
@@ -24,9 +25,10 @@ export interface EmptyStateAction {
   onClick?: () => void;
   external?: boolean;
   ariaLabel?: string;
+  icon?: LucideIcon;
 }
 
-interface EmptyStateProps {
+export interface EmptyStateProps {
   icon?: LucideIcon;
   illustration?: ComponentChildren;
   title: string;
@@ -107,9 +109,13 @@ function ActionButton(
     variant: "default" | "outline";
   },
 ) {
+  const ActionIcon = action.icon;
   const content = (
     <>
       {action.external && <ExternalLink class="size-4" aria-hidden="true" />}
+      {!action.external && ActionIcon && (
+        <ActionIcon class="size-4" aria-hidden="true" />
+      )}
       <span>{action.label}</span>
     </>
   );

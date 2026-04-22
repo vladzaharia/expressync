@@ -19,9 +19,11 @@ import DashboardStatsCards from "../islands/DashboardStatsCards.tsx";
 import type { SyncRun } from "../src/db/schema.ts";
 import { steveClient } from "../src/lib/steve-client.ts";
 import { lagoClient } from "../src/lib/lago-client.ts";
-import { ArrowRight } from "lucide-preact";
+import { ArrowRight, Link2, Tag, Zap } from "lucide-preact";
 import { accentTailwindClasses, borderBeamColors } from "../src/lib/colors.ts";
 import { cn } from "../src/lib/utils/cn.ts";
+import { EmptyState } from "../components/shared/EmptyState.tsx";
+import LiveChargerTicker from "../islands/dashboard/LiveChargerTicker.tsx";
 
 interface DashboardStats {
   tags: {
@@ -56,6 +58,7 @@ interface DashboardData {
   stats: DashboardStats;
   recentSyncRuns: SyncRun[];
   recentTransactions: RecentTransaction[];
+  isFirstRun: boolean;
 }
 
 const defaultStats: DashboardStats = {
@@ -222,11 +225,19 @@ export const handler = define.handlers({
       .orderBy(desc(schema.syncedTransactionEvents.syncedAt))
       .limit(5);
 
+    // First-run: no active/blocked tags AND no Lago customers yet. Keeps
+    // the dashboard skeleton visible underneath so operators can still see
+    // the shape of what's coming — the banner sits above it.
+    const isFirstRun = stats.tags.active === 0 &&
+      stats.tags.blocked === 0 &&
+      stats.lago.customers === 0;
+
     return {
       data: {
         stats,
         recentSyncRuns,
         recentTransactions,
+        isFirstRun,
       },
     };
   },
@@ -236,8 +247,16 @@ export default define.page<typeof handler>(
   function DashboardPage({ data, url, state }) {
     return (
       <SidebarLayout currentPath={url.pathname} user={state.user}>
-        {/* Height: auto on mobile (scrollable), fixed on desktop */}
-        <div className="relative min-h-0 lg:h-[calc(100vh-6.5rem)] overflow-auto lg:overflow-hidden">
+        {/* Height: auto on mobile (scrollable); on desktop fixed only when */}
+        {/* no first-run banner is present (banner needs extra room). */}
+        <div
+          className={cn(
+            "relative min-h-0 overflow-auto",
+            data.isFirstRun
+              ? "lg:h-auto lg:overflow-auto"
+              : "lg:h-[calc(100vh-6.5rem)] lg:overflow-hidden",
+          )}
+        >
           {/* Subtle background pattern */}
           <DotPattern
             className="absolute inset-0 -z-10 opacity-[0.03] [mask-image:radial-gradient(800px_circle_at_center,white,transparent)]"
@@ -245,6 +264,35 @@ export default define.page<typeof handler>(
             height={20}
             cr={1}
           />
+
+          {/* Header strip: live SSE status chip + first-run banner */}
+          <div className="mb-3 flex items-center justify-end">
+            <LiveChargerTicker />
+          </div>
+
+          {data.isFirstRun
+            ? (
+              <div className="mb-3">
+                <EmptyState
+                  icon={Zap}
+                  title="Welcome to ExpresSync"
+                  description="Register a charge point in StEvE and scan a tag to get started. Link your first tag to a Lago customer to start billing."
+                  primaryAction={{
+                    label: "Register a tag",
+                    href: "/tags/new",
+                    icon: Tag,
+                  }}
+                  secondaryAction={{
+                    label: "Link a tag to a customer",
+                    href: "/links/new",
+                    icon: Link2,
+                  }}
+                  accent="cyan"
+                  size="lg"
+                />
+              </div>
+            )
+            : null}
 
           {/* Main dashboard grid: 1/3 stats, 2/3 tables */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:h-full">
@@ -257,7 +305,7 @@ export default define.page<typeof handler>(
 
             {/* Right column: Tables (2/3) - 2 tables each 1/2 height */}
             <div className="lg:col-span-2 flex flex-col gap-3 lg:h-full">
-              {/* Recent Transactions Table (top half) - Green accent */}
+              {/* Recent Charging Sessions Table (top half) - Green accent */}
               <BlurFade
                 delay={0.1}
                 duration={0.4}
