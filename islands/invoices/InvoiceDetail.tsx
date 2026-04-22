@@ -1,13 +1,6 @@
 import { useSignal } from "@preact/signals";
-import { useEffect, useRef } from "preact/hooks";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog.tsx";
+import { useEffect } from "preact/hooks";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { InvoiceStatusChip } from "@/components/billing/InvoiceStatusChip.tsx";
@@ -20,6 +13,7 @@ import {
   formatMoney,
   type InvoiceUiStatus,
 } from "@/src/lib/invoice-ui.ts";
+import { useInvoiceSse as _useInvoiceSse } from "@/hooks/use-invoice-sse.ts";
 import { sseConnected, subscribeSse } from "@/islands/shared/SseProvider.tsx";
 
 interface InvoiceDetailState {
@@ -65,7 +59,6 @@ export default function InvoiceDetail(
   );
   const showRetryDialog = useSignal(false);
   const showVoidDialog = useSignal(false);
-  const cancelButtonRef = useRef<HTMLButtonElement>(null);
 
   // Dual-mode refresh while pending: SSE with polling fallback.
   //
@@ -227,13 +220,6 @@ export default function InvoiceDetail(
     }
   };
 
-  // Focus the safe "Cancel" button on open
-  useEffect(() => {
-    if (!showVoidDialog.value && !showRetryDialog.value) return;
-    const t = setTimeout(() => cancelButtonRef.current?.focus(), 20);
-    return () => clearTimeout(t);
-  }, [showVoidDialog.value, showRetryDialog.value]);
-
   const canFinalize = state.value.status === "draft";
   const canVoid = state.value.status === "finalized" &&
     state.value.paymentStatus !== "succeeded";
@@ -361,69 +347,35 @@ export default function InvoiceDetail(
       </div>
 
       {/* Retry payment confirm */}
-      <Dialog
+      <ConfirmDialog
         open={showRetryDialog.value}
         onOpenChange={(v) => showRetryDialog.value = v}
-      >
-        <DialogContent onClose={() => showRetryDialog.value = false}>
-          <DialogHeader>
-            <DialogTitle>Retry payment?</DialogTitle>
-            <DialogDescription>
-              Lago will attempt to charge the customer's payment method again.
-              The invoice will flip to <em>pending</em>{" "}
-              until a webhook reports the outcome.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              ref={cancelButtonRef}
-              variant="outline"
-              onClick={() => showRetryDialog.value = false}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="default"
-              onClick={() => run("retry")}
-              disabled={busy.value !== null}
-            >
-              Retry Payment
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        title="Retry payment?"
+        description={
+          <>
+            Lago will attempt to charge the customer's payment method again. The
+            invoice will flip to <em>pending</em>{" "}
+            until a webhook reports the outcome.
+          </>
+        }
+        confirmLabel="Retry Payment"
+        onConfirm={() => run("retry")}
+        isLoading={busy.value === "retry"}
+        confirmDisabled={busy.value !== null}
+      />
 
       {/* Void confirm */}
-      <Dialog
+      <ConfirmDialog
         open={showVoidDialog.value}
         onOpenChange={(v) => showVoidDialog.value = v}
-      >
-        <DialogContent onClose={() => showVoidDialog.value = false}>
-          <DialogHeader>
-            <DialogTitle>Void this invoice?</DialogTitle>
-            <DialogDescription>
-              Voiding marks the invoice as cancelled in Lago. This action cannot
-              be undone and the invoice stays in the audit trail.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              ref={cancelButtonRef}
-              variant="outline"
-              onClick={() => showVoidDialog.value = false}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => run("void")}
-              disabled={busy.value !== null}
-            >
-              Void
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        title="Void this invoice?"
+        description="Voiding marks the invoice as cancelled in Lago. This action cannot be undone and the invoice stays in the audit trail."
+        variant="destructive"
+        confirmLabel="Void"
+        onConfirm={() => run("void")}
+        isLoading={busy.value === "void"}
+        confirmDisabled={busy.value !== null}
+      />
     </div>
   );
 }

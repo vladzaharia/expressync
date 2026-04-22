@@ -5,8 +5,7 @@ import { eq } from "drizzle-orm";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
 import MappingForm from "../../islands/MappingForm.tsx";
-import { ArrowLeft } from "lucide-preact";
-import { CHROME_SIZE } from "../../components/AppSidebar.tsx";
+import { BackAction } from "../../components/shared/BackAction.tsx";
 import { config } from "../../src/lib/config.ts";
 import { steveClient } from "../../src/lib/steve-client.ts";
 import { lagoClient } from "../../src/lib/lago-client.ts";
@@ -94,19 +93,6 @@ export const handler = define.handlers({
   },
 });
 
-function BackAction() {
-  return (
-    <a
-      href="/links"
-      className="flex items-center justify-center gap-2 px-4 transition-colors"
-      style={{ height: CHROME_SIZE }}
-    >
-      <ArrowLeft className="size-5" />
-      <span className="text-sm font-medium">Back</span>
-    </a>
-  );
-}
-
 export default define.page<typeof handler>(
   function NewTagLinkingPage({ data, url, state }) {
     const meta = data.preselectedTagId
@@ -123,7 +109,7 @@ export default define.page<typeof handler>(
         currentPath={url.pathname}
         user={state.user}
         accentColor="violet"
-        actions={<BackAction />}
+        actions={<BackAction href="/links" />}
       >
         <PageCard
           title={title}

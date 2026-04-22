@@ -9,8 +9,7 @@ import { steveClient } from "../../src/lib/steve-client.ts";
 import { lagoClient } from "../../src/lib/lago-client.ts";
 import { config } from "../../src/lib/config.ts";
 import { getAllChildTags, isMetaTag } from "../../src/lib/tag-hierarchy.ts";
-import { ArrowLeft } from "lucide-preact";
-import { CHROME_SIZE } from "../../components/AppSidebar.tsx";
+import { BackAction } from "../../components/shared/BackAction.tsx";
 import {
   Card,
   CardContent,
@@ -418,19 +417,6 @@ export const handler = define.handlers({
   },
 });
 
-function BackAction() {
-  return (
-    <a
-      href="/tags"
-      className="flex items-center justify-center gap-2 px-4 transition-colors"
-      style={{ height: CHROME_SIZE }}
-    >
-      <ArrowLeft className="size-5" />
-      <span className="text-sm font-medium">Back</span>
-    </a>
-  );
-}
-
 export default define.page<typeof handler>(
   function TagDetailsPage({ data, url, state }) {
     const {
@@ -466,7 +452,7 @@ export default define.page<typeof handler>(
         currentPath={url.pathname}
         user={state.user}
         accentColor="cyan"
-        actions={<BackAction />}
+        actions={<BackAction href="/tags" />}
       >
         <PageCard
           title={isMeta ? "Meta-tag details" : "Tag details"}

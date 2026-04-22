@@ -11,13 +11,8 @@ import { db } from "../../src/db/index.ts";
 import * as schema from "../../src/db/schema.ts";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
-import {
-  ArrowLeft,
-  BatteryCharging,
-  Tag as TagIcon,
-  User,
-} from "lucide-preact";
-import { CHROME_SIZE } from "../../components/AppSidebar.tsx";
+import { BatteryCharging, Tag as TagIcon, User } from "lucide-preact";
+import { BackAction } from "../../components/shared/BackAction.tsx";
 import {
   type Pill,
   StatusPillRow,
@@ -140,19 +135,6 @@ export const handler = define.handlers({
   },
 });
 
-function BackAction() {
-  return (
-    <a
-      href="/reservations"
-      class="flex items-center justify-center gap-2 px-4 transition-colors hover:bg-muted/40"
-      style={{ height: CHROME_SIZE }}
-    >
-      <ArrowLeft class="size-5" />
-      <span class="text-sm font-medium">Back</span>
-    </a>
-  );
-}
-
 export default define.page<typeof handler>(
   function ReservationDetailPage({ data, url, state }) {
     const r = data.reservation;
@@ -218,7 +200,9 @@ export default define.page<typeof handler>(
         currentPath={url.pathname}
         user={state.user}
         accentColor="indigo"
-        actions={<BackAction />}
+        actions={
+          <BackAction href="/reservations" className="hover:bg-muted/40" />
+        }
       >
         <PageCard
           title={`Reservation #${r.id}`}
