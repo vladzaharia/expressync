@@ -116,11 +116,16 @@ async function getDashboardStats(): Promise<DashboardStats> {
     monthStart.setDate(monthStart.getDate() - 30);
     monthStart.setHours(0, 0, 0, 0);
 
+    // Convert dates to ISO strings for embedding in SQL templates
+    // (postgres.js driver does not accept Date objects as inline sql parameters)
+    const todayIso = todayStart.toISOString();
+    const weekIso = weekStart.toISOString();
+
     // Fetch kWh delivered by all three timeframes in a single SQL query
     const [kwhStats] = await db
       .select({
-        kwhDay: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncedTransactionEvents.syncedAt} >= ${todayStart} THEN ${schema.syncedTransactionEvents.kwhDelta} ELSE 0 END), 0)`,
-        kwhWeek: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncedTransactionEvents.syncedAt} >= ${weekStart} THEN ${schema.syncedTransactionEvents.kwhDelta} ELSE 0 END), 0)`,
+        kwhDay: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncedTransactionEvents.syncedAt} >= ${todayIso} THEN ${schema.syncedTransactionEvents.kwhDelta} ELSE 0 END), 0)`,
+        kwhWeek: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncedTransactionEvents.syncedAt} >= ${weekIso} THEN ${schema.syncedTransactionEvents.kwhDelta} ELSE 0 END), 0)`,
         kwhMonth: sql<number>`COALESCE(SUM(${schema.syncedTransactionEvents.kwhDelta}), 0)`,
       })
       .from(schema.syncedTransactionEvents)
@@ -133,10 +138,10 @@ async function getDashboardStats(): Promise<DashboardStats> {
     // Fetch sync success rates by all three timeframes in a single SQL query
     const [syncStats] = await db
       .select({
-        dayTotal: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${todayStart} THEN 1 ELSE 0 END), 0)`,
-        daySuccess: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${todayStart} AND ${schema.syncRuns.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
-        weekTotal: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${weekStart} THEN 1 ELSE 0 END), 0)`,
-        weekSuccess: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${weekStart} AND ${schema.syncRuns.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
+        dayTotal: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${todayIso} THEN 1 ELSE 0 END), 0)`,
+        daySuccess: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${todayIso} AND ${schema.syncRuns.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
+        weekTotal: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${weekIso} THEN 1 ELSE 0 END), 0)`,
+        weekSuccess: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${weekIso} AND ${schema.syncRuns.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
         monthTotal: sql<number>`COALESCE(SUM(1), 0)`,
         monthSuccess: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
       })
