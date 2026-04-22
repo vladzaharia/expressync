@@ -1,0 +1,3 @@
+# ExpresSync Admin Dashboard - Not indexed
+User-agent: *
+Disallow: /
