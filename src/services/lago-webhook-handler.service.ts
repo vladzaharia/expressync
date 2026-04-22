@@ -101,6 +101,20 @@ export function notify(n: AdminNotification): void {
 
 // ----------------------------------------------------------------------------
 // Circuit breaker state (module-level, process-local).
+//
+// LIMITATION: this state lives in memory only. A worker restart (deploy,
+// OOM, container rotation) clears `consecutiveFailures` and `disabledUntilMs`
+// back to zero — so a breaker that tripped right before a restart will
+// silently re-arm with a fresh counter on the next boot. In single-process
+// deployments this is acceptable (the alternative is eating webhook traffic
+// for the cooldown window across a deploy), but in multi-replica setups
+// each replica tracks its own breaker independently.
+//
+// TODO: persist breaker state to DB (or Redis if we take that dep later) so
+// trip/cooldown survive restarts and are shared across replicas. Suggested
+// schema: a single-row `lago_webhook_breaker_state` table with
+// `(consecutive_failures, disabled_until_at, updated_at)` guarded by a
+// `SELECT ... FOR UPDATE` on read-modify-write paths.
 // ----------------------------------------------------------------------------
 
 const CIRCUIT_BREAKER_THRESHOLD = 5;
