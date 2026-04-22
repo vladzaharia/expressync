@@ -1,7 +1,7 @@
 import { define } from "../../utils.ts";
 import { db } from "../../src/db/index.ts";
 import * as schema from "../../src/db/schema.ts";
-import { desc, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
 import TagMetadataForm from "../../islands/TagMetadataForm.tsx";
@@ -14,21 +14,14 @@ import { SectionCard } from "../../components/shared/SectionCard.tsx";
 import { FileText } from "lucide-preact";
 import { TagHeaderStrip } from "../../components/tags/TagHeaderStrip.tsx";
 import {
-  TagLinkingCard,
+  type RelationTag,
+  TagLinkCard,
   type TagLinkingInfo,
-} from "../../components/tags/TagLinkingCard.tsx";
-import {
-  type IssuedCardRow,
-  IssuedCardsSection,
-} from "../../components/tags/IssuedCardsSection.tsx";
+} from "../../components/tags/TagLinkCard.tsx";
 import {
   type RecentTransactionRow,
   TagRecentTransactionsSection,
 } from "../../components/tags/TagRecentTransactionsSection.tsx";
-import {
-  type RelationTag,
-  TagRelationsSection,
-} from "../../components/tags/TagRelationsSection.tsx";
 import type {
   LagoCustomer,
   LagoSubscription,
@@ -55,8 +48,6 @@ interface LoaderData {
     isLinked: boolean;
   };
   linking: TagLinkingInfo | null;
-  issuedCards: IssuedCardRow[];
-  issuedCardsMissing: boolean;
   recentTransactions: RecentTransactionRow[];
   relations: {
     hasAny: boolean;
@@ -68,15 +59,6 @@ interface LoaderData {
   steveFetchFailed: boolean;
   lagoFetchFailed: boolean;
   lagoDashboardUrl: string;
-}
-
-function buildInvoiceUrl(
-  dashboardUrl: string,
-  lagoCustomerLagoId: string | null,
-  lagoInvoiceId: string | null,
-): string | null {
-  if (!dashboardUrl || !lagoCustomerLagoId || !lagoInvoiceId) return null;
-  return `${dashboardUrl}/customer/${lagoCustomerLagoId}/invoice/${lagoInvoiceId}/overview`;
 }
 
 export const handler = define.handlers({
@@ -158,72 +140,7 @@ export const handler = define.handlers({
     }
 
     // -----------------------------------------------------------------
-    // 4. Issued cards — tolerate missing migration.
-    // -----------------------------------------------------------------
-    let issuedCardRows: Array<{
-      id: number;
-      cardType: string;
-      billingMode: string;
-      issuedAt: Date | null;
-      issuedBy: string | null;
-      issuedByEmail: string | null;
-      note: string | null;
-      lagoInvoiceId: string | null;
-      syncError: string | null;
-    }> = [];
-    let issuedCardsMissing = false;
-
-    if (mapping) {
-      try {
-        const rows = await db
-          .select({
-            id: schema.issuedCards.id,
-            cardType: schema.issuedCards.cardType,
-            billingMode: schema.issuedCards.billingMode,
-            issuedAt: schema.issuedCards.issuedAt,
-            issuedBy: schema.issuedCards.issuedBy,
-            issuedByEmail: schema.users.email,
-            note: schema.issuedCards.note,
-            lagoInvoiceId: schema.issuedCards.lagoInvoiceId,
-            syncError: schema.issuedCards.syncError,
-          })
-          .from(schema.issuedCards)
-          .leftJoin(
-            schema.users,
-            eq(schema.issuedCards.issuedBy, schema.users.id),
-          )
-          .where(eq(schema.issuedCards.userMappingId, mapping.id))
-          .orderBy(desc(schema.issuedCards.issuedAt));
-        issuedCardRows = rows;
-      } catch (err) {
-        // Most commonly the table doesn't exist yet (migration 0011 pending).
-        issuedCardsMissing = true;
-        console.error("[tags/[tagPk]] issued_cards query failed:", err);
-      }
-    }
-
-    const lagoCustomerLagoId = lagoCustomer?.lago_id ?? null;
-    const dashboardUrl = config.LAGO_DASHBOARD_URL;
-    const issuedCards: IssuedCardRow[] = issuedCardRows.map((r) => ({
-      id: r.id,
-      cardType: r.cardType,
-      billingMode: r.billingMode,
-      issuedAt: r.issuedAt
-        ? r.issuedAt.toISOString()
-        : new Date(0).toISOString(),
-      issuedByEmail: r.issuedByEmail ?? null,
-      note: r.note,
-      lagoInvoiceId: r.lagoInvoiceId,
-      lagoInvoiceUrl: buildInvoiceUrl(
-        dashboardUrl,
-        lagoCustomerLagoId,
-        r.lagoInvoiceId,
-      ),
-      syncError: r.syncError,
-    }));
-
-    // -----------------------------------------------------------------
-    // 5. Recent StEvE transactions + lastSyncedAt join.
+    // 4. Recent StEvE transactions + lastSyncedAt join.
     // -----------------------------------------------------------------
     let recentTransactions: RecentTransactionRow[] = [];
     if (resolvedIdTag && !steveFetchFailed) {
@@ -394,8 +311,6 @@ export const handler = define.handlers({
         isLinked: Boolean(mapping?.lagoCustomerExternalId),
       },
       linking,
-      issuedCards,
-      issuedCardsMissing,
       recentTransactions,
       relations: {
         hasAny: Boolean(parentTag) || childrenRel.length > 0,
@@ -420,28 +335,15 @@ export default define.page<typeof handler>(
       idTag,
       parentIdTag,
       isMeta,
-      mappingId,
       initialMetadata,
       header,
       linking,
-      issuedCards,
-      issuedCardsMissing,
       recentTransactions,
       relations,
-      hasLagoCustomer,
-      mappingLabel,
       steveFetchFailed,
       lagoFetchFailed,
       lagoDashboardUrl,
     } = data;
-
-    const relationsSection = (
-      <TagRelationsSection
-        isMeta={isMeta}
-        parent={relations.parent}
-        childTags={relations.children}
-      />
-    );
 
     return (
       <SidebarLayout
@@ -454,7 +356,7 @@ export default define.page<typeof handler>(
           title={isMeta ? "Meta-tag details" : "Tag details"}
           description={isMeta
             ? "Meta-tags group multiple real tags under one customer. Edit the rollup's metadata here; child tags inherit via StEvE's parentIdTag."
-            : "Identity, metadata, linking, issued cards, and recent charging for this tag."}
+            : "Identity, metadata, linking, and recent charging for this tag."}
           colorScheme="cyan"
         >
           <div class="space-y-6">
@@ -497,36 +399,22 @@ export default define.page<typeof handler>(
               </SectionCard>
 
               <div class="lg:col-span-1">
-                <TagLinkingCard
+                <TagLinkCard
                   tagPk={tagPk}
+                  isMeta={isMeta}
                   linking={linking}
+                  relations={relations}
                   lagoDashboardUrl={lagoDashboardUrl}
                   lagoFetchFailed={lagoFetchFailed}
                 />
               </div>
             </div>
 
-            {/* Meta-tag variant: hierarchy promoted above issued cards. */}
-            {isMeta ? relationsSection : null}
-
-            <IssuedCardsSection
-              tagPk={tagPk}
-              mappingId={mappingId}
-              mappingLabel={mappingLabel}
-              hasLagoCustomer={hasLagoCustomer}
-              isMeta={isMeta}
-              rows={issuedCards}
-              issuedCardsMissing={issuedCardsMissing}
-            />
-
             <TagRecentTransactionsSection
               idTag={idTag}
               rows={recentTransactions}
               steveFetchFailed={steveFetchFailed}
             />
-
-            {/* Non-meta: render hierarchy only when non-empty. */}
-            {!isMeta && relations.hasAny ? relationsSection : null}
           </div>
         </PageCard>
       </SidebarLayout>
