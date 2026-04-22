@@ -127,7 +127,9 @@ export default define.page<typeof handler>(
             } linked`}
           colorScheme="violet"
         >
-          <LinkingStatStrip totals={data.totals} />
+          <div class="mb-6">
+            <LinkingStatStrip totals={data.totals} />
+          </div>
 
           {groupedMappings.length === 0
             ? <LinkingEmptyState />
