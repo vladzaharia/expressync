@@ -93,8 +93,8 @@ export default define.page<typeof handler>(
         accentColor="green"
       >
         <PageCard
-          title="Charging Transactions"
-          description={`${data.totalCount} transaction${
+          title="Charging Sessions"
+          description={`${data.totalCount} session${
             data.totalCount !== 1 ? "s" : ""
           } recorded`}
           colorScheme="green"

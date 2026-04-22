@@ -87,7 +87,7 @@ export default function TransactionsTable({
       pageSize={pageSize}
       fetchUrl="/api/transaction/summary"
       showLoadMore={showLoadMore}
-      emptyMessage="No transactions found. Transactions will appear here after syncing."
+      emptyMessage="No charging sessions found. Sessions will appear here after syncing."
       onRowClick={handleRowClick}
       getItemKey={(tx) => tx.id}
     />

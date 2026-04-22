@@ -275,7 +275,7 @@ export default define.page<typeof handler>(
                   <CardHeader className="border-b border-border/50 flex-shrink-0 py-1">
                     <CardTitle className="flex items-center justify-between text-base">
                       <SparklesText sparklesCount={6}>
-                        Recent Transactions
+                        Recent Charging Sessions
                       </SparklesText>
                       <a
                         href="/transactions"
