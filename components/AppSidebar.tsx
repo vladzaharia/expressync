@@ -22,6 +22,7 @@ import { ExpresSyncBrand } from "./brand/ExpresSyncBrand.tsx";
 import { type AccentColor, accentTailwindClasses } from "@/src/lib/colors.ts";
 import {
   getAllNavItems,
+  isPathActive,
   NAV_SECTIONS,
   type NavItem,
 } from "@/src/lib/navigation.ts";
@@ -109,52 +110,12 @@ function NavSection({
   return content;
 }
 
-// Theme toggle section - matches nav items
-function ThemeToggleSection({ isCollapsed }: { isCollapsed: boolean }) {
-  const toggleTheme = useThemeToggle();
-
-  const content = (
-    <button
-      type="button"
-      onClick={toggleTheme}
-      className={cn(
-        "flex items-center border-t hover:bg-muted/50 transition-colors cursor-pointer shrink-0 w-full text-muted-foreground hover:text-foreground",
-        isCollapsed ? "justify-center" : "gap-3 px-4",
-      )}
-      style={{ height: CHROME_SIZE, minHeight: CHROME_SIZE }}
-    >
-      <ThemeToggle />
-      {!isCollapsed && (
-        <span className="text-sm font-medium">
-          Toggle Theme
-        </span>
-      )}
-    </button>
-  );
-
-  if (isCollapsed) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>{content}</TooltipTrigger>
-        <TooltipContent side="right" sideOffset={8}>
-          Toggle Theme
-        </TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  return content;
-}
-
 export function AppSidebar({ currentPath, user }: AppSidebarProps) {
   const { state, toggleSidebar, isMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
   const isAdmin = user?.role === "admin";
 
-  const isActive = (url: string) => {
-    if (url === "/") return currentPath === "/";
-    return currentPath === url || currentPath.startsWith(url + "/");
-  };
+  const isActive = (url: string) => isPathActive(url, currentPath);
 
   const flatNavItems: NavItem[] = getAllNavItems(isAdmin);
   const visibleSections = NAV_SECTIONS
@@ -434,34 +395,23 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
         ))}
       </SidebarContent>
 
-      {/* Footer sections */}
+      {
+        /* Footer sections — Wave B1: theme, bell, and user menu moved to top
+          bar; keep a subtle user-summary line (expanded desktop only) so the
+          sidebar still shows who's signed in, then the sign-out button. */
+      }
       <SidebarFooter className="p-0 mt-auto gap-0">
-        {/* Theme toggle section - matches nav items exactly */}
-        <ThemeToggleSection isCollapsed={isCollapsed} />
-
-        {/* Notifications bell — before User section (Phase P1) */}
-        <NotificationBell variant="desktop" isCollapsed={isCollapsed} />
-
-        {/* User info section */}
-        {user && (
-          <div
-            className={cn(
-              "flex items-center border-t bg-primary/5 hover:bg-primary/10 transition-colors shrink-0",
-              isCollapsed ? "justify-center" : "gap-3 px-4",
-            )}
-            style={{ height: CHROME_SIZE, minHeight: CHROME_SIZE }}
-          >
-            <User className="size-5 text-primary shrink-0" />
-            {!isCollapsed && (
-              <div className="flex flex-col min-w-0">
-                <span className="text-sm font-medium truncate">
-                  {user.name || "User"}
-                </span>
-                <span className="text-xs text-muted-foreground truncate">
-                  {user.email}
-                </span>
-              </div>
-            )}
+        {user && !isCollapsed && (
+          <div className="flex items-center gap-3 px-4 py-2 border-t text-muted-foreground shrink-0">
+            <User className="size-4 text-primary shrink-0" aria-hidden="true" />
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-medium truncate text-foreground">
+                {user.name || "User"}
+              </span>
+              <span className="text-[11px] text-muted-foreground truncate">
+                {user.email}
+              </span>
+            </div>
           </div>
         )}
 

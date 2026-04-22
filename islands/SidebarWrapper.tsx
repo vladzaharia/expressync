@@ -5,6 +5,10 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar.tsx";
 import { AppSidebar, CHROME_SIZE } from "@/components/AppSidebar.tsx";
+import { SectionNav } from "@/components/SectionNav.tsx";
+import PaletteTriggerPill from "@/islands/PaletteTriggerPill.tsx";
+import NotificationBell from "@/islands/NotificationBell.tsx";
+import UserMenu from "@/islands/UserMenu.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { type AccentColor, accentTailwindClasses } from "@/src/lib/colors.ts";
 
@@ -27,45 +31,56 @@ interface SidebarWrapperProps {
 }
 
 function TopBarContent({
+  currentPath,
   actions,
   accentColor = "blue",
-}: Pick<SidebarWrapperProps, "actions" | "accentColor">) {
-  useSidebar();
+  user,
+}: Pick<
+  SidebarWrapperProps,
+  "currentPath" | "actions" | "accentColor" | "user"
+>) {
+  const { isMobile } = useSidebar();
 
-  // Get accent color classes from centralized config
+  // On mobile, the "top bar" is rendered by AppSidebar itself — don't double
+  // up here. Admin shell previously hid the header if there were no actions;
+  // we now always render it on desktop for SectionNav + right-cluster chrome.
+  if (isMobile) return null;
+
   const colorClasses = accentTailwindClasses[accentColor];
   const accentBgClass =
     `${colorClasses.bg} ${colorClasses.bgHover} ${colorClasses.text}`;
 
-  // Hide on mobile if no actions, show on desktop always
-  if (!actions) {
-    return (
-      <header
-        className="hidden md:flex shrink-0 items-stretch border-b bg-background sticky top-0 z-10"
-        style={{ height: CHROME_SIZE }}
-      >
-        <div className="flex-1" />
-      </header>
-    );
-  }
-
-  // Show on all screen sizes when there are actions
   return (
     <header
-      className="flex shrink-0 items-stretch border-b bg-background sticky top-0 z-10"
+      className="hidden md:flex shrink-0 items-stretch border-b bg-background sticky top-0 z-10"
       style={{ height: CHROME_SIZE }}
     >
-      {/* Spacer */}
-      <div className="flex-1" />
+      {/* Left: section breadcrumb, fills available space */}
+      <div className="flex-1 min-w-0 flex items-center">
+        <SectionNav currentPath={currentPath} />
+      </div>
 
-      {/* Page action section - full block with accent background */}
-      <div
-        className={cn(
-          "flex items-center justify-center border-l transition-colors",
-          accentBgClass,
-        )}
-      >
-        {actions}
+      {/* Center-right: palette trigger pill */}
+      <div className="flex items-center shrink-0">
+        <PaletteTriggerPill />
+      </div>
+
+      {/* Page action section — preserves accent gradient behavior. */}
+      {actions && (
+        <div
+          className={cn(
+            "flex items-center justify-center border-l transition-colors",
+            accentBgClass,
+          )}
+        >
+          {actions}
+        </div>
+      )}
+
+      {/* Right cluster: NotificationBell + UserMenu */}
+      <div className="flex items-center gap-2 px-3 border-l shrink-0">
+        <NotificationBell variant="topbar" />
+        <UserMenu user={user} />
       </div>
     </header>
   );
@@ -82,7 +97,12 @@ export default function SidebarWrapper({
     <SidebarProvider defaultOpen={false}>
       <AppSidebar currentPath={currentPath} user={user} />
       <SidebarInset>
-        <TopBarContent actions={actions} accentColor={accentColor} />
+        <TopBarContent
+          currentPath={currentPath}
+          actions={actions}
+          accentColor={accentColor}
+          user={user}
+        />
         <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
       </SidebarInset>
     </SidebarProvider>
