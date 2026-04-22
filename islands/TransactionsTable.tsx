@@ -11,6 +11,8 @@ interface Props {
   totalCount?: number;
   pageSize?: number;
   showLoadMore?: boolean;
+  fetchParams?: Record<string, string>;
+  emptyMessage?: string;
 }
 
 const columns: PaginatedTableColumn<TransactionSummary>[] = [
@@ -74,6 +76,9 @@ export default function TransactionsTable({
   totalCount,
   pageSize = 15,
   showLoadMore = true,
+  fetchParams,
+  emptyMessage =
+    "No charging sessions found. Sessions will appear here after syncing.",
 }: Props) {
   const handleRowClick = (tx: TransactionSummary) => {
     globalThis.location.href = `/transactions/${tx.steveTransactionId}`;
@@ -86,8 +91,9 @@ export default function TransactionsTable({
       totalCount={totalCount}
       pageSize={pageSize}
       fetchUrl="/api/transaction/summary"
+      fetchParams={fetchParams}
       showLoadMore={showLoadMore}
-      emptyMessage="No charging sessions found. Sessions will appear here after syncing."
+      emptyMessage={emptyMessage}
       onRowClick={handleRowClick}
       getItemKey={(tx) => tx.id}
     />

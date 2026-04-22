@@ -32,6 +32,8 @@ export interface PaginatedTableProps<T> {
   pageSize?: number;
   /** API endpoint to fetch more items */
   fetchUrl?: string;
+  /** Extra query params merged into every fetch (e.g. active filters) */
+  fetchParams?: Record<string, string>;
   /** Whether to show the Load More button */
   showLoadMore?: boolean;
   /** Custom empty state message */
@@ -56,6 +58,7 @@ export function PaginatedTable<T>({
   totalCount,
   pageSize = 15,
   fetchUrl,
+  fetchParams,
   showLoadMore = true,
   emptyMessage = "No items found",
   onRowClick,
@@ -80,6 +83,11 @@ export function PaginatedTable<T>({
       const url = new URL(fetchUrl, globalThis.location.origin);
       url.searchParams.set("skip", items.value.length.toString());
       url.searchParams.set("limit", pageSize.toString());
+      if (fetchParams) {
+        for (const [k, v] of Object.entries(fetchParams)) {
+          if (v) url.searchParams.set(k, v);
+        }
+      }
 
       const response = await fetch(url.toString());
       if (response.ok) {
