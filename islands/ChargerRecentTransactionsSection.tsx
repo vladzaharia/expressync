@@ -44,9 +44,7 @@ export default function ChargerRecentTransactionsSection(
       <div class="flex items-center justify-between">
         <h2 class="text-sm font-semibold">Recent transactions</h2>
         <a
-          href={`/transactions?chargeBoxId=${
-            encodeURIComponent(chargeBoxId)
-          }`}
+          href={`/transactions?chargeBoxId=${encodeURIComponent(chargeBoxId)}`}
           class="text-xs text-primary underline-offset-4 hover:underline"
         >
           View all →

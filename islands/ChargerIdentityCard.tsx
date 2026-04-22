@@ -98,7 +98,9 @@ export default function ChargerIdentityCard({
             <button
               type="button"
               onClick={handleCopy}
-              aria-label={copied ? "Copied" : `Copy ${chargeBoxId} to clipboard`}
+              aria-label={copied
+                ? "Copied"
+                : `Copy ${chargeBoxId} to clipboard`}
               title={copied ? "Copied" : "Copy chargeBoxId"}
               class="inline-flex items-center justify-center rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >

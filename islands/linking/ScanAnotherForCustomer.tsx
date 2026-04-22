@@ -38,9 +38,7 @@ export default function ScanAnotherForCustomer({ customerExternalId }: Props) {
     // Unknown tag — send them through `/tags/new` to register it. The
     // customer context is preserved as a returnable search param on the
     // `/tags/new` page; today we just forward the idTag.
-    globalThis.location.href = `/tags/new?idTag=${
-      encodeURIComponent(r.idTag)
-    }`;
+    globalThis.location.href = `/tags/new?idTag=${encodeURIComponent(r.idTag)}`;
   };
 
   return (

@@ -20,7 +20,13 @@
 
 import { useComputed, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import { AlertTriangle, ExternalLink, Layers, Package, Radio, Tag } from "lucide-preact";
+import {
+  AlertTriangle,
+  ExternalLink,
+  Layers,
+  Package,
+  Radio,
+} from "lucide-preact";
 import { Button } from "@/components/ui/button.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -28,15 +34,8 @@ import { cn } from "@/src/lib/utils/cn.ts";
 import TapToAddModal from "@/islands/TapToAddModal.tsx";
 import { isMetaTag } from "@/src/lib/tag-hierarchy.ts";
 import { tagTypeIcons } from "@/components/brand/tags/index.ts";
-import {
-  TAG_TYPES,
-  type TagType,
-  tagTypeLabels,
-} from "@/src/lib/types/tags.ts";
-import {
-  tagTypeBgClass,
-  tagTypeTextClass,
-} from "@/src/lib/tag-visuals.ts";
+import { type TagType, tagTypeLabels } from "@/src/lib/types/tags.ts";
+import { tagTypeBgClass, tagTypeTextClass } from "@/src/lib/tag-visuals.ts";
 
 export interface OcppTag {
   id: string;
@@ -76,7 +75,14 @@ function coerceTagType(idTag: string): TagType {
 }
 
 export default function TagPicker(props: Props) {
-  const { value, valuePk, onChange, mappingId, allowTap = true, label } = props;
+  const {
+    value,
+    valuePk: _valuePk,
+    onChange,
+    mappingId,
+    allowTap = true,
+    label,
+  } = props;
 
   const ocppTags = useSignal<OcppTag[]>([]);
   const existingMappings = useSignal<ExistingMapping[]>([]);
@@ -245,7 +251,7 @@ export default function TagPicker(props: Props) {
             <a href="/tags/new" target="_blank" rel="noopener noreferrer">
               <ExternalLink className="size-4 mr-1" aria-hidden="true" />
               <span>Create new tag</span>
-              <span className="sr-only"> (opens in new tab)</span>
+              <span className="sr-only">(opens in new tab)</span>
             </a>
           </Button>
         </div>
@@ -356,8 +362,9 @@ export default function TagPicker(props: Props) {
               // Tag doesn't exist yet — send the operator to /tags/new with
               // the scanned idTag prefilled. The plan forbids inline create
               // on /links/new; /tags/new owns tag creation.
-              globalThis.location.href =
-                `/tags/new?idTag=${encodeURIComponent(tagId)}`;
+              globalThis.location.href = `/tags/new?idTag=${
+                encodeURIComponent(tagId)
+              }`;
             }
           }}
         />

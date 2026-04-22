@@ -29,7 +29,7 @@ import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
 import { steveClient } from "../../src/lib/steve-client.ts";
 import { isMetaTag } from "../../src/lib/tag-hierarchy.ts";
-import { type TagType, isTagType } from "../../src/lib/types/tags.ts";
+import { isTagType, type TagType } from "../../src/lib/types/tags.ts";
 import ScanTagAction from "../../islands/ScanTagAction.tsx";
 import TagsFilterBar, {
   type TagsFilterStateSerialized,
@@ -423,8 +423,10 @@ export default define.page<typeof handler>(
                 )
                 : null}
 
-              {/* Filter bar island only mounts when a URL filter is present.
-                  Full UI is deferred — see islands/TagsFilterBar.tsx. */}
+              {
+                /* Filter bar island only mounts when a URL filter is present.
+                  Full UI is deferred — see islands/TagsFilterBar.tsx. */
+              }
               {filterActive
                 ? (
                   <TagsFilterBar
@@ -460,4 +462,3 @@ export default define.page<typeof handler>(
     );
   },
 );
-

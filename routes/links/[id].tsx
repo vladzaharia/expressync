@@ -133,7 +133,8 @@ export const handler = define.handlers({
     let cascadeCount = 1;
     try {
       const allTags = await steveClient.getOcppTags();
-      cascadeCount = 1 + getAllChildTags(mapping.steveOcppIdTag, allTags).length;
+      cascadeCount = 1 +
+        getAllChildTags(mapping.steveOcppIdTag, allTags).length;
     } catch (err) {
       console.error("Failed to compute cascade count:", err);
     }
@@ -182,8 +183,9 @@ export default define.page<typeof handler>(
         ? `${lagoDashboardUrl}/customer/${lagoCustomer.lagoId}/subscription/${lagoSubscription.lagoId}/overview`
         : null;
 
-    const billingTier: "standard" | "comped" =
-      mapping.billingTier === "comped" ? "comped" : "standard";
+    const billingTier: "standard" | "comped" = mapping.billingTier === "comped"
+      ? "comped"
+      : "standard";
 
     return (
       <SidebarLayout
@@ -269,8 +271,10 @@ export default define.page<typeof handler>(
                   rows={recentTransactions}
                   tagPk={mapping.steveOcppTagPk}
                 />
-                {/* Scan another tag that should bill the same customer.
-                    Only shown once a Lago customer is actually linked. */}
+                {
+                  /* Scan another tag that should bill the same customer.
+                    Only shown once a Lago customer is actually linked. */
+                }
                 {hasLagoCustomer && mapping.lagoCustomerExternalId
                   ? (
                     <ScanAnotherForCustomer
