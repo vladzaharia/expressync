@@ -28,7 +28,7 @@ export const handler = define.handlers({
   async GET(ctx) {
     const steveTransactionId = parseInt(ctx.params.id);
     if (isNaN(steveTransactionId)) {
-      return ctx.renderNotFound();
+      return new Response("Not Found", { status: 404 });
     }
 
     // Get transaction sync state
@@ -109,7 +109,12 @@ export default define.page<typeof handler>(function TransactionDetailsPage({
   url,
   state,
 }) {
-  const { steveTransactionId, syncState, billingEvents, ocppTagId: resolvedOcppTagId } = data;
+  const {
+    steveTransactionId,
+    syncState,
+    billingEvents,
+    ocppTagId: resolvedOcppTagId,
+  } = data;
   const ocppTagId = resolvedOcppTagId ?? "Unknown";
 
   return (

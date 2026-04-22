@@ -1,12 +1,30 @@
 import { config } from "./config.ts";
 import {
+  type CancelReservationParams,
+  type ChangeAvailabilityParams,
+  type DataTransferParams,
+  type GetCompositeScheduleParams,
+  type GetConfigurationParams,
+  type GetDiagnosticsParams,
+  type GetLocalListVersionParams,
+  type OcppOperationName,
+  type OcppTagFilters,
+  type OcppTaskResult,
+  OcppTaskResultSchema,
+  type OcppTaskStatus,
+  OcppTaskStatusSchema,
+  type RemoteStartTransactionParams,
+  type RemoteStopTransactionParams,
+  type ReserveNowParams,
+  type SetChargingProfileParams,
   type StEvEChargeBox,
-  StEvEChargeBoxSchema,
   type StEvEOcppTag,
   StEvEOcppTagSchema,
   type StEvETransaction,
   StEvETransactionSchema,
   type TransactionFilters,
+  type TriggerMessageParams,
+  type UnlockConnectorParams,
 } from "./types/steve.ts";
 import { z } from "zod";
 import { retry } from "./utils/retry.ts";
@@ -17,11 +35,14 @@ import { logger } from "./utils/logger.ts";
  */
 class StEvEClient {
   private baseUrl: string;
-  private apiKey: string;
+  private authHeader: string;
 
   constructor() {
     this.baseUrl = config.STEVE_API_URL;
-    this.apiKey = config.STEVE_API_KEY;
+    // SteVe 3.8+ REST API uses HTTP Basic auth.
+    // Username = auth.user; password = webapi.value (seeded into web_user.api_password).
+    this.authHeader = "Basic " +
+      btoa(`${config.STEVE_API_USERNAME}:${config.STEVE_API_KEY}`);
   }
 
   /**
@@ -32,7 +53,7 @@ class StEvEClient {
     schema: z.ZodSchema<T>,
     options: RequestInit = {},
   ): Promise<T> {
-    return retry(async () => {
+    return await retry(async () => {
       const url = `${this.baseUrl}${path}`;
       const method = options.method || "GET";
 
@@ -56,7 +77,7 @@ class StEvEClient {
           signal: controller.signal,
           headers: {
             "Content-Type": "application/json",
-            "X-API-KEY": this.apiKey,
+            "Authorization": this.authHeader,
             ...options.headers,
           },
         });
@@ -84,7 +105,9 @@ class StEvEClient {
         const data = await response.json();
         logger.debug("StEvE", "Response data received", {
           dataType: Array.isArray(data) ? "array" : typeof data,
-          dataSize: Array.isArray(data) ? data.length : Object.keys(data).length,
+          dataSize: Array.isArray(data)
+            ? data.length
+            : Object.keys(data).length,
         });
 
         // Validate response with Zod schema
@@ -146,10 +169,40 @@ class StEvEClient {
   }
 
   /**
-   * Fetch all OCPP ID tags
+   * Fetch OCPP ID tags, optionally filtered.
+   *
+   * Phase B: StEvE's `/v1/ocppTags` supports query filters documented in the
+   * OpenAPI spec:
+   * - `blocked`, `expired`, `inTransaction` — tri-state: "ALL" | "TRUE" | "FALSE"
+   * - `idTag`, `parentIdTag` — string match
+   * - `ocppTagPk` — numeric PK
+   *
+   * Called with no args, it preserves the original "list all tags" behavior.
+   * `{ inTransaction: "TRUE" }` is the cheap "is anyone charging right now"
+   * signal for the adaptive scheduler (Phase C).
    */
-  async getOcppTags(): Promise<StEvEOcppTag[]> {
-    return this.request("/v1/ocppTags", z.array(StEvEOcppTagSchema));
+  async getOcppTags(filters?: OcppTagFilters): Promise<StEvEOcppTag[]> {
+    const params = new URLSearchParams();
+
+    if (filters) {
+      if (filters.blocked !== undefined) params.set("blocked", filters.blocked);
+      if (filters.expired !== undefined) params.set("expired", filters.expired);
+      if (filters.inTransaction !== undefined) {
+        params.set("inTransaction", filters.inTransaction);
+      }
+      if (filters.idTag !== undefined) params.set("idTag", filters.idTag);
+      if (filters.ocppTagPk !== undefined) {
+        params.set("ocppTagPk", filters.ocppTagPk.toString());
+      }
+      if (filters.parentIdTag !== undefined) {
+        params.set("parentIdTag", filters.parentIdTag);
+      }
+    }
+
+    const queryString = params.toString();
+    const path = `/v1/ocppTags${queryString ? `?${queryString}` : ""}`;
+
+    return await this.request(path, z.array(StEvEOcppTagSchema));
   }
 
   /**
@@ -251,10 +304,35 @@ class StEvEClient {
   }
 
   /**
-   * Fetch all charge boxes
+   * Fetch all charge boxes.
+   *
+   * SteVe 3.12.0 has no REST endpoint for listing charge boxes — only
+   * /v1/ocppTags, /v1/transactions, and /v1/operations/* exist. Derive the
+   * list from the transactions endpoint instead (distinct chargeBoxId/Pk),
+   * so charge boxes that have never been involved in a transaction will not
+   * appear. This is a known limitation until upstream adds a listing endpoint.
+   *
+   * Phase B: callers that need a stable charger roster should read from
+   * `chargers_cache` via `src/services/charger-cache.service.ts` instead of
+   * calling this on every request. The cache is refreshed at the end of
+   * every sync run and records `first_seen_at` / `last_seen_at` so stale
+   * chargers stay visible with an "Offline" badge rather than disappearing.
    */
   async getChargeBoxes(): Promise<StEvEChargeBox[]> {
-    return this.request("/v1/chargeBoxes", z.array(StEvEChargeBoxSchema));
+    const transactions = await this.request(
+      "/v1/transactions?type=ALL&periodType=ALL",
+      z.array(StEvETransactionSchema),
+    );
+    const seen = new Map<number, StEvEChargeBox>();
+    for (const tx of transactions) {
+      if (!seen.has(tx.chargeBoxPk)) {
+        seen.set(tx.chargeBoxPk, {
+          chargeBoxId: tx.chargeBoxId,
+          chargeBoxPk: tx.chargeBoxPk,
+        });
+      }
+    }
+    return Array.from(seen.values());
   }
 
   /**
@@ -300,6 +378,211 @@ class StEvEClient {
 
     return completed;
   }
+
+  // ==========================================================================
+  // === Phase A: OCPP operations (non-destructive subset) ===
+  // ==========================================================================
+
+  /**
+   * Normalize a selection object to the shape StEvE expects on the wire:
+   * `chargeBoxIdList: [...]`. Accepts either `chargeBoxId` (single-select
+   * operations) or `chargeBoxIdList` (multi-select) and always returns an
+   * object without the friendlier `chargeBoxId` key so StEvE validates it.
+   */
+  private normalizeSelection<
+    T extends { chargeBoxId?: string; chargeBoxIdList?: string[] },
+  >(body: T): Omit<T, "chargeBoxId"> & { chargeBoxIdList: string[] } {
+    const { chargeBoxId, chargeBoxIdList, ...rest } = body;
+    const list = chargeBoxIdList && chargeBoxIdList.length > 0
+      ? chargeBoxIdList
+      : (chargeBoxId ? [chargeBoxId] : []);
+    return { ...rest, chargeBoxIdList: list } as
+      & Omit<T, "chargeBoxId">
+      & { chargeBoxIdList: string[] };
+  }
+
+  /**
+   * Thin POST helper reusing the class-wide `request()` pipeline (retry,
+   * Zod, logger, auth). All allowed OCPP operations go through this method
+   * so behavior stays consistent and the retry budget is honored.
+   */
+  private postOperation<TReq extends Record<string, unknown>, TRes>(
+    opName: OcppOperationName,
+    body: TReq,
+    resSchema: z.ZodSchema<TRes>,
+  ): Promise<TRes> {
+    const normalized = this.normalizeSelection(
+      body as { chargeBoxId?: string; chargeBoxIdList?: string[] } & TReq,
+    );
+    logger.info("StEvE", `Invoking OCPP operation ${opName}`, {
+      chargeBoxIdList: normalized.chargeBoxIdList,
+    });
+    return this.request(`/v1/operations/${opName}`, resSchema, {
+      method: "POST",
+      body: JSON.stringify(normalized),
+    });
+  }
+
+  /**
+   * Namespaced OCPP operations. Destructive ops (Reset, ClearCache,
+   * UpdateFirmware, SendLocalList, ClearChargingProfile, ChangeConfiguration)
+   * are deliberately absent — use the StEvE admin UI.
+   */
+  readonly operations = {
+    remoteStart: (
+      params: RemoteStartTransactionParams,
+    ): Promise<OcppTaskResult> =>
+      this.postOperation(
+        "RemoteStartTransaction",
+        params as unknown as Record<string, unknown>,
+        OcppTaskResultSchema,
+      ),
+
+    remoteStop: (
+      params: RemoteStopTransactionParams,
+    ): Promise<OcppTaskResult> =>
+      this.postOperation(
+        "RemoteStopTransaction",
+        params as unknown as Record<string, unknown>,
+        OcppTaskResultSchema,
+      ),
+
+    unlockConnector: (params: UnlockConnectorParams): Promise<OcppTaskResult> =>
+      this.postOperation(
+        "UnlockConnector",
+        params as unknown as Record<string, unknown>,
+        OcppTaskResultSchema,
+      ),
+
+    reserveNow: (params: ReserveNowParams): Promise<OcppTaskResult> =>
+      this.postOperation(
+        "ReserveNow",
+        params as unknown as Record<string, unknown>,
+        OcppTaskResultSchema,
+      ),
+
+    cancelReservation: (
+      params: CancelReservationParams,
+    ): Promise<OcppTaskResult> =>
+      this.postOperation(
+        "CancelReservation",
+        params as unknown as Record<string, unknown>,
+        OcppTaskResultSchema,
+      ),
+
+    triggerMessage: (params: TriggerMessageParams): Promise<OcppTaskResult> =>
+      this.postOperation(
+        "TriggerMessage",
+        params as unknown as Record<string, unknown>,
+        OcppTaskResultSchema,
+      ),
+
+    getConfiguration: (
+      params: GetConfigurationParams,
+    ): Promise<OcppTaskResult> =>
+      this.postOperation(
+        "GetConfiguration",
+        params as unknown as Record<string, unknown>,
+        OcppTaskResultSchema,
+      ),
+
+    getCompositeSchedule: (
+      params: GetCompositeScheduleParams,
+    ): Promise<OcppTaskResult> =>
+      this.postOperation(
+        "GetCompositeSchedule",
+        params as unknown as Record<string, unknown>,
+        OcppTaskResultSchema,
+      ),
+
+    getDiagnostics: (params: GetDiagnosticsParams): Promise<OcppTaskResult> =>
+      this.postOperation(
+        "GetDiagnostics",
+        params as unknown as Record<string, unknown>,
+        OcppTaskResultSchema,
+      ),
+
+    getLocalListVersion: (
+      params: GetLocalListVersionParams,
+    ): Promise<OcppTaskResult> =>
+      this.postOperation(
+        "GetLocalListVersion",
+        params as unknown as Record<string, unknown>,
+        OcppTaskResultSchema,
+      ),
+
+    dataTransfer: (params: DataTransferParams): Promise<OcppTaskResult> =>
+      this.postOperation(
+        "DataTransfer",
+        params as unknown as Record<string, unknown>,
+        OcppTaskResultSchema,
+      ),
+
+    setChargingProfile: (
+      params: SetChargingProfileParams,
+    ): Promise<OcppTaskResult> =>
+      this.postOperation(
+        "SetChargingProfile",
+        params as unknown as Record<string, unknown>,
+        OcppTaskResultSchema,
+      ),
+
+    changeAvailability: (
+      params: ChangeAvailabilityParams,
+    ): Promise<OcppTaskResult> =>
+      this.postOperation(
+        "ChangeAvailability",
+        params as unknown as Record<string, unknown>,
+        OcppTaskResultSchema,
+      ),
+
+    /**
+     * Best-effort task status polling.
+     *
+     * StEvE 3.12.0 does not ship the `/v1/operations/{taskId}` endpoint
+     * (only master adds a TasksController). Returns `null` on 404 so the
+     * caller can surface a "pending" state with a StEvE admin link instead
+     * of erroring. Other failures propagate so the retry pipeline can
+     * recover from transient network issues.
+     */
+    getTask: async (taskId: number): Promise<OcppTaskStatus | null> => {
+      const url = `${this.baseUrl}/v1/operations/${taskId}`;
+      logger.debug("StEvE", "Polling OCPP task", { taskId });
+      try {
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Accept": "application/json",
+            "Authorization": this.authHeader,
+          },
+        });
+        if (response.status === 404) {
+          logger.debug(
+            "StEvE",
+            "Task polling endpoint not available (404) — 3.12.0 has no TasksController",
+            { taskId },
+          );
+          // Drain the body so the connection is returned to the pool.
+          await response.body?.cancel();
+          return null;
+        }
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(
+            `StEvE task poll failed: ${response.status} ${response.statusText} - ${errorText}`,
+          );
+        }
+        const data = await response.json();
+        return OcppTaskStatusSchema.parse(data);
+      } catch (error) {
+        logger.warn("StEvE", "Task polling errored", {
+          taskId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
+    },
+  };
 }
 
 // Export singleton instance

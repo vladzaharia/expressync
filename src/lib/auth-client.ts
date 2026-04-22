@@ -3,7 +3,7 @@
  */
 export async function signOut(): Promise<void> {
   await fetch("/api/auth/sign-out", { method: "POST" });
-  window.location.href = "/login";
+  globalThis.location.href = "/login";
 }
 
 /**

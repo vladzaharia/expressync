@@ -5,6 +5,11 @@ import { eq } from "drizzle-orm";
 import { steveClient } from "../../../src/lib/steve-client.ts";
 import { getAllChildTags } from "../../../src/lib/tag-hierarchy.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
+import {
+  isTagType,
+  TAG_TYPES,
+  type TagType,
+} from "../../../src/lib/types/tags.ts";
 
 export const handler = define.handlers({
   // Get all mappings
@@ -47,19 +52,81 @@ export const handler = define.handlers({
         );
       }
 
-      // Fetch all OCPP tags to check for children
+      // Phase I: validate optional tag_type against TAG_TYPES allowlist.
+      // Accept both snake_case (`tag_type`) and camelCase (`tagType`) keys for
+      // flexibility; default to "other" if unset.
+      const rawTagType = body.tag_type ?? body.tagType;
+      let tagType: TagType = "other";
+      if (rawTagType !== undefined && rawTagType !== null) {
+        if (!isTagType(rawTagType)) {
+          return new Response(
+            JSON.stringify({
+              error: `Invalid tag_type. Must be one of: ${
+                TAG_TYPES.join(", ")
+              }`,
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        tagType = rawTagType;
+      }
+
+      // Fetch all OCPP tags to check for children + verify the parent tag
+      // actually exists in StEvE.
       const allTags = await steveClient.getOcppTags();
       const childTags = getAllChildTags(ocppTagId, allTags);
+
+      // Guarantee tag/mapping consistency: if the client gave us an
+      // ocppTagPk that StEvE doesn't know about (stale dropdown, scanner
+      // race, etc.), create the tag in StEvE before inserting the mapping
+      // row. Prefer an exact match by pk; fall back to idTag to heal the
+      // common case where the client had only the idTag. Without this,
+      // we'd silently insert a dangling user_mappings row.
+      let effectiveTagPk: number = ocppTagPk;
+      let steveTag = allTags.find((t) => t.ocppTagPk === ocppTagPk);
+      if (!steveTag) {
+        steveTag = allTags.find((t) => t.idTag === ocppTagId);
+      }
+      if (!steveTag) {
+        logger.info(
+          "API",
+          `Tag ${ocppTagId} not found in StEvE; creating it there before inserting mapping`,
+        );
+        try {
+          const created = await steveClient.createOcppTag(ocppTagId, {});
+          effectiveTagPk = created.ocppTagPk;
+        } catch (err) {
+          logger.error(
+            "API",
+            "Failed to auto-create StEvE tag during mapping creation",
+            err as Error,
+          );
+          return new Response(
+            JSON.stringify({
+              error:
+                `Tag ${ocppTagId} does not exist in StEvE and could not be created: ${
+                  err instanceof Error ? err.message : String(err)
+                }`,
+            }),
+            { status: 502, headers: { "Content-Type": "application/json" } },
+          );
+        }
+      } else if (steveTag.ocppTagPk !== ocppTagPk) {
+        // Client had a stale pk but the idTag is real. Use the authoritative pk
+        // so the mapping row references the live StEvE record.
+        effectiveTagPk = steveTag.ocppTagPk;
+      }
 
       // Create mapping for the parent tag
       const [parentMapping] = await db
         .insert(schema.userMappings)
         .values({
-          steveOcppTagPk: ocppTagPk,
+          steveOcppTagPk: effectiveTagPk,
           steveOcppIdTag: ocppTagId,
           lagoCustomerExternalId: lagoCustomerId,
           lagoSubscriptionExternalId: lagoSubscriptionId || null,
           isActive: isActive ?? true,
+          tagType,
         })
         .returning();
 
@@ -75,12 +142,18 @@ export const handler = define.handlers({
               lagoCustomerExternalId: lagoCustomerId,
               lagoSubscriptionExternalId: lagoSubscriptionId || null,
               isActive: isActive ?? true,
+              // Children inherit the parent's type by default.
+              tagType,
             })
             .returning();
           childMappings.push(childMapping);
         } catch (error) {
           // Skip if child mapping already exists
-          logger.warn("API", `Failed to create mapping for child tag ${childTag.idTag}`, error as Error);
+          logger.warn(
+            "API",
+            `Failed to create mapping for child tag ${childTag.idTag}`,
+            error as Error,
+          );
         }
       }
 
@@ -128,6 +201,37 @@ export const handler = define.handlers({
         updates.lagoSubscriptionExternalId = body.lagoSubscriptionExternalId;
       }
       if (body.isActive !== undefined) updates.isActive = body.isActive;
+
+      // Phase P2: billing_tier flip (inline PATCH from LinkingDangerZone).
+      // Validate against the same allowlist enforced by the DB CHECK
+      // constraint so a garbage value gets a 400 rather than a 5xx round-trip.
+      if (body.billingTier !== undefined && body.billingTier !== null) {
+        if (body.billingTier !== "standard" && body.billingTier !== "comped") {
+          return new Response(
+            JSON.stringify({
+              error: "Invalid billingTier. Must be 'standard' or 'comped'.",
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        updates.billingTier = body.billingTier;
+      }
+
+      // Phase I: allow updating tag_type; validate against TAG_TYPES allowlist.
+      const rawTagType = body.tag_type ?? body.tagType;
+      if (rawTagType !== undefined && rawTagType !== null) {
+        if (!isTagType(rawTagType)) {
+          return new Response(
+            JSON.stringify({
+              error: `Invalid tag_type. Must be one of: ${
+                TAG_TYPES.join(", ")
+              }`,
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        updates.tagType = rawTagType;
+      }
 
       // Get the current mapping to find its tag
       const [currentMapping] = await db

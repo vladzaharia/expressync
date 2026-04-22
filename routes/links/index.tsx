@@ -8,25 +8,36 @@ import { config } from "../../src/lib/config.ts";
 import { lagoClient } from "../../src/lib/lago-client.ts";
 import { PageCard } from "../../components/PageCard.tsx";
 import { CHROME_SIZE } from "../../components/AppSidebar.tsx";
+import { LinkingStatStrip } from "../../components/links/LinkingStatStrip.tsx";
+import { LinkingEmptyState } from "../../components/links/LinkingEmptyState.tsx";
+import { isMetaTag } from "../../src/lib/tag-hierarchy.ts";
+import { steveClient } from "../../src/lib/steve-client.ts";
+
+/**
+ * Tag Linking — list page.
+ *
+ * Loader shape (matches `LinksIndexLoaderData` in the refactor plan):
+ *   mappings           — DB user_mappings rows
+ *   subscriptionNames  — Lago external_id → display-name
+ *   customerLagoIds    — Lago external_id → Lago internal id (for URL building)
+ *   subscriptionLagoIds — same, for subscriptions
+ *   totals             — derived stats for `LinkingStatStrip`
+ */
 
 export const handler = define.handlers({
   async GET(_ctx) {
     const mappings = await db.select().from(schema.userMappings);
 
-    // Fetch subscription names and Lago IDs from Lago
     const subscriptionNames = new Map<string, string>();
-    // Maps external_id -> lago_id for URL generation
     const customerLagoIds = new Map<string, string>();
     const subscriptionLagoIds = new Map<string, string>();
 
     try {
-      // Fetch customers to get lago_id mappings
       const { customers } = await lagoClient.getCustomers();
       for (const customer of customers) {
         customerLagoIds.set(customer.external_id, customer.lago_id);
       }
 
-      // Fetch subscriptions to get lago_id mappings and names
       const { subscriptions } = await lagoClient.getSubscriptions();
       for (const sub of subscriptions) {
         subscriptionNames.set(sub.external_id, sub.name || sub.plan_code);
@@ -34,8 +45,31 @@ export const handler = define.handlers({
       }
     } catch (error) {
       console.error("Failed to fetch Lago data:", error);
-      // Continue without Lago data
     }
+
+    // Derived totals for the stat strip. `unlinkedTagCount` is best-effort
+    // (we need StEvE to know the full tag roster); if StEvE fails we fall
+    // back to 0 to avoid breaking the page.
+    let unlinkedTagCount = 0;
+    try {
+      const allTags = await steveClient.getOcppTags();
+      const mappedIds = new Set(
+        mappings.map((m) => m.steveOcppIdTag.toLowerCase()),
+      );
+      unlinkedTagCount = allTags.filter(
+        (t) => !mappedIds.has(t.idTag.toLowerCase()),
+      ).length;
+    } catch (error) {
+      console.error("Failed to fetch StEvE tags for unlinked count:", error);
+    }
+
+    const customersLinked = new Set(
+      mappings
+        .filter((m) => m.lagoCustomerExternalId)
+        .map((m) => m.lagoCustomerExternalId as string),
+    ).size;
+    const metaTagsLinked =
+      mappings.filter((m) => isMetaTag(m.steveOcppIdTag)).length;
 
     return {
       data: {
@@ -43,6 +77,12 @@ export const handler = define.handlers({
         subscriptionNames: Object.fromEntries(subscriptionNames),
         customerLagoIds: Object.fromEntries(customerLagoIds),
         subscriptionLagoIds: Object.fromEntries(subscriptionLagoIds),
+        totals: {
+          customersLinked,
+          tagsLinked: mappings.length,
+          metaTagsLinked,
+          unlinkedTagCount,
+        },
       },
     };
   },
@@ -63,7 +103,6 @@ function LinkTagsAction() {
 
 export default define.page<typeof handler>(
   function TagLinkingPage({ data, url, state }) {
-    // Group mappings by customer/subscription
     const groupedMappings = groupMappingsByCustomer(
       data.mappings,
       data.subscriptionNames,
@@ -80,16 +119,24 @@ export default define.page<typeof handler>(
       >
         <PageCard
           title="Tag Linking"
-          description={`${groupedMappings.length} customer${
-            groupedMappings.length !== 1 ? "s" : ""
-          } linked`}
+          description={groupedMappings.length === 0
+            ? "Connect OCPP tags to Lago customers to start billing."
+            : `${groupedMappings.length} customer${
+              groupedMappings.length !== 1 ? "s" : ""
+            } linked`}
           colorScheme="violet"
         >
-          <TagLinkingGrid
-            groups={groupedMappings}
-            lagoDashboardUrl={config.LAGO_DASHBOARD_URL}
-            steveDashboardUrl={config.STEVE_BASE_URL}
-          />
+          <LinkingStatStrip totals={data.totals} />
+
+          {groupedMappings.length === 0
+            ? <LinkingEmptyState />
+            : (
+              <TagLinkingGrid
+                groups={groupedMappings}
+                lagoDashboardUrl={config.LAGO_DASHBOARD_URL}
+                steveDashboardUrl={config.STEVE_BASE_URL}
+              />
+            )}
         </PageCard>
       </SidebarLayout>
     );
@@ -109,6 +156,7 @@ interface MappingGroup {
     ocppTagPk: number;
     mappingId: number;
     isChild: boolean;
+    tagType: string;
   }>;
 }
 
@@ -148,15 +196,14 @@ function groupMappingsByCustomer(
       ocppTagPk: mapping.steveOcppTagPk,
       mappingId: mapping.id,
       isChild,
+      tagType: mapping.tagType,
     });
 
-    // Use the first non-child mapping's display name as customer name
     if (!isChild && mapping.displayName) {
       group.customerName = mapping.displayName;
     }
   }
 
-  // Sort tags within each group (parents first, then children)
   for (const group of groups.values()) {
     group.tags.sort((a, b) => {
       if (a.isChild !== b.isChild) return a.isChild ? 1 : -1;

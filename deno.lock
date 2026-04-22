@@ -9,6 +9,7 @@
     "jsr:@fresh/core@^2.2.0": "2.2.0",
     "jsr:@fresh/plugin-vite@^1.0.8": "1.0.8",
     "jsr:@hexagon/croner@^9.1.0": "9.1.0",
+    "jsr:@std/assert@1": "1.0.19",
     "jsr:@std/async@^1.0.11": "1.0.16",
     "jsr:@std/bytes@^1.0.6": "1.0.6",
     "jsr:@std/dotenv@~0.225.3": "0.225.6",
@@ -133,6 +134,12 @@
     },
     "@hexagon/croner@9.1.0": {
       "integrity": "defde0fcee33c7c7901d5d6be230a30fb326e5d31773bc991a2976468f61f9eb"
+    },
+    "@std/assert@1.0.19": {
+      "integrity": "eaada96ee120cb980bc47e040f82814d786fe8162ecc53c91d8df60b8755991e",
+      "dependencies": [
+        "jsr:@std/internal"
+      ]
     },
     "@std/async@1.0.16": {
       "integrity": "6c9e43035313b67b5de43e2b3ee3eadb39a488a0a0a3143097f112e025d3ee9a"
@@ -2361,6 +2368,7 @@
       "jsr:@fresh/core@^2.2.0",
       "jsr:@fresh/plugin-vite@^1.0.8",
       "jsr:@hexagon/croner@^9.1.0",
+      "jsr:@std/assert@1",
       "jsr:@std/async@^1.0.11",
       "jsr:@std/dotenv@~0.225.3",
       "npm:@preact/signals@^2.5.1",

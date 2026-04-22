@@ -2,7 +2,11 @@ import { steveClient } from "../lib/steve-client.ts";
 import { lagoClient } from "../lib/lago-client.ts";
 import type { TransactionWithCompletion } from "./transaction-processor.ts";
 import { processTransactions } from "./transaction-processor.ts";
-import { BATCH_SIZE, batchEvents, buildLagoEvents } from "./lago-event-builder.ts";
+import {
+  BATCH_SIZE,
+  batchEvents,
+  buildLagoEvents,
+} from "./lago-event-builder.ts";
 import {
   atomicUpsertSyncStatesAndCreateEvents,
   batchUpsertSyncStates,
@@ -25,6 +29,24 @@ import { buildMappingLookupWithInheritance } from "./mapping-resolver.ts";
 import { syncTagStatus } from "./tag-sync.service.ts";
 import { SyncLogger } from "./sync-logger.ts";
 import { config } from "../lib/config.ts";
+import { refreshChargerCache } from "./charger-cache.service.ts";
+
+/**
+ * Best-effort charger cache refresh.
+ *
+ * Called after `markSyncComplete` so a cache failure never fails the sync.
+ * Extracted into a helper because `runSync` has three "complete" exit paths.
+ */
+async function safeRefreshChargerCache(syncRunId: number): Promise<void> {
+  try {
+    await refreshChargerCache();
+  } catch (error) {
+    logger.warn("Sync", "Charger cache refresh failed (non-fatal)", {
+      syncRunId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
 
 export interface SyncResult {
   syncRunId: number;
@@ -41,12 +63,17 @@ async function runTagSync(
   syncLogger: SyncLogger,
   mappings: UserMapping[],
   allTags: StEvEOcppTag[],
+  syncRunId: number,
 ): Promise<TagSyncStats> {
   syncLogger.startSegment("tag_linking");
-  let tagStats: TagSyncStats = { activatedTags: 0, deactivatedTags: 0, unchangedTags: 0 };
+  let tagStats: TagSyncStats = {
+    activatedTags: 0,
+    deactivatedTags: 0,
+    unchangedTags: 0,
+  };
   try {
     syncLogger.info("Starting tag status synchronization");
-    const tagSyncResult = await syncTagStatus(mappings, allTags);
+    const tagSyncResult = await syncTagStatus(mappings, allTags, syncRunId);
     tagStats = {
       activatedTags: tagSyncResult.activatedTags,
       deactivatedTags: tagSyncResult.deactivatedTags,
@@ -139,7 +166,12 @@ export async function runSync(): Promise<SyncResult> {
       logger.info("Sync", "No transactions to process, completing sync");
 
       // Sync tag status even when there are no transactions
-      const tagStats = await runTagSync(syncLogger, mappings, allTags);
+      const tagStats = await runTagSync(
+        syncLogger,
+        mappings,
+        allTags,
+        syncRun.id,
+      );
 
       // Skip transaction sync segment
       await syncLogger.skipSegment(
@@ -148,6 +180,7 @@ export async function runSync(): Promise<SyncResult> {
       );
 
       await markSyncComplete(syncRun.id, 0, 0, undefined, tagStats);
+      await safeRefreshChargerCache(syncRun.id);
       return {
         syncRunId: syncRun.id,
         transactionsProcessed: 0,
@@ -196,12 +229,21 @@ export async function runSync(): Promise<SyncResult> {
 
     transactionsProcessed = allTransactions.size;
 
-    // Separate transactions that should be sent to Lago from those that shouldn't
+    // Separate transactions that should be sent to Lago from those that shouldn't.
+    // Two reasons a transaction is skipped: `no_subscription` (WARN — a mapping is
+    // incomplete) and `non_usage_plan` (INFO — intentional, e.g. ExpressChargeM
+    // members whose kWh isn't billed per-unit).
     const transactionsToSend = processedTransactions.filter((pt) =>
       pt.shouldSendToLago
     );
-    const transactionsWithoutSubscription = processedTransactions.filter((pt) =>
+    const transactionsSkipped = processedTransactions.filter((pt) =>
       !pt.shouldSendToLago
+    );
+    const skippedNoSubscription = transactionsSkipped.filter((pt) =>
+      pt.skipReason === "no_subscription"
+    );
+    const skippedNonUsagePlan = transactionsSkipped.filter((pt) =>
+      pt.skipReason === "non_usage_plan"
     );
 
     eventsCreated = transactionsToSend.length;
@@ -209,17 +251,29 @@ export async function runSync(): Promise<SyncResult> {
     logger.info("Sync", "Transactions processed", {
       transactionsProcessed,
       eventsCreated,
-      transactionsWithoutSubscription: transactionsWithoutSubscription.length,
+      skippedNoSubscription: skippedNoSubscription.length,
+      skippedNonUsagePlan: skippedNonUsagePlan.length,
     });
 
-    // Log warning if some transactions couldn't be sent
-    if (transactionsWithoutSubscription.length > 0) {
+    if (skippedNoSubscription.length > 0) {
       logger.warn(
         "Sync",
-        "Some transactions have no subscription and will not be sent to Lago",
+        "Transactions have no subscription and will not be sent to Lago",
         {
-          count: transactionsWithoutSubscription.length,
-          transactionIds: transactionsWithoutSubscription.map((pt) =>
+          count: skippedNoSubscription.length,
+          transactionIds: skippedNoSubscription.map((pt) =>
+            pt.steveTransactionId
+          ),
+        },
+      );
+    }
+    if (skippedNonUsagePlan.length > 0) {
+      logger.info(
+        "Sync",
+        "Transactions on non-usage plans skipped (expected)",
+        {
+          count: skippedNonUsagePlan.length,
+          transactionIds: skippedNonUsagePlan.map((pt) =>
             pt.steveTransactionId
           ),
         },
@@ -228,24 +282,32 @@ export async function runSync(): Promise<SyncResult> {
 
     if (transactionsToSend.length === 0) {
       // Tag linking segment
-      const tagStats = await runTagSync(syncLogger, mappings, allTags);
+      const tagStats = await runTagSync(
+        syncLogger,
+        mappings,
+        allTags,
+        syncRun.id,
+      );
 
       // Transaction sync segment - still save sync states for transactions without subscriptions
       syncLogger.startSegment("transaction_sync");
       syncLogger.info("No events to send to Lago", { transactionsProcessed });
-      if (transactionsWithoutSubscription.length > 0) {
+      if (transactionsSkipped.length > 0) {
         syncLogger.info(
           "Saving sync states for transactions without subscriptions",
           {
-            count: transactionsWithoutSubscription.length,
+            count: transactionsSkipped.length,
           },
         );
-        const syncStateUpdates = transactionsWithoutSubscription.map((pt) => ({
+        const syncStateUpdates = transactionsSkipped.map((pt) => ({
           steveTransactionId: pt.steveTransactionId,
           lastSyncedMeterValue: pt.meterValueTo,
-          totalKwhBilled:
-            Number(syncStateByTxId.get(pt.steveTransactionId)?.totalKwhBilled ?? 0) +
-            pt.kwhDelta,
+          totalKwhBilled: (
+            Number(
+              syncStateByTxId.get(pt.steveTransactionId)?.totalKwhBilled ?? 0,
+            ) +
+            pt.kwhDelta
+          ).toFixed(6),
           lastSyncRunId: syncRun.id,
           isFinalized: pt.isFinal,
         }));
@@ -254,7 +316,14 @@ export async function runSync(): Promise<SyncResult> {
       }
       await syncLogger.endSegment();
 
-      await markSyncComplete(syncRun.id, transactionsProcessed, 0, undefined, tagStats);
+      await markSyncComplete(
+        syncRun.id,
+        transactionsProcessed,
+        0,
+        undefined,
+        tagStats,
+      );
+      await safeRefreshChargerCache(syncRun.id);
       return {
         syncRunId: syncRun.id,
         transactionsProcessed,
@@ -264,7 +333,12 @@ export async function runSync(): Promise<SyncResult> {
     }
 
     // Tag linking segment
-    const tagStats = await runTagSync(syncLogger, mappings, allTags);
+    const tagStats = await runTagSync(
+      syncLogger,
+      mappings,
+      allTags,
+      syncRun.id,
+    );
 
     // Transaction sync segment
     syncLogger.startSegment("transaction_sync");
@@ -315,7 +389,7 @@ export async function runSync(): Promise<SyncResult> {
     // don't reprocess them, but they don't get event records)
     const transactionsForSyncState = [
       ...successfullySentTransactions,
-      ...transactionsWithoutSubscription,
+      ...transactionsSkipped,
     ];
 
     // 9. Update sync states and create event records atomically
@@ -324,15 +398,19 @@ export async function runSync(): Promise<SyncResult> {
     syncLogger.info("Updating sync states in database", {
       successfullySent: successfullySentTransactions.length,
       failedBatches: eventBatches.length - successfulBatchIndices.size,
-      withoutSubscription: transactionsWithoutSubscription.length,
+      withoutSubscription: transactionsSkipped.length,
     });
 
     const syncStateUpdates: NewTransactionSyncState[] = transactionsForSyncState
       .map((pt) => ({
         steveTransactionId: pt.steveTransactionId,
         lastSyncedMeterValue: pt.meterValueTo,
-        totalKwhBilled: Number(syncStateByTxId.get(pt.steveTransactionId)
-          ?.totalKwhBilled ?? 0) + pt.kwhDelta,
+        totalKwhBilled: (
+          Number(
+            syncStateByTxId.get(pt.steveTransactionId)?.totalKwhBilled ?? 0,
+          ) +
+          pt.kwhDelta
+        ).toFixed(6),
         lastSyncRunId: syncRun.id,
         isFinalized: pt.isFinal,
       }));
@@ -344,7 +422,7 @@ export async function runSync(): Promise<SyncResult> {
         transactionSyncStateId: null, // Will be set by trigger or later
         lagoEventTransactionId: pt.lagoEventTransactionId,
         userMappingId: pt.userMappingId,
-        kwhDelta: pt.kwhDelta,
+        kwhDelta: pt.kwhDelta.toFixed(6),
         meterValueFrom: pt.meterValueFrom,
         meterValueTo: pt.meterValueTo,
         isFinal: pt.isFinal,
@@ -376,6 +454,7 @@ export async function runSync(): Promise<SyncResult> {
       errors,
       tagStats,
     );
+    await safeRefreshChargerCache(syncRun.id);
 
     logger.info("Sync", "Sync run completed successfully", {
       syncRunId: syncRun.id,

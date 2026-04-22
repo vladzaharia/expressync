@@ -10,7 +10,7 @@ import {
 } from "./table.tsx";
 import { ChevronDown, Loader2 } from "lucide-preact";
 import { cn } from "@/src/lib/utils/cn.ts";
-import type { ComponentChildren, VNode } from "preact";
+import type { ComponentChildren } from "preact";
 
 export interface PaginatedTableColumn<T> {
   key: string;

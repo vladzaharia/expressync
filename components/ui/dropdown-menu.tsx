@@ -1,5 +1,4 @@
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
-import { Check, ChevronRight, Circle } from "lucide-preact";
 import type { ComponentProps } from "preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 

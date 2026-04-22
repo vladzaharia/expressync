@@ -6,8 +6,6 @@ import { Slot } from "@radix-ui/react-slot";
 import { PanelLeft } from "lucide-preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { Button } from "./button.tsx";
-import { Input } from "./input.tsx";
-import { Separator } from "./separator.tsx";
 import {
   Tooltip,
   TooltipContent,
@@ -16,7 +14,6 @@ import {
 } from "./tooltip.tsx";
 
 const SIDEBAR_WIDTH = "16rem";
-const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3.5rem"; // Match CHROME_SIZE from AppSidebar
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 const MOBILE_NAV_HEIGHT = "3.5rem"; // Same as CHROME_SIZE for consistency
@@ -45,10 +42,10 @@ function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    const checkMobile = () => setIsMobile(globalThis.innerWidth < 768);
     checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    addEventListener("resize", checkMobile);
+    return () => removeEventListener("resize", checkMobile);
   }, []);
 
   return isMobile;
@@ -98,8 +95,8 @@ function SidebarProvider({
         toggleSidebar();
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    addEventListener("keydown", handleKeyDown);
+    return () => removeEventListener("keydown", handleKeyDown);
   }, [toggleSidebar]);
 
   const state = open ? "expanded" : "collapsed";
@@ -122,7 +119,7 @@ function SidebarProvider({
           style={{
             "--sidebar-width": SIDEBAR_WIDTH,
             "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
-            ...style,
+            ...(typeof style === "object" && style !== null ? style : {}),
           } as React.CSSProperties}
           className={cn(
             // On mobile: flex-col for top nav bar layout
@@ -152,7 +149,12 @@ function Sidebar({
   variant?: "sidebar" | "floating" | "inset";
   collapsible?: "offcanvas" | "icon" | "none";
 }) {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+  const {
+    isMobile,
+    state,
+    openMobile: _openMobile,
+    setOpenMobile: _setOpenMobile,
+  } = useSidebar();
 
   if (collapsible === "none") {
     return (
@@ -364,7 +366,7 @@ const sidebarMenuButtonVariants = cn(
 function SidebarMenuButton({
   asChild = false,
   isActive = false,
-  variant = "default",
+  variant: _variant = "default",
   size = "default",
   tooltip,
   className,

@@ -44,6 +44,7 @@ export default function ThemeToggle({ iconOnly = true }: ThemeToggleProps) {
   // Full clickable version (unused currently)
   return (
     <button
+      type="button"
       onClick={toggleTheme}
       className="size-5"
       aria-label={`Switch to ${theme.value === "dark" ? "light" : "dark"} mode`}

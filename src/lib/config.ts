@@ -18,6 +18,10 @@ export const config = {
   // Dashboard URL = base URL, API URL = base URL + /api
   STEVE_BASE_URL: steveBaseUrl,
   STEVE_API_URL: steveBaseUrl ? `${steveBaseUrl}/api` : "",
+  // Username for SteVe REST API Basic auth. Matches SteVe's auth.user.
+  STEVE_API_USERNAME: Deno.env.get("STEVE_API_USERNAME")!,
+  // Password for SteVe REST API Basic auth. Matches SteVe's webapi.value
+  // (the value that seeds web_user.api_password on first boot).
   STEVE_API_KEY: Deno.env.get("STEVE_API_KEY")!,
 
   // Lago Billing Platform
@@ -32,11 +36,28 @@ export const config = {
   ),
 
   // Sync Configuration
-  SYNC_CRON_SCHEDULE: Deno.env.get("SYNC_CRON_SCHEDULE") || "*/15 * * * *",
+  // SYNC_CRON_SCHEDULE: escape-hatch override. When set to a non-empty string,
+  // the adaptive SyncScheduler will use this pattern for ALL tiers, effectively
+  // disabling the adaptive logic. Leave unset (or empty) to let the scheduler
+  // choose 15m/1h/1w based on Active/Idle/Dormant tier rules (Phase C).
+  SYNC_CRON_SCHEDULE: Deno.env.get("SYNC_CRON_SCHEDULE") || "",
   SYNC_ON_STARTUP: Deno.env.get("SYNC_ON_STARTUP") || "false",
   SYNC_LOOKBACK_MINUTES: (() => {
     const val = parseInt(Deno.env.get("SYNC_LOOKBACK_MINUTES") || "1440");
     return isNaN(val) ? 1440 : val;
+  })(),
+  // Phase C: adaptive cadence tunables
+  // Days of no tag changes + no transactions required before the scheduler
+  // demotes from Idle to Dormant.
+  SYNC_DORMANT_THRESHOLD_DAYS: (() => {
+    const val = parseInt(Deno.env.get("SYNC_DORMANT_THRESHOLD_DAYS") || "30");
+    return isNaN(val) || val <= 0 ? 30 : val;
+  })(),
+  // Number of consecutive idle evaluations required to demote tier
+  // (avoids thrashing between Active <-> Idle and Idle <-> Dormant).
+  SYNC_IDLE_HYSTERESIS_TICKS: (() => {
+    const val = parseInt(Deno.env.get("SYNC_IDLE_HYSTERESIS_TICKS") || "2");
+    return isNaN(val) || val < 1 ? 2 : val;
   })(),
 
   // Application
@@ -66,6 +87,7 @@ export function validateConfig() {
   const required = [
     "DATABASE_URL",
     "STEVE_BASE_URL",
+    "STEVE_API_USERNAME",
     "STEVE_API_KEY",
     "LAGO_API_URL",
     "LAGO_API_KEY",
@@ -90,6 +112,7 @@ export function validateSyncWorkerConfig() {
   const required = [
     "DATABASE_URL",
     "STEVE_BASE_URL",
+    "STEVE_API_USERNAME",
     "STEVE_API_KEY",
     "LAGO_API_URL",
     "LAGO_API_KEY",
