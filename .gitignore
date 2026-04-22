@@ -13,3 +13,7 @@ vendor/
 
 # Design docs
 _design/
+# Local configuration (not tracked)
+docker-compose.override.yml
+docker-compose.env
+docker-compose.postgres.env

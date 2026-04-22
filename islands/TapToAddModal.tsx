@@ -60,8 +60,7 @@ export default function TapToAddModal({
           method: "HEAD",
         });
         if (checkResponse.status === 503) {
-          const data = await checkResponse.json().catch(() => ({}));
-          errorMessage.value = data.message || "Cannot connect to log service!";
+          errorMessage.value = "Cannot connect to log service!";
           modalState.value = "error";
           return;
         }

@@ -34,13 +34,20 @@ export const config = {
   // Sync Configuration
   SYNC_CRON_SCHEDULE: Deno.env.get("SYNC_CRON_SCHEDULE") || "*/15 * * * *",
   SYNC_ON_STARTUP: Deno.env.get("SYNC_ON_STARTUP") || "false",
+  SYNC_LOOKBACK_MINUTES: (() => {
+    const val = parseInt(Deno.env.get("SYNC_LOOKBACK_MINUTES") || "1440");
+    return isNaN(val) ? 1440 : val;
+  })(),
 
   // Application
-  PORT: parseInt(Deno.env.get("PORT") || "8000"),
+  PORT: (() => {
+    const val = parseInt(Deno.env.get("PORT") || "8000");
+    return isNaN(val) ? 8000 : val;
+  })(),
   DENO_ENV: Deno.env.get("DENO_ENV") || "development",
 
   // Debug/Logging
-  DEBUG_LEVEL: Deno.env.get("DEBUG_LEVEL") || "ERROR",
+  DEBUG_LEVEL: Deno.env.get("DEBUG_LEVEL") || "INFO",
 
   // Docker (for log streaming)
   DOCKER_SOCKET_PATH: Deno.env.get("DOCKER_SOCKET_PATH") ||

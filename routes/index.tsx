@@ -1,7 +1,7 @@
 import { define } from "../utils.ts";
 import { db } from "../src/db/index.ts";
 import * as schema from "../src/db/schema.ts";
-import { desc, gte } from "drizzle-orm";
+import { desc, eq, gte, sql } from "drizzle-orm";
 import { SidebarLayout } from "../components/SidebarLayout.tsx";
 import {
   Card,
@@ -16,7 +16,7 @@ import { BorderBeam } from "../components/magicui/border-beam.tsx";
 import SyncRunsTable from "../islands/SyncRunsTable.tsx";
 import RecentTransactionsTable from "../islands/RecentTransactionsTable.tsx";
 import DashboardStatsCards from "../islands/DashboardStatsCards.tsx";
-import type { SyncedTransactionEvent, SyncRun } from "../src/db/schema.ts";
+import type { SyncRun } from "../src/db/schema.ts";
 import { steveClient } from "../src/lib/steve-client.ts";
 import { lagoClient } from "../src/lib/lago-client.ts";
 import { ArrowRight } from "lucide-preact";
@@ -47,10 +47,18 @@ interface DashboardStats {
   };
 }
 
+interface RecentTransaction {
+  id: number;
+  steveTransactionId: number;
+  kwhDelta: string;
+  syncedAt: Date | null;
+  ocppTag: string | null;
+}
+
 interface DashboardData {
   stats: DashboardStats;
   recentSyncRuns: SyncRun[];
-  recentTransactions: SyncedTransactionEvent[];
+  recentTransactions: RecentTransaction[];
 }
 
 const defaultStats: DashboardStats = {
@@ -108,47 +116,35 @@ async function getDashboardStats(): Promise<DashboardStats> {
     monthStart.setDate(monthStart.getDate() - 30);
     monthStart.setHours(0, 0, 0, 0);
 
-    // Fetch kWh delivered by timeframe
-    const [dayEvents, weekEvents, monthEvents] = await Promise.all([
-      db
-        .select()
-        .from(schema.syncedTransactionEvents)
-        .where(gte(schema.syncedTransactionEvents.syncedAt, todayStart)),
-      db
-        .select()
-        .from(schema.syncedTransactionEvents)
-        .where(gte(schema.syncedTransactionEvents.syncedAt, weekStart)),
-      db
-        .select()
-        .from(schema.syncedTransactionEvents)
-        .where(gte(schema.syncedTransactionEvents.syncedAt, monthStart)),
-    ]);
+    // Fetch kWh delivered by all three timeframes in a single SQL query
+    const [kwhStats] = await db
+      .select({
+        kwhDay: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncedTransactionEvents.syncedAt} >= ${todayStart} THEN ${schema.syncedTransactionEvents.kwhDelta} ELSE 0 END), 0)`,
+        kwhWeek: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncedTransactionEvents.syncedAt} >= ${weekStart} THEN ${schema.syncedTransactionEvents.kwhDelta} ELSE 0 END), 0)`,
+        kwhMonth: sql<number>`COALESCE(SUM(${schema.syncedTransactionEvents.kwhDelta}), 0)`,
+      })
+      .from(schema.syncedTransactionEvents)
+      .where(gte(schema.syncedTransactionEvents.syncedAt, monthStart));
 
-    const kwhDay = dayEvents.reduce((sum, ev) => sum + ev.kwhDelta, 0);
-    const kwhWeek = weekEvents.reduce((sum, ev) => sum + ev.kwhDelta, 0);
-    const kwhMonth = monthEvents.reduce((sum, ev) => sum + ev.kwhDelta, 0);
+    const kwhDay = Number(kwhStats.kwhDay);
+    const kwhWeek = Number(kwhStats.kwhWeek);
+    const kwhMonth = Number(kwhStats.kwhMonth);
 
-    // Fetch sync success rates by timeframe
-    const [daySyncs, weekSyncs, monthSyncs] = await Promise.all([
-      db
-        .select()
-        .from(schema.syncRuns)
-        .where(gte(schema.syncRuns.startedAt, todayStart)),
-      db
-        .select()
-        .from(schema.syncRuns)
-        .where(gte(schema.syncRuns.startedAt, weekStart)),
-      db
-        .select()
-        .from(schema.syncRuns)
-        .where(gte(schema.syncRuns.startedAt, monthStart)),
-    ]);
+    // Fetch sync success rates by all three timeframes in a single SQL query
+    const [syncStats] = await db
+      .select({
+        dayTotal: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${todayStart} THEN 1 ELSE 0 END), 0)`,
+        daySuccess: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${todayStart} AND ${schema.syncRuns.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
+        weekTotal: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${weekStart} THEN 1 ELSE 0 END), 0)`,
+        weekSuccess: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${weekStart} AND ${schema.syncRuns.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
+        monthTotal: sql<number>`COALESCE(SUM(1), 0)`,
+        monthSuccess: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
+      })
+      .from(schema.syncRuns)
+      .where(gte(schema.syncRuns.startedAt, monthStart));
 
-    const calculateSuccessRate = (syncs: typeof daySyncs) => {
-      if (syncs.length === 0) return 100;
-      const successful = syncs.filter((s) => s.status === "completed").length;
-      return Math.round((successful / syncs.length) * 100);
-    };
+    const calcRate = (success: number, total: number) =>
+      total === 0 ? 100 : Math.round((success / total) * 100);
 
     return {
       tags: { active: activeTags, blocked: blockedTags },
@@ -159,9 +155,9 @@ async function getDashboardStats(): Promise<DashboardStats> {
         month: kwhMonth,
       },
       syncSuccess: {
-        day: calculateSuccessRate(daySyncs),
-        week: calculateSuccessRate(weekSyncs),
-        month: calculateSuccessRate(monthSyncs),
+        day: calcRate(Number(syncStats.daySuccess), Number(syncStats.dayTotal)),
+        week: calcRate(Number(syncStats.weekSuccess), Number(syncStats.weekTotal)),
+        month: calcRate(Number(syncStats.monthSuccess), Number(syncStats.monthTotal)),
       },
     };
   } catch (error) {
@@ -182,10 +178,20 @@ export const handler = define.handlers({
       .orderBy(desc(schema.syncRuns.startedAt))
       .limit(5);
 
-    // Get recent transactions
+    // Get recent transactions with OCPP tag resolved via userMappings
     const recentTransactions = await db
-      .select()
+      .select({
+        id: schema.syncedTransactionEvents.id,
+        steveTransactionId: schema.syncedTransactionEvents.steveTransactionId,
+        kwhDelta: schema.syncedTransactionEvents.kwhDelta,
+        syncedAt: schema.syncedTransactionEvents.syncedAt,
+        ocppTag: schema.userMappings.steveOcppIdTag,
+      })
       .from(schema.syncedTransactionEvents)
+      .leftJoin(
+        schema.userMappings,
+        eq(schema.syncedTransactionEvents.userMappingId, schema.userMappings.id),
+      )
       .orderBy(desc(schema.syncedTransactionEvents.syncedAt))
       .limit(5);
 

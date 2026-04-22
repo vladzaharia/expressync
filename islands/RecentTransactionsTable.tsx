@@ -1,4 +1,3 @@
-import type { SyncedTransactionEvent } from "@/src/db/schema.ts";
 import {
   Table,
   TableBody,
@@ -10,8 +9,16 @@ import {
 import { Badge } from "@/components/ui/badge.tsx";
 import { Clock, Zap } from "lucide-preact";
 
+interface RecentTransaction {
+  id: number;
+  steveTransactionId: number;
+  kwhDelta: string;
+  syncedAt: Date | null;
+  ocppTag: string | null;
+}
+
 interface Props {
-  transactions: SyncedTransactionEvent[];
+  transactions: RecentTransaction[];
   hideHeader?: boolean;
 }
 
@@ -66,11 +73,11 @@ export default function RecentTransactionsTable({
             </TableCell>
             <TableCell>
               <Badge variant="outline" className="font-mono text-xs">
-                {tx.ocppIdTag}
+                {tx.ocppTag ?? "—"}
               </Badge>
             </TableCell>
             <TableCell className="text-right font-medium">
-              {tx.kwhDelta.toFixed(2)}
+              {Number(tx.kwhDelta).toFixed(2)}
             </TableCell>
             <TableCell className="text-right text-muted-foreground text-xs">
               <span className="flex items-center justify-end gap-1">

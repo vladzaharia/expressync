@@ -65,12 +65,27 @@ export const handler = define.handlers({
         .where(eq(schema.syncRuns.id, syncRunIds[0]!))
       : [];
 
+    // Resolve the OCPP tag via user mapping
+    const firstMappingId = billingEvents[0]?.userMappingId;
+    let ocppTagId: string | null = null;
+    if (firstMappingId) {
+      const [mapping] = await db
+        .select({ steveOcppIdTag: schema.userMappings.steveOcppIdTag })
+        .from(schema.userMappings)
+        .where(eq(schema.userMappings.id, firstMappingId))
+        .limit(1);
+      if (mapping) {
+        ocppTagId = mapping.steveOcppIdTag;
+      }
+    }
+
     return {
       data: {
         steveTransactionId,
         syncState,
         billingEvents,
         syncRuns,
+        ocppTagId,
       },
     };
   },
@@ -94,8 +109,8 @@ export default define.page<typeof handler>(function TransactionDetailsPage({
   url,
   state,
 }) {
-  const { steveTransactionId, syncState, billingEvents } = data;
-  const ocppTagId = billingEvents[0]?.ocppTagId ?? "Unknown";
+  const { steveTransactionId, syncState, billingEvents, ocppTagId: resolvedOcppTagId } = data;
+  const ocppTagId = resolvedOcppTagId ?? "Unknown";
 
   return (
     <SidebarLayout
@@ -135,7 +150,7 @@ export default define.page<typeof handler>(function TransactionDetailsPage({
                   Total kWh Billed
                 </p>
                 <p className="font-semibold tabular-nums">
-                  {(syncState?.totalKwhBilled ?? 0).toFixed(2)} kWh
+                  {Number(syncState?.totalKwhBilled ?? 0).toFixed(2)} kWh
                 </p>
               </div>
             </div>

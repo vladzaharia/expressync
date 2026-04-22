@@ -26,51 +26,50 @@ export const handler = define.handlers({
       .select({ value: count() })
       .from(schema.transactionSyncState);
 
-    // Get paginated transactions
-    const transactions = await db
-      .select({
-        id: schema.transactionSyncState.id,
-        steveTransactionId: schema.transactionSyncState.steveTransactionId,
-        totalKwhBilled: schema.transactionSyncState.totalKwhBilled,
-        isFinalized: schema.transactionSyncState.isFinalized,
-        updatedAt: schema.transactionSyncState.updatedAt,
-      })
-      .from(schema.transactionSyncState)
-      .orderBy(desc(schema.transactionSyncState.updatedAt))
-      .limit(PAGE_SIZE);
-
-    // Get event counts and OCPP tags for each transaction
-    const transactionSummaries: TransactionSummary[] = await Promise.all(
-      transactions.map(async (tx) => {
-        const events = await db
-          .select({
-            count: sql<number>`count(*)`,
-            ocppTagId: schema.syncedTransactionEvents.ocppTagId,
-            lastSyncedAt: sql<
-              Date
-            >`max(${schema.syncedTransactionEvents.syncedAt})`,
-          })
-          .from(schema.syncedTransactionEvents)
-          .where(
-            eq(
-              schema.syncedTransactionEvents.steveTransactionId,
-              tx.steveTransactionId,
-            ),
-          )
-          .groupBy(schema.syncedTransactionEvents.ocppTagId);
-
-        const firstEvent = events[0];
-        return {
-          id: tx.id,
-          steveTransactionId: tx.steveTransactionId,
-          ocppTagId: firstEvent?.ocppTagId ?? null,
-          totalKwhBilled: tx.totalKwhBilled ?? 0,
-          isFinalized: tx.isFinalized ?? false,
-          lastSyncedAt: firstEvent?.lastSyncedAt ?? tx.updatedAt,
-          eventCount: Number(firstEvent?.count ?? 0),
-        };
-      }),
-    );
+    // Get paginated transactions with event counts, OCPP tags, and last synced times
+    // via a single JOIN query instead of N+1 queries
+    const transactionSummaries: TransactionSummary[] = (
+      await db
+        .select({
+          id: schema.transactionSyncState.id,
+          steveTransactionId: schema.transactionSyncState.steveTransactionId,
+          totalKwhBilled: schema.transactionSyncState.totalKwhBilled,
+          isFinalized: schema.transactionSyncState.isFinalized,
+          updatedAt: schema.transactionSyncState.updatedAt,
+          eventCount: sql<number>`COALESCE(COUNT(${schema.syncedTransactionEvents.id}), 0)`,
+          lastSyncedAt: sql<Date>`MAX(${schema.syncedTransactionEvents.syncedAt})`,
+          ocppTagId: sql<string | null>`MIN(${schema.userMappings.steveOcppIdTag})`,
+        })
+        .from(schema.transactionSyncState)
+        .leftJoin(
+          schema.syncedTransactionEvents,
+          eq(
+            schema.transactionSyncState.steveTransactionId,
+            schema.syncedTransactionEvents.steveTransactionId,
+          ),
+        )
+        .leftJoin(
+          schema.userMappings,
+          eq(schema.syncedTransactionEvents.userMappingId, schema.userMappings.id),
+        )
+        .groupBy(
+          schema.transactionSyncState.id,
+          schema.transactionSyncState.steveTransactionId,
+          schema.transactionSyncState.totalKwhBilled,
+          schema.transactionSyncState.isFinalized,
+          schema.transactionSyncState.updatedAt,
+        )
+        .orderBy(desc(schema.transactionSyncState.updatedAt))
+        .limit(PAGE_SIZE)
+    ).map((row) => ({
+      id: row.id,
+      steveTransactionId: row.steveTransactionId,
+      ocppTagId: row.ocppTagId ?? null,
+      totalKwhBilled: Number(row.totalKwhBilled) || 0,
+      isFinalized: row.isFinalized ?? false,
+      lastSyncedAt: row.lastSyncedAt ?? row.updatedAt,
+      eventCount: Number(row.eventCount),
+    }));
 
     return { data: { transactions: transactionSummaries, totalCount } };
   },

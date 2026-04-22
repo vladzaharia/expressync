@@ -29,6 +29,20 @@
       "when": 1767697873737,
       "tag": "0003_drop_old_tag_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1745193600000,
+      "tag": "0004_add_indexes_and_types",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1745280000000,
+      "tag": "0005_add_user_roles",
+      "breakpoints": true
     }
   ]
 }

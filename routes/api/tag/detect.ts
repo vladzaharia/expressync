@@ -1,44 +1,7 @@
 import { define } from "../../../utils.ts";
 import { dockerClient } from "../../../src/lib/docker-client.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
-
-/**
- * Regex patterns to detect rejected/failed OCPP tag authentication attempts
- * These patterns match StEvE log entries for unauthorized tags
- */
-const TAG_REJECTION_PATTERNS = [
-  // Pattern: "The user with idTag 'ABC123' is INVALID (not present in DB)." - StEvE actual format
-  /The user with idTag ['"]?([^'"]+)['"]? is INVALID/i,
-  // Pattern: "Authorization rejected for idTag: ABC123"
-  /Authorization rejected for idTag:\s*(\S+)/i,
-  // Pattern: "Unknown idTag: ABC123"
-  /Unknown idTag:\s*(\S+)/i,
-  // Pattern: "idTag ABC123 not found"
-  /idTag\s+(\S+)\s+not found/i,
-  // Pattern: "Invalid idTag: ABC123"
-  /Invalid idTag:\s*(\S+)/i,
-  // Pattern: "AuthorizationStatus: Invalid for idTag ABC123"
-  /AuthorizationStatus:\s*Invalid.*idTag\s+(\S+)/i,
-  // Pattern: "Authorize.req received for unknown tag: ABC123"
-  /Authorize\.req.*unknown.*tag:\s*(\S+)/i,
-  // Pattern: "REJECTED" with idTag in context
-  /idTag[=:\s]+["']?(\S+?)["']?.*(?:REJECTED|INVALID|BLOCKED)/i,
-  /(?:REJECTED|INVALID|BLOCKED).*idTag[=:\s]+["']?(\S+?)["']?/i,
-];
-
-/**
- * Extract tag ID from a log line if it matches rejection patterns
- */
-function extractRejectedTag(logLine: string): string | null {
-  for (const pattern of TAG_REJECTION_PATTERNS) {
-    const match = logLine.match(pattern);
-    if (match && match[1]) {
-      // Clean up the tag ID (remove quotes, trailing punctuation)
-      return match[1].replace(/['".,;:!?]+$/, "").trim();
-    }
-  }
-  return null;
-}
+import { extractRejectedTag } from "../../../src/lib/utils/tag-patterns.ts";
 
 /**
  * GET /api/tag/detect
@@ -53,6 +16,12 @@ export const handler = define.handlers({
   async GET(ctx) {
     const url = new URL(ctx.req.url);
     const timeout = parseInt(url.searchParams.get("timeout") || "60", 10);
+    if (isNaN(timeout) || timeout < 1 || timeout > 300) {
+      return new Response(
+        JSON.stringify({ error: "Invalid timeout parameter (1-300)" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
 
     // Check if Docker is available
     const dockerAvailable = await dockerClient.isAvailable();
@@ -85,6 +54,16 @@ export const handler = define.handlers({
             `event: connected\ndata: ${JSON.stringify({ timeout })}\n\n`,
           ),
         );
+
+        // Keepalive heartbeat every 15 seconds to prevent proxy/browser timeouts
+        const keepaliveInterval = setInterval(() => {
+          try {
+            controller.enqueue(encoder.encode(`: keepalive\n\n`));
+          } catch {
+            // Controller may already be closed
+            clearInterval(keepaliveInterval);
+          }
+        }, 15_000);
 
         try {
           // Stream logs from Docker
@@ -139,6 +118,7 @@ export const handler = define.handlers({
             ),
           );
         } finally {
+          clearInterval(keepaliveInterval);
           controller.close();
         }
       },

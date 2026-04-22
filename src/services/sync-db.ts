@@ -1,7 +1,6 @@
 import { db } from "../db/index.ts";
 import {
   type NewSyncedTransactionEvent,
-  type NewSyncRun,
   type NewTransactionSyncState,
   syncedTransactionEvents,
   type SyncRun,
@@ -13,7 +12,7 @@ import {
   type UserMapping,
   userMappings,
 } from "../db/schema.ts";
-import { count, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { logger } from "../lib/utils/logger.ts";
 
 /**
@@ -36,24 +35,37 @@ export async function createSyncRun(): Promise<{ id: number }> {
  * Check if there's already a running sync
  */
 export async function getRunningSync(): Promise<{ id: number } | null> {
+  const STALE_SYNC_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+
   logger.debug("SyncDB", "Checking for running sync");
 
   const [runningSync] = await db
-    .select({ id: syncRuns.id })
+    .select({ id: syncRuns.id, startedAt: syncRuns.startedAt })
     .from(syncRuns)
     .where(eq(syncRuns.status, "running"))
     .limit(1);
 
-  if (runningSync) {
-    logger.debug("SyncDB", "Found running sync", { syncRunId: runningSync.id });
-  } else {
+  if (!runningSync) {
     logger.debug("SyncDB", "No running sync found");
+    return null;
   }
 
-  return runningSync || null;
+  // Check if the running sync is stale
+  const elapsed = Date.now() - runningSync.startedAt.getTime();
+  if (elapsed > STALE_SYNC_TIMEOUT_MS) {
+    logger.warn("SyncDB", "Found stale sync run, marking as failed", {
+      syncRunId: runningSync.id,
+      elapsedMs: elapsed,
+    });
+    await markSyncFailed(runningSync.id, ["Sync timed out (stale lock detected)"]);
+    return null;
+  }
+
+  logger.debug("SyncDB", "Found running sync", { syncRunId: runningSync.id });
+  return runningSync;
 }
 
-interface TagSyncStats {
+export interface TagSyncStats {
   activatedTags: number;
   deactivatedTags: number;
   unchangedTags: number;
@@ -186,35 +198,6 @@ export async function upsertSyncState(
 }
 
 /**
- * Create a synced transaction event record
- */
-export async function createSyncedEvent(
-  data: NewSyncedTransactionEvent,
-): Promise<void> {
-  await db.insert(syncedTransactionEvents).values(data);
-}
-
-/**
- * Batch create synced transaction events
- */
-export async function batchCreateSyncedEvents(
-  events: NewSyncedTransactionEvent[],
-): Promise<void> {
-  if (events.length === 0) {
-    logger.debug("SyncDB", "No synced events to create");
-    return;
-  }
-
-  logger.debug("SyncDB", "Creating batch of synced events", {
-    count: events.length,
-  });
-
-  await db.insert(syncedTransactionEvents).values(events);
-
-  logger.debug("SyncDB", "Synced events created", { count: events.length });
-}
-
-/**
  * Batch upsert sync states
  */
 export async function batchUpsertSyncStates(
@@ -234,6 +217,56 @@ export async function batchUpsertSyncStates(
   }
 
   logger.debug("SyncDB", "Sync states upserted", { count: states.length });
+}
+
+/**
+ * Atomically upsert sync states and create synced event records in a single
+ * database transaction. This ensures that if either operation fails, neither
+ * is persisted -- preventing sync state from advancing without a corresponding
+ * event record (or vice versa).
+ */
+export async function atomicUpsertSyncStatesAndCreateEvents(
+  states: NewTransactionSyncState[],
+  events: NewSyncedTransactionEvent[],
+): Promise<void> {
+  if (states.length === 0 && events.length === 0) {
+    logger.debug("SyncDB", "No sync states or events to persist atomically");
+    return;
+  }
+
+  logger.debug("SyncDB", "Atomically persisting sync states and events", {
+    statesCount: states.length,
+    eventsCount: events.length,
+  });
+
+  await db.transaction(async (tx) => {
+    // Upsert sync states
+    for (const state of states) {
+      await tx
+        .insert(transactionSyncState)
+        .values(state)
+        .onConflictDoUpdate({
+          target: transactionSyncState.steveTransactionId,
+          set: {
+            lastSyncedMeterValue: state.lastSyncedMeterValue,
+            totalKwhBilled: state.totalKwhBilled,
+            lastSyncRunId: state.lastSyncRunId,
+            isFinalized: state.isFinalized,
+            updatedAt: new Date(),
+          },
+        });
+    }
+
+    // Create synced event records
+    if (events.length > 0) {
+      await tx.insert(syncedTransactionEvents).values(events);
+    }
+  });
+
+  logger.debug("SyncDB", "Atomic persist complete", {
+    statesCount: states.length,
+    eventsCount: events.length,
+  });
 }
 
 /**
@@ -301,8 +334,7 @@ export async function getSyncRunLogs(
     query = db
       .select()
       .from(syncRunLogs)
-      .where(eq(syncRunLogs.syncRunId, syncRunId))
-      .where(eq(syncRunLogs.segment, segment))
+      .where(and(eq(syncRunLogs.syncRunId, syncRunId), eq(syncRunLogs.segment, segment)))
       .orderBy(syncRunLogs.createdAt);
   }
 

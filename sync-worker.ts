@@ -36,14 +36,31 @@ try {
 // Track if a sync is currently running (for additional safety)
 let isSyncing = false;
 
+// Track if shutdown is in progress (prevents reconnection race)
+let isShuttingDown = false;
+
+// Track the current sync promise for graceful shutdown
+let currentSyncPromise: Promise<void> | null = null;
+
 // Channel name for sync notifications (must match sync-notifier.service.ts)
 const SYNC_CHANNEL = "sync_trigger";
 
 // Create a dedicated postgres client for LISTEN
-const listenClient = postgres(config.DATABASE_URL, {
-  max: 1, // Only need one connection for listening
-  idle_timeout: 0, // Keep connection alive
-});
+let listenClient = createListenClient();
+
+function createListenClient() {
+  return postgres(config.DATABASE_URL, {
+    max: 1, // Only need one connection for listening
+    idle_timeout: 0, // Keep connection alive
+    onclose: () => {
+      if (isShuttingDown) return;
+      console.error("[Sync Worker] LISTEN connection closed unexpectedly");
+      console.log("[Sync Worker] Attempting to re-establish LISTEN...");
+      listenClient = createListenClient();
+      setTimeout(setupListen, 5000);
+    },
+  });
+}
 
 /**
  * Sync handler function
@@ -59,30 +76,33 @@ async function handleSync() {
   isSyncing = true;
   const startTime = Date.now();
 
-  try {
-    console.log("[Sync Worker] Starting scheduled sync...");
-    const result = await runSync();
+  currentSyncPromise = runSync()
+    .then((result) => {
+      const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 
-    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-
-    console.log(
-      `[Sync Worker] Sync completed in ${duration}s: ` +
-        `${result.eventsCreated} events created, ` +
-        `${result.transactionsProcessed} transactions processed`,
-    );
-
-    if (result.errors.length > 0) {
-      console.error(
-        `[Sync Worker] Sync had ${result.errors.length} errors:`,
-        result.errors,
+      console.log(
+        `[Sync Worker] Sync completed in ${duration}s: ` +
+          `${result.eventsCreated} events created, ` +
+          `${result.transactionsProcessed} transactions processed`,
       );
-    }
-  } catch (error) {
-    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-    console.error(`[Sync Worker] Sync failed after ${duration}s:`, error);
-  } finally {
-    isSyncing = false;
-  }
+
+      if (result.errors.length > 0) {
+        console.error(
+          `[Sync Worker] Sync had ${result.errors.length} errors:`,
+          result.errors,
+        );
+      }
+    })
+    .catch((error) => {
+      const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+      console.error(`[Sync Worker] Sync failed after ${duration}s:`, error);
+    })
+    .finally(() => {
+      isSyncing = false;
+      currentSyncPromise = null;
+    });
+
+  await currentSyncPromise;
 }
 
 // Create the cron job
@@ -101,32 +121,42 @@ const job = new Cron(
 console.log("[Sync Worker] Cron job scheduled successfully");
 console.log(`[Sync Worker] Next run: ${job.nextRun()?.toISOString()}`);
 
-// Set up LISTEN for manual sync triggers
-console.log(`[Sync Worker] Setting up LISTEN on channel: ${SYNC_CHANNEL}`);
-await listenClient.listen(
-  SYNC_CHANNEL,
-  (payload) => {
-    try {
-      const data = JSON.parse(payload);
-      console.log(
-        `[Sync Worker] Received sync trigger notification from ${data.source}`,
-      );
-      handleSync().catch((error) => {
-        console.error("[Sync Worker] Manual sync failed:", error);
-      });
-    } catch (error) {
-      console.error(
-        "[Sync Worker] Failed to parse notification payload:",
-        error,
-      );
-    }
-  },
-  () => {
-    console.log(
-      `[Sync Worker] LISTEN connection established on channel: ${SYNC_CHANNEL}`,
+// Set up LISTEN for manual sync triggers with reconnection logic
+async function setupListen() {
+  try {
+    await listenClient.listen(
+      SYNC_CHANNEL,
+      (payload) => {
+        try {
+          const data = JSON.parse(payload);
+          console.log(
+            `[Sync Worker] Received sync trigger notification from ${data.source}`,
+          );
+          handleSync().catch((error) => {
+            console.error("[Sync Worker] Manual sync failed:", error);
+          });
+        } catch (error) {
+          console.error(
+            "[Sync Worker] Failed to parse notification payload:",
+            error,
+          );
+        }
+      },
+      () => {
+        console.log(
+          `[Sync Worker] LISTEN connection established on channel: ${SYNC_CHANNEL}`,
+        );
+      },
     );
-  },
-);
+    console.log(`[Sync Worker] LISTEN established on ${SYNC_CHANNEL}`);
+  } catch (error) {
+    console.error("[Sync Worker] LISTEN failed, retrying in 5s:", error);
+    setTimeout(setupListen, 5000);
+  }
+}
+
+console.log(`[Sync Worker] Setting up LISTEN on channel: ${SYNC_CHANNEL}`);
+await setupListen();
 
 // Run sync immediately on startup (optional, but useful for testing)
 if (config.SYNC_ON_STARTUP === "true") {
@@ -138,9 +168,17 @@ if (config.SYNC_ON_STARTUP === "true") {
 
 // Graceful shutdown handler
 const shutdown = async () => {
+  isShuttingDown = true;
   console.log("[Sync Worker] Shutting down gracefully...");
   job.stop();
   console.log("[Sync Worker] Cron job stopped");
+
+  if (currentSyncPromise) {
+    console.log("[Sync Worker] Waiting for in-flight sync to complete...");
+    await currentSyncPromise;
+    console.log("[Sync Worker] In-flight sync finished");
+  }
+
   await listenClient.end();
   console.log("[Sync Worker] LISTEN connection closed");
   Deno.exit(0);

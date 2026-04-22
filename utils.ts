@@ -9,6 +9,7 @@ export interface State {
     email: string;
     emailVerified: boolean;
     image: string | null;
+    role: string;
     createdAt: Date;
     updatedAt: Date;
   };

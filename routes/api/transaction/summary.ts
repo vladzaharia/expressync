@@ -2,6 +2,7 @@ import { define } from "../../../utils.ts";
 import { db } from "../../../src/db/index.ts";
 import * as schema from "../../../src/db/schema.ts";
 import { count, desc, eq, sql } from "drizzle-orm";
+import { logger } from "../../../src/lib/utils/logger.ts";
 
 // Transaction summary type for the table
 export interface TransactionSummary {
@@ -31,81 +32,70 @@ export const handler = define.handlers({
     try {
       const url = new URL(ctx.req.url);
       const skip = parseInt(url.searchParams.get("skip") || "0");
+      if (isNaN(skip) || skip < 0) {
+        return new Response(
+          JSON.stringify({ error: "Invalid skip parameter" }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
       const limit = parseInt(url.searchParams.get("limit") || "15");
+      if (isNaN(limit) || limit < 1 || limit > 100) {
+        return new Response(
+          JSON.stringify({ error: "Invalid limit parameter (1-100)" }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
 
       // Get total count
       const [{ value: total }] = await db
         .select({ value: count() })
         .from(schema.transactionSyncState);
 
-      // Get paginated transactions
-      const transactions = await db
-        .select({
-          id: schema.transactionSyncState.id,
-          steveTransactionId: schema.transactionSyncState.steveTransactionId,
-          totalKwhBilled: schema.transactionSyncState.totalKwhBilled,
-          isFinalized: schema.transactionSyncState.isFinalized,
-          updatedAt: schema.transactionSyncState.updatedAt,
-        })
-        .from(schema.transactionSyncState)
-        .orderBy(desc(schema.transactionSyncState.updatedAt))
-        .offset(skip)
-        .limit(limit);
-
-      // Get event counts and OCPP tags for each transaction
-      const items: TransactionSummary[] = await Promise.all(
-        transactions.map(async (tx) => {
-          // Get event count and last synced time
-          const [eventStats] = await db
-            .select({
-              count: sql<number>`count(*)`,
-              lastSyncedAt: sql<
-                Date
-              >`max(${schema.syncedTransactionEvents.syncedAt})`,
-            })
-            .from(schema.syncedTransactionEvents)
-            .where(
-              eq(
-                schema.syncedTransactionEvents.steveTransactionId,
-                tx.steveTransactionId,
-              ),
-            );
-
-          // Get OCPP tag from the first event's user mapping
-          const [firstEvent] = await db
-            .select({
-              userMappingId: schema.syncedTransactionEvents.userMappingId,
-            })
-            .from(schema.syncedTransactionEvents)
-            .where(
-              eq(
-                schema.syncedTransactionEvents.steveTransactionId,
-                tx.steveTransactionId,
-              ),
-            )
-            .limit(1);
-
-          let ocppTagId: string | null = null;
-          if (firstEvent?.userMappingId) {
-            const [mapping] = await db
-              .select({ steveOcppIdTag: schema.userMappings.steveOcppIdTag })
-              .from(schema.userMappings)
-              .where(eq(schema.userMappings.id, firstEvent.userMappingId))
-              .limit(1);
-            ocppTagId = mapping?.steveOcppIdTag ?? null;
-          }
-
-          return {
-            id: tx.id,
-            steveTransactionId: tx.steveTransactionId,
-            ocppTagId,
-            totalKwhBilled: tx.totalKwhBilled ?? 0,
-            isFinalized: tx.isFinalized ?? false,
-            lastSyncedAt: eventStats?.lastSyncedAt ?? tx.updatedAt,
-            eventCount: Number(eventStats?.count ?? 0),
-          };
-        }),
-      );
+      // Get paginated transactions with event counts, OCPP tags, and last synced times
+      // via a single JOIN query instead of N+1 queries
+      const items: TransactionSummary[] = (
+        await db
+          .select({
+            id: schema.transactionSyncState.id,
+            steveTransactionId: schema.transactionSyncState.steveTransactionId,
+            totalKwhBilled: schema.transactionSyncState.totalKwhBilled,
+            isFinalized: schema.transactionSyncState.isFinalized,
+            updatedAt: schema.transactionSyncState.updatedAt,
+            eventCount: sql<number>`COALESCE(COUNT(${schema.syncedTransactionEvents.id}), 0)`,
+            lastSyncedAt: sql<Date>`MAX(${schema.syncedTransactionEvents.syncedAt})`,
+            ocppTagId: sql<string | null>`MIN(${schema.userMappings.steveOcppIdTag})`,
+          })
+          .from(schema.transactionSyncState)
+          .leftJoin(
+            schema.syncedTransactionEvents,
+            eq(
+              schema.transactionSyncState.steveTransactionId,
+              schema.syncedTransactionEvents.steveTransactionId,
+            ),
+          )
+          .leftJoin(
+            schema.userMappings,
+            eq(schema.syncedTransactionEvents.userMappingId, schema.userMappings.id),
+          )
+          .groupBy(
+            schema.transactionSyncState.id,
+            schema.transactionSyncState.steveTransactionId,
+            schema.transactionSyncState.totalKwhBilled,
+            schema.transactionSyncState.isFinalized,
+            schema.transactionSyncState.updatedAt,
+          )
+          .orderBy(desc(schema.transactionSyncState.updatedAt))
+          .offset(skip)
+          .limit(limit)
+      ).map((row) => ({
+        id: row.id,
+        steveTransactionId: row.steveTransactionId,
+        ocppTagId: row.ocppTagId ?? null,
+        totalKwhBilled: Number(row.totalKwhBilled) || 0,
+        isFinalized: row.isFinalized ?? false,
+        lastSyncedAt: row.lastSyncedAt ?? row.updatedAt,
+        eventCount: Number(row.eventCount),
+      }));
 
       return new Response(
         JSON.stringify({
@@ -120,7 +110,7 @@ export const handler = define.handlers({
         },
       );
     } catch (error) {
-      console.error("Failed to fetch transaction summaries:", error);
+      logger.error("API", "Failed to fetch transaction summaries", error as Error);
       return new Response(
         JSON.stringify({ error: "Failed to fetch transaction summaries" }),
         {

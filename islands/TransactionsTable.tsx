@@ -43,7 +43,7 @@ const columns: PaginatedTableColumn<TransactionSummary>[] = [
     className: "text-right",
     render: (tx) => (
       <span className="font-medium tabular-nums">
-        {tx.totalKwhBilled.toFixed(2)}
+        {Number(tx.totalKwhBilled).toFixed(2)}
       </span>
     ),
   },

@@ -30,19 +30,25 @@ export const auth = betterAuth({
   // Base URL for redirects
   baseURL: config.AUTH_URL,
 
-  // Trusted origins for CORS (includes dev server)
+  // Trusted origins for CORS
   trustedOrigins: [
     config.AUTH_URL,
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
+    ...(config.DENO_ENV === "development"
+      ? [
+          "http://localhost:5173",
+          "http://127.0.0.1:5173",
+          "http://localhost:8000",
+          "http://127.0.0.1:8000",
+        ]
+      : []),
   ],
 
   // Email & password authentication
   emailAndPassword: {
     enabled: true,
-    // Require email verification before login (disabled for simplicity)
+    // Disable public self-registration -- admins are created via seed script
+    disableSignUp: true,
+    minPasswordLength: 12,
     requireEmailVerification: false,
   },
 
@@ -50,8 +56,8 @@ export const auth = betterAuth({
   session: {
     // Cookie name
     cookieName: "ev_billing_session",
-    // Session expiry (30 days)
-    expiresIn: 60 * 60 * 24 * 30,
+    // Session expiry (7 days)
+    expiresIn: 60 * 60 * 24 * 7,
     // Update session on each request (every 24 hours)
     updateAge: 60 * 60 * 24,
   },

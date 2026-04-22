@@ -6,6 +6,8 @@ import {
   LagoCustomerSchema,
   type LagoEvent,
   LagoEventSchema,
+  type LagoInvoice,
+  LagoInvoiceSchema,
   type LagoSubscription,
   LagoSubscriptionSchema,
 } from "./types/lago.ts";
@@ -49,64 +51,99 @@ class LagoClient {
         }
       }
 
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${this.apiKey}`,
-          ...options.headers,
-        },
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      try {
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${this.apiKey}`,
+            ...options.headers,
+          },
+        });
 
-      logger.debug("Lago", "Response received", {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        logger.error("Lago", "API request failed", {
-          method,
-          path,
+        logger.debug("Lago", "Response received", {
           status: response.status,
           statusText: response.statusText,
-          errorBody: errorText,
+          headers: Object.fromEntries(response.headers.entries()),
         });
-        throw new Error(
-          `Lago API error: ${response.status} ${response.statusText} - ${errorText}`,
-        );
-      }
 
-      // Handle 204 No Content
-      if (response.status === 204) {
-        logger.debug("Lago", "No content response (204)");
-        return {} as T;
-      }
+        if (!response.ok) {
+          const errorText = await response.text();
+          logger.error("Lago", "API request failed", {
+            method,
+            path,
+            status: response.status,
+            statusText: response.statusText,
+            errorBody: errorText,
+          });
+          throw new Error(
+            `Lago API error: ${response.status} ${response.statusText} - ${errorText}`,
+          );
+        }
 
-      const data = await response.json();
-      logger.debug("Lago", "Response data received", {
-        dataKeys: Object.keys(data),
-        dataSize: JSON.stringify(data).length,
-      });
+        // Handle 204 No Content
+        if (response.status === 204) {
+          logger.debug("Lago", "No content response (204)");
+          return {} as T;
+        }
 
-      // Validate response with Zod schema
-      try {
-        const validated = schema.parse(data);
-        logger.debug("Lago", "Response validation successful");
-        return validated;
-      } catch (error) {
-        logger.error("Lago", "Response validation failed", {
-          error: error instanceof Error ? error.message : String(error),
-          receivedData: data,
+        const data = await response.json();
+        logger.debug("Lago", "Response data received", {
+          dataKeys: Object.keys(data),
+          dataSize: JSON.stringify(data).length,
         });
-        throw new Error(`Lago API response validation failed: ${error}`);
+
+        // Validate response with Zod schema
+        try {
+          const validated = schema.parse(data);
+          logger.debug("Lago", "Response validation successful");
+          return validated;
+        } catch (error) {
+          logger.error("Lago", "Response validation failed", {
+            error: error instanceof Error ? error.message : String(error),
+            receivedData: data,
+          });
+          throw new Error(`Lago API response validation failed: ${error}`);
+        }
+      } finally {
+        clearTimeout(timeoutId);
       }
     }, {
       maxAttempts: 3,
       initialDelay: 1000,
       logAttempts: true,
     });
+  }
+
+  /**
+   * Fetch all pages of a paginated Lago endpoint
+   */
+  private async requestAllPages<T>(
+    path: string,
+    dataKey: string,
+    itemSchema: z.ZodSchema<T>,
+  ): Promise<T[]> {
+    const MAX_PAGES = 100;
+    const allItems: T[] = [];
+    let page = 1;
+    while (true) {
+      if (page > MAX_PAGES) {
+        logger.warn("Lago", "Max page limit reached", { path, page });
+        break;
+      }
+      const separator = path.includes('?') ? '&' : '?';
+      const data = await this.request(
+        `${path}${separator}page=${page}&per_page=100`,
+        z.object({ [dataKey]: z.array(itemSchema) }).passthrough(),
+      );
+      allItems.push(...data[dataKey]);
+      if (data[dataKey].length < 100) break;
+      page++;
+    }
+    return allItems;
   }
 
   /**
@@ -185,10 +222,12 @@ class LagoClient {
    * @returns Object with customers array
    */
   async getCustomers(): Promise<{ customers: LagoCustomer[] }> {
-    return this.request(
+    const customers = await this.requestAllPages(
       "/customers",
-      z.object({ customers: z.array(LagoCustomerSchema) }),
+      "customers",
+      LagoCustomerSchema,
     );
+    return { customers };
   }
 
   /**
@@ -216,10 +255,12 @@ class LagoClient {
     const params = externalCustomerId
       ? `?external_customer_id=${encodeURIComponent(externalCustomerId)}`
       : "";
-    return this.request(
+    const subscriptions = await this.requestAllPages(
       `/subscriptions${params}`,
-      z.object({ subscriptions: z.array(LagoSubscriptionSchema) }),
+      "subscriptions",
+      LagoSubscriptionSchema,
     );
+    return { subscriptions };
   }
 
   /**
@@ -235,10 +276,40 @@ class LagoClient {
   ): Promise<LagoCurrentUsage> {
     const customerId = encodeURIComponent(externalCustomerId);
     const subId = encodeURIComponent(externalSubscriptionId);
-    return this.request(
+    const result = await this.request(
       `/customers/${customerId}/current_usage?external_subscription_id=${subId}`,
-      LagoCurrentUsageSchema,
+      z.object({ customer_usage: LagoCurrentUsageSchema }),
     );
+    return result.customer_usage;
+  }
+
+  /**
+   * Get invoices with pagination
+   *
+   * @param page - Page number (default: 1)
+   * @param perPage - Items per page (default: 20)
+   * @returns Object with invoices array and pagination meta
+   */
+  async getInvoices(
+    page: number = 1,
+    perPage: number = 20,
+  ): Promise<{
+    invoices: LagoInvoice[];
+    meta: { current_page: number; total_pages: number; total_count: number };
+  }> {
+    const result = await this.request(
+      `/invoices?page=${page}&per_page=${perPage}`,
+      z.object({
+        invoices: z.array(LagoInvoiceSchema),
+        meta: z.object({
+          current_page: z.number(),
+          total_pages: z.number(),
+          total_count: z.number(),
+        }),
+      }),
+    );
+
+    return result;
   }
 }
 

@@ -1,21 +1,41 @@
 import { FreshContext } from "fresh";
 import { auth } from "../src/lib/auth.ts";
+import { db } from "../src/db/index.ts";
+import { users } from "../src/db/schema.ts";
+import { eq } from "drizzle-orm";
 import { define } from "../utils.ts";
+import { checkRateLimit } from "../src/lib/utils/rate-limit.ts";
 
 // Routes that don't require authentication
 const PUBLIC_ROUTES = [
   "/login",
   "/api/auth",
   "/api/health",
+  "/api/webhook/lago",
+];
+
+// Routes that require admin role
+const ADMIN_ONLY_PATHS = [
+  "/api/sync",
+  "/api/tag",
+  "/api/dashboard",
+  "/api/customer",
+  "/api/subscription",
+  "/api/user",
+  "/api/charger",
+  "/api/invoice",
+  "/api/usage",
+  "/api/transaction",
+  "/links",
+  "/sync",
+  "/users",
+  "/chargers",
+  "/transactions",
 ];
 
 // Rate limiting configuration
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const RATE_LIMIT_MAX_REQUESTS = 100; // per window
 const AUTH_RATE_LIMIT_MAX = 10; // stricter for auth endpoints
-
-// Simple in-memory rate limiter (use Redis in production for multi-instance)
-const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 /**
  * Get client IP address from request
@@ -24,33 +44,6 @@ function getClientIp(req: Request): string {
   return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     req.headers.get("x-real-ip") ??
     "unknown";
-}
-
-/**
- * Check rate limit for a given key
- */
-function checkRateLimit(key: string, maxRequests: number): boolean {
-  const now = Date.now();
-  const record = rateLimitStore.get(key);
-
-  // Cleanup expired entries periodically to prevent memory leak
-  if (rateLimitStore.size > 10000) {
-    for (const [k, v] of rateLimitStore) {
-      if (now > v.resetAt) rateLimitStore.delete(k);
-    }
-  }
-
-  if (!record || now > record.resetAt) {
-    rateLimitStore.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return true;
-  }
-
-  if (record.count >= maxRequests) {
-    return false;
-  }
-
-  record.count++;
-  return true;
 }
 
 /**
@@ -133,9 +126,50 @@ export const handler = define.middleware(async (ctx) => {
     });
   }
 
-  // Add user to state for routes to access
-  ctx.state.user = session.user;
+  // Look up the user's role from the database (BetterAuth doesn't know about our custom role column)
+  const [dbUser] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+
+  const userRole = dbUser?.role ?? "customer";
+
+  // Add user (with role) and session to state for routes to access
+  ctx.state.user = { ...session.user, role: userRole };
   ctx.state.session = session.session;
 
-  return ctx.next();
+  // Role-based access control: check if path requires admin role
+  // "/" is checked as an exact match to avoid matching all paths as a prefix
+  const isAdminOnlyPath = url.pathname === "/" || ADMIN_ONLY_PATHS.some((prefix) =>
+    url.pathname.startsWith(prefix)
+  );
+
+  if (isAdminOnlyPath && userRole !== "admin") {
+    if (url.pathname.startsWith("/api/")) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden: admin access required" }),
+        {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Pages should return 403 for non-admin users
+    return new Response(
+      JSON.stringify({ error: "Forbidden: admin access required" }),
+      {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  const response = await ctx.next();
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("X-XSS-Protection", "1; mode=block");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  return response;
 });
