@@ -4,7 +4,7 @@ import {
 } from "@/components/ui/paginated-table.tsx";
 import { Calendar, Hash, Zap } from "lucide-preact";
 import { TransactionStatusBadge } from "@/components/shared/index.ts";
-import type { TransactionSummary } from "@/routes/transactions/index.tsx";
+import type { TransactionSummary } from "@/routes/admin/transactions/index.tsx";
 
 interface Props {
   transactions: TransactionSummary[];
@@ -90,7 +90,7 @@ export default function TransactionsTable({
       columns={columns}
       totalCount={totalCount}
       pageSize={pageSize}
-      fetchUrl="/api/transaction/summary"
+      fetchUrl="/api/admin/transaction/summary"
       fetchParams={fetchParams}
       showLoadMore={showLoadMore}
       emptyMessage={emptyMessage}

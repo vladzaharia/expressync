@@ -10,7 +10,7 @@ interface Props {
 }
 
 /**
- * Polls `POST /api/invoice/[id]/pdf` + `POST /api/invoice/[id]/refresh`
+ * Polls `POST /api/admin/invoice/[id]/pdf` + `POST /api/admin/invoice/[id]/refresh`
  * until a `file_url` appears. Each fetch is bound to an AbortController so
  * navigating away stops the polling cleanly.
  */
@@ -32,7 +32,7 @@ export default function InvoicePdfLink({
 
     try {
       const res = await fetch(
-        `/api/invoice/${encodeURIComponent(invoiceId)}/pdf`,
+        `/api/admin/invoice/${encodeURIComponent(invoiceId)}/pdf`,
         { method: "POST", signal },
       );
 
@@ -56,7 +56,7 @@ export default function InvoicePdfLink({
         await new Promise((r) => setTimeout(r, 2000));
         if (signal.aborted) return;
         const refreshRes = await fetch(
-          `/api/invoice/${encodeURIComponent(invoiceId)}/refresh`,
+          `/api/admin/invoice/${encodeURIComponent(invoiceId)}/refresh`,
           { method: "POST", signal },
         );
         if (refreshRes.ok) {
