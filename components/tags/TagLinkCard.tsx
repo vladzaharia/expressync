@@ -173,7 +173,6 @@ export function TagLinkCard(
             subscriptionUrl={subscriptionUrl}
             lagoFetchFailed={lagoFetchFailed}
             warnLine={warnLine}
-            parent={relations.parent}
           />
         )
         : (
@@ -190,7 +189,7 @@ export function TagLinkCard(
           isMeta={isMeta}
           parent={relations.parent}
           childTags={relations.children}
-          hideParent={linking !== null && relations.parent !== null}
+          tagHasDirectLink={linking !== null}
         />
       )}
     </SectionCard>
@@ -207,7 +206,6 @@ function LinkedBody(
     subscriptionUrl,
     lagoFetchFailed,
     warnLine,
-    parent,
   }: {
     linking: TagLinkingInfo;
     tagPk: number;
@@ -215,47 +213,33 @@ function LinkedBody(
     subscriptionUrl: string | null;
     lagoFetchFailed: boolean;
     warnLine?: string | null;
-    parent: RelationTag | null;
   },
 ) {
   const customerName = linking.customerName ?? linking.lagoCustomerExternalId ??
     "—";
+  // Lago sometimes returns an empty string for `subscriptionName` — fall
+  // back through to the plan code (the "type", e.g. `ExpressChargeAC`).
+  const planLabel =
+    (linking.subscriptionName && linking.subscriptionName.trim()) ||
+    (linking.subscriptionPlanCode && linking.subscriptionPlanCode.trim()) ||
+    null;
 
   return (
     <div class="space-y-4">
       {/* Narrative hero: one sentence describing the placement. */}
       <p class="text-sm leading-relaxed">
         Billed to <strong class="text-foreground">{customerName}</strong>
-        {linking.subscriptionPlanCode
+        {planLabel
           ? (
             <>
-              {" "}on plan{" "}
-              <strong class="text-foreground">
-                {linking.subscriptionName ?? linking.subscriptionPlanCode}
-              </strong>
+              {" "}on plan <strong class="text-foreground">{planLabel}</strong>
             </>
           )
           : (
             <span class="text-muted-foreground">
               {" "}· no active subscription
             </span>
-          )}
-        {parent && (
-          <>
-            {" "}· inherited via{" "}
-            <span class="inline-flex align-middle">
-              <TagChip
-                idTag={parent.idTag}
-                tagPk={parent.tagPk ?? 0}
-                tagType={parent.tagType}
-                displayName={parent.displayName}
-                hasLagoCustomer={parent.hasLagoCustomer}
-                href={parent.tagPk !== null ? undefined : null}
-              />
-            </span>
-          </>
-        )}
-        .
+          )}.
       </p>
 
       {/* Customer + subscription detail rows */}
@@ -278,13 +262,11 @@ function LinkedBody(
           <dt class="text-[11px] uppercase tracking-wide text-muted-foreground">
             Subscription
           </dt>
-          {linking.subscriptionPlanCode
+          {planLabel
             ? (
               <>
                 <dd class="flex flex-wrap items-center gap-2">
-                  <span class="font-medium">
-                    {linking.subscriptionName ?? linking.subscriptionPlanCode}
-                  </span>
+                  <span class="font-medium">{planLabel}</span>
                   {linking.subscriptionStatus
                     ? (
                       <span
@@ -299,7 +281,14 @@ function LinkedBody(
                     : null}
                 </dd>
                 <dd class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                  <code class="font-mono">{linking.subscriptionPlanCode}</code>
+                  {linking.subscriptionPlanCode &&
+                      linking.subscriptionPlanCode !== planLabel
+                    ? (
+                      <code class="font-mono">
+                        {linking.subscriptionPlanCode}
+                      </code>
+                    )
+                    : null}
                   {linking.subscriptionCurrentPeriodEnd
                     ? (
                       <span>
@@ -435,44 +424,57 @@ function UnlinkedBody(
 // ---------------------------------------------------------------------------
 
 function FamilyZone(
-  { isMeta, parent, childTags, hideParent }: {
+  { isMeta, parent, childTags, tagHasDirectLink }: {
     isMeta: boolean;
     parent: RelationTag | null;
     childTags: RelationTag[];
-    /** When the narrative already mentions the parent, skip the Parent block. */
-    hideParent: boolean;
+    /** Does this tag carry its own Lago customer link? Drives parent copy. */
+    tagHasDirectLink: boolean;
   },
 ) {
   const emptyChildren = childTags.length === 0;
+  // When the tag itself isn't linked but its parent is, the parent is the
+  // billing source — surface that inline on the parent block instead of in
+  // the narrative sentence above.
+  const parentProvidesBilling = parent !== null && parent.hasLagoCustomer &&
+    !tagHasDirectLink;
 
   return (
     <div class="mt-5 space-y-3 border-t pt-4">
-      {!hideParent && (
-        <div>
-          <div class="mb-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-            Parent
-          </div>
-          {parent
-            ? (
-              <div class="flex flex-wrap items-center gap-2">
-                <TagChip
-                  idTag={parent.idTag}
-                  tagPk={parent.tagPk ?? 0}
-                  tagType={parent.tagType}
-                  displayName={parent.displayName}
-                  hasLagoCustomer={parent.hasLagoCustomer}
-                  href={parent.tagPk !== null ? undefined : null}
-                />
-              </div>
-            )
-            : (
-              <div class="flex items-center gap-2 text-xs text-muted-foreground">
-                <Link2Off class="size-3.5" aria-hidden="true" />
-                <span>No parent — top-level tag.</span>
-              </div>
-            )}
+      <div>
+        <div class="mb-1.5 flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+          <span>Parent</span>
+          {parentProvidesBilling && (
+            <span class="rounded bg-cyan-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-700 dark:text-cyan-300">
+              Billing source
+            </span>
+          )}
         </div>
-      )}
+        {parent
+          ? (
+            <div class="flex flex-wrap items-center gap-2">
+              <TagChip
+                idTag={parent.idTag}
+                tagPk={parent.tagPk ?? 0}
+                tagType={parent.tagType}
+                displayName={parent.displayName}
+                hasLagoCustomer={parent.hasLagoCustomer}
+                href={parent.tagPk !== null ? undefined : null}
+              />
+              {parentProvidesBilling && (
+                <span class="text-xs text-muted-foreground">
+                  This tag inherits billing from its parent.
+                </span>
+              )}
+            </div>
+          )
+          : (
+            <div class="flex items-center gap-2 text-xs text-muted-foreground">
+              <Link2Off class="size-3.5" aria-hidden="true" />
+              <span>No parent — top-level tag.</span>
+            </div>
+          )}
+      </div>
 
       {(isMeta || !emptyChildren) && (
         <div>
