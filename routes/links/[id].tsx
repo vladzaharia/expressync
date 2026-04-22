@@ -5,7 +5,6 @@ import { eq } from "drizzle-orm";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
 import MappingForm from "../../islands/MappingForm.tsx";
-import MappingIssueCardAction from "../../islands/MappingIssueCardAction.tsx";
 import { BackAction } from "../../components/shared/BackAction.tsx";
 import { SectionCard } from "../../components/shared/SectionCard.tsx";
 import { Settings } from "lucide-preact";
@@ -28,7 +27,6 @@ import ScanAnotherForCustomer from "../../islands/linking/ScanAnotherForCustomer
  *   lagoCustomer        — Lago lookup (nullable on error)
  *   lagoSubscription    — Lago lookup (nullable)
  *   recentTransactions  — last 5 sessions for this ocppIdTag
- *   cardsIssued         — integer from DB (mapping.cardsIssued)
  *   isMeta              — derived
  *   cascadeCount        — 1 + child-mapping count (for delete copy)
  */
@@ -146,7 +144,6 @@ export const handler = define.handlers({
         lagoCustomer,
         lagoSubscription,
         recentTransactions,
-        cardsIssued: mapping.cardsIssued ?? 0,
         isMeta: isMetaTag(mapping.steveOcppIdTag),
         cascadeCount,
       },
@@ -158,7 +155,6 @@ export default define.page<typeof handler>(
   function EditTagLinkingPage({ data, url, state }) {
     const { mapping, lagoCustomer, lagoSubscription, recentTransactions } =
       data;
-    const mappingLabel = mapping.displayName ?? mapping.steveOcppIdTag;
     const hasLagoCustomer = Boolean(mapping.lagoCustomerExternalId);
     const meta = data.isMeta;
 
@@ -188,14 +184,6 @@ export default define.page<typeof handler>(
             ? "Meta-tags (OCPP-*) group multiple real tags under one customer — they don't correspond to a physical card."
             : "Update the billing configuration for this OCPP tag."}
           colorScheme="violet"
-          headerActions={
-            <MappingIssueCardAction
-              userMappingId={mapping.id}
-              mappingLabel={mappingLabel}
-              hasLagoCustomer={hasLagoCustomer}
-              isMeta={meta}
-            />
-          }
         >
           <div class="space-y-6">
             <LinkingHeaderStrip
@@ -217,7 +205,6 @@ export default define.page<typeof handler>(
                   lagoUrl: subscriptionLagoUrl,
                 }
                 : null}
-              cardsIssued={data.cardsIssued}
               tagPk={mapping.steveOcppTagPk}
             />
 

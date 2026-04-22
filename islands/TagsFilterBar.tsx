@@ -11,8 +11,8 @@
  *     second pass.
  *
  * The server should only render this island when the URL already carries
- * filter params (`?q=…`, `?linked=…`, `?active=…`, `?meta=…`, `?issued=…`,
- * or `?types=…`) — otherwise leave it unmounted. The current implementation
+ * filter params (`?q=…`, `?linked=…`, `?active=…`, `?meta=…`, or `?types=…`)
+ * — otherwise leave it unmounted. The current implementation
  * renders a minimal "Filters active — clear" placeholder so operators who
  * land on a deep-linked filtered view have a visible exit.
  */
@@ -29,7 +29,6 @@ export interface TagsFilterState {
   linked: TriState;
   active: TriState;
   meta: TriState;
-  issued: TriState;
   /**
    * Serializable set of tag types selected. Server loader echoes this as
    * `Set<TagType>`; the island stores it as a plain array for JSON-friendly
@@ -43,7 +42,6 @@ export interface TagsFilterStateSerialized {
   linked: TriState;
   active: TriState;
   meta: TriState;
-  issued: TriState;
   types: TagType[];
 }
 
@@ -61,7 +59,7 @@ interface Props {
 /**
  * Minimal scaffold implementation. Future iterations will add:
  *   - A debounced `<input>` bound to `state.q` writing back to the URL.
- *   - `ToggleGroup`-driven tri-state controls for linked/active/meta/issued.
+ *   - `ToggleGroup`-driven tri-state controls for linked/active/meta.
  *   - A multi-select popover for `types`.
  * For now we just render the "clear filters" escape hatch.
  */
@@ -94,7 +92,6 @@ function hasActiveFilter(s: TagsFilterStateSerialized): boolean {
     s.linked !== "any" ||
     s.active !== "any" ||
     s.meta !== "any" ||
-    s.issued !== "any" ||
     s.types.length > 0
   );
 }
