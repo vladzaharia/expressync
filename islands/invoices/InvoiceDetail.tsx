@@ -20,6 +20,7 @@ import {
   formatMoney,
   type InvoiceUiStatus,
 } from "@/src/lib/invoice-ui.ts";
+import { sseConnected, subscribeSse } from "@/islands/shared/SseProvider.tsx";
 
 interface InvoiceDetailState {
   id: string;
@@ -66,35 +67,104 @@ export default function InvoiceDetail(
   const showVoidDialog = useSignal(false);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Poll `/refresh` while pending.
+  // Dual-mode refresh while pending: SSE with polling fallback.
+  //
+  // Phase P7 layers `invoice.updated` events from the shared SseProvider on
+  // top of the original 5s /refresh poll. If SSE is connected within 2s of
+  // entering "pending", we stop the poll loop and rely on server-pushed
+  // events. If SSE disconnects and stays down for 10s, we resume polling so
+  // the page still recovers on hostile networks. `AbortController` on the
+  // poll fallback is preserved for clean unmount.
   useEffect(() => {
     if (state.value.uiStatus !== "pending") return;
+
     const ac = new AbortController();
     const started = Date.now();
+    let pollingActive = false;
+    let pollResumeTimer: number | null = null;
+    let pollStopTimer: number | null = null;
 
-    (async () => {
-      while (!ac.signal.aborted && Date.now() - started < 60_000) {
-        await new Promise((r) => setTimeout(r, 5_000));
-        if (ac.signal.aborted) return;
-        try {
-          const res = await fetch(
-            `/api/invoice/${encodeURIComponent(state.value.id)}/refresh`,
-            { method: "POST", signal: ac.signal },
-          );
-          if (!res.ok) continue;
-          const next = await res.json().catch(() => null);
-          if (!next) continue;
-          applyServerUpdate(next);
-          if (state.value.uiStatus !== "pending") return;
-        } catch (err) {
-          if ((err as Error).name !== "AbortError") {
-            console.error("InvoiceDetail refresh poll failed", err);
+    const stopPolling = () => {
+      pollingActive = false;
+      ac.abort();
+    };
+
+    const runPollLoop = () => {
+      if (pollingActive) return;
+      pollingActive = true;
+      (async () => {
+        while (
+          pollingActive &&
+          !ac.signal.aborted &&
+          Date.now() - started < 60_000
+        ) {
+          await new Promise((r) => setTimeout(r, 5_000));
+          if (!pollingActive || ac.signal.aborted) return;
+          try {
+            const res = await fetch(
+              `/api/invoice/${encodeURIComponent(state.value.id)}/refresh`,
+              { method: "POST", signal: ac.signal },
+            );
+            if (!res.ok) continue;
+            const next = await res.json().catch(() => null);
+            if (!next) continue;
+            applyServerUpdate(next);
+            if (state.value.uiStatus !== "pending") return;
+          } catch (err) {
+            if ((err as Error).name !== "AbortError") {
+              console.error("InvoiceDetail refresh poll failed", err);
+            }
           }
         }
-      }
-    })();
+      })();
+    };
 
-    return () => ac.abort();
+    // Start polling by default; SSE will cancel it on first connect.
+    runPollLoop();
+
+    pollStopTimer = globalThis.setTimeout(() => {
+      if (sseConnected.value) stopPolling();
+    }, 2_000);
+
+    const unsubConn = sseConnected.subscribe((connected) => {
+      if (connected) {
+        if (pollResumeTimer !== null) {
+          globalThis.clearTimeout(pollResumeTimer);
+          pollResumeTimer = null;
+        }
+        stopPolling();
+      } else if (pollResumeTimer === null) {
+        pollResumeTimer = globalThis.setTimeout(() => {
+          pollResumeTimer = null;
+          runPollLoop();
+        }, 10_000);
+      }
+    });
+
+    // SSE event: invoice.updated filtered by id — refetch once.
+    const unsubUpdate = subscribeSse("invoice.updated", async (p) => {
+      const pid = (p as { invoiceId?: string })?.invoiceId;
+      if (pid !== state.value.id) return;
+      try {
+        const res = await fetch(
+          `/api/invoice/${encodeURIComponent(state.value.id)}/refresh`,
+          { method: "POST" },
+        );
+        if (!res.ok) return;
+        const next = await res.json().catch(() => null);
+        if (next) applyServerUpdate(next);
+      } catch (err) {
+        console.error("InvoiceDetail SSE-triggered refresh failed", err);
+      }
+    });
+
+    return () => {
+      stopPolling();
+      if (pollStopTimer !== null) globalThis.clearTimeout(pollStopTimer);
+      if (pollResumeTimer !== null) globalThis.clearTimeout(pollResumeTimer);
+      unsubConn();
+      unsubUpdate();
+    };
   }, [state.value.uiStatus, state.value.id]);
 
   const applyServerUpdate = (payload: Partial<InvoiceDetailState>) => {
