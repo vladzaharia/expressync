@@ -144,7 +144,9 @@ export default define.page<typeof handler>(
         accentColor="orange"
       >
         <PageCard title="Chargers" colorScheme="orange">
-          <ChargersStatStrip totals={data.totals} />
+          <div class="mb-6">
+            <ChargersStatStrip totals={data.totals} />
+          </div>
 
           {data.errored
             ? (
