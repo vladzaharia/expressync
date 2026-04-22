@@ -16,8 +16,25 @@
  */
 
 import { renderToString } from "preact-render-to-string";
-import juice from "juice";
 import type { ComponentChildren, JSX } from "preact";
+
+// Lazy import: juice + its CJS deps (cheerio → encoding-sniffer → iconv-lite,
+// mensch) don't survive Rollup's ESM bundling for Fresh's SSR build. Loading
+// it via runtime-computed specifier defeats Rollup's static analysis so the
+// bundler never tries to crawl into juice's CJS graph.
+let _juice: ((html: string, opts?: Record<string, unknown>) => string) | null =
+  null;
+async function getJuice() {
+  if (_juice) return _juice;
+  // Construct the module specifier at runtime so Rollup can't see "juice".
+  const moduleId = ["jui", "ce"].join("");
+  const mod = await import(/* @vite-ignore */ moduleId);
+  _juice = (mod.default ?? mod) as (
+    html: string,
+    opts?: Record<string, unknown>,
+  ) => string;
+  return _juice;
+}
 
 import {
   ALLOWED_URL_PREFIXES,
@@ -674,7 +691,9 @@ function buildText(spec: EmailTemplate, brand: BrandAssets): string {
 
 // ---- Entry point ----------------------------------------------------------
 
-export function renderTemplate(spec: EmailTemplate): RenderedEmail {
+export async function renderTemplate(
+  spec: EmailTemplate,
+): Promise<RenderedEmail> {
   validateSpec(spec);
   const brand = BRAND_ASSETS[spec.brand];
 
@@ -695,8 +714,10 @@ export function renderTemplate(spec: EmailTemplate): RenderedEmail {
 
   // 4. Inline the styles. juice converts the <style> block into inline
   //    `style=""` attributes on matching elements while preserving @-rules.
+  //    Lazy-loaded — see top of file for why.
   let html: string;
   try {
+    const juice = await getJuice();
     html = juice(rawHtml, {
       preserveImportant: true,
       preserveMediaQueries: true,

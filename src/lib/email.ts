@@ -221,7 +221,7 @@ export async function sendCustomerMagicLink(
   url: string,
 ): Promise<void> {
   const inputs: MagicLinkInputs = { to: email, url };
-  const rendered = renderTemplate(buildMagicLinkEmail(inputs));
+  const rendered = await renderTemplate(buildMagicLinkEmail(inputs));
   await sendEmail(payloadFromRendered(rendered, email));
 }
 
@@ -231,7 +231,7 @@ export async function sendSessionSummary(
   email: string,
   session: SessionSummaryData,
 ): Promise<void> {
-  const rendered = renderTemplate(
+  const rendered = await renderTemplate(
     buildSessionSummaryEmail({ to: email, session }),
   );
   await sendEmail(payloadFromRendered(rendered, email));
@@ -243,7 +243,7 @@ export async function sendReservationCancelled(
   reservation: ReservationData,
   reason?: string,
 ): Promise<void> {
-  const rendered = renderTemplate(
+  const rendered = await renderTemplate(
     buildReservationCancelledEmail({ to: email, reservation, reason }),
   );
   await sendEmail(payloadFromRendered(rendered, email));
@@ -254,7 +254,7 @@ export async function sendAdminPasswordReset(
   email: string,
   url: string,
 ): Promise<void> {
-  const rendered = renderTemplate(
+  const rendered = await renderTemplate(
     buildAdminPasswordResetEmail({ to: email, url }),
   );
   await sendEmail(payloadFromRendered(rendered, email));
