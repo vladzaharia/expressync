@@ -185,7 +185,7 @@ export default define.page<typeof handler>(
               description="Switch tabs to inspect logs from each segment"
               icon={Receipt}
               accent="blue"
-              contentClassName="pt-0"
+              contentClassName="p-0"
             >
               <SyncSegmentTabs
                 run={run}
