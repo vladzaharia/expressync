@@ -14,7 +14,6 @@
  *     palette's Recent LRU, so renaming a title never invalidates recents.
  */
 
-import type { ComponentType } from "preact";
 import {
   BatteryCharging,
   Bell,
@@ -22,6 +21,7 @@ import {
   FileText,
   LayoutDashboard,
   Link2,
+  type LucideIcon,
   Receipt,
   RefreshCw,
   Tag,
@@ -38,7 +38,7 @@ export interface NavItem {
   id: string;
   title: string;
   path: string;
-  icon: ComponentType<{ class?: string; className?: string }>;
+  icon: LucideIcon;
   accentColor: NavAccent;
   keywords?: string[];
   adminOnly?: boolean;
