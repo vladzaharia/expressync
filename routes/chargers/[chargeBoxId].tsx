@@ -47,7 +47,7 @@ import ChargerRecentTransactionsSection, {
 import ChargerOperationLogTable, {
   type OperationLogRow,
 } from "../../islands/ChargerOperationLogTable.tsx";
-import RemoteActionsPanel from "../../islands/RemoteActionsPanel.tsx";
+import RemoteActionsPanel from "../../islands/charger-actions/RemoteActionsPanel.tsx";
 
 // ---------------------------------------------------------------------------
 // Loader DTO
