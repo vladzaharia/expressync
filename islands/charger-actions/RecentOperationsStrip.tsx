@@ -2,7 +2,7 @@
  * RecentOperationsStrip — horizontal-scroll strip of the last ~5 operations
  * for this charger.
  *
- * Polls `GET /api/charger/operation?chargeBoxId=...&limit=5` every 5s. Each
+ * Polls `GET /api/admin/charger/operation?chargeBoxId=...&limit=5` every 5s. Each
  * chip surfaces op name + status pill + relative timestamp; clicking a chip
  * opens a small detail popover (rendered inline with `<details>` for
  * simplicity). The `bump` prop is incremented by the parent whenever a new
@@ -86,7 +86,7 @@ export default function RecentOperationsStrip({ chargeBoxId, bump }: Props) {
     async function load() {
       try {
         const res = await fetch(
-          `/api/charger/operation?chargeBoxId=${
+          `/api/admin/charger/operation?chargeBoxId=${
             encodeURIComponent(chargeBoxId)
           }&limit=5`,
         );

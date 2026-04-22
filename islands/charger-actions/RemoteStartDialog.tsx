@@ -5,7 +5,7 @@
  *   - `idTag` is picked via `TagPickerCombobox` (no freeform text).
  *   - `connectorId` is hidden; the submit payload injects `1` per the
  *     single-connector deployment convention (see `types.ts`).
- *   - On open, we fetch `/api/charger/{chargeBoxId}/recent-tag` and
+ *   - On open, we fetch `/api/admin/charger/{chargeBoxId}/recent-tag` and
  *     pre-select the returned idTag when present.
  */
 
@@ -40,7 +40,7 @@ export default function RemoteStartDialog(props: PerDialogProps) {
     (async () => {
       try {
         const res = await fetch(
-          `/api/charger/${encodeURIComponent(chargeBoxId)}/recent-tag`,
+          `/api/admin/charger/${encodeURIComponent(chargeBoxId)}/recent-tag`,
         );
         if (!res.ok) return;
         const json = await res.json();
