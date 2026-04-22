@@ -8,8 +8,7 @@
 import { define } from "../../../utils.ts";
 import { SidebarLayout } from "../../../components/SidebarLayout.tsx";
 import { PageCard } from "../../../components/PageCard.tsx";
-import { ArrowLeft } from "lucide-preact";
-import { CHROME_SIZE } from "../../../components/AppSidebar.tsx";
+import { BackAction } from "../../../components/shared/BackAction.tsx";
 import { getProfile } from "../../../src/services/charging-profile.service.ts";
 import ProfileEditor from "../../../islands/charging-profile/ProfileEditor.tsx";
 
@@ -22,19 +21,6 @@ export const handler = define.handlers({
   },
 });
 
-function BackAction() {
-  return (
-    <a
-      href="/links"
-      className="flex items-center justify-center gap-2 px-4 transition-colors"
-      style={{ height: CHROME_SIZE }}
-    >
-      <ArrowLeft className="size-5" />
-      <span className="text-sm font-medium">Back</span>
-    </a>
-  );
-}
-
 export default define.page<typeof handler>(
   function ChargingProfilePage({ data, url, state }) {
     return (
@@ -42,7 +28,7 @@ export default define.page<typeof handler>(
         currentPath={url.pathname}
         user={state.user}
         accentColor="emerald"
-        actions={<BackAction />}
+        actions={<BackAction href="/links" />}
       >
         <PageCard
           title="Charging Profile"
