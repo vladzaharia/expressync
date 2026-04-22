@@ -226,22 +226,6 @@ function LinkedBody(
 
   return (
     <div class="space-y-4">
-      {/* Narrative hero: one sentence describing the placement. */}
-      <p class="text-sm leading-relaxed">
-        Billed to <strong class="text-foreground">{customerName}</strong>
-        {planLabel
-          ? (
-            <>
-              {" "}on plan <strong class="text-foreground">{planLabel}</strong>
-            </>
-          )
-          : (
-            <span class="text-muted-foreground">
-              {" "}· no active subscription
-            </span>
-          )}.
-      </p>
-
       {/* Customer + subscription detail rows */}
       <dl class="grid gap-3 text-sm sm:grid-cols-2">
         <div class="space-y-0.5">
