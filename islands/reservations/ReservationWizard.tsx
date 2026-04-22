@@ -17,7 +17,6 @@ import {
   ArrowLeft,
   ArrowRight,
   BatteryCharging,
-  CalendarClock,
   Check,
   Loader2,
   Tag as TagIcon,
@@ -27,6 +26,10 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { ConflictWarning } from "@/components/reservations/ConflictWarning.tsx";
 import { TimeRangePill } from "@/components/reservations/TimeRangePill.tsx";
+import {
+  DateTimeRangePicker,
+  type PickerConflict,
+} from "@/components/reservations/DateTimeRangePicker.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 import type { ReservationStatus } from "@/src/db/schema.ts";
 
@@ -399,15 +402,19 @@ export default function ReservationWizard(
 
       {step === 3 && selectedCharger && (
         <StepWindow
-          startLocal={startLocal}
-          onStartChange={setStartLocal}
-          duration={duration}
-          onDurationChange={setDuration}
+          startAtDate={startAtDate}
+          endAtDate={endAtDate}
+          onRangeChange={(startAt, endAt) => {
+            setStartLocal(isoAt(startAt));
+            const newDuration = Math.max(
+              15,
+              Math.round((endAt.getTime() - startAt.getTime()) / 60_000),
+            );
+            setDuration(newDuration);
+          }}
           checking={checkingConflicts}
           conflicts={conflicts}
           onPickSuggestion={onPickSuggestion}
-          startAtDate={startAtDate}
-          endAtDate={endAtDate}
           tz={displayTz ?? null}
         />
       )}
@@ -629,91 +636,44 @@ function StepTag(
 
 function StepWindow(
   {
-    startLocal,
-    onStartChange,
-    duration,
-    onDurationChange,
+    startAtDate,
+    endAtDate,
+    onRangeChange,
     checking,
     conflicts,
     onPickSuggestion,
-    startAtDate,
-    endAtDate,
     tz,
   }: {
-    startLocal: string;
-    onStartChange: (v: string) => void;
-    duration: number;
-    onDurationChange: (v: number) => void;
+    startAtDate: Date | null;
+    endAtDate: Date | null;
+    onRangeChange: (startAt: Date, endAt: Date) => void;
     checking: boolean;
     conflicts: WizardConflict[];
     onPickSuggestion: (iso: string) => void;
-    startAtDate: Date | null;
-    endAtDate: Date | null;
     tz: string | null;
   },
 ) {
+  const pickerConflicts: PickerConflict[] = conflicts.map((c) => ({
+    id: c.id,
+    startAtIso: c.startAtIso,
+    endAtIso: c.endAtIso,
+  }));
+  const value = startAtDate && endAtDate
+    ? { startAt: startAtDate, endAt: endAtDate }
+    : null;
   return (
     <div class="flex flex-col gap-4">
-      <div class="grid gap-4 sm:grid-cols-2">
-        <div class="flex flex-col gap-2">
-          <Label htmlFor="reservation-start">Start</Label>
-          <Input
-            id="reservation-start"
-            type="datetime-local"
-            value={startLocal}
-            onInput={(e) => onStartChange((e.target as HTMLInputElement).value)}
-          />
-        </div>
-        <div class="flex flex-col gap-2">
-          <Label htmlFor="reservation-duration">Duration (minutes)</Label>
-          <Input
-            id="reservation-duration"
-            type="number"
-            min={15}
-            step={15}
-            value={duration}
-            onInput={(e) => {
-              const v = parseInt(
-                (e.target as HTMLInputElement).value || "0",
-                10,
-              );
-              onDurationChange(Number.isFinite(v) && v > 0 ? v : 15);
-            }}
-          />
-          <div class="flex flex-wrap gap-1.5 text-xs">
-            {[30, 60, 90, 120, 240].map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => onDurationChange(m)}
-                class={cn(
-                  "rounded-full border px-2 py-0.5 transition-colors hover:border-indigo-500/50",
-                  duration === m && "border-indigo-500 bg-indigo-500/10",
-                )}
-              >
-                {m}m
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {startAtDate && endAtDate && (
-        <div class="flex items-center gap-2 text-sm text-muted-foreground">
-          <CalendarClock class="size-4" />
-          <TimeRangePill
-            startAtIso={startAtDate.toISOString()}
-            endAtIso={endAtDate.toISOString()}
-            tz={tz ?? undefined}
-          />
-        </div>
-      )}
-
-      {checking && (
-        <div class="flex items-center gap-2 text-xs text-muted-foreground">
-          <Loader2 class="size-3.5 animate-spin" /> Checking for conflicts…
-        </div>
-      )}
+      <DateTimeRangePicker
+        value={value}
+        onChange={(next) => onRangeChange(next.startAt, next.endAt)}
+        tz={tz ?? undefined}
+        minuteStep={15}
+        conflicts={pickerConflicts}
+        loadingConflicts={checking}
+        variant="inline"
+        minDate={new Date()}
+        idPrefix="wizard"
+      />
       <ConflictWarning
         conflicts={conflicts}
         tz={tz ?? undefined}
