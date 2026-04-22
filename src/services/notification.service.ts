@@ -24,6 +24,7 @@ import {
 } from "../db/schema.ts";
 import { config } from "../lib/config.ts";
 import { logger } from "../lib/utils/logger.ts";
+import { eventBus } from "./event-bus.service.ts";
 
 const log = logger.child("NotificationService");
 
@@ -184,7 +185,31 @@ export async function createNotification(
       })
       .returning();
 
-    return toDTO(inserted);
+    const dto = toDTO(inserted);
+    // Phase P7: fan-out to SSE subscribers. Non-fatal if there are no
+    // subscribers; the buffered replay keeps a 60s grace window.
+    try {
+      eventBus.publish({
+        type: "notification.created",
+        payload: {
+          id: dto.id,
+          kind: dto.kind,
+          severity: dto.severity,
+          title: dto.title,
+          body: dto.body,
+          sourceType: dto.sourceType,
+          sourceId: dto.sourceId,
+          sourceUrl: dto.sourceUrl,
+          adminUserId: dto.adminUserId,
+          createdAt: dto.createdAt,
+        },
+      });
+    } catch (pubErr) {
+      log.warn("eventBus.publish(notification.created) failed", {
+        error: pubErr instanceof Error ? pubErr.message : String(pubErr),
+      });
+    }
+    return dto;
   } catch (err) {
     log.error("Failed to insert notification", {
       kind: input.kind,
@@ -214,6 +239,12 @@ export async function markRead(id: number, userId: string): Promise<boolean> {
       ),
     )
     .returning({ id: notifications.id });
+  if (res.length > 0) {
+    eventBus.publish({
+      type: "notification.read",
+      payload: { id, adminUserId: userId, count: 1 },
+    });
+  }
   return res.length > 0;
 }
 
@@ -235,6 +266,12 @@ export async function markAllRead(userId: string): Promise<number> {
       ),
     )
     .returning({ id: notifications.id });
+  if (res.length > 0) {
+    eventBus.publish({
+      type: "notification.read",
+      payload: { id: null, adminUserId: userId, count: res.length },
+    });
+  }
   return res.length;
 }
 
