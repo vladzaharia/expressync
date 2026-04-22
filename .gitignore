@@ -20,3 +20,6 @@ docker-compose.postgres.env
 
 # Claude Code agent worktrees (scratch)
 .claude/worktrees/
+
+# Email preview output (scripts/preview-email.ts)
+_email-preview.html
