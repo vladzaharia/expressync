@@ -11,6 +11,7 @@ import {
 } from "../../../src/lib/types/steve.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
 import { recordChargerStatus } from "../../../src/services/charger-cache.service.ts";
+import { eventBus } from "../../../src/services/event-bus.service.ts";
 
 /**
  * Map from allowed operation name to the corresponding `steveClient.operations`
@@ -205,6 +206,21 @@ export const handler = define.handlers({
               ? cacheErr.message
               : String(cacheErr),
           });
+        }
+        // Phase P7: publish charger.state so live-status consumers can react
+        // immediately. Placeholder status mirrors what the cache stores until
+        // the async StatusNotification lands.
+        try {
+          eventBus.publish({
+            type: "charger.state",
+            payload: {
+              chargeBoxId,
+              status: "Available",
+              updatedAt: new Date().toISOString(),
+            },
+          });
+        } catch (_pubErr) {
+          // Non-fatal; cache upsert already succeeded.
         }
       }
 

@@ -30,6 +30,7 @@ import {
   type NotificationRowItem,
 } from "@/components/notifications/NotificationRow.tsx";
 import { toast } from "sonner";
+import { sseConnected, subscribeSse } from "@/islands/shared/SseProvider.tsx";
 
 const CHROME_SIZE = "3.5rem";
 const POLL_INTERVAL_MS = 30_000;
@@ -60,9 +61,20 @@ export default function NotificationBell({
     return String(n);
   });
 
-  // ---- Poll unread count -------------------------------------------------
+  // ---- Dual-mode count sync: SSE with polling fallback -------------------
+  // Phase P7: `SseProvider` mounts in `_app.tsx` and streams
+  // `notification.created` / `notification.read` events for the signed-in
+  // admin. We layer SSE on top of the existing 30s poll:
+  //   - If SSE connects within 2s, we stop the interval.
+  //   - If SSE goes down for more than 10s, we resume polling.
+  // This preserves correct behaviour on hosts where SSE is blocked
+  // (ENABLE_SSE=false, hostile proxies, etc.) while eliminating poll traffic
+  // when the stream is healthy.
   useEffect(() => {
     let cancelled = false;
+    let intervalId: number | null = null;
+    let pollStopTimer: number | null = null;
+    let pollResumeTimer: number | null = null;
 
     const fetchCount = async () => {
       try {
@@ -79,8 +91,56 @@ export default function NotificationBell({
       }
     };
 
+    const startPolling = () => {
+      if (intervalId !== null || cancelled) return;
+      intervalId = globalThis.setInterval(fetchCount, POLL_INTERVAL_MS);
+    };
+    const stopPolling = () => {
+      if (intervalId !== null) {
+        globalThis.clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    // Always kick off a fresh count and start polling by default.
     fetchCount();
-    const intervalId = globalThis.setInterval(fetchCount, POLL_INTERVAL_MS);
+    startPolling();
+
+    // If SSE is connected within 2s of mount, drop the polling loop.
+    pollStopTimer = globalThis.setTimeout(() => {
+      if (sseConnected.value) stopPolling();
+    }, 2_000);
+
+    // Watch the connected signal: on disconnect, wait 10s before resuming;
+    // on reconnect cancel the pending resume + stop polling again.
+    const unsubConn = sseConnected.subscribe((connected) => {
+      if (cancelled) return;
+      if (connected) {
+        if (pollResumeTimer !== null) {
+          globalThis.clearTimeout(pollResumeTimer);
+          pollResumeTimer = null;
+        }
+        stopPolling();
+        // Reconcile once on (re)connect so the badge matches server truth.
+        fetchCount();
+      } else {
+        if (pollResumeTimer !== null) return;
+        pollResumeTimer = globalThis.setTimeout(() => {
+          pollResumeTimer = null;
+          startPolling();
+        }, 10_000);
+      }
+    });
+
+    // Wire SSE event handlers.
+    const unsubCreated = subscribeSse("notification.created", (_p) => {
+      unreadCount.value += 1;
+      if (dropdownOpen.value) loadList();
+    });
+    const unsubRead = subscribeSse("notification.read", (p) => {
+      const n = Number((p as { count?: number })?.count ?? 1);
+      unreadCount.value = Math.max(0, unreadCount.value - n);
+    });
 
     const onVisibility = () => {
       if (document.visibilityState === "visible") fetchCount();
@@ -89,7 +149,12 @@ export default function NotificationBell({
 
     return () => {
       cancelled = true;
-      globalThis.clearInterval(intervalId);
+      stopPolling();
+      if (pollStopTimer !== null) globalThis.clearTimeout(pollStopTimer);
+      if (pollResumeTimer !== null) globalThis.clearTimeout(pollResumeTimer);
+      unsubConn();
+      unsubCreated();
+      unsubRead();
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);

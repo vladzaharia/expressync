@@ -78,6 +78,12 @@ export const config = {
   // BetterAuth
   AUTH_SECRET: Deno.env.get("AUTH_SECRET")!,
   AUTH_URL: Deno.env.get("AUTH_URL") || "http://localhost:8000",
+
+  // Phase P7: SSE backbone. Defaults to enabled; set to "false" to force all
+  // SSE endpoints to return 503 so client islands fall back to polling. Useful
+  // behind proxies or on constrained networks where long-lived connections
+  // aren't viable.
+  ENABLE_SSE: Deno.env.get("ENABLE_SSE") !== "false",
 } as const;
 
 /**

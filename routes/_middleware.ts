@@ -23,6 +23,7 @@ const ADMIN_ONLY_PATHS = [
   "/api/user",
   "/api/charger",
   "/api/invoice",
+  "/api/stream",
   "/api/usage",
   "/api/transaction",
   "/links",
