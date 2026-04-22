@@ -39,6 +39,7 @@ import {
   type CreateNotificationInput,
   type NotificationSourceType,
 } from "./notification.service.ts";
+import { eventBus } from "./event-bus.service.ts";
 
 const log = logger.child("LagoWebhookHandler");
 
@@ -467,6 +468,38 @@ function reactTo(payload: LagoWebhook, rowId: number): boolean {
     sourceType: "webhook_event",
     sourceId: String(rowId),
   };
+
+  // Phase P7: publish `invoice.updated` for every invoice.* webhook so the
+  // InvoiceDetail island can refresh in near-real-time. The payload carries
+  // enough state for the client to decide whether to refetch. This runs in
+  // addition to (not instead of) the notification path below.
+  if (payload.webhook_type.startsWith("invoice.")) {
+    const inv = (payload as { invoice?: Record<string, unknown> }).invoice;
+    if (inv && typeof inv.lago_id === "string") {
+      try {
+        eventBus.publish({
+          type: "invoice.updated",
+          payload: {
+            invoiceId: inv.lago_id as string,
+            status: typeof inv.status === "string"
+              ? (inv.status as string)
+              : undefined,
+            paymentStatus: typeof inv.payment_status === "string"
+              ? (inv.payment_status as string)
+              : undefined,
+            paymentOverdue: typeof inv.payment_overdue === "boolean"
+              ? (inv.payment_overdue as boolean)
+              : undefined,
+            webhookType: payload.webhook_type,
+          },
+        });
+      } catch (err) {
+        log.warn("eventBus.publish(invoice.updated) failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+  }
 
   switch (payload.webhook_type) {
     case "alert.triggered": {

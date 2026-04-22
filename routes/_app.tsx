@@ -4,6 +4,7 @@
 import { define } from "../utils.ts";
 import { Toaster } from "sonner";
 import CommandPalette from "../islands/CommandPalette.tsx";
+import SseProvider from "../islands/shared/SseProvider.tsx";
 
 export default define.page(function App({ Component }) {
   return (
@@ -34,6 +35,7 @@ export default define.page(function App({ Component }) {
         <Component />
         <Toaster richColors position="bottom-right" />
         <CommandPalette />
+        <SseProvider />
       </body>
     </html>
   );

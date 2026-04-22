@@ -28,6 +28,7 @@ import { logger } from "../lib/utils/logger.ts";
 import { buildMappingLookupWithInheritance } from "./mapping-resolver.ts";
 import { syncTagStatus } from "./tag-sync.service.ts";
 import { SyncLogger } from "./sync-logger.ts";
+import { eventBus } from "./event-bus.service.ts";
 import { config } from "../lib/config.ts";
 import { refreshChargerCache } from "./charger-cache.service.ts";
 // Phase P5: charging profile apply-on-tx-start hook
@@ -492,6 +493,41 @@ export async function runSync(): Promise<SyncResult> {
       eventsCreated,
       errorCount: errors.length,
     });
+
+    // Phase P7: announce completion on the event bus so dashboards / sync
+    // index pages can refresh without polling.
+    try {
+      eventBus.publish({
+        type: "sync.completed",
+        payload: {
+          syncRunId: syncRun.id,
+          transactionsProcessed,
+          eventsCreated,
+          errorCount: errors.length,
+        },
+      });
+      // Stub `transaction.meter` per newly-processed transaction so the
+      // Phase-L charger live view has something to hydrate against before
+      // real OCPP meter-values pipeline lands.
+      for (const pt of successfullySentTransactions) {
+        const txId = (pt as unknown as { steveTransactionId?: number | string })
+          .steveTransactionId;
+        if (typeof txId === "number" || typeof txId === "string") {
+          eventBus.publish({
+            type: "transaction.meter",
+            payload: {
+              transactionId: txId,
+              chargeBoxId:
+                (pt as unknown as { chargeBoxId?: string }).chargeBoxId ?? "",
+            },
+          });
+        }
+      }
+    } catch (pubErr) {
+      logger.warn("Sync", "eventBus.publish failed", {
+        error: pubErr instanceof Error ? pubErr.message : String(pubErr),
+      });
+    }
 
     return {
       syncRunId: syncRun.id,
