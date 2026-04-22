@@ -452,6 +452,76 @@ export async function listBySubscription(
     .limit(limit);
 }
 
+/**
+ * Bulk-cancel all future reservations owned by the given user. Used by the
+ * unlink path (`DELETE /api/admin/tag/link`) when soft-deactivating a tag
+ * leaves the customer with zero active mappings — they can no longer charge,
+ * so any reservation they hold for a future window is meaningless.
+ *
+ * Idempotent: cancelled rows are skipped on the next call.
+ *
+ * Cancellation criteria (all must hold):
+ *   - reservation belongs to a user_mapping owned by `userId`
+ *     (joined via reservations.steve_ocpp_tag_pk → user_mappings.steve_ocpp_tag_pk)
+ *   - end_at is in the future
+ *   - status is one of pending/confirmed/active (i.e. not already terminal)
+ *
+ * Returns the number of rows that transitioned to `cancelled`. Best-effort
+ * StEvE CancelReservation is intentionally NOT dispatched here: when the
+ * user's tag is being deactivated, the StEvE-side reservations are also
+ * losing their authorising tag — the next sync pass + the StEvE-side state
+ * machine will tear them down naturally.
+ */
+export async function bulkCancelFutureReservationsForUser(
+  userId: string,
+): Promise<number> {
+  if (!userId) return 0;
+
+  // Fetch all OCPP tag PKs the user owns. We can't filter by `is_active`
+  // here because the unlink workflow flips `is_active=false` for the user's
+  // mappings BEFORE calling this function — so we want to cancel whatever
+  // reservations were attached to ANY of their mapped tags.
+  const mappingRows = await db
+    .select({ steveOcppTagPk: schema.userMappings.steveOcppTagPk })
+    .from(schema.userMappings)
+    .where(eq(schema.userMappings.userId, userId));
+
+  if (mappingRows.length === 0) return 0;
+  const tagPks = mappingRows.map((r) => r.steveOcppTagPk);
+
+  const updated = await db
+    .update(schema.reservations)
+    .set({
+      status: "cancelled",
+      cancelledAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        inArray(schema.reservations.steveOcppTagPk, tagPks),
+        gte(schema.reservations.endAt, new Date()),
+        inArray(
+          schema.reservations.status,
+          ["pending", "confirmed", "active"] as ReservationStatus[],
+        ),
+      ),
+    )
+    .returning({ id: schema.reservations.id });
+
+  if (updated.length > 0) {
+    logger.info(
+      "Reservations",
+      "Bulk-cancelled future reservations on unlink",
+      {
+        userId,
+        count: updated.length,
+        reservationIds: updated.map((r) => r.id),
+      },
+    );
+  }
+  return updated.length;
+}
+
 /** Convert a DB row into the cross-domain DTO sibling surfaces consume. */
 export function toReservationRowDTO(
   r: Reservation,

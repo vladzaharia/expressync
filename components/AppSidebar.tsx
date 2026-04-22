@@ -1,4 +1,5 @@
 import * as React from "preact/compat";
+import type { ComponentType } from "preact";
 import {
   Sidebar,
   SidebarContent,
@@ -19,12 +20,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip.tsx";
 import { BorderBeam } from "./magicui/border-beam.tsx";
 import { Particles } from "./magicui/particles.tsx";
 import { ExpresSyncBrand } from "./brand/ExpresSyncBrand.tsx";
+import { PolarisExpressBrand } from "./brand/PolarisExpressBrand.tsx";
 import { type AccentColor, accentTailwindClasses } from "@/src/lib/colors.ts";
 import {
-  ADMIN_NAV_SECTIONS as NAV_SECTIONS,
-  getAllNavItems,
+  ADMIN_NAV_SECTIONS,
   isPathActive,
   type NavItem,
+  type NavSection,
 } from "@/src/lib/admin-navigation.ts";
 
 // Shared chrome size - used by both sidebar and top bar
@@ -39,9 +41,43 @@ interface UserInfo {
   role?: string | null | undefined;
 }
 
+/**
+ * Brand-component shape — mirrors both `ExpresSyncBrand` and
+ * `PolarisExpressBrand` so callers can swap surfaces without changing the
+ * sidebar's render call site.
+ */
+type BrandVariant =
+  | "logo-only"
+  | "sidebar-collapsed"
+  | "sidebar-expanded"
+  | "login"
+  | "header-mobile";
+type BrandComponent = ComponentType<
+  { variant?: BrandVariant; className?: string }
+>;
+
 interface AppSidebarProps {
   currentPath: string;
   user?: UserInfo;
+  /**
+   * Polaris Track A: nav module to render. Defaults to `ADMIN_NAV_SECTIONS`
+   * for backwards compatibility — customer pages pass
+   * `CUSTOMER_NAV_SECTIONS` from `src/lib/customer-navigation.ts`.
+   */
+  navSections?: NavSection[];
+  /**
+   * Polaris Track A: which UI surface this sidebar serves. Drives the
+   * default brand component and (eventually) the mobile shell pattern.
+   * Defaults to "admin" so existing admin pages keep their previous
+   * behavior unchanged.
+   */
+  role?: "admin" | "customer";
+  /**
+   * Polaris Track A: explicit override for the brand component. When
+   * omitted, defaults to ExpresSyncBrand for `role="admin"` and
+   * PolarisExpressBrand for `role="customer"`.
+   */
+  brandComponent?: BrandComponent;
 }
 
 // Extended accent type to include "primary" for dashboard
@@ -62,7 +98,7 @@ export const accentClasses: Record<
 };
 
 // Full-block nav link component
-function NavSection({
+function NavSectionLink({
   href,
   icon: Icon,
   title,
@@ -110,21 +146,39 @@ function NavSection({
   return content;
 }
 
-export function AppSidebar({ currentPath, user }: AppSidebarProps) {
+export function AppSidebar({
+  currentPath,
+  user,
+  navSections = ADMIN_NAV_SECTIONS,
+  role = "admin",
+  brandComponent,
+}: AppSidebarProps) {
   const { state, toggleSidebar, isMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
   const isAdmin = user?.role === "admin";
 
   const isActive = (url: string) => isPathActive(url, currentPath);
 
-  const flatNavItems: NavItem[] = getAllNavItems(isAdmin);
-  const visibleSections = NAV_SECTIONS
+  // Resolve the brand component from explicit prop, role, or fall back to
+  // ExpresSync (matches pre-Polaris default).
+  const Brand: BrandComponent = brandComponent ??
+    (role === "customer"
+      ? (PolarisExpressBrand as BrandComponent)
+      : (ExpresSyncBrand as BrandComponent));
+
+  // Filter nav sections by role — admin-only filter only applies to the
+  // admin nav; the customer nav module never sets `adminOnly`, so this
+  // works uniformly for both surfaces.
+  const visibleSections = navSections
     .filter((s) => !s.adminOnly || isAdmin)
     .map((s) => ({
       ...s,
       items: s.items.filter((i) => !i.adminOnly || isAdmin),
     }))
     .filter((s) => s.items.length > 0);
+
+  // Flat list (used by the mobile horizontal bar fallback).
+  const flatNavItems: NavItem[] = visibleSections.flatMap((s) => s.items);
 
   const handleSignOut = async () => {
     await fetch("/api/auth/sign-out", { method: "POST" });
@@ -133,7 +187,20 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
 
   const toggleTheme = useThemeToggle();
 
-  // Mobile layout - horizontal navigation bar
+  // Mobile layout
+  //
+  // For the customer surface, the mobile shell is the bottom-tab bar built
+  // in Track G1 (`components/customer/MobileBottomTabBar.tsx`). That file
+  // doesn't exist yet — the sidebar gracefully falls back to the existing
+  // horizontal-bar admin pattern below until G1 lands. Once the bottom-tab
+  // bar component is committed, swap in:
+  //
+  //   if (isMobile && role === "customer") {
+  //     return <MobileBottomTabBar ... />;
+  //   }
+  //
+  // The horizontal-bar fallback below is identical to the previous admin
+  // mobile shell so admin tests continue to pass without changes.
   if (isMobile) {
     return (
       <Sidebar
@@ -154,7 +221,7 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
             )}
             style={{ width: CHROME_SIZE, height: CHROME_SIZE }}
           >
-            <ExpresSyncBrand variant="sidebar-collapsed" />
+            <Brand variant="sidebar-collapsed" />
           </a>
 
           {/* Nav items as icons - square buttons */}
@@ -279,7 +346,7 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
   }
 
   // Desktop layout - vertical sidebar (existing code)
-  // Logo content - ExpresSync brand that morphs to sidebar toggle on hover
+  // Logo content - brand that morphs to sidebar toggle on hover
   const logoContent = (
     <button
       type="button"
@@ -302,9 +369,9 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
         ease={80}
       />
 
-      {/* Default state: ExpresSync brand */}
+      {/* Default state: brand */}
       <div className="flex items-center gap-3 transition-all duration-200 group-hover/logo:opacity-0 group-hover/logo:scale-90">
-        <ExpresSyncBrand
+        <Brand
           variant={isCollapsed ? "sidebar-collapsed" : "sidebar-expanded"}
         />
       </div>
@@ -367,7 +434,7 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
       <SidebarContent className="flex flex-col p-0 gap-0">
         {visibleSections.map((section, sIdx) => (
           <div key={section.id} className="flex flex-col">
-            {!isCollapsed && (
+            {!isCollapsed && section.title && (
               <div
                 className={cn(
                   "px-4 pt-3 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground shrink-0",
@@ -381,7 +448,7 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
               <div className="border-t" aria-hidden="true" />
             )}
             {section.items.map((item) => (
-              <NavSection
+              <NavSectionLink
                 key={item.id}
                 href={item.path}
                 icon={item.icon}

@@ -90,9 +90,16 @@ export function buildMappingLookupWithInheritance(
   allTags: StEvEOcppTag[],
 ): Map<string, UserMapping> {
   // First, create a map of direct mappings
+  // Polaris Track A: filter out soft-deactivated mappings here so children
+  // never inherit from a parent whose `is_active=false`. Without this guard,
+  // a deactivated parent tag's children would still resolve back to it via
+  // inheritance, undoing the soft-unlink.
   const directMappingsByTag = new Map(
     directMappings
-      .filter((m) => m.lagoSubscriptionExternalId || m.lagoCustomerExternalId) // Mappings with subscriptions or customer IDs
+      .filter((m) =>
+        (m.lagoSubscriptionExternalId || m.lagoCustomerExternalId) &&
+        m.isActive
+      ) // Mappings with subscriptions or customer IDs AND active
       .map((m) => [m.steveOcppIdTag, m]),
   );
 

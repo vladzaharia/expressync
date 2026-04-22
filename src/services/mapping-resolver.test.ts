@@ -95,3 +95,51 @@ Deno.test("buildMappingLookupWithInheritance - cycle protection in tag hierarchy
 
   assertEquals(lookup.size, 0);
 });
+
+Deno.test(
+  "buildMappingLookupWithInheritance - soft-deactivated mappings are excluded (regression)",
+  () => {
+    // Polaris Track A regression: a soft-unlinked parent tag must NOT cascade
+    // to its children via inheritance, otherwise the unlink is silently
+    // undone for every child.
+    const tags = [
+      makeTag("PARENT_DEACTIVATED"),
+      makeTag("CHILD_INHERITS", "PARENT_DEACTIVATED"),
+    ];
+    const mappings = [
+      makeMapping("PARENT_DEACTIVATED", { isActive: false }),
+    ];
+
+    const lookup = buildMappingLookupWithInheritance(mappings, tags);
+
+    // Neither parent nor child should appear — the parent is filtered out at
+    // the source, so inheritance has no candidate to resolve to.
+    assertEquals(lookup.has("PARENT_DEACTIVATED"), false);
+    assertEquals(lookup.has("CHILD_INHERITS"), false);
+  },
+);
+
+Deno.test(
+  "buildMappingLookupWithInheritance - active siblings still resolve when one mapping is deactivated",
+  () => {
+    // A more nuanced case: parent ACTIVE, second sibling parent DEACTIVATED.
+    // Only the active parent should drive inheritance.
+    const tags = [
+      makeTag("PARENT_ACTIVE"),
+      makeTag("PARENT_DEACTIVATED"),
+      makeTag("CHILD_OK", "PARENT_ACTIVE"),
+      makeTag("CHILD_BLOCKED", "PARENT_DEACTIVATED"),
+    ];
+    const mappings = [
+      makeMapping("PARENT_ACTIVE", { isActive: true }),
+      makeMapping("PARENT_DEACTIVATED", { isActive: false }),
+    ];
+
+    const lookup = buildMappingLookupWithInheritance(mappings, tags);
+
+    assertEquals(lookup.has("PARENT_ACTIVE"), true);
+    assertEquals(lookup.has("PARENT_DEACTIVATED"), false);
+    assertEquals(lookup.has("CHILD_OK"), true);
+    assertEquals(lookup.has("CHILD_BLOCKED"), false);
+  },
+);

@@ -15,6 +15,7 @@ import { config } from "../lib/config.ts";
 import type { StEvEOcppTag } from "../lib/types/steve.ts";
 import { db } from "../db/index.ts";
 import {
+  notifications,
   tagChangeLog,
   type TagChangeType,
   type UserMapping,
@@ -354,4 +355,121 @@ export async function syncTagStatus(
   });
 
   return result;
+}
+
+// ============================================================================
+// Single-tag inline sync (Polaris Track A — Lifecycle / "Immediate StEvE
+// propagation"). Used by the admin-tag-link route + Lago webhook handlers so
+// activation/deactivation of a card hits StEvE on the spot rather than
+// waiting up to 15 min for the next background pass.
+// ============================================================================
+
+export interface SyncSingleTagResult {
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * Push a single mapping's active/inactive status to StEvE inline.
+ *
+ * Called from every admin/web hook code-path that creates, updates, or
+ * deactivates a `user_mappings` row. The next background sync pass already
+ * reconciles drift on its own schedule (15 min default), so a transient
+ * StEvE outage here only widens the worst-case window — it does not corrupt
+ * state. The DB write that triggered this call has already committed.
+ *
+ * Failure semantics (per the plan):
+ *   - DB change persists (the caller's transaction has already committed).
+ *   - StEvE call is attempted ONCE inline.
+ *   - On failure: insert a `notifications` row with `kind='steve_sync_failed'`,
+ *     `severity='error'`, `audience='admin'`, sourceType='mapping' so the
+ *     admin can see the drift and reconcile.
+ *   - Returns `{ ok: false, error: <message> }`. NEVER throws — caller must
+ *     not roll back DB state on this signal.
+ *
+ * Note: this writes a stale-time-stamped note even on the inline path so the
+ * admin opening the StEvE-side tag editor sees the right context. The
+ * background `syncTagStatus` will overwrite this note on its next pass with
+ * fresh customer/subscription metadata.
+ */
+export async function syncSingleTagToSteve(
+  mapping: UserMapping,
+): Promise<SyncSingleTagResult> {
+  const timestamp = new Date().toISOString();
+  const note = mapping.isActive
+    // Active: succinct note; the background pass will enrich this with the
+    // full customer/subscription label on its next cycle.
+    ? `Active mapping ${mapping.id}\n---\nLast updated by Polaris ${timestamp}`
+    // Inactive: explicit deactivation note carries the timestamp + mapping
+    // id so an operator opening StEvE can correlate it back to our DB.
+    : `Deactivated by Polaris ${timestamp} (mapping ${mapping.id})\n---\nLast updated by Polaris ${timestamp}`;
+
+  // Construct the payload StEvE expects. `maxActiveTransactionCount`:
+  //   -1 → unlimited (active)
+  //    0 → blocked (deactivated)
+  // We omit `expiryDate` so StEvE retains whatever was previously set; the
+  // background pass owns the long-form expiry strategy.
+  const updatedTag: StEvEOcppTag = {
+    idTag: mapping.steveOcppIdTag,
+    ocppTagPk: mapping.steveOcppTagPk,
+    note,
+    parentIdTag: null,
+    maxActiveTransactionCount: mapping.isActive ? -1 : 0,
+  };
+
+  try {
+    await steveClient.updateOcppTag(updatedTag);
+    logger.info("TagSync", "Inline StEvE sync succeeded", {
+      mappingId: mapping.id,
+      ocppIdTag: mapping.steveOcppIdTag,
+      isActive: mapping.isActive,
+    });
+    return { ok: true };
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    logger.error("TagSync", "Inline StEvE sync failed", {
+      mappingId: mapping.id,
+      ocppIdTag: mapping.steveOcppIdTag,
+      isActive: mapping.isActive,
+      error: errMsg,
+    });
+
+    // Best-effort admin notification. Don't let notification persistence
+    // problems mask the real failure — log and swallow.
+    try {
+      await db.insert(notifications).values({
+        kind: "steve_sync_failed",
+        severity: "error",
+        title: `StEvE sync failed for tag ${mapping.steveOcppIdTag}`,
+        body: `${errMsg}. The mapping is set to ${
+          mapping.isActive ? "active" : "inactive"
+        } in our DB but StEvE was not updated. Background sync will retry.`,
+        sourceType: "mapping",
+        sourceId: String(mapping.id),
+        audience: "admin",
+        context: {
+          mappingId: mapping.id,
+          ocppIdTag: mapping.steveOcppIdTag,
+          ocppTagPk: mapping.steveOcppTagPk,
+          isActive: mapping.isActive,
+          desiredMaxActiveTransactionCount: mapping.isActive ? -1 : 0,
+          attemptedAt: timestamp,
+          error: errMsg,
+        },
+      });
+    } catch (notificationErr) {
+      logger.warn(
+        "TagSync",
+        "Failed to insert steve_sync_failed notification",
+        {
+          mappingId: mapping.id,
+          error: notificationErr instanceof Error
+            ? notificationErr.message
+            : String(notificationErr),
+        },
+      );
+    }
+
+    return { ok: false, error: errMsg };
+  }
 }
