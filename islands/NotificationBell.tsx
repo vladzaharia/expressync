@@ -6,7 +6,7 @@
  *
  * Behaviours:
  *   - Polls `GET /api/notifications/unread-count` every 30s AND on visibility
- *     change. Post-MVP: swap for SSE via `/api/notifications/stream`.
+ *     change. Post-MVP: swap for SSE via `/api/admin/notifications/stream`.
  *   - Opens a dropdown fetching `GET /api/notifications/unread?limit=5`.
  *   - Row click → `PATCH /api/notifications/{id}` with `{ action: "mark_read" }`,
  *     navigate to `sourceUrl` (or `/notifications` when null), close dropdown.
@@ -83,7 +83,7 @@ export default function NotificationBell({
 
     const fetchCount = async () => {
       try {
-        const res = await fetch("/api/notifications/unread-count", {
+        const res = await fetch("/api/admin/notifications/unread-count", {
           credentials: "same-origin",
         });
         if (!res.ok) return;
@@ -202,7 +202,7 @@ export default function NotificationBell({
     loadingList.value = true;
     try {
       const res = await fetch(
-        `/api/notifications/unread?limit=${DROPDOWN_LIMIT}`,
+        `/api/admin/notifications/unread?limit=${DROPDOWN_LIMIT}`,
         { credentials: "same-origin" },
       );
       if (res.ok) {
@@ -230,7 +230,7 @@ export default function NotificationBell({
     items.value = items.value.filter((x) => x.id !== n.id);
 
     try {
-      await fetch(`/api/notifications/${n.id}`, {
+      await fetch(`/api/admin/notifications/${n.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "mark_read" }),
@@ -251,7 +251,7 @@ export default function NotificationBell({
 
   const handleMarkAllRead = async () => {
     try {
-      const res = await fetch("/api/notifications/mark-all-read", {
+      const res = await fetch("/api/admin/notifications/mark-all-read", {
         method: "POST",
         credentials: "same-origin",
       });

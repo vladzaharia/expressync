@@ -16,7 +16,7 @@ interface Props {
 /**
  * Admin-only dropdown to change a charger's `form_factor`.
  *
- * PATCHes `/api/charger/{chargeBoxId}` with `{ formFactor }`. On success,
+ * PATCHes `/api/admin/charger/{chargeBoxId}` with `{ formFactor }`. On success,
  * reloads the page so the detail SVG/icons re-render from the fresh server
  * state (keeps the island tiny; no need to mirror the form-factor icon map
  * over the network).
@@ -34,7 +34,7 @@ export default function ChargerFormFactorSelect(
     setError(null);
     try {
       const res = await fetch(
-        `/api/charger/${encodeURIComponent(chargeBoxId)}`,
+        `/api/admin/charger/${encodeURIComponent(chargeBoxId)}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },

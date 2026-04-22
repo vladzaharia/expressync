@@ -26,7 +26,12 @@ import { runSync, type SyncResult } from "./src/services/sync.service.ts";
 import { SyncScheduler } from "./src/services/sync-scheduler.ts";
 import { ensureLagoMetricSafety } from "./src/services/lago-safety.service.ts";
 import { db } from "./src/db/index.ts";
-import { rateLimits } from "./src/db/schema.ts";
+import {
+  authAudit,
+  magicLinkAudit,
+  rateLimits,
+  verifications,
+} from "./src/db/schema.ts";
 
 // Validate configuration on startup
 console.log("[Sync Worker] Starting OCPP Billing Sync Worker...");
@@ -136,13 +141,20 @@ async function handleSync(): Promise<SyncResult | void> {
   return result;
 }
 
-// Phase A7a: Rate-limit cleanup cron — runs every 2 minutes and deletes
-// `rate_limits` rows older than 120 seconds. Because RATE_LIMIT_WINDOW_MS is
-// 60s, anything older than that is guaranteed-stale and safe to prune.
+// Phase A7a + Polaris Track A: cleanup cron — runs every 2 minutes and prunes:
+//   - `rate_limits`        rows older than 120s (RATE_LIMIT_WINDOW_MS = 60s)
+//   - `verifications`      expired scan-pair entries past their expiresAt
+//   - `auth_audit`         rows older than 90 days (forensic retention window)
+//   - `magic_link_audit`   rows older than 30 days (token already expired in 15m)
+//
+// Each prune runs independently so a failure in one doesn't drop the others.
+// The same Cron job ticks every 2 min; the audit prunes are cheap (indexed
+// on created_at DESC) and idempotent.
 const rateLimitCleanupJob = new Cron(
   "*/2 * * * *",
   { protect: true, timezone: "UTC" },
   async () => {
+    // 1. Rate limits — frequent, narrow window.
     try {
       const result = await db
         .delete(rateLimits)
@@ -155,10 +167,57 @@ const rateLimitCleanupJob = new Cron(
     } catch (err) {
       console.error("[Sync Worker] rate_limits cleanup failed:", err);
     }
+
+    // 2. Verifications — purge expired scan-pair rows + Better-Auth's own
+    // verification entries past their TTL. The `expiresAt` column is set by
+    // both flows; deleting on it is safe and self-correcting.
+    try {
+      const result = await db
+        .delete(verifications)
+        .where(sql`expires_at < now()`);
+      const removed = (result as unknown as { count?: number })?.count;
+      if (removed && removed > 0) {
+        console.log(
+          `[Sync Worker] verifications cleanup ok; rows removed: ${removed}`,
+        );
+      }
+    } catch (err) {
+      console.error("[Sync Worker] verifications cleanup failed:", err);
+    }
+
+    // 3. auth_audit — 90-day retention.
+    try {
+      const result = await db
+        .delete(authAudit)
+        .where(sql`created_at < now() - interval '90 days'`);
+      const removed = (result as unknown as { count?: number })?.count;
+      if (removed && removed > 0) {
+        console.log(
+          `[Sync Worker] auth_audit cleanup ok; rows removed: ${removed}`,
+        );
+      }
+    } catch (err) {
+      console.error("[Sync Worker] auth_audit cleanup failed:", err);
+    }
+
+    // 4. magic_link_audit — 30-day retention.
+    try {
+      const result = await db
+        .delete(magicLinkAudit)
+        .where(sql`requested_at < now() - interval '30 days'`);
+      const removed = (result as unknown as { count?: number })?.count;
+      if (removed && removed > 0) {
+        console.log(
+          `[Sync Worker] magic_link_audit cleanup ok; rows removed: ${removed}`,
+        );
+      }
+    } catch (err) {
+      console.error("[Sync Worker] magic_link_audit cleanup failed:", err);
+    }
   },
 );
 console.log(
-  `[Sync Worker] Rate-limit cleanup cron scheduled; next run: ${
+  `[Sync Worker] Rate-limit + audit cleanup cron scheduled; next run: ${
     rateLimitCleanupJob.nextRun()?.toISOString() ?? "unknown"
   }`,
 );

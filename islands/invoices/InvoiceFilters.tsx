@@ -59,8 +59,8 @@ export default function InvoiceFilters({ initial }: Props) {
     if (customerId.value) params.set("customerId", customerId.value);
     const qs = params.toString();
     globalThis.location.href = qs
-      ? `/api/invoice/export.csv?${qs}`
-      : "/api/invoice/export.csv";
+      ? `/api/admin/invoice/export.csv?${qs}`
+      : "/api/admin/invoice/export.csv";
   };
 
   return (

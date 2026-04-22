@@ -72,7 +72,7 @@ export default function ReservationDetail(
   const doCancel = async () => {
     setCancelBusy(true);
     try {
-      const res = await fetch(`/api/reservations/${reservationId}`, {
+      const res = await fetch(`/api/admin/reservations/${reservationId}`, {
         method: "DELETE",
       });
       if (res.ok) {
@@ -102,7 +102,7 @@ export default function ReservationDetail(
     }
     setRescheduleBusy(true);
     try {
-      const res = await fetch(`/api/reservations/${reservationId}`, {
+      const res = await fetch(`/api/admin/reservations/${reservationId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
