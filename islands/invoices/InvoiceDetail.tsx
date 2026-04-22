@@ -95,7 +95,9 @@ export default function InvoiceDetail(
           if (!pollingActive || ac.signal.aborted) return;
           try {
             const res = await fetch(
-              `/api/invoice/${encodeURIComponent(state.value.id)}/refresh`,
+              `/api/admin/invoice/${
+                encodeURIComponent(state.value.id)
+              }/refresh`,
               { method: "POST", signal: ac.signal },
             );
             if (!res.ok) continue;
@@ -140,7 +142,7 @@ export default function InvoiceDetail(
       if (pid !== state.value.id) return;
       try {
         const res = await fetch(
-          `/api/invoice/${encodeURIComponent(state.value.id)}/refresh`,
+          `/api/admin/invoice/${encodeURIComponent(state.value.id)}/refresh`,
           { method: "POST" },
         );
         if (!res.ok) return;
@@ -183,7 +185,7 @@ export default function InvoiceDetail(
     }[kind];
     try {
       const res = await fetch(
-        `/api/invoice/${encodeURIComponent(state.value.id)}/${urlPath}`,
+        `/api/admin/invoice/${encodeURIComponent(state.value.id)}/${urlPath}`,
         { method: "POST" },
       );
       if (!res.ok) {

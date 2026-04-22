@@ -58,7 +58,7 @@ export default function NotificationArchiveTable(
     params.set("skip", String(offset));
     if (severity.value !== "all") params.set("severity", severity.value);
     if (readState.value !== "any") params.set("readState", readState.value);
-    return `/api/notifications?${params.toString()}`;
+    return `/api/admin/notifications?${params.toString()}`;
   };
 
   // Refetch whenever filters change.
@@ -114,7 +114,7 @@ export default function NotificationArchiveTable(
       x.id === n.id ? { ...x, readAt: new Date().toISOString() } : x
     );
     try {
-      await fetch(`/api/notifications/${n.id}`, {
+      await fetch(`/api/admin/notifications/${n.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "mark_read" }),
@@ -138,7 +138,7 @@ export default function NotificationArchiveTable(
     items.value = items.value.filter((x) => x.id !== id);
     total.value = Math.max(0, total.value - 1);
     try {
-      const res = await fetch(`/api/notifications/${id}`, {
+      const res = await fetch(`/api/admin/notifications/${id}`, {
         method: "DELETE",
         credentials: "same-origin",
       });
@@ -152,7 +152,7 @@ export default function NotificationArchiveTable(
   const handleMarkAllRead = async () => {
     markingAll.value = true;
     try {
-      const res = await fetch("/api/notifications/mark-all-read", {
+      const res = await fetch("/api/admin/notifications/mark-all-read", {
         method: "POST",
         credentials: "same-origin",
       });

@@ -90,7 +90,7 @@ export default function SyncRunsTable({
       columns={columns}
       totalCount={totalCount}
       pageSize={pageSize}
-      fetchUrl="/api/sync"
+      fetchUrl="/api/admin/sync"
       showLoadMore={showLoadMore}
       emptyMessage="No sync events recorded yet. Sync runs will appear here after the first sync."
       onRowClick={handleRowClick}

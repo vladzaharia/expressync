@@ -45,7 +45,7 @@ import {
 } from "@/src/lib/command-palette/commands.ts";
 import { CommandGroup } from "@/components/command-palette/CommandGroup.tsx";
 import { CommandItem } from "@/components/command-palette/CommandItem.tsx";
-import type { CommandSearchResponse } from "@/routes/api/command-palette/search.ts";
+import type { CommandSearchResponse } from "@/routes/api/admin/command-palette/search.ts";
 
 const RECENT_KEY = "cmdk.recent";
 const RECENT_MIGRATED_KEY = "cmdk.recent.migrated_v1";
@@ -225,7 +225,7 @@ export default function CommandPalette() {
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch("/api/command-palette/search", {
+        const res = await fetch("/api/admin/command-palette/search", {
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },

@@ -115,7 +115,7 @@ export default function IssueCardDialog(props: IssueCardDialogProps) {
     submitting.value = true;
     errorMessage.value = null;
     try {
-      const res = await fetch("/api/mapping/issue-card", {
+      const res = await fetch("/api/admin/mapping/issue-card", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -177,7 +177,7 @@ export default function ProfileEditor(
         body.maxWGlobal = customMaxW.value;
       }
       const res = await fetch(
-        `/api/charging-profile/${encodeURIComponent(externalId)}`,
+        `/api/admin/charging-profile/${encodeURIComponent(externalId)}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -220,7 +220,7 @@ export default function ProfileEditor(
     clearing.value = true;
     try {
       const res = await fetch(
-        `/api/charging-profile/${encodeURIComponent(externalId)}`,
+        `/api/admin/charging-profile/${encodeURIComponent(externalId)}`,
         { method: "DELETE" },
       );
       if (!res.ok) {

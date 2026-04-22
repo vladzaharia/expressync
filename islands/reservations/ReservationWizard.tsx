@@ -209,9 +209,12 @@ export default function ReservationWizard(
           status: "pending,confirmed,active",
           limit: "100",
         });
-        const res = await fetch(`/api/reservations?${params.toString()}`, {
-          signal: ac.signal,
-        });
+        const res = await fetch(
+          `/api/admin/reservations?${params.toString()}`,
+          {
+            signal: ac.signal,
+          },
+        );
         if (!res.ok) {
           if (!cancelled) setConflicts([]);
           return;
@@ -281,7 +284,7 @@ export default function ReservationWizard(
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/reservations", {
+      const res = await fetch("/api/admin/reservations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

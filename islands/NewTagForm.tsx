@@ -62,7 +62,7 @@ export default function NewTagForm(
     saving.value = true;
     errorMessage.value = null;
     try {
-      const res = await fetch("/api/tag/create", {
+      const res = await fetch("/api/admin/tag/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

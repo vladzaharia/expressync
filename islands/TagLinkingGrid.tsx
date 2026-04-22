@@ -121,7 +121,7 @@ export default function TagLinkingGrid(
     if (!target) return;
     deletingId.value = target.mappingId;
     try {
-      const res = await fetch(`/api/tag/link?id=${target.mappingId}`, {
+      const res = await fetch(`/api/admin/tag/link?id=${target.mappingId}`, {
         method: "DELETE",
       });
       if (res.ok) {
@@ -159,7 +159,7 @@ export default function TagLinkingGrid(
     groups.value = next;
 
     try {
-      const res = await fetch(`/api/tag/link?id=${mappingId}`, {
+      const res = await fetch(`/api/admin/tag/link?id=${mappingId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: !isActive }),
