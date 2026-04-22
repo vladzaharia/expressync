@@ -20,10 +20,7 @@ import type { SyncRun } from "../src/db/schema.ts";
 import { steveClient } from "../src/lib/steve-client.ts";
 import { lagoClient } from "../src/lib/lago-client.ts";
 import { ArrowRight } from "lucide-preact";
-import {
-  accentTailwindClasses,
-  borderBeamColors,
-} from "../src/lib/colors.ts";
+import { accentTailwindClasses, borderBeamColors } from "../src/lib/colors.ts";
 import { cn } from "../src/lib/utils/cn.ts";
 
 interface DashboardStats {
@@ -124,9 +121,15 @@ async function getDashboardStats(): Promise<DashboardStats> {
     // Fetch kWh delivered by all three timeframes in a single SQL query
     const [kwhStats] = await db
       .select({
-        kwhDay: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncedTransactionEvents.syncedAt} >= ${todayIso} THEN ${schema.syncedTransactionEvents.kwhDelta} ELSE 0 END), 0)`,
-        kwhWeek: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncedTransactionEvents.syncedAt} >= ${weekIso} THEN ${schema.syncedTransactionEvents.kwhDelta} ELSE 0 END), 0)`,
-        kwhMonth: sql<number>`COALESCE(SUM(${schema.syncedTransactionEvents.kwhDelta}), 0)`,
+        kwhDay: sql<
+          number
+        >`COALESCE(SUM(CASE WHEN ${schema.syncedTransactionEvents.syncedAt} >= ${todayIso} THEN ${schema.syncedTransactionEvents.kwhDelta} ELSE 0 END), 0)`,
+        kwhWeek: sql<
+          number
+        >`COALESCE(SUM(CASE WHEN ${schema.syncedTransactionEvents.syncedAt} >= ${weekIso} THEN ${schema.syncedTransactionEvents.kwhDelta} ELSE 0 END), 0)`,
+        kwhMonth: sql<
+          number
+        >`COALESCE(SUM(${schema.syncedTransactionEvents.kwhDelta}), 0)`,
       })
       .from(schema.syncedTransactionEvents)
       .where(gte(schema.syncedTransactionEvents.syncedAt, monthStart));
@@ -138,12 +141,22 @@ async function getDashboardStats(): Promise<DashboardStats> {
     // Fetch sync success rates by all three timeframes in a single SQL query
     const [syncStats] = await db
       .select({
-        dayTotal: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${todayIso} THEN 1 ELSE 0 END), 0)`,
-        daySuccess: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${todayIso} AND ${schema.syncRuns.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
-        weekTotal: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${weekIso} THEN 1 ELSE 0 END), 0)`,
-        weekSuccess: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${weekIso} AND ${schema.syncRuns.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
+        dayTotal: sql<
+          number
+        >`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${todayIso} THEN 1 ELSE 0 END), 0)`,
+        daySuccess: sql<
+          number
+        >`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${todayIso} AND ${schema.syncRuns.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
+        weekTotal: sql<
+          number
+        >`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${weekIso} THEN 1 ELSE 0 END), 0)`,
+        weekSuccess: sql<
+          number
+        >`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${weekIso} AND ${schema.syncRuns.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
         monthTotal: sql<number>`COALESCE(SUM(1), 0)`,
-        monthSuccess: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
+        monthSuccess: sql<
+          number
+        >`COALESCE(SUM(CASE WHEN ${schema.syncRuns.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
       })
       .from(schema.syncRuns)
       .where(gte(schema.syncRuns.startedAt, monthStart));
@@ -161,8 +174,14 @@ async function getDashboardStats(): Promise<DashboardStats> {
       },
       syncSuccess: {
         day: calcRate(Number(syncStats.daySuccess), Number(syncStats.dayTotal)),
-        week: calcRate(Number(syncStats.weekSuccess), Number(syncStats.weekTotal)),
-        month: calcRate(Number(syncStats.monthSuccess), Number(syncStats.monthTotal)),
+        week: calcRate(
+          Number(syncStats.weekSuccess),
+          Number(syncStats.weekTotal),
+        ),
+        month: calcRate(
+          Number(syncStats.monthSuccess),
+          Number(syncStats.monthTotal),
+        ),
       },
     };
   } catch (error) {
@@ -195,7 +214,10 @@ export const handler = define.handlers({
       .from(schema.syncedTransactionEvents)
       .leftJoin(
         schema.userMappings,
-        eq(schema.syncedTransactionEvents.userMappingId, schema.userMappings.id),
+        eq(
+          schema.syncedTransactionEvents.userMappingId,
+          schema.userMappings.id,
+        ),
       )
       .orderBy(desc(schema.syncedTransactionEvents.syncedAt))
       .limit(5);

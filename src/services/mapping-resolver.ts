@@ -133,25 +133,43 @@ export function buildMappingLookupWithInheritance(
 }
 
 /**
- * Resolve subscription for a mapping, auto-selecting if none specified
- *
- * If the mapping has no subscription ID, this function will:
- * 1. Fetch all subscriptions for the customer
- * 2. Find the first active subscription
- * 3. Return that subscription's external ID
- *
- * An optional cache can be provided to avoid redundant Lago API calls
- * when multiple transactions share the same customer.
- *
- * @param mapping - The user mapping (may have null subscription)
- * @param cache - Optional Map keyed by lagoCustomerExternalId to cache resolved subscription IDs
- * @returns The subscription external ID, or null if none found
+ * Resolved subscription info: external ID plus the plan code backing it.
+ * planCode is `null` when we used an explicit mapping-level external ID and
+ * haven't fetched the subscription from Lago (i.e. we trust the mapping).
  */
-export async function resolveSubscriptionId(
+export interface ResolvedSubscription {
+  externalId: string;
+  planCode: string | null;
+}
+
+/**
+ * Shared cache type for subscription resolution. Values can be:
+ *   - `null` — no active subscription found (negative cache)
+ *   - `{ externalId, planCode }` — resolved via Lago API lookup
+ */
+export type SubscriptionResolutionCache = Map<
+  string,
+  ResolvedSubscription | null
+>;
+
+/**
+ * Resolve subscription for a mapping, auto-selecting if none specified.
+ *
+ * If the mapping has an explicit `lagoSubscriptionExternalId`, that's
+ * returned immediately with `planCode = null` (we don't fetch the plan
+ * unless the caller needs it). Otherwise:
+ *   1. Fetch all subscriptions for the customer
+ *   2. Find the first active subscription
+ *   3. Return its external ID + plan code
+ *
+ * An optional cache avoids redundant Lago API calls when multiple
+ * transactions share the same customer.
+ */
+export async function resolveSubscription(
   mapping: UserMapping,
-  cache?: Map<string, string | null>,
-): Promise<string | null> {
-  // If mapping already has a subscription, use it
+  cache?: SubscriptionResolutionCache,
+): Promise<ResolvedSubscription | null> {
+  // If mapping already has a subscription, use it directly.
   if (mapping.lagoSubscriptionExternalId) {
     logger.debug(
       "MappingResolver",
@@ -161,22 +179,20 @@ export async function resolveSubscriptionId(
         subscriptionId: mapping.lagoSubscriptionExternalId,
       },
     );
-    return mapping.lagoSubscriptionExternalId;
+    return { externalId: mapping.lagoSubscriptionExternalId, planCode: null };
   }
 
-  // No subscription specified, try to auto-select
+  // No subscription specified, try to auto-select.
   if (!mapping.lagoCustomerExternalId) {
     logger.warn(
       "MappingResolver",
       "Cannot auto-select subscription: no customer ID",
-      {
-        mappingId: mapping.id,
-      },
+      { mappingId: mapping.id },
     );
     return null;
   }
 
-  // Check cache first to avoid redundant Lago API calls
+  // Check cache first to avoid redundant Lago API calls.
   if (cache && cache.has(mapping.lagoCustomerExternalId)) {
     const cached = cache.get(mapping.lagoCustomerExternalId)!;
     logger.debug(
@@ -185,7 +201,8 @@ export async function resolveSubscriptionId(
       {
         mappingId: mapping.id,
         customerId: mapping.lagoCustomerExternalId,
-        cachedSubscriptionId: cached,
+        cachedSubscriptionId: cached?.externalId ?? null,
+        cachedPlanCode: cached?.planCode ?? null,
       },
     );
     return cached;
@@ -197,25 +214,26 @@ export async function resolveSubscriptionId(
   });
 
   try {
-    // Fetch all subscriptions for the customer
-    const { subscriptions } = await lagoClient.getSubscriptions(mapping.lagoCustomerExternalId);
-
-    // Find first active subscription
+    const { subscriptions } = await lagoClient.getSubscriptions(
+      mapping.lagoCustomerExternalId,
+    );
     const activeSubscription = subscriptions.find(
       (sub: LagoSubscription) => sub.status === "active",
     );
 
     if (activeSubscription) {
+      const resolved: ResolvedSubscription = {
+        externalId: activeSubscription.external_id,
+        planCode: activeSubscription.plan_code,
+      };
       logger.info("MappingResolver", "Auto-selected active subscription", {
         mappingId: mapping.id,
-        subscriptionId: activeSubscription.external_id,
+        subscriptionId: resolved.externalId,
         subscriptionName: activeSubscription.name,
+        planCode: resolved.planCode,
       });
-      // Cache the result
-      if (cache) {
-        cache.set(mapping.lagoCustomerExternalId, activeSubscription.external_id);
-      }
-      return activeSubscription.external_id;
+      if (cache) cache.set(mapping.lagoCustomerExternalId, resolved);
+      return resolved;
     }
 
     logger.warn(
@@ -227,10 +245,7 @@ export async function resolveSubscriptionId(
         totalSubscriptions: subscriptions.length,
       },
     );
-    // Cache null result too, to avoid retrying for the same customer
-    if (cache) {
-      cache.set(mapping.lagoCustomerExternalId, null);
-    }
+    if (cache) cache.set(mapping.lagoCustomerExternalId, null);
     return null;
   } catch (error) {
     logger.error(
@@ -244,4 +259,16 @@ export async function resolveSubscriptionId(
     );
     return null;
   }
+}
+
+/**
+ * Backwards-compatible wrapper: returns just the subscription external ID.
+ * Prefer `resolveSubscription` for new code that needs the plan code.
+ */
+export async function resolveSubscriptionId(
+  mapping: UserMapping,
+  cache?: SubscriptionResolutionCache,
+): Promise<string | null> {
+  const resolved = await resolveSubscription(mapping, cache);
+  return resolved?.externalId ?? null;
 }

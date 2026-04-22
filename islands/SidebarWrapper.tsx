@@ -5,15 +5,14 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar.tsx";
 import { AppSidebar, CHROME_SIZE } from "@/components/AppSidebar.tsx";
-import { PanelLeft } from "lucide-preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { type AccentColor, accentTailwindClasses } from "@/src/lib/colors.ts";
 
 interface User {
   id: string;
-  name: string | null;
+  name: string | null | undefined;
   email: string;
-  image: string | null;
+  image?: string | null | undefined;
 }
 
 interface SidebarWrapperProps {
@@ -30,7 +29,7 @@ function TopBarContent({
   actions,
   accentColor = "blue",
 }: Pick<SidebarWrapperProps, "actions" | "accentColor">) {
-  const { toggleSidebar } = useSidebar();
+  useSidebar();
 
   // Get accent color classes from centralized config
   const colorClasses = accentTailwindClasses[accentColor];

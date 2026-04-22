@@ -20,10 +20,11 @@ export const handler = define.handlers({
 export default define.page<typeof handler>(function SyncPage(
   { data, url, state },
 ) {
+  const isAdmin = state.user?.role === "admin";
   return (
     <SidebarLayout
       currentPath={url.pathname}
-      actions={<SyncControls />}
+      actions={<SyncControls isAdmin={isAdmin} />}
       accentColor="blue"
       user={state.user}
     >
@@ -38,7 +39,7 @@ export default define.page<typeof handler>(function SyncPage(
           syncRuns={data.syncRuns}
           totalCount={data.totalCount}
           pageSize={PAGE_SIZE}
-          showLoadMore={true}
+          showLoadMore
         />
       </PageCard>
     </SidebarLayout>

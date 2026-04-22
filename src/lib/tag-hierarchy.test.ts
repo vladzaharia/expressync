@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { getAllChildTags, getAllAncestorTags } from "./tag-hierarchy.ts";
+import { getAllAncestorTags, getAllChildTags } from "./tag-hierarchy.ts";
 import type { StEvEOcppTag } from "./types/steve.ts";
 
 function makeTag(

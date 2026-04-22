@@ -1,6 +1,25 @@
 import type { StEvEOcppTag } from "./types/steve.ts";
 
 /**
+ * Prefix marking a tag as a "meta-tag" — a parent tag used purely to group
+ * other tags under a single customer (e.g. `OCPP-VLAD` sits above `1234` and
+ * `ABCD1234567890`). Meta-tags never correspond to a physical card handed to
+ * a customer; they exist solely for hierarchy rollup in StEvE so that one
+ * customer can own multiple real tags without duplicating the mapping.
+ *
+ * Callers use this prefix to:
+ *   - exclude meta-tag mappings from customer-facing surfaces (Lago invoice
+ *     metadata, customer portal listings), and
+ *   - reject attempts to issue a physical card against the meta-tag itself.
+ */
+export const META_TAG_PREFIX = "OCPP-" as const;
+
+/** True if the OCPP id tag is a meta-tag by naming convention. */
+export function isMetaTag(idTag: string | null | undefined): boolean {
+  return typeof idTag === "string" && idTag.startsWith(META_TAG_PREFIX);
+}
+
+/**
  * Get all child tags (direct and indirect descendants) of a parent tag
  *
  * @param parentIdTag - The parent tag ID to find children for
@@ -12,23 +31,19 @@ export function getAllChildTags(
   allTags: StEvEOcppTag[],
 ): StEvEOcppTag[] {
   const children: StEvEOcppTag[] = [];
-  const visited = new Set<string>();
+  // Seed visited with the starting tag so a cycle that loops back to it
+  // (e.g. A -> B -> A) is skipped instead of re-included as its own descendant.
+  const visited = new Set<string>([parentIdTag]);
 
   function findChildren(currentParentId: string) {
-    // Prevent infinite loops
-    if (visited.has(currentParentId)) {
-      return;
-    }
-    visited.add(currentParentId);
-
-    // Find direct children
     const directChildren = allTags.filter(
       (tag) => tag.parentIdTag === currentParentId,
     );
 
     for (const child of directChildren) {
+      if (visited.has(child.idTag)) continue;
+      visited.add(child.idTag);
       children.push(child);
-      // Recursively find grandchildren
       findChildren(child.idTag);
     }
   }
@@ -66,20 +81,17 @@ export function getAllAncestorTags(
   allTags: StEvEOcppTag[],
 ): StEvEOcppTag[] {
   const ancestors: StEvEOcppTag[] = [];
-  const visited = new Set<string>();
+  // Seed visited with the starting tag so a cycle that loops back to it
+  // (e.g. A -> B -> A) stops cleanly instead of re-including the start as an ancestor.
+  const visited = new Set<string>([tag.idTag]);
 
   let current = tag;
   while (current.parentIdTag) {
-    // Prevent infinite loops
-    if (visited.has(current.parentIdTag)) {
-      break;
-    }
+    if (visited.has(current.parentIdTag)) break;
     visited.add(current.parentIdTag);
 
     const parent = allTags.find((t) => t.idTag === current.parentIdTag);
-    if (!parent) {
-      break;
-    }
+    if (!parent) break;
     ancestors.push(parent);
     current = parent;
   }

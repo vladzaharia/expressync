@@ -8,7 +8,14 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { NumberTicker } from "@/components/magicui/number-ticker.tsx";
 import { BorderBeam } from "@/components/magicui/border-beam.tsx";
-import { CheckCircle2, CreditCard, User, Users, XCircle, Zap } from "lucide-preact";
+import {
+  CheckCircle2,
+  CreditCard,
+  User,
+  Users,
+  XCircle,
+  Zap,
+} from "lucide-preact";
 import {
   type AccentColor,
   accentTailwindClasses,
@@ -87,7 +94,10 @@ export default function DashboardStatsCards({ stats: propStats }: Props) {
         <CardHeader className="py-2 flex-shrink-0">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
             <Users
-              className={cn("size-4", accentTailwindClasses[cardColors.tags].text)}
+              className={cn(
+                "size-4",
+                accentTailwindClasses[cardColors.tags].text,
+              )}
             />
             OCPP Tags
           </CardTitle>
@@ -128,7 +138,10 @@ export default function DashboardStatsCards({ stats: propStats }: Props) {
         <CardHeader className="py-2 flex-shrink-0">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
             <CreditCard
-              className={cn("size-4", accentTailwindClasses[cardColors.lago].text)}
+              className={cn(
+                "size-4",
+                accentTailwindClasses[cardColors.lago].text,
+              )}
             />
             Lago Billing
           </CardTitle>
@@ -137,7 +150,12 @@ export default function DashboardStatsCards({ stats: propStats }: Props) {
           <div className="grid grid-cols-2 gap-4 w-full">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <User className={cn("size-4", accentTailwindClasses[cardColors.lago].text)} />
+                <User
+                  className={cn(
+                    "size-4",
+                    accentTailwindClasses[cardColors.lago].text,
+                  )}
+                />
                 <span className="text-xs text-muted-foreground">Customers</span>
               </div>
               <div className="text-2xl font-bold">
@@ -146,8 +164,15 @@ export default function DashboardStatsCards({ stats: propStats }: Props) {
             </div>
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <CreditCard className={cn("size-4", accentTailwindClasses[cardColors.lago].text)} />
-                <span className="text-xs text-muted-foreground">Subscriptions</span>
+                <CreditCard
+                  className={cn(
+                    "size-4",
+                    accentTailwindClasses[cardColors.lago].text,
+                  )}
+                />
+                <span className="text-xs text-muted-foreground">
+                  Subscriptions
+                </span>
               </div>
               <div className="text-2xl font-bold">
                 <NumberTicker value={stats.lago.subscriptions} />
@@ -169,7 +194,10 @@ export default function DashboardStatsCards({ stats: propStats }: Props) {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 flex-shrink-0">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
             <Zap
-              className={cn("size-4", accentTailwindClasses[cardColors.energy].text)}
+              className={cn(
+                "size-4",
+                accentTailwindClasses[cardColors.energy].text,
+              )}
             />
             Energy Delivered
           </CardTitle>
@@ -181,9 +209,25 @@ export default function DashboardStatsCards({ stats: propStats }: Props) {
             size="sm"
             variant="outline-joined"
           >
-            <ToggleGroupItem value="day" aria-label="Day" className={accentTailwindClasses[cardColors.energy].toggleOn}>D</ToggleGroupItem>
-            <ToggleGroupItem value="week" aria-label="Week" className={accentTailwindClasses[cardColors.energy].toggleOn}>W</ToggleGroupItem>
-            <ToggleGroupItem value="month" aria-label="Month" className={accentTailwindClasses[cardColors.energy].toggleOn}>
+            <ToggleGroupItem
+              value="day"
+              aria-label="Day"
+              className={accentTailwindClasses[cardColors.energy].toggleOn}
+            >
+              D
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="week"
+              aria-label="Week"
+              className={accentTailwindClasses[cardColors.energy].toggleOn}
+            >
+              W
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="month"
+              aria-label="Month"
+              className={accentTailwindClasses[cardColors.energy].toggleOn}
+            >
               M
             </ToggleGroupItem>
           </ToggleGroup>
@@ -210,7 +254,10 @@ export default function DashboardStatsCards({ stats: propStats }: Props) {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 flex-shrink-0">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
             <CheckCircle2
-              className={cn("size-4", accentTailwindClasses[cardColors.sync].text)}
+              className={cn(
+                "size-4",
+                accentTailwindClasses[cardColors.sync].text,
+              )}
             />
             Sync Success
           </CardTitle>
@@ -222,9 +269,25 @@ export default function DashboardStatsCards({ stats: propStats }: Props) {
             size="sm"
             variant="outline-joined"
           >
-            <ToggleGroupItem value="day" aria-label="Day" className={accentTailwindClasses[cardColors.sync].toggleOn}>D</ToggleGroupItem>
-            <ToggleGroupItem value="week" aria-label="Week" className={accentTailwindClasses[cardColors.sync].toggleOn}>W</ToggleGroupItem>
-            <ToggleGroupItem value="month" aria-label="Month" className={accentTailwindClasses[cardColors.sync].toggleOn}>
+            <ToggleGroupItem
+              value="day"
+              aria-label="Day"
+              className={accentTailwindClasses[cardColors.sync].toggleOn}
+            >
+              D
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="week"
+              aria-label="Week"
+              className={accentTailwindClasses[cardColors.sync].toggleOn}
+            >
+              W
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="month"
+              aria-label="Month"
+              className={accentTailwindClasses[cardColors.sync].toggleOn}
+            >
               M
             </ToggleGroupItem>
           </ToggleGroup>

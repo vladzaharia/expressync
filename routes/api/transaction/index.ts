@@ -73,7 +73,10 @@ export const handler = define.handlers({
         .from(schema.syncedTransactionEvents)
         .leftJoin(
           schema.userMappings,
-          eq(schema.syncedTransactionEvents.userMappingId, schema.userMappings.id),
+          eq(
+            schema.syncedTransactionEvents.userMappingId,
+            schema.userMappings.id,
+          ),
         )
         .where(whereClause)
         .orderBy(desc(schema.syncedTransactionEvents.syncedAt))

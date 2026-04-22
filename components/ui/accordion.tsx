@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from "preact/hooks";
-import type { ComponentChildren, JSX } from "preact";
+import type { ComponentChildren } from "preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { ChevronDown } from "lucide-preact";
 
