@@ -8,19 +8,11 @@ import {
 import ThemeToggle, { useThemeToggle } from "../islands/ThemeToggle.tsx";
 import NotificationBell from "../islands/NotificationBell.tsx";
 import {
-  BatteryCharging,
-  CalendarClock,
-  FileText,
   LayoutDashboard,
-  Link2,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
-  Receipt,
-  RefreshCw,
-  Tag,
   User,
-  Users,
 } from "lucide-preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip.tsx";
@@ -28,6 +20,11 @@ import { BorderBeam } from "./magicui/border-beam.tsx";
 import { Particles } from "./magicui/particles.tsx";
 import { ExpresSyncBrand } from "./brand/ExpresSyncBrand.tsx";
 import { type AccentColor, accentTailwindClasses } from "@/src/lib/colors.ts";
+import {
+  getAllNavItems,
+  NAV_SECTIONS,
+  type NavItem,
+} from "@/src/lib/navigation.ts";
 
 // Shared chrome size - used by both sidebar and top bar
 export const CHROME_SIZE = "3.5rem"; // 56px
@@ -38,6 +35,7 @@ interface UserInfo {
   name: string | null | undefined;
   email: string;
   image?: string | null | undefined;
+  role?: string | null | undefined;
 }
 
 interface AppSidebarProps {
@@ -47,68 +45,6 @@ interface AppSidebarProps {
 
 // Extended accent type to include "primary" for dashboard
 export type NavAccentColor = AccentColor | "primary";
-
-export const mainNavItems: Array<{
-  title: string;
-  url: string;
-  icon: typeof LayoutDashboard;
-  accentColor: NavAccentColor;
-}> = [
-  {
-    title: "Dashboard",
-    url: "/",
-    icon: LayoutDashboard,
-    accentColor: "primary",
-  },
-  {
-    title: "Tags",
-    url: "/tags",
-    icon: Tag,
-    accentColor: "cyan",
-  },
-  {
-    title: "Tag Linking",
-    url: "/links",
-    icon: Link2,
-    accentColor: "violet",
-  },
-  {
-    title: "Transactions",
-    url: "/transactions",
-    icon: Receipt,
-    accentColor: "green",
-  },
-  {
-    title: "Invoices",
-    url: "/invoices",
-    icon: FileText,
-    accentColor: "teal",
-  },
-  {
-    title: "Chargers",
-    url: "/chargers",
-    icon: BatteryCharging,
-    accentColor: "orange",
-  },
-  {
-    title: "Sync",
-    url: "/sync",
-    icon: RefreshCw,
-    accentColor: "blue",
-  },
-  {
-    title: "Users",
-    url: "/users",
-    icon: Users,
-    accentColor: "amber",
-  },
-  {
-    title: "Reservations",
-    url: "/reservations",
-    icon: CalendarClock,
-    accentColor: "indigo",
-  },
-];
 
 // Accent color to Tailwind class mappings - extends centralized config with "primary"
 export const accentClasses: Record<
@@ -213,11 +149,21 @@ function ThemeToggleSection({ isCollapsed }: { isCollapsed: boolean }) {
 export function AppSidebar({ currentPath, user }: AppSidebarProps) {
   const { state, toggleSidebar, isMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
+  const isAdmin = user?.role === "admin";
 
   const isActive = (url: string) => {
     if (url === "/") return currentPath === "/";
-    return currentPath.startsWith(url);
+    return currentPath === url || currentPath.startsWith(url + "/");
   };
+
+  const flatNavItems: NavItem[] = getAllNavItems(isAdmin);
+  const visibleSections = NAV_SECTIONS
+    .filter((s) => !s.adminOnly || isAdmin)
+    .map((s) => ({
+      ...s,
+      items: s.items.filter((i) => !i.adminOnly || isAdmin),
+    }))
+    .filter((s) => s.items.length > 0);
 
   const handleSignOut = async () => {
     await fetch("/api/auth/sign-out", { method: "POST" });
@@ -251,16 +197,16 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
           </a>
 
           {/* Nav items as icons - square buttons */}
-          {mainNavItems.map((item) => {
+          {flatNavItems.map((item) => {
             const Icon = item.icon;
-            const active = isActive(item.url);
+            const active = isActive(item.path);
             const accent = accentClasses[item.accentColor];
 
             return (
-              <Tooltip key={item.title}>
+              <Tooltip key={item.id}>
                 <TooltipTrigger asChild>
                   <a
-                    href={item.url}
+                    href={item.path}
                     className={cn(
                       "flex items-center justify-center shrink-0 transition-colors",
                       active ? cn(accent.bg, accent.text) : cn(
@@ -458,16 +404,33 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
 
       {/* Main nav sections */}
       <SidebarContent className="flex flex-col p-0 gap-0">
-        {mainNavItems.map((item) => (
-          <NavSection
-            key={item.title}
-            href={item.url}
-            icon={item.icon}
-            title={item.title}
-            isActive={isActive(item.url)}
-            isCollapsed={isCollapsed}
-            accentColor={item.accentColor}
-          />
+        {visibleSections.map((section, sIdx) => (
+          <div key={section.id} className="flex flex-col">
+            {!isCollapsed && (
+              <div
+                className={cn(
+                  "px-4 pt-3 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground shrink-0",
+                  sIdx > 0 && "border-t",
+                )}
+              >
+                {section.title}
+              </div>
+            )}
+            {isCollapsed && sIdx > 0 && (
+              <div className="border-t" aria-hidden="true" />
+            )}
+            {section.items.map((item) => (
+              <NavSection
+                key={item.id}
+                href={item.path}
+                icon={item.icon}
+                title={item.title}
+                isActive={isActive(item.path)}
+                isCollapsed={isCollapsed}
+                accentColor={item.accentColor}
+              />
+            ))}
+          </div>
         ))}
       </SidebarContent>
 
