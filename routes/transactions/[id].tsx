@@ -22,6 +22,7 @@ import {
   Zap,
 } from "lucide-preact";
 import { BackAction } from "../../components/shared/BackAction.tsx";
+import { MetricTile } from "../../components/shared/MetricTile.tsx";
 
 export const handler = define.handlers({
   async GET(ctx) {
@@ -111,47 +112,38 @@ export default define.page<typeof handler>(function TransactionDetailsPage({
       actions={<BackAction href="/transactions" />}
     >
       <div className="space-y-6">
-        {/* Transaction Info Card */}
-        <PageCard title="Transaction Overview" colorScheme="green">
+        {/* Charging Session Info Card */}
+        <PageCard title="Charging Session Overview" colorScheme="green">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-2">
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
-                <Zap className="size-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Transaction ID</p>
-                <p className="font-mono font-semibold">{steveTransactionId}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
-                <Tag className="size-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">OCPP Tag</p>
-                <p className="font-mono font-semibold">{ocppTagId}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-accent/10">
-                <Activity className="size-5 text-accent" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  Total kWh Billed
-                </p>
-                <p className="font-semibold tabular-nums">
+            <MetricTile
+              icon={Zap}
+              label="Session ID"
+              value={<span className="font-mono">{steveTransactionId}</span>}
+              accent="blue"
+            />
+            <MetricTile
+              icon={Tag}
+              label="OCPP Tag"
+              value={<span className="font-mono">{ocppTagId}</span>}
+              accent="cyan"
+            />
+            <MetricTile
+              icon={Activity}
+              label="Total kWh Billed"
+              value={
+                <span className="tabular-nums">
                   {Number(syncState?.totalKwhBilled ?? 0).toFixed(2)} kWh
-                </p>
-              </div>
-            </div>
+                </span>
+              }
+              accent="green"
+            />
             <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
+              <div className="flex size-10 items-center justify-center rounded-lg bg-muted shrink-0">
                 {syncState?.isFinalized
                   ? <CheckCircle2 className="size-5 text-success" />
                   : <Clock className="size-5 text-warning" />}
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Status</p>
                 {syncState?.isFinalized
                   ? (
