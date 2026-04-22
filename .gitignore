@@ -17,3 +17,6 @@ _design/
 docker-compose.override.yml
 docker-compose.env
 docker-compose.postgres.env
+
+# Claude Code agent worktrees (scratch)
+.claude/worktrees/
