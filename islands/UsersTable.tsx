@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { Plus, Shield, ShieldCheck, Trash2, User } from "lucide-preact";
 
@@ -371,46 +372,28 @@ export default function UsersTable({
         /* Accessible delete-confirm (replaces browser confirm()). Default focus
           lands on Cancel; destructive label is explicit. */
       }
-      <Dialog
+      <ConfirmDialog
         open={deleteTarget.value !== null}
-        onOpenChange={(open) => {
-          if (!open) deleteTarget.value = null;
+        onOpenChange={(o) => {
+          if (!o) deleteTarget.value = null;
         }}
-      >
-        <DialogContent
-          className="sm:max-w-sm"
-          onClose={() => (deleteTarget.value = null)}
-        >
-          <DialogHeader>
-            <DialogTitle>Delete user?</DialogTitle>
-            <DialogDescription>
-              {deleteTarget.value
-                ? (
-                  <>
-                    Delete{" "}
-                    <span class="font-medium">
-                      {deleteTarget.value.name ?? deleteTarget.value.email}
-                    </span>
-                    ? This cannot be undone.
-                  </>
-                )
-                : null}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-4">
-            <Button
-              variant="outline"
-              onClick={() => (deleteTarget.value = null)}
-              autofocus
-            >
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={confirmDelete}>
-              Delete user
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        title="Delete user?"
+        description={deleteTarget.value
+          ? (
+            <>
+              Delete{" "}
+              <span className="font-medium">
+                {deleteTarget.value.name ?? deleteTarget.value.email}
+              </span>? This cannot be undone.
+            </>
+          )
+          : null}
+        variant="destructive"
+        confirmLabel="Delete user"
+        onConfirm={confirmDelete}
+        isLoading={deleting.value !== null &&
+          deleting.value === deleteTarget.value?.id}
+      />
     </div>
   );
 }
