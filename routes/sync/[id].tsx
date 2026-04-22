@@ -21,6 +21,7 @@ import {
 } from "lucide-preact";
 import SyncDetailAccordion from "../../islands/SyncDetailAccordion.tsx";
 import { BackAction } from "../../components/shared/BackAction.tsx";
+import { MetricTile } from "../../components/shared/MetricTile.tsx";
 import { formatDate, formatDuration } from "../../src/lib/utils/format.ts";
 
 export const handler = define.handlers({
@@ -91,28 +92,20 @@ export default define.page<typeof handler>(
                   </Badge>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
-                  <Clock className="size-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Time Started</p>
-                  <p className="font-semibold text-sm">
-                    {formatDate(run.startedAt)}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
-                  <Clock className="size-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Duration</p>
-                  <p className="font-semibold">
-                    {formatDuration(run.startedAt, run.completedAt)}
-                  </p>
-                </div>
-              </div>
+              <MetricTile
+                icon={Clock}
+                label="Time Started"
+                value={
+                  <span className="text-sm">{formatDate(run.startedAt)}</span>
+                }
+                accent="blue"
+              />
+              <MetricTile
+                icon={Clock}
+                label="Duration"
+                value={formatDuration(run.startedAt, run.completedAt)}
+                accent="blue"
+              />
             </div>
           </PageCard>
 
@@ -126,45 +119,24 @@ export default define.page<typeof handler>(
                   Tag Linking
                 </div>
                 <div className="grid grid-cols-3 gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-10 items-center justify-center rounded-lg bg-success/10">
-                      <CheckCircle2 className="size-5 text-success" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Tags Activated
-                      </p>
-                      <p className="font-semibold tabular-nums">
-                        {run.tagsActivated ?? 0}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-10 items-center justify-center rounded-lg bg-destructive/10">
-                      <AlertCircle className="size-5 text-destructive" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Tags Deactivated
-                      </p>
-                      <p className="font-semibold tabular-nums">
-                        {run.tagsDeactivated ?? 0}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
-                      <RefreshCw className="size-5 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Tags Unchanged
-                      </p>
-                      <p className="font-semibold tabular-nums">
-                        {run.tagsUnchanged ?? 0}
-                      </p>
-                    </div>
-                  </div>
+                  <MetricTile
+                    icon={CheckCircle2}
+                    label="Tags Activated"
+                    value={run.tagsActivated ?? 0}
+                    accent="green"
+                  />
+                  <MetricTile
+                    icon={AlertCircle}
+                    label="Tags Deactivated"
+                    value={run.tagsDeactivated ?? 0}
+                    accent="red"
+                  />
+                  <MetricTile
+                    icon={RefreshCw}
+                    label="Tags Unchanged"
+                    value={run.tagsUnchanged ?? 0}
+                    accent="blue"
+                  />
                 </div>
               </div>
 
@@ -172,35 +144,21 @@ export default define.page<typeof handler>(
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   <Receipt className="size-4" />
-                  Transactions
+                  Charging Sessions
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
-                      <RefreshCw className="size-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Processed
-                      </p>
-                      <p className="font-semibold tabular-nums">
-                        {run.transactionsProcessed ?? 0}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-10 items-center justify-center rounded-lg bg-success/10">
-                      <Zap className="size-5 text-success" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Events Created
-                      </p>
-                      <p className="font-semibold tabular-nums">
-                        {run.eventsCreated ?? 0}
-                      </p>
-                    </div>
-                  </div>
+                  <MetricTile
+                    icon={RefreshCw}
+                    label="Processed"
+                    value={run.transactionsProcessed ?? 0}
+                    accent="blue"
+                  />
+                  <MetricTile
+                    icon={Zap}
+                    label="Events Created"
+                    value={run.eventsCreated ?? 0}
+                    accent="green"
+                  />
                 </div>
               </div>
             </div>
