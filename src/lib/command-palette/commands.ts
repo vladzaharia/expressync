@@ -11,21 +11,9 @@
  * `/api/command-palette/search` keyed by the user's query.
  */
 
-import {
-  BatteryCharging,
-  CalendarClock,
-  FileText,
-  LayoutDashboard,
-  Link2,
-  Plus,
-  Receipt,
-  RefreshCw,
-  Shield,
-  Tag,
-  Users,
-  Zap,
-} from "lucide-preact";
+import { LayoutDashboard, Plus, RefreshCw, Shield, Zap } from "lucide-preact";
 import type { AccentColor } from "@/src/lib/colors.ts";
+import { getAllNavItems, type NavItem } from "@/src/lib/navigation.ts";
 
 export type CommandKind = "navigate" | "action";
 export type CommandAccent = AccentColor | "primary" | "neutral";
@@ -56,80 +44,10 @@ export interface PaletteCommand {
 }
 
 /**
- * Mirrors `mainNavItems` in `components/AppSidebar.tsx`. Kept local to avoid
- * pulling the sidebar (which imports preact/compat) into a plain `.ts` file.
+ * Navigate commands are built from the shared nav source of truth in
+ * `src/lib/navigation.ts`. That module is preact/compat-free so this plain
+ * `.ts` file can consume it without pulling the sidebar in transitively.
  */
-const NAV_ITEMS: Array<{
-  title: string;
-  href: string;
-  icon: typeof LayoutDashboard;
-  accent: CommandAccent;
-  keywords?: string[];
-}> = [
-  {
-    title: "Dashboard",
-    href: "/",
-    icon: LayoutDashboard,
-    accent: "primary",
-    keywords: ["home", "stats", "overview"],
-  },
-  {
-    title: "Tags",
-    href: "/tags",
-    icon: Tag,
-    accent: "cyan",
-    keywords: ["ocpp", "rfid", "cards"],
-  },
-  {
-    title: "Tag Linking",
-    href: "/links",
-    icon: Link2,
-    accent: "violet",
-    keywords: ["mapping", "links", "users"],
-  },
-  {
-    title: "Transactions",
-    href: "/transactions",
-    icon: Receipt,
-    accent: "green",
-    keywords: ["sessions", "kwh", "billing"],
-  },
-  {
-    title: "Invoices",
-    href: "/invoices",
-    icon: FileText,
-    accent: "teal",
-    keywords: ["billing", "lago", "payments"],
-  },
-  {
-    title: "Chargers",
-    href: "/chargers",
-    icon: BatteryCharging,
-    accent: "orange",
-    keywords: ["stations", "wallbox", "steve"],
-  },
-  {
-    title: "Sync",
-    href: "/sync",
-    icon: RefreshCw,
-    accent: "blue",
-    keywords: ["runs", "replay", "reconcile"],
-  },
-  {
-    title: "Users",
-    href: "/users",
-    icon: Users,
-    accent: "amber",
-    keywords: ["admins", "accounts"],
-  },
-  {
-    title: "Reservations",
-    href: "/reservations",
-    icon: CalendarClock,
-    accent: "indigo",
-    keywords: ["bookings", "reserve", "schedule"],
-  },
-];
 
 function postJson(url: string, body?: unknown): Promise<Response> {
   return fetch(url, {
@@ -154,16 +72,16 @@ export interface ActionEnv {
   navigate: (href: string) => void;
 }
 
-export function buildNavigateCommands(): PaletteCommand[] {
-  return NAV_ITEMS.map((it) => ({
-    id: `nav:${it.href}`,
+export function buildNavigateCommands(isAdmin = false): PaletteCommand[] {
+  return getAllNavItems(isAdmin).map((it: NavItem) => ({
+    id: it.id,
     kind: "navigate",
     group: "navigate",
     title: it.title,
-    subtitle: it.href,
+    subtitle: it.path,
     icon: it.icon,
-    accent: it.accent,
-    href: it.href,
+    accent: it.accentColor as CommandAccent,
+    href: it.path,
     keywords: it.keywords,
   }));
 }

@@ -48,8 +48,55 @@ import { CommandItem } from "@/components/command-palette/CommandItem.tsx";
 import type { CommandSearchResponse } from "@/routes/api/command-palette/search.ts";
 
 const RECENT_KEY = "cmdk.recent";
+const RECENT_MIGRATED_KEY = "cmdk.recent.migrated_v1";
 const RECENT_LIMIT = 10;
 const SEARCH_DEBOUNCE_MS = 150;
+
+/**
+ * One-shot migration for Recent LRU entries stored before Wave A4:
+ *   - Old ids used label-style keys ("nav:transactions"); rewrite to
+ *     path-style ("nav:/transactions") which is the new stable id shape.
+ *   - Title "Transactions" was renamed to "Charging Sessions".
+ * Gated by `cmdk.recent.migrated_v1` so it only runs once per browser.
+ */
+function migrateRecentV1() {
+  try {
+    if (localStorage.getItem(RECENT_MIGRATED_KEY) === "true") return;
+    const raw = localStorage.getItem(RECENT_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        // Map of legacy id -> new id (derived from old label-style keys).
+        const idMap: Record<string, string> = {
+          "nav:dashboard": "nav:/",
+          "nav:tags": "nav:/tags",
+          "nav:tag-linking": "nav:/links",
+          "nav:transactions": "nav:/transactions",
+          "nav:invoices": "nav:/invoices",
+          "nav:chargers": "nav:/chargers",
+          "nav:sync": "nav:/sync",
+          "nav:users": "nav:/users",
+          "nav:reservations": "nav:/reservations",
+        };
+        const migrated = parsed.map((e) => {
+          if (!e || typeof e !== "object") return e;
+          const entry = e as Record<string, unknown>;
+          if (typeof entry.id === "string" && idMap[entry.id]) {
+            entry.id = idMap[entry.id];
+          }
+          if (entry.title === "Transactions") {
+            entry.title = "Charging Sessions";
+          }
+          return entry;
+        });
+        localStorage.setItem(RECENT_KEY, JSON.stringify(migrated));
+      }
+    }
+    localStorage.setItem(RECENT_MIGRATED_KEY, "true");
+  } catch {
+    /* ignore storage errors */
+  }
+}
 
 interface RecentEntry {
   id: string;
