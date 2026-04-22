@@ -4,6 +4,7 @@ import * as schema from "../../src/db/schema.ts";
 import { desc, eq } from "drizzle-orm";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
+import { SectionCard } from "../../components/shared/SectionCard.tsx";
 import { Badge } from "../../components/ui/badge.tsx";
 import {
   Table,
@@ -23,6 +24,9 @@ import {
 } from "lucide-preact";
 import { BackAction } from "../../components/shared/BackAction.tsx";
 import { MetricTile } from "../../components/shared/MetricTile.tsx";
+import LiveSessionCard from "../../islands/charging-sessions/LiveSessionCard.tsx";
+import { steveClient } from "../../src/lib/steve-client.ts";
+import { logger } from "../../src/lib/utils/logger.ts";
 
 export const handler = define.handlers({
   async GET(ctx) {
@@ -65,19 +69,82 @@ export const handler = define.handlers({
         .where(eq(schema.syncRuns.id, syncRunIds[0]!))
       : [];
 
-    // Resolve the OCPP tag via user mapping
+    // Resolve the OCPP tag + PK via user mapping. We look up once using the
+    // first billing event's mapping; if the session has no events yet (common
+    // for freshly-started live sessions) we'll fall back to StEvE below.
     const firstMappingId = billingEvents[0]?.userMappingId;
     let ocppTagId: string | null = null;
+    let ocppTagPk: number | null = null;
     if (firstMappingId) {
       const [mapping] = await db
-        .select({ steveOcppIdTag: schema.userMappings.steveOcppIdTag })
+        .select({
+          steveOcppIdTag: schema.userMappings.steveOcppIdTag,
+          steveOcppTagPk: schema.userMappings.steveOcppTagPk,
+        })
         .from(schema.userMappings)
         .where(eq(schema.userMappings.id, firstMappingId))
         .limit(1);
       if (mapping) {
         ocppTagId = mapping.steveOcppIdTag;
+        ocppTagPk = mapping.steveOcppTagPk;
       }
     }
+
+    // Live-session enrichment — only when not yet finalized. Fetch the StEvE
+    // row so we can surface chargeBoxId + startTimestamp to the island. If
+    // StEvE is unreachable we still render the live card with the fields we
+    // already have.
+    const isLive = !syncState?.isFinalized;
+    let liveChargeBoxId: string | null = null;
+    let liveConnectorId: number | null = null;
+    let liveStartedAt: string | null = null;
+    const liveInitialKwh = Number(syncState?.totalKwhBilled ?? 0);
+    if (isLive) {
+      try {
+        const [steveTx] = await steveClient.getTransactions({
+          transactionPk: steveTransactionId,
+          type: "ACTIVE",
+          periodType: "ALL",
+        });
+        if (steveTx) {
+          liveChargeBoxId = steveTx.chargeBoxId;
+          liveConnectorId = steveTx.connectorId;
+          liveStartedAt = steveTx.startTimestamp;
+          // If we still have no tag mapping from billing events, take the
+          // ocppIdTag from StEvE so the overview tile renders something
+          // meaningful; the tagPk cross-link will only activate if we can
+          // resolve a mapping below.
+          if (!ocppTagId) {
+            ocppTagId = steveTx.ocppIdTag;
+          }
+          // Best-effort tagPk resolution (so the OCPP Tag value can link).
+          if (!ocppTagPk && steveTx.ocppIdTag) {
+            try {
+              const [mapping] = await db
+                .select({
+                  steveOcppTagPk: schema.userMappings.steveOcppTagPk,
+                })
+                .from(schema.userMappings)
+                .where(
+                  eq(schema.userMappings.steveOcppIdTag, steveTx.ocppIdTag),
+                )
+                .limit(1);
+              if (mapping) ocppTagPk = mapping.steveOcppTagPk;
+            } catch {
+              // Non-fatal — link just won't render.
+            }
+          }
+        }
+      } catch (error) {
+        logger.warn(
+          "TransactionDetail",
+          "StEvE lookup for live session failed — rendering card without chargeBoxId",
+          { error: error instanceof Error ? error.message : String(error) },
+        );
+      }
+    }
+
+    const isAdmin = ctx.state.user?.role === "admin";
 
     return {
       data: {
@@ -86,6 +153,13 @@ export const handler = define.handlers({
         billingEvents,
         syncRuns,
         ocppTagId,
+        ocppTagPk,
+        isLive,
+        liveChargeBoxId,
+        liveConnectorId,
+        liveStartedAt,
+        liveInitialKwh,
+        isAdmin,
       },
     };
   },
@@ -101,6 +175,13 @@ export default define.page<typeof handler>(function TransactionDetailsPage({
     syncState,
     billingEvents,
     ocppTagId: resolvedOcppTagId,
+    ocppTagPk,
+    isLive,
+    liveChargeBoxId,
+    liveConnectorId,
+    liveStartedAt,
+    liveInitialKwh,
+    isAdmin,
   } = data;
   const ocppTagId = resolvedOcppTagId ?? "Unknown";
 
@@ -112,6 +193,18 @@ export default define.page<typeof handler>(function TransactionDetailsPage({
       actions={<BackAction href="/transactions" />}
     >
       <div className="space-y-6">
+        {/* Live session card — only for in-progress sessions. */}
+        {isLive && (
+          <LiveSessionCard
+            steveTransactionId={steveTransactionId}
+            chargeBoxId={liveChargeBoxId}
+            connectorId={liveConnectorId}
+            initialKwh={liveInitialKwh}
+            startedAt={liveStartedAt}
+            isAdmin={isAdmin}
+          />
+        )}
+
         {/* Charging Session Info Card */}
         <PageCard title="Charging Session Overview" colorScheme="green">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-2">
@@ -124,7 +217,16 @@ export default define.page<typeof handler>(function TransactionDetailsPage({
             <MetricTile
               icon={Tag}
               label="OCPP Tag"
-              value={<span className="font-mono">{ocppTagId}</span>}
+              value={ocppTagPk && resolvedOcppTagId
+                ? (
+                  <a
+                    href={`/tags/${ocppTagPk}`}
+                    className="font-mono hover:underline"
+                  >
+                    {ocppTagId}
+                  </a>
+                )
+                : <span className="font-mono">{ocppTagId}</span>}
               accent="cyan"
             />
             <MetricTile
@@ -165,18 +267,31 @@ export default define.page<typeof handler>(function TransactionDetailsPage({
               </div>
             </div>
           </div>
+          {liveChargeBoxId && (
+            <p className="mt-4 text-xs text-muted-foreground">
+              Charger:{" "}
+              <a
+                href={`/chargers/${encodeURIComponent(liveChargeBoxId)}`}
+                className="font-mono hover:underline"
+              >
+                {liveChargeBoxId}
+              </a>
+              {liveConnectorId != null && (
+                <span>· Connector {liveConnectorId}</span>
+              )}
+            </p>
+          )}
         </PageCard>
 
         {/* Billing Events Table */}
-        <PageCard
+        <SectionCard
           title="Billing Events"
           description={`${billingEvents.length} event${
             billingEvents.length !== 1 ? "s" : ""
           } sent to Lago`}
-          colorScheme="green"
         >
           <BillingEventsTable events={billingEvents} />
-        </PageCard>
+        </SectionCard>
       </div>
     </SidebarLayout>
   );
