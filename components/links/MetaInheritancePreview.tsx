@@ -3,18 +3,15 @@
  * on `/links/new` when the operator selects a meta-tag (OCPP-*) in the
  * TagPicker.
  *
- * Lists the child idTags that will inherit the link at the next sync tick.
- * Pure presentation; no signals or fetches.
+ * Renders inline inside the `MappingForm` (which itself lives inside a
+ * `SectionCard` now), so this uses a lightweight bordered sub-panel rather
+ * than another full SectionCard — prevents nested card chrome while still
+ * carrying the violet accent wash the rest of the linking UI uses.
  */
 
 import { CornerDownRight, Info, Layers } from "lucide-preact";
+import { Badge } from "@/components/ui/badge.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card.tsx";
 
 interface Props {
   parentIdTag: string;
@@ -26,20 +23,38 @@ export function MetaInheritancePreview(
   { parentIdTag, childIdTags, class: className }: Props,
 ) {
   const count = childIdTags.length;
+
   return (
-    <Card
+    <section
+      aria-labelledby="inheritance-preview-title"
       class={cn(
-        "border-dashed border-violet-500/40 bg-violet-500/5",
+        "rounded-lg border border-violet-500/30 bg-violet-500/5",
         className,
       )}
     >
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <Layers class="size-4 text-violet-500" aria-hidden="true" />
-          Inheritance preview
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3 text-sm">
+      <header class="flex items-center justify-between gap-3 border-b border-violet-500/20 px-4 py-2.5">
+        <div class="flex items-center gap-2 min-w-0">
+          <span
+            class="flex size-7 shrink-0 items-center justify-center rounded-md bg-violet-500/10 text-violet-600 dark:text-violet-400"
+            aria-hidden="true"
+          >
+            <Layers class="size-4" />
+          </span>
+          <h4
+            id="inheritance-preview-title"
+            class="text-sm font-semibold truncate"
+          >
+            Inheritance preview
+          </h4>
+        </div>
+        {count > 0 && (
+          <Badge variant="outline" class="font-normal">
+            {count} child{count === 1 ? "" : "ren"}
+          </Badge>
+        )}
+      </header>
+
+      <div class="space-y-3 px-4 py-3 text-sm">
         <p class="text-muted-foreground">
           {count === 0
             ? (
@@ -52,15 +67,16 @@ export function MetaInheritancePreview(
             )
             : (
               <>
-                <strong class="text-foreground">
-                  {count} child{count === 1 ? "" : "ren"}
-                </strong>{" "}
-                will follow this link at the next sync tick:
+                These tags will follow the link at the next sync tick:
               </>
             )}
         </p>
+
         {count > 0 && (
-          <ul class="flex flex-wrap gap-1.5" aria-label="Inherited child tags">
+          <ul
+            class="flex flex-wrap gap-1.5"
+            aria-label="Inherited child tags"
+          >
             {childIdTags.map((idTag) => (
               <li
                 key={idTag}
@@ -75,11 +91,12 @@ export function MetaInheritancePreview(
             ))}
           </ul>
         )}
+
         <p class="flex items-start gap-1.5 text-xs text-muted-foreground">
           <Info class="size-3.5 shrink-0 mt-0.5" aria-hidden="true" />
-          Inheritance propagates at the next sync; no immediate StEvE write.
+          Inheritance propagates at the next sync — no immediate StEvE write.
         </p>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
