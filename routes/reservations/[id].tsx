@@ -11,8 +11,15 @@ import { db } from "../../src/db/index.ts";
 import * as schema from "../../src/db/schema.ts";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
-import { BatteryCharging, Tag as TagIcon, User } from "lucide-preact";
+import {
+  BatteryCharging,
+  CalendarClock,
+  Link2,
+  Tag as TagIcon,
+  User,
+} from "lucide-preact";
 import { BackAction } from "../../components/shared/BackAction.tsx";
+import { SectionCard } from "../../components/shared/SectionCard.tsx";
 import {
   type Pill,
   StatusPillRow,
@@ -213,9 +220,11 @@ export default define.page<typeof handler>(
             <StatusPillRow pills={pills} />
 
             <div class="grid gap-6 lg:grid-cols-2">
-              {/* Left: mini timeline */}
-              <div class="rounded-md border bg-background p-4">
-                <h3 class="mb-3 text-sm font-semibold">Timeline</h3>
+              <SectionCard
+                title="Timeline"
+                icon={CalendarClock}
+                accent="indigo"
+              >
                 <div class="flex flex-col gap-3 text-sm">
                   <div class="flex items-center justify-between gap-3">
                     <span class="text-muted-foreground">Window</span>
@@ -245,12 +254,14 @@ export default define.page<typeof handler>(
                   Times shown in your local timezone. Charger-local tz will be
                   used once charger metadata carries it.
                 </p>
-              </div>
+              </SectionCard>
 
-              {/* Right: chips + audit */}
               <div class="flex flex-col gap-4">
-                <div class="rounded-md border bg-background p-4">
-                  <h3 class="mb-3 text-sm font-semibold">Integration</h3>
+                <SectionCard
+                  title="Integration"
+                  icon={Link2}
+                  accent="indigo"
+                >
                   <dl class="grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <dt class="text-xs uppercase tracking-wide text-muted-foreground">
@@ -267,12 +278,13 @@ export default define.page<typeof handler>(
                       </dd>
                     </div>
                   </dl>
-                </div>
+                </SectionCard>
 
-                <div class="rounded-md border bg-background p-4">
-                  <h3 class="mb-3 flex items-center gap-2 text-sm font-semibold">
-                    <User class="size-4" /> Audit
-                  </h3>
+                <SectionCard
+                  title="Audit"
+                  icon={User}
+                  accent="indigo"
+                >
                   <dl class="grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <dt class="text-xs uppercase tracking-wide text-muted-foreground">
@@ -304,11 +316,10 @@ export default define.page<typeof handler>(
                       ))}
                     </ul>
                   )}
-                </div>
+                </SectionCard>
               </div>
             </div>
 
-            {/* Action row */}
             <div class="flex flex-col gap-3 border-t pt-4">
               <ReservationDetail
                 reservationId={r.id}

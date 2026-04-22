@@ -19,7 +19,7 @@ import ChargingSessionsFilters, {
 } from "../../islands/ChargingSessionsFilters.tsx";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
-import { MetricTile } from "@/components/shared/index.ts";
+import { StatStrip, type StatStripItem } from "@/components/shared/index.ts";
 import { Activity, BatteryCharging, Gauge, Zap } from "lucide-preact";
 
 const PAGE_SIZE = 15;
@@ -42,7 +42,7 @@ interface Filters {
   tag: string;
 }
 
-interface StatStrip {
+interface TransactionStats {
   sessionsToday: number;
   kwh7d: number;
   activeNow: number;
@@ -88,7 +88,7 @@ function buildTxStateConditions(filters: Filters): SQL | undefined {
   return and(...parts);
 }
 
-async function computeStats(): Promise<StatStrip> {
+async function computeStats(): Promise<TransactionStats> {
   try {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
@@ -275,30 +275,35 @@ export default define.page<typeof handler>(
           }${hasActiveFilter ? " match current filters" : " recorded"}`}
           colorScheme="green"
         >
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-            <MetricTile
-              icon={Zap}
-              label="Sessions today"
-              value={data.stats.sessionsToday}
+          <div class="mb-6">
+            <StatStrip
               accent="green"
-            />
-            <MetricTile
-              icon={BatteryCharging}
-              label="kWh delivered (7d)"
-              value={data.stats.kwh7d.toFixed(2)}
-              accent="green"
-            />
-            <MetricTile
-              icon={Activity}
-              label="Active now"
-              value={data.stats.activeNow}
-              accent="cyan"
-            />
-            <MetricTile
-              icon={Gauge}
-              label="Avg kWh / session (7d)"
-              value={data.stats.avgKwh7d.toFixed(2)}
-              accent="amber"
+              items={[
+                {
+                  key: "sessions-today",
+                  label: "Sessions today",
+                  value: data.stats.sessionsToday,
+                  icon: Zap,
+                },
+                {
+                  key: "kwh-7d",
+                  label: "kWh delivered (7d)",
+                  value: data.stats.kwh7d.toFixed(2),
+                  icon: BatteryCharging,
+                },
+                {
+                  key: "active-now",
+                  label: "Active now",
+                  value: data.stats.activeNow,
+                  icon: Activity,
+                },
+                {
+                  key: "avg-kwh",
+                  label: "Avg kWh / session (7d)",
+                  value: data.stats.avgKwh7d.toFixed(2),
+                  icon: Gauge,
+                },
+              ] satisfies StatStripItem[]}
             />
           </div>
 

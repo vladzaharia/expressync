@@ -10,12 +10,8 @@ import { lagoClient } from "../../src/lib/lago-client.ts";
 import { config } from "../../src/lib/config.ts";
 import { getAllChildTags, isMetaTag } from "../../src/lib/tag-hierarchy.ts";
 import { BackAction } from "../../components/shared/BackAction.tsx";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "../../components/ui/card.tsx";
+import { SectionCard } from "../../components/shared/SectionCard.tsx";
+import { FileText } from "lucide-preact";
 import { TagHeaderStrip } from "../../components/tags/TagHeaderStrip.tsx";
 import {
   TagLinkingCard,
@@ -487,18 +483,18 @@ export default define.page<typeof handler>(
 
             {/* 2-col split: metadata (2fr) + linking (1fr) at lg+. */}
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              <Card class="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle class="text-base">Metadata</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <TagMetadataForm
-                    ocppTagPk={tagPk}
-                    ocppIdTag={idTag}
-                    initial={initialMetadata}
-                  />
-                </CardContent>
-              </Card>
+              <SectionCard
+                title="Metadata"
+                icon={FileText}
+                accent="cyan"
+                className="lg:col-span-2"
+              >
+                <TagMetadataForm
+                  ocppTagPk={tagPk}
+                  ocppIdTag={idTag}
+                  initial={initialMetadata}
+                />
+              </SectionCard>
 
               <div class="lg:col-span-1">
                 <TagLinkingCard

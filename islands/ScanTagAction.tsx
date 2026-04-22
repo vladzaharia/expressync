@@ -3,6 +3,7 @@ import { Radio } from "lucide-preact";
 import { Button } from "@/components/ui/button.tsx";
 import TapToAddModal from "./TapToAddModal.tsx";
 import type { ScanResult } from "@/islands/shared/use-scan-tag.ts";
+import type { AccentColor } from "@/src/lib/colors.ts";
 
 /**
  * Header-action island on /tags (and any other page that wants a
@@ -26,10 +27,18 @@ interface Props {
   /** Hand through to `TapToAddModal`. */
   confirmMode?: "auto" | "manual";
   timeoutSeconds?: number;
+  /** Themes the modal BorderBeam / countdown ring. Defaults to cyan. */
+  accent?: AccentColor;
 }
 
 export default function ScanTagAction(
-  { onDetected, buttonLabel = "Scan Tag", confirmMode, timeoutSeconds }: Props,
+  {
+    onDetected,
+    buttonLabel = "Scan Tag",
+    confirmMode,
+    timeoutSeconds,
+    accent,
+  }: Props,
 ) {
   const open = useSignal(false);
 
@@ -68,6 +77,7 @@ export default function ScanTagAction(
         onDetected={handleDetected}
         confirmMode={confirmMode}
         timeoutSeconds={timeoutSeconds}
+        accent={accent}
       />
     </>
   );

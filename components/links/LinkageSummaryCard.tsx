@@ -15,12 +15,7 @@ import {
   User,
 } from "lucide-preact";
 import { Button } from "@/components/ui/button.tsx";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card.tsx";
+import { SectionCard } from "@/components/shared/SectionCard.tsx";
 
 interface Props {
   idTag: string;
@@ -41,84 +36,81 @@ export function LinkageSummaryCard(
   { idTag, tagPk, customer, subscription }: Props,
 ) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <Link2 className="size-4 text-violet-500" aria-hidden="true" />
-          Linkage summary
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4 text-sm">
-        <p class="text-muted-foreground leading-relaxed">
-          Tag <code class="font-mono text-foreground">{idTag}</code> bills{" "}
-          <strong class="text-foreground">
-            {customer ? customer.name : "—"}
-          </strong>
-          {subscription
-            ? (
-              <>
-                {" "}on plan{" "}
-                <strong class="text-foreground">{subscription.name}</strong>.
-              </>
-            )
-            : <>(no active subscription yet).</>}
-        </p>
+    <SectionCard
+      title="Linkage summary"
+      icon={Link2}
+      accent="violet"
+      contentClassName="pt-4 space-y-4 text-sm"
+    >
+      <p class="text-muted-foreground leading-relaxed">
+        Tag <code class="font-mono text-foreground">{idTag}</code> bills{" "}
+        <strong class="text-foreground">
+          {customer ? customer.name : "—"}
+        </strong>
+        {subscription
+          ? (
+            <>
+              {" "}on plan{" "}
+              <strong class="text-foreground">{subscription.name}</strong>.
+            </>
+          )
+          : <>(no active subscription yet).</>}
+      </p>
 
-        <div class="flex flex-col gap-2">
+      <div class="flex flex-col gap-2">
+        <Button variant="outline" size="sm" asChild>
+          <a href={`/tags/${tagPk}`}>
+            <Tag class="mr-2 size-4" aria-hidden="true" />
+            Edit tag metadata
+          </a>
+        </Button>
+        {customer?.lagoUrl && (
           <Button variant="outline" size="sm" asChild>
-            <a href={`/tags/${tagPk}`}>
-              <Tag class="mr-2 size-4" aria-hidden="true" />
-              Edit tag metadata
+            <a
+              href={customer.lagoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <User class="mr-2 size-4" aria-hidden="true" />
+              Open customer in Lago
+              <ExternalLink
+                class="ml-auto size-3 opacity-60"
+                aria-hidden="true"
+              />
+              <span class="sr-only">(opens in new tab)</span>
             </a>
           </Button>
-          {customer?.lagoUrl && (
-            <Button variant="outline" size="sm" asChild>
-              <a
-                href={customer.lagoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <User class="mr-2 size-4" aria-hidden="true" />
-                Open customer in Lago
-                <ExternalLink
-                  class="ml-auto size-3 opacity-60"
-                  aria-hidden="true"
-                />
-                <span class="sr-only">(opens in new tab)</span>
-              </a>
-            </Button>
-          )}
-          {subscription?.lagoUrl && (
-            <Button variant="outline" size="sm" asChild>
-              <a
-                href={subscription.lagoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <CreditCard class="mr-2 size-4" aria-hidden="true" />
-                Open subscription in Lago
-                <ExternalLink
-                  class="ml-auto size-3 opacity-60"
-                  aria-hidden="true"
-                />
-                <span class="sr-only">(opens in new tab)</span>
-              </a>
-            </Button>
-          )}
-          {customer && (
-            <Button variant="outline" size="sm" asChild>
-              <a
-                href={`/links/new?customerId=${
-                  encodeURIComponent(customer.externalId)
-                }`}
-              >
-                <Scan class="mr-2 size-4" aria-hidden="true" />
-                Scan another tag for this customer
-              </a>
-            </Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+        )}
+        {subscription?.lagoUrl && (
+          <Button variant="outline" size="sm" asChild>
+            <a
+              href={subscription.lagoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <CreditCard class="mr-2 size-4" aria-hidden="true" />
+              Open subscription in Lago
+              <ExternalLink
+                class="ml-auto size-3 opacity-60"
+                aria-hidden="true"
+              />
+              <span class="sr-only">(opens in new tab)</span>
+            </a>
+          </Button>
+        )}
+        {customer && (
+          <Button variant="outline" size="sm" asChild>
+            <a
+              href={`/links/new?customerId=${
+                encodeURIComponent(customer.externalId)
+              }`}
+            >
+              <Scan class="mr-2 size-4" aria-hidden="true" />
+              Scan another tag for this customer
+            </a>
+          </Button>
+        )}
+      </div>
+    </SectionCard>
   );
 }
