@@ -76,7 +76,7 @@ export const handler = define.middleware(async (ctx) => {
     ? `auth:${clientIp}`
     : `general:${clientIp}`;
 
-  if (!checkRateLimit(rateLimitKey, maxRequests)) {
+  if (!(await checkRateLimit(rateLimitKey, maxRequests))) {
     return new Response(
       JSON.stringify({ error: "Too many requests. Please try again later." }),
       {

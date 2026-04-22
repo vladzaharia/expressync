@@ -10,6 +10,7 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -869,3 +870,35 @@ export interface ChargingWindow {
   /** Optional per-window power cap in Watts (overrides maxWGlobal) */
   maxW?: number;
 }
+
+// ============================================================================
+// === Phase A7a: Postgres-backed rate limiter ===
+// ============================================================================
+
+/**
+ * Rate Limits - Postgres-backed fixed-window rate limiter
+ *
+ * Replaces the in-memory `Map` used previously so rate limits survive restarts
+ * and work correctly across multiple app instances. Each row represents one
+ * (key, windowStart) bucket; `count` is incremented via UPSERT on every hit.
+ *
+ * Cleanup is handled by a cron job in `sync-worker.ts` which deletes rows
+ * whose `updated_at` is older than 120 seconds.
+ */
+export const rateLimits = pgTable("rate_limits", {
+  id: serial("id").primaryKey(),
+  key: text("key").notNull(),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+  count: integer("count").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (table) => [
+  uniqueIndex("rate_limits_key_window_start_unique").on(
+    table.key,
+    table.windowStart,
+  ),
+  index("idx_rate_limits_updated_at").on(table.updatedAt),
+]);
+
+export type RateLimit = typeof rateLimits.$inferSelect;
+export type NewRateLimit = typeof rateLimits.$inferInsert;

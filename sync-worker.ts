@@ -19,10 +19,14 @@
  */
 
 import postgres from "postgres";
+import { Cron } from "croner";
+import { sql } from "drizzle-orm";
 import { config, validateSyncWorkerConfig } from "./src/lib/config.ts";
 import { runSync, type SyncResult } from "./src/services/sync.service.ts";
 import { SyncScheduler } from "./src/services/sync-scheduler.ts";
 import { ensureLagoMetricSafety } from "./src/services/lago-safety.service.ts";
+import { db } from "./src/db/index.ts";
+import { rateLimits } from "./src/db/schema.ts";
 
 // Validate configuration on startup
 console.log("[Sync Worker] Starting OCPP Billing Sync Worker...");
@@ -132,6 +136,33 @@ async function handleSync(): Promise<SyncResult | void> {
   return result;
 }
 
+// Phase A7a: Rate-limit cleanup cron — runs every 2 minutes and deletes
+// `rate_limits` rows older than 120 seconds. Because RATE_LIMIT_WINDOW_MS is
+// 60s, anything older than that is guaranteed-stale and safe to prune.
+const rateLimitCleanupJob = new Cron(
+  "*/2 * * * *",
+  { protect: true, timezone: "UTC" },
+  async () => {
+    try {
+      const result = await db
+        .delete(rateLimits)
+        .where(sql`updated_at < now() - interval '120 seconds'`);
+      console.log(
+        `[Sync Worker] rate_limits cleanup ok; rows removed: ${
+          (result as unknown as { count?: number })?.count ?? "unknown"
+        }`,
+      );
+    } catch (err) {
+      console.error("[Sync Worker] rate_limits cleanup failed:", err);
+    }
+  },
+);
+console.log(
+  `[Sync Worker] Rate-limit cleanup cron scheduled; next run: ${
+    rateLimitCleanupJob.nextRun()?.toISOString() ?? "unknown"
+  }`,
+);
+
 // Start the adaptive scheduler (replaces the old fixed Cron).
 await SyncScheduler.start(handleSync);
 console.log("[Sync Worker] Adaptive scheduler started");
@@ -201,6 +232,7 @@ const shutdown = async () => {
   isShuttingDown = true;
   console.log("[Sync Worker] Shutting down gracefully...");
   SyncScheduler.stop();
+  rateLimitCleanupJob.stop();
   console.log("[Sync Worker] Scheduler stopped");
 
   if (currentSyncPromise) {
