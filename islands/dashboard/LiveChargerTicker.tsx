@@ -5,7 +5,7 @@
  * `islands/shared/SseProvider.tsx`) and:
  *   - Flashes a pulsing dot for ~1s on each event.
  *   - Updates an "updated Xs ago" relative timestamp.
- *   - Falls back to a muted "Live updates off" chip when the SSE backbone is
+ *   - Renders nothing when the SSE backbone is
  *     disconnected (e.g. `ENABLE_SSE=false` on the server or a network blip
  *     the provider hasn't recovered from yet).
  *
@@ -66,22 +66,7 @@ export default function LiveChargerTicker({ class: className }: Props) {
   const hasEvent = lastEventAt.value !== null;
 
   if (!connected && !hasEvent) {
-    return (
-      <div
-        class={cn(
-          "inline-flex items-center gap-2 rounded-full border border-border/60 bg-muted/30 px-2.5 py-1 text-xs text-muted-foreground",
-          className,
-        )}
-        role="status"
-        aria-live="polite"
-      >
-        <span
-          class="size-2 rounded-full bg-muted-foreground/50"
-          aria-hidden="true"
-        />
-        <span>Live updates off</span>
-      </div>
-    );
+    return null;
   }
 
   const dotColor = connected ? "bg-green-500" : "bg-amber-500";
