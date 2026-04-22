@@ -7,6 +7,8 @@ import { PageCard } from "../../components/PageCard.tsx";
 import MappingForm from "../../islands/MappingForm.tsx";
 import MappingIssueCardAction from "../../islands/MappingIssueCardAction.tsx";
 import { BackAction } from "../../components/shared/BackAction.tsx";
+import { SectionCard } from "../../components/shared/SectionCard.tsx";
+import { Settings } from "lucide-preact";
 import { getAllChildTags, isMetaTag } from "../../src/lib/tag-hierarchy.ts";
 import { config } from "../../src/lib/config.ts";
 import { lagoClient } from "../../src/lib/lago-client.ts";
@@ -220,7 +222,14 @@ export default define.page<typeof handler>(
             />
 
             <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-              <section>
+              <SectionCard
+                title="Billing configuration"
+                description={meta
+                  ? "Meta-tag rollup — child tags inherit this customer"
+                  : "Customer + subscription that this tag bills to"}
+                icon={Settings}
+                accent="violet"
+              >
                 <MappingForm
                   mapping={{
                     id: mapping.id,
@@ -233,7 +242,7 @@ export default define.page<typeof handler>(
                   }}
                   lagoDashboardUrl={lagoDashboardUrl}
                 />
-              </section>
+              </SectionCard>
               <aside class="space-y-4">
                 <LinkageSummaryCard
                   idTag={mapping.steveOcppIdTag}

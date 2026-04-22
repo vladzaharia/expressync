@@ -1,4 +1,3 @@
-import type { ComponentChildren } from "preact";
 import { define } from "../../utils.ts";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
@@ -8,6 +7,10 @@ import InvoicesTable from "../../islands/invoices/InvoicesTable.tsx";
 import InvoiceFilters from "../../islands/invoices/InvoiceFilters.tsx";
 import { MoneyBadge } from "../../components/billing/MoneyBadge.tsx";
 import { BlurFade } from "../../components/magicui/blur-fade.tsx";
+import {
+  StatStrip,
+  type StatStripItem,
+} from "../../components/shared/StatStrip.tsx";
 import {
   deriveInvoiceUiStatus,
   extractInvoiceCustomer,
@@ -225,48 +228,48 @@ export default define.page<typeof handler>(function InvoicesIndexPage({
         )}
 
         <BlurFade direction="up" duration={0.35}>
-          <div className="grid grid-cols-2 gap-3 mb-6 lg:grid-cols-4">
-            <StatTile
-              label="Unpaid"
-              icon={<Wallet className="size-4" />}
-              value={
-                <MoneyBadge
-                  cents={data.stats.unpaidCents}
-                  currency={data.stats.currency}
-                />
-              }
-              sub={`${data.stats.unpaidCount} invoice${
-                data.stats.unpaidCount === 1 ? "" : "s"
-              }`}
-            />
-            <StatTile
-              label="Paid this month"
-              icon={<FileText className="size-4" />}
-              value={
-                <MoneyBadge
-                  cents={data.stats.paidThisMonthCents}
-                  currency={data.stats.currency}
-                />
-              }
-            />
-            <StatTile
-              label="Overdue"
-              icon={<AlertTriangle className="size-4" />}
-              value={
-                <span className="text-2xl font-semibold tabular-nums">
-                  {data.stats.overdueCount}
-                </span>
-              }
-              warn={data.stats.overdueCount > 0}
-            />
-            <StatTile
-              label="Cycle"
-              icon={<Clock className="size-4" />}
-              value={
-                <span className="text-sm font-medium tabular-nums text-muted-foreground">
-                  Last 30 days
-                </span>
-              }
+          <div className="mb-6">
+            <StatStrip
+              accent="teal"
+              items={[
+                {
+                  key: "unpaid",
+                  label: `Unpaid · ${data.stats.unpaidCount}`,
+                  value: (
+                    <MoneyBadge
+                      cents={data.stats.unpaidCents}
+                      currency={data.stats.currency}
+                    />
+                  ),
+                  icon: Wallet,
+                },
+                {
+                  key: "paid",
+                  label: "Paid this month",
+                  value: (
+                    <MoneyBadge
+                      cents={data.stats.paidThisMonthCents}
+                      currency={data.stats.currency}
+                    />
+                  ),
+                  icon: FileText,
+                  tone: "emerald",
+                },
+                {
+                  key: "overdue",
+                  label: "Overdue",
+                  value: data.stats.overdueCount,
+                  icon: AlertTriangle,
+                  warn: data.stats.overdueCount > 0,
+                },
+                {
+                  key: "cycle",
+                  label: "Cycle",
+                  value: "Last 30 days",
+                  icon: Clock,
+                  tone: "muted",
+                },
+              ] satisfies StatStripItem[]}
             />
           </div>
         </BlurFade>
@@ -284,34 +287,3 @@ export default define.page<typeof handler>(function InvoicesIndexPage({
     </SidebarLayout>
   );
 });
-
-function StatTile({
-  label,
-  value,
-  sub,
-  icon,
-  warn,
-}: {
-  label: string;
-  value: ComponentChildren;
-  sub?: string;
-  icon?: ComponentChildren;
-  warn?: boolean;
-}) {
-  return (
-    <div
-      className={warn
-        ? "rounded-lg border border-rose-500/30 bg-rose-500/5 p-4"
-        : "rounded-lg border bg-card p-4"}
-    >
-      <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
-        {icon}
-        {label}
-      </div>
-      <div className="mt-2 text-2xl font-semibold">
-        {value}
-      </div>
-      {sub && <p className="mt-1 text-xs text-muted-foreground">{sub}</p>}
-    </div>
-  );
-}
