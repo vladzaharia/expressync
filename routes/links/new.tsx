@@ -10,10 +10,7 @@ import { CHROME_SIZE } from "../../components/AppSidebar.tsx";
 import { config } from "../../src/lib/config.ts";
 import { steveClient } from "../../src/lib/steve-client.ts";
 import { lagoClient } from "../../src/lib/lago-client.ts";
-import {
-  getAllChildTags,
-  isMetaTag,
-} from "../../src/lib/tag-hierarchy.ts";
+import { getAllChildTags, isMetaTag } from "../../src/lib/tag-hierarchy.ts";
 import { MetaInheritancePreview } from "../../components/links/MetaInheritancePreview.tsx";
 
 /**

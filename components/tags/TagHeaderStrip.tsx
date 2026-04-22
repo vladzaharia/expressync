@@ -18,10 +18,7 @@ import {
   type TagType,
   tagTypeLabels,
 } from "@/src/lib/types/tags.ts";
-import {
-  tagTypeBgClass,
-  tagTypeTextClass,
-} from "@/src/lib/tag-visuals.ts";
+import { tagTypeBgClass, tagTypeTextClass } from "@/src/lib/tag-visuals.ts";
 
 interface Props {
   idTag: string;

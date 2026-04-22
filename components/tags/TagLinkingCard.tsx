@@ -140,10 +140,10 @@ export function TagLinkingCard(
   const customerUrl = lagoDashboardUrl && linking.lagoCustomerLagoId
     ? `${lagoDashboardUrl}/customer/${linking.lagoCustomerLagoId}`
     : null;
-  const subscriptionUrl =
-    lagoDashboardUrl && linking.lagoCustomerLagoId && linking.lagoSubscriptionLagoId
-      ? `${lagoDashboardUrl}/customer/${linking.lagoCustomerLagoId}/subscription/${linking.lagoSubscriptionLagoId}/overview`
-      : null;
+  const subscriptionUrl = lagoDashboardUrl && linking.lagoCustomerLagoId &&
+      linking.lagoSubscriptionLagoId
+    ? `${lagoDashboardUrl}/customer/${linking.lagoCustomerLagoId}/subscription/${linking.lagoSubscriptionLagoId}/overview`
+    : null;
 
   return (
     <Card>

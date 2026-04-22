@@ -130,7 +130,7 @@ export default function SyncControls({ isAdmin = false }: SyncControlsProps) {
     return !!until && new Date(until).getTime() > now.value;
   });
 
-  async function handleResetCadence() {
+  function handleResetCadence() {
     triggerDialogOpen.value = true;
   }
 

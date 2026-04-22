@@ -13,16 +13,9 @@ import type { ComponentChildren } from "preact";
 import { CornerDownRight, Layers } from "lucide-preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { isMetaTag } from "@/src/lib/tag-hierarchy.ts";
-import {
-  TAG_TYPES,
-  type TagType,
-  tagTypeLabels,
-} from "@/src/lib/types/tags.ts";
+import { TAG_TYPES, type TagType } from "@/src/lib/types/tags.ts";
 import { tagTypeIcons } from "@/components/brand/tags/index.ts";
-import {
-  tagTypeBgClass,
-  tagTypeTextClass,
-} from "@/src/lib/tag-visuals.ts";
+import { tagTypeBgClass, tagTypeTextClass } from "@/src/lib/tag-visuals.ts";
 
 interface Props {
   /** The OCPP id tag (shown mono); also used to detect meta-tag by prefix. */
@@ -98,7 +91,9 @@ export function TagChip({
     hasLagoCustomer
       ? "bg-background hover:bg-accent hover:text-accent-foreground"
       : "border-dashed bg-muted/40 text-muted-foreground hover:bg-muted",
-    target ? "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" : null,
+    target
+      ? "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      : null,
     className,
   );
 

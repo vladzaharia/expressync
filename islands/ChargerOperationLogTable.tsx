@@ -10,7 +10,14 @@
 import { useState } from "preact/hooks";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table.tsx";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table.tsx";
 import { ChevronDown, ChevronRight, RefreshCw } from "lucide-preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { formatRelative } from "./shared/charger-visuals.ts";
@@ -127,7 +134,9 @@ export default function ChargerOperationLogTable(
                 </TableCell>
                 <TableCell class="font-mono text-xs">{row.operation}</TableCell>
                 <TableCell>
-                  <Badge variant={statusVariant(row.status)}>{row.status}</Badge>
+                  <Badge variant={statusVariant(row.status)}>
+                    {row.status}
+                  </Badge>
                   {row.taskId !== null && (
                     <span class="ml-2 font-mono text-[11px] text-muted-foreground">
                       task {row.taskId}

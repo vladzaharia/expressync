@@ -20,8 +20,8 @@
 import { useEffect, useState } from "preact/hooks";
 import type { LucideIcon } from "lucide-preact";
 import {
-  BellRing,
   Ban,
+  BellRing,
   ChevronDown,
   Download,
   FileText,
@@ -122,8 +122,18 @@ const OP_CATALOG: Record<OcppOperationName, OpSpec> = {
     description:
       "Send a RemoteStartTransaction so the charger begins charging under the supplied OCPP tag.",
     fields: [
-      { key: "chargeBoxId", label: "Charge box ID", type: "string", readOnly: true },
-      { key: "connectorId", label: "Connector (0 = charger-wide)", type: "integer", min: 0 },
+      {
+        key: "chargeBoxId",
+        label: "Charge box ID",
+        type: "string",
+        readOnly: true,
+      },
+      {
+        key: "connectorId",
+        label: "Connector (0 = charger-wide)",
+        type: "integer",
+        min: 0,
+      },
       { key: "idTag", label: "OCPP ID tag", type: "string", required: true },
       {
         key: "chargingProfilePk",
@@ -139,8 +149,18 @@ const OP_CATALOG: Record<OcppOperationName, OpSpec> = {
     description:
       "Send a RemoteStopTransaction for the given live transaction ID.",
     fields: [
-      { key: "chargeBoxId", label: "Charge box ID", type: "string", readOnly: true },
-      { key: "transactionId", label: "Transaction ID", type: "integer", required: true },
+      {
+        key: "chargeBoxId",
+        label: "Charge box ID",
+        type: "string",
+        readOnly: true,
+      },
+      {
+        key: "transactionId",
+        label: "Transaction ID",
+        type: "integer",
+        required: true,
+      },
     ],
     destructive: true,
     primaryLabel: "Stop transaction",
@@ -152,8 +172,19 @@ const OP_CATALOG: Record<OcppOperationName, OpSpec> = {
     description:
       "Physically releases the cable. Use when a customer can't detach after a completed session.",
     fields: [
-      { key: "chargeBoxId", label: "Charge box ID", type: "string", readOnly: true },
-      { key: "connectorId", label: "Connector", type: "integer", required: true, min: 1 },
+      {
+        key: "chargeBoxId",
+        label: "Charge box ID",
+        type: "string",
+        readOnly: true,
+      },
+      {
+        key: "connectorId",
+        label: "Connector",
+        type: "integer",
+        required: true,
+        min: 1,
+      },
     ],
     destructive: true,
     primaryLabel: "Unlock connector",
@@ -161,11 +192,28 @@ const OP_CATALOG: Record<OcppOperationName, OpSpec> = {
   ReserveNow: {
     icon: Timer,
     label: "Reserve connector",
-    description: "Reserve a connector for a specific idTag until a future time.",
+    description:
+      "Reserve a connector for a specific idTag until a future time.",
     fields: [
-      { key: "chargeBoxId", label: "Charge box ID", type: "string", readOnly: true },
-      { key: "connectorId", label: "Connector (0 = any)", type: "integer", required: true, min: 0 },
-      { key: "expiry", label: "Expires at (ISO8601)", type: "datetime", required: true },
+      {
+        key: "chargeBoxId",
+        label: "Charge box ID",
+        type: "string",
+        readOnly: true,
+      },
+      {
+        key: "connectorId",
+        label: "Connector (0 = any)",
+        type: "integer",
+        required: true,
+        min: 0,
+      },
+      {
+        key: "expiry",
+        label: "Expires at (ISO8601)",
+        type: "datetime",
+        required: true,
+      },
       { key: "idTag", label: "OCPP ID tag", type: "string", required: true },
     ],
     primaryLabel: "Reserve",
@@ -175,8 +223,19 @@ const OP_CATALOG: Record<OcppOperationName, OpSpec> = {
     label: "Cancel reservation",
     description: "Cancels an existing reservation by its reservation ID.",
     fields: [
-      { key: "chargeBoxId", label: "Charge box ID", type: "string", readOnly: true },
-      { key: "reservationId", label: "Reservation ID", type: "integer", required: true, min: 0 },
+      {
+        key: "chargeBoxId",
+        label: "Charge box ID",
+        type: "string",
+        readOnly: true,
+      },
+      {
+        key: "reservationId",
+        label: "Reservation ID",
+        type: "integer",
+        required: true,
+        min: 0,
+      },
     ],
     primaryLabel: "Cancel reservation",
   },
@@ -186,8 +245,18 @@ const OP_CATALOG: Record<OcppOperationName, OpSpec> = {
     description:
       "Put the charge point (or one connector) Operative or Inoperative.",
     fields: [
-      { key: "chargeBoxId", label: "Charge box ID", type: "string", readOnly: true },
-      { key: "connectorId", label: "Connector (0 = whole charger)", type: "integer", min: 0 },
+      {
+        key: "chargeBoxId",
+        label: "Charge box ID",
+        type: "string",
+        readOnly: true,
+      },
+      {
+        key: "connectorId",
+        label: "Connector (0 = whole charger)",
+        type: "integer",
+        min: 0,
+      },
       {
         key: "availType",
         label: "Availability",
@@ -208,7 +277,12 @@ const OP_CATALOG: Record<OcppOperationName, OpSpec> = {
     description:
       "Ask the charger to send one specific OCPP message now (e.g. StatusNotification).",
     fields: [
-      { key: "chargeBoxId", label: "Charge box ID", type: "string", readOnly: true },
+      {
+        key: "chargeBoxId",
+        label: "Charge box ID",
+        type: "string",
+        readOnly: true,
+      },
       {
         key: "triggerMessage",
         label: "Message",
@@ -219,11 +293,22 @@ const OP_CATALOG: Record<OcppOperationName, OpSpec> = {
           { value: "Heartbeat", label: "Heartbeat" },
           { value: "MeterValues", label: "MeterValues" },
           { value: "BootNotification", label: "BootNotification" },
-          { value: "DiagnosticsStatusNotification", label: "DiagnosticsStatusNotification" },
-          { value: "FirmwareStatusNotification", label: "FirmwareStatusNotification" },
+          {
+            value: "DiagnosticsStatusNotification",
+            label: "DiagnosticsStatusNotification",
+          },
+          {
+            value: "FirmwareStatusNotification",
+            label: "FirmwareStatusNotification",
+          },
         ],
       },
-      { key: "connectorId", label: "Connector (optional)", type: "integer", min: 1 },
+      {
+        key: "connectorId",
+        label: "Connector (optional)",
+        type: "integer",
+        min: 1,
+      },
     ],
     primaryLabel: "Trigger",
   },
@@ -233,7 +318,12 @@ const OP_CATALOG: Record<OcppOperationName, OpSpec> = {
     description:
       "Fetch configuration keys. Leave custom keys blank to retrieve everything.",
     fields: [
-      { key: "chargeBoxId", label: "Charge box ID", type: "string", readOnly: true },
+      {
+        key: "chargeBoxId",
+        label: "Charge box ID",
+        type: "string",
+        readOnly: true,
+      },
       {
         key: "commaSeparatedCustomConfKeys",
         label: "Custom keys (comma-separated)",
@@ -247,9 +337,26 @@ const OP_CATALOG: Record<OcppOperationName, OpSpec> = {
     label: "Get composite schedule",
     description: "Retrieve the currently active charging schedule.",
     fields: [
-      { key: "chargeBoxId", label: "Charge box ID", type: "string", readOnly: true },
-      { key: "connectorId", label: "Connector", type: "integer", required: true, min: 0 },
-      { key: "durationInSeconds", label: "Duration (s)", type: "integer", required: true, min: 1 },
+      {
+        key: "chargeBoxId",
+        label: "Charge box ID",
+        type: "string",
+        readOnly: true,
+      },
+      {
+        key: "connectorId",
+        label: "Connector",
+        type: "integer",
+        required: true,
+        min: 0,
+      },
+      {
+        key: "durationInSeconds",
+        label: "Duration (s)",
+        type: "integer",
+        required: true,
+        min: 1,
+      },
       {
         key: "chargingRateUnit",
         label: "Rate unit",
@@ -268,10 +375,26 @@ const OP_CATALOG: Record<OcppOperationName, OpSpec> = {
     description:
       "Ask the charger to upload a diagnostics bundle to the given URL.",
     fields: [
-      { key: "chargeBoxId", label: "Charge box ID", type: "string", readOnly: true },
-      { key: "location", label: "Upload URL", type: "string", required: true, placeholder: "ftp://…" },
+      {
+        key: "chargeBoxId",
+        label: "Charge box ID",
+        type: "string",
+        readOnly: true,
+      },
+      {
+        key: "location",
+        label: "Upload URL",
+        type: "string",
+        required: true,
+        placeholder: "ftp://…",
+      },
       { key: "retries", label: "Retries", type: "integer", min: 1 },
-      { key: "retryInterval", label: "Retry interval (s)", type: "integer", min: 1 },
+      {
+        key: "retryInterval",
+        label: "Retry interval (s)",
+        type: "integer",
+        min: 1,
+      },
       { key: "start", label: "Start (ISO, optional)", type: "datetime" },
       { key: "stop", label: "Stop (ISO, optional)", type: "datetime" },
     ],
@@ -283,7 +406,12 @@ const OP_CATALOG: Record<OcppOperationName, OpSpec> = {
     description:
       "Returns the charger's currently cached local authorization list version.",
     fields: [
-      { key: "chargeBoxId", label: "Charge box ID", type: "string", readOnly: true },
+      {
+        key: "chargeBoxId",
+        label: "Charge box ID",
+        type: "string",
+        readOnly: true,
+      },
     ],
     primaryLabel: "Get version",
   },
@@ -293,7 +421,12 @@ const OP_CATALOG: Record<OcppOperationName, OpSpec> = {
     description:
       "OEM-specific DataTransfer. Type DATA TRANSFER below to confirm because vendor semantics vary.",
     fields: [
-      { key: "chargeBoxId", label: "Charge box ID", type: "string", readOnly: true },
+      {
+        key: "chargeBoxId",
+        label: "Charge box ID",
+        type: "string",
+        readOnly: true,
+      },
       { key: "vendorId", label: "Vendor ID", type: "string", required: true },
       { key: "messageId", label: "Message ID (optional)", type: "string" },
       { key: "data", label: "Payload", type: "textarea" },
@@ -307,10 +440,32 @@ const OP_CATALOG: Record<OcppOperationName, OpSpec> = {
     label: "Set charging profile",
     description: "Apply a stored TxDefault/TxProfile to this connector.",
     fields: [
-      { key: "chargeBoxId", label: "Charge box ID", type: "string", readOnly: true },
-      { key: "connectorId", label: "Connector", type: "integer", required: true, min: 0 },
-      { key: "chargingProfilePk", label: "Charging profile PK", type: "integer", required: true, min: 1 },
-      { key: "transactionId", label: "Transaction ID (optional)", type: "integer", min: 1 },
+      {
+        key: "chargeBoxId",
+        label: "Charge box ID",
+        type: "string",
+        readOnly: true,
+      },
+      {
+        key: "connectorId",
+        label: "Connector",
+        type: "integer",
+        required: true,
+        min: 0,
+      },
+      {
+        key: "chargingProfilePk",
+        label: "Charging profile PK",
+        type: "integer",
+        required: true,
+        min: 1,
+      },
+      {
+        key: "transactionId",
+        label: "Transaction ID (optional)",
+        type: "integer",
+        min: 1,
+      },
     ],
     destructive: true,
     primaryLabel: "Apply profile",
@@ -380,7 +535,10 @@ function initialFormFor(
       out[f.key] = chargeBoxId;
       continue;
     }
-    if (f.key in prefill && prefill[f.key] !== undefined && prefill[f.key] !== null) {
+    if (
+      f.key in prefill && prefill[f.key] !== undefined &&
+      prefill[f.key] !== null
+    ) {
       out[f.key] = String(prefill[f.key]);
       continue;
     }
@@ -513,7 +671,10 @@ export default function RemoteActionsPanel(
       </div>
 
       {lastResult && (
-        <OperationResultCard result={lastResult} onClear={() => setLastResult(null)} />
+        <OperationResultCard
+          result={lastResult}
+          onClear={() => setLastResult(null)}
+        />
       )}
 
       {activeOp && (
@@ -596,7 +757,9 @@ function OperationDialog({
     if (!session) return null;
     const ageMs = Date.now() - new Date(session.startTimestampIso).getTime();
     if (ageMs < 60_000) {
-      return `Transaction #${txId} started ${Math.round(ageMs / 1000)}s ago — are you sure?`;
+      return `Transaction #${txId} started ${
+        Math.round(ageMs / 1000)
+      }s ago — are you sure?`;
     }
     return null;
   })();
@@ -717,8 +880,8 @@ function OperationDialog({
           {needsTypeConfirm && (
             <div class="flex flex-col gap-1">
               <Label for={`confirm-${op}`} class="text-xs">
-                Type{" "}
-                <code class="font-mono">{spec.typeConfirmPhrase}</code>{" "}
+                Type <code class="font-mono">{spec.typeConfirmPhrase}</code>
+                {" "}
                 to confirm
               </Label>
               <Input
@@ -800,7 +963,9 @@ function FieldRow(
             ))}
           </SelectContent>
         </Select>
-        {field.help && <p class="text-[11px] text-muted-foreground">{field.help}</p>}
+        {field.help && (
+          <p class="text-[11px] text-muted-foreground">{field.help}</p>
+        )}
       </div>
     );
   }
@@ -818,7 +983,9 @@ function FieldRow(
           onInput={(e) =>
             onChange((e.currentTarget as HTMLTextAreaElement).value)}
         />
-        {field.help && <p class="text-[11px] text-muted-foreground">{field.help}</p>}
+        {field.help && (
+          <p class="text-[11px] text-muted-foreground">{field.help}</p>
+        )}
       </div>
     );
   }
@@ -842,7 +1009,9 @@ function FieldRow(
         onInput={(e) => onChange((e.currentTarget as HTMLInputElement).value)}
         class={field.readOnly ? "bg-muted font-mono text-xs" : undefined}
       />
-      {field.help && <p class="text-[11px] text-muted-foreground">{field.help}</p>}
+      {field.help && (
+        <p class="text-[11px] text-muted-foreground">{field.help}</p>
+      )}
     </div>
   );
 }
@@ -950,9 +1119,7 @@ function OperationResultCard(
             completed {state.completedAt.toLocaleTimeString()}
           </span>
         )}
-        {!terminal && (
-          <span>polling… attempt {state.pollAttempts + 1}</span>
-        )}
+        {!terminal && <span>polling… attempt {state.pollAttempts + 1}</span>}
       </div>
       {state.result && (
         <details class="text-xs">

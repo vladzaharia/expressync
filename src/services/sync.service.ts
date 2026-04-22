@@ -30,6 +30,8 @@ import { syncTagStatus } from "./tag-sync.service.ts";
 import { SyncLogger } from "./sync-logger.ts";
 import { config } from "../lib/config.ts";
 import { refreshChargerCache } from "./charger-cache.service.ts";
+// Phase P5: charging profile apply-on-tx-start hook
+import { onTransactionStarted as chargingProfileOnTransactionStarted } from "./charging-profile.service.ts";
 
 /**
  * Best-effort charger cache refresh.
@@ -228,6 +230,34 @@ export async function runSync(): Promise<SyncResult> {
     );
 
     transactionsProcessed = allTransactions.size;
+
+    // Phase P5: charging profile apply-on-tx-start hook
+    // For each newly-seen transaction (no prior sync state) that maps to a
+    // subscription, fire the charging-profile onTransactionStarted hook to
+    // issue a TxProfile bound to the charger+connector. Non-blocking.
+    for (const pt of processedTransactions) {
+      const hadPriorState = syncStateByTxId.has(pt.steveTransactionId);
+      if (hadPriorState) continue;
+      const tx = allTransactions.get(pt.steveTransactionId);
+      if (!tx) continue;
+      try {
+        await chargingProfileOnTransactionStarted({
+          lagoSubscriptionExternalId: pt.lagoSubscriptionExternalId,
+          chargeBoxId: tx.chargeBoxId,
+          connectorId: tx.connectorId ?? 0,
+          steveTransactionId: pt.steveTransactionId,
+        });
+      } catch (err) {
+        logger.warn(
+          "Sync",
+          "charging profile onTransactionStarted hook failed (non-blocking)",
+          {
+            steveTransactionId: pt.steveTransactionId,
+            error: err instanceof Error ? err.message : String(err),
+          },
+        );
+      }
+    }
 
     // Separate transactions that should be sent to Lago from those that shouldn't.
     // Two reasons a transaction is skipped: `no_subscription` (WARN — a mapping is

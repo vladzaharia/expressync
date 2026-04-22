@@ -6,7 +6,14 @@
  * or the danger zone.
  */
 
-import { CreditCard, ExternalLink, Link2, Scan, Tag, User } from "lucide-preact";
+import {
+  CreditCard,
+  ExternalLink,
+  Link2,
+  Scan,
+  Tag,
+  User,
+} from "lucide-preact";
 import { Button } from "@/components/ui/button.tsx";
 import {
   Card,
@@ -18,7 +25,11 @@ import {
 interface Props {
   idTag: string;
   tagPk: number;
-  customer: null | { externalId: string; name: string; lagoUrl?: string | null };
+  customer: null | {
+    externalId: string;
+    name: string;
+    lagoUrl?: string | null;
+  };
   subscription: null | {
     externalId: string;
     name: string;
@@ -39,8 +50,7 @@ export function LinkageSummaryCard(
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
         <p class="text-muted-foreground leading-relaxed">
-          Tag <code class="font-mono text-foreground">{idTag}</code>{" "}
-          bills{" "}
+          Tag <code class="font-mono text-foreground">{idTag}</code> bills{" "}
           <strong class="text-foreground">
             {customer ? customer.name : "—"}
           </strong>
@@ -51,7 +61,7 @@ export function LinkageSummaryCard(
                 <strong class="text-foreground">{subscription.name}</strong>.
               </>
             )
-            : <> (no active subscription yet).</>}
+            : <>(no active subscription yet).</>}
         </p>
 
         <div class="flex flex-col gap-2">

@@ -68,8 +68,9 @@ export const handler = define.handlers({
         .filter((m) => m.lagoCustomerExternalId)
         .map((m) => m.lagoCustomerExternalId as string),
     ).size;
-    const metaTagsLinked =
-      mappings.filter((m) => isMetaTag(m.steveOcppIdTag)).length;
+    const metaTagsLinked = mappings.filter((m) =>
+      isMetaTag(m.steveOcppIdTag)
+    ).length;
 
     return {
       data: {

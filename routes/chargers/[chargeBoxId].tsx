@@ -246,7 +246,10 @@ export const handler = define.handlers({
 
     // 3. Look up active-tag PKs in DB via userMappings so we can link the
     //    TagChip to /tags/[tagPk]. One batched query keeps the loader fast.
-    let tagPkByIdTag = new Map<string, { tagPk: number; tagType: string | null }>();
+    let tagPkByIdTag = new Map<
+      string,
+      { tagPk: number; tagType: string | null }
+    >();
     try {
       const idTagsWanted = Array.from(
         new Set([
@@ -263,7 +266,9 @@ export const handler = define.handlers({
           })
           .from(schema.userMappings);
         tagPkByIdTag = new Map(
-          mappings.map((m) => [m.idTag, { tagPk: m.tagPk, tagType: m.tagType }]),
+          mappings.map((
+            m,
+          ) => [m.idTag, { tagPk: m.tagPk, tagType: m.tagType }]),
         );
       }
     } catch (error) {
@@ -475,7 +480,9 @@ export default define.page<typeof handler>(
               isStale={charger.isStale}
               isOffline={charger.isOffline}
               lastStatusAtIso={charger.lastStatusAtIso}
-              connectors={data.connectors.map((c) => ({ uiStatus: c.uiStatus }))}
+              connectors={data.connectors.map((c) => ({
+                uiStatus: c.uiStatus,
+              }))}
             />
 
             {/* Row 1: identity + live status, 1+2 split at lg: */}

@@ -21,6 +21,8 @@ import {
   type LagoSubscriptionAlert,
   LagoSubscriptionAlertSchema,
   LagoSubscriptionSchema,
+  type LagoSubscriptionWithMetadata,
+  LagoSubscriptionWithMetadataSchema,
   type LagoWallet,
   LagoWalletSchema,
   type LagoWalletTransaction,
@@ -279,6 +281,44 @@ class LagoClient {
   }
 
   /**
+   * Get a single subscription by external ID.
+   *
+   * Uses the metadata-tolerant schema so callers that need to read
+   * the charging-profile mirror can see the `metadata` field. All
+   * other consumers should prefer `getSubscriptions`.
+   */
+  getSubscription(
+    externalId: string,
+  ): Promise<{ subscription: LagoSubscriptionWithMetadata }> {
+    return this.request(
+      `/subscriptions/${encodeURIComponent(externalId)}`,
+      z.object({ subscription: LagoSubscriptionWithMetadataSchema }),
+    );
+  }
+
+  /**
+   * Update a subscription (currently used for charging-profile metadata mirror).
+   *
+   * Lago's subscription update endpoint accepts a partial `subscription`
+   * object. We only send the `metadata` field; callers are responsible for
+   * merging (getSubscription first, then update with the new metadata) if
+   * they need to preserve existing keys.
+   */
+  async updateSubscription(
+    externalId: string,
+    patch: { metadata?: Record<string, unknown> },
+  ): Promise<void> {
+    await this.request(
+      `/subscriptions/${encodeURIComponent(externalId)}`,
+      z.object({}).passthrough(),
+      {
+        method: "PUT",
+        body: JSON.stringify({ subscription: patch }),
+      },
+    );
+  }
+
+  /**
    * Get current usage for a subscription
    *
    * @param externalCustomerId - Customer external ID
@@ -325,6 +365,69 @@ class LagoClient {
     );
 
     return result;
+  }
+
+  /**
+   * List invoices with optional filters. Returns extended invoice records so
+   * callers can consume `customer`, `subscriptions`, `file_url`, and
+   * `payment_overdue` directly.
+   */
+  async listInvoices(opts: {
+    externalCustomerId?: string;
+    externalSubscriptionId?: string;
+    status?: string | string[];
+    paymentStatus?: string | string[];
+    paymentOverdue?: boolean;
+    issuingDateFrom?: string;
+    issuingDateTo?: string;
+    searchTerm?: string;
+    page?: number;
+    perPage?: number;
+  } = {}): Promise<{
+    invoices: LagoInvoiceExtended[];
+    meta: { current_page: number; total_pages: number; total_count: number };
+  }> {
+    const params = new URLSearchParams();
+    params.set("page", String(opts.page ?? 1));
+    params.set("per_page", String(opts.perPage ?? 20));
+    if (opts.externalCustomerId) {
+      params.set("external_customer_id", opts.externalCustomerId);
+    }
+    if (opts.externalSubscriptionId) {
+      params.set("external_subscription_id", opts.externalSubscriptionId);
+    }
+    if (opts.status) {
+      const arr = Array.isArray(opts.status) ? opts.status : [opts.status];
+      for (const s of arr) params.append("status[]", s);
+    }
+    if (opts.paymentStatus) {
+      const arr = Array.isArray(opts.paymentStatus)
+        ? opts.paymentStatus
+        : [opts.paymentStatus];
+      for (const s of arr) params.append("payment_status[]", s);
+    }
+    if (opts.paymentOverdue !== undefined) {
+      params.set("payment_overdue", String(opts.paymentOverdue));
+    }
+    if (opts.issuingDateFrom) {
+      params.set("issuing_date_from", opts.issuingDateFrom);
+    }
+    if (opts.issuingDateTo) {
+      params.set("issuing_date_to", opts.issuingDateTo);
+    }
+    if (opts.searchTerm) params.set("search_term", opts.searchTerm);
+
+    return await this.request(
+      `/invoices?${params.toString()}`,
+      z.object({
+        invoices: z.array(LagoInvoiceExtendedSchema),
+        meta: z.object({
+          current_page: z.number(),
+          total_pages: z.number(),
+          total_count: z.number(),
+        }),
+      }),
+    );
   }
 
   // ==========================================================================

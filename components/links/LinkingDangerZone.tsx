@@ -16,7 +16,12 @@
 
 import { useSignal } from "@preact/signals";
 import { toast } from "sonner";
-import { AlertTriangle, CircleDollarSign, Loader2, Trash2 } from "lucide-preact";
+import {
+  AlertTriangle,
+  CircleDollarSign,
+  Loader2,
+  Trash2,
+} from "lucide-preact";
 import { Button } from "@/components/ui/button.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
@@ -86,7 +91,9 @@ export default function LinkingDangerZone(props: Props) {
       });
       if (!res.ok) throw new Error("server");
       toast.success(
-        next === "comped" ? "Switched to comped billing" : "Switched to standard billing",
+        next === "comped"
+          ? "Switched to comped billing"
+          : "Switched to standard billing",
       );
     } catch (_e) {
       tier.value = prev;
@@ -124,7 +131,10 @@ export default function LinkingDangerZone(props: Props) {
   return (
     <section class="mt-8 rounded-lg border border-destructive/30 bg-destructive/5 p-4 sm:p-6">
       <div class="mb-4 flex items-start gap-2">
-        <AlertTriangle class="size-5 text-destructive mt-0.5" aria-hidden="true" />
+        <AlertTriangle
+          class="size-5 text-destructive mt-0.5"
+          aria-hidden="true"
+        />
         <div>
           <h2 class="text-sm font-semibold text-destructive">Danger zone</h2>
           <p class="text-xs text-muted-foreground">
@@ -243,8 +253,8 @@ export default function LinkingDangerZone(props: Props) {
                 : (
                   <>
                     This will delete the mapping for{" "}
-                    <code class="font-mono">{props.idTag}</code>. The
-                    underlying OCPP tag is not removed.
+                    <code class="font-mono">{props.idTag}</code>. The underlying
+                    OCPP tag is not removed.
                   </>
                 )}
             </DialogDescription>

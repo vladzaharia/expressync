@@ -35,7 +35,7 @@ export const handler = define.handlers({
       return json(400, { error: "invalid_json" });
     }
     const idTag = typeof (body as { idTag?: unknown }).idTag === "string"
-      ? ((body as { idTag: string }).idTag).trim()
+      ? (body as { idTag: string }).idTag.trim()
       : "";
     if (idTag === "") {
       return json(400, { error: "invalid_id_tag" });

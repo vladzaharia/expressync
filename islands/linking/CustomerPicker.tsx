@@ -118,9 +118,7 @@ export default function CustomerPicker(
 
   // Empty-state (no Lago customers at all)
   if (customers.value.length === 0) {
-    const href = lagoDashboardUrl
-      ? `${lagoDashboardUrl}/customers/new`
-      : null;
+    const href = lagoDashboardUrl ? `${lagoDashboardUrl}/customers/new` : null;
     return (
       <div className="space-y-2">
         <Label>{label ?? "Select Lago Customer"}</Label>
@@ -140,7 +138,7 @@ export default function CustomerPicker(
               <a href={href} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="size-4 mr-1" aria-hidden="true" />
                 <span>Create customer in Lago</span>
-                <span className="sr-only"> (opens in new tab)</span>
+                <span className="sr-only">(opens in new tab)</span>
               </a>
             </Button>
           )}

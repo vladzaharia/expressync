@@ -115,9 +115,7 @@ export default function MappingForm(props: Props) {
     successMessage.value = "";
 
     try {
-      const url = mapping
-        ? `/api/tag/link?id=${mapping.id}`
-        : "/api/tag/link";
+      const url = mapping ? `/api/tag/link?id=${mapping.id}` : "/api/tag/link";
       const method = mapping ? "PUT" : "POST";
 
       const body = mapping
@@ -262,9 +260,11 @@ export default function MappingForm(props: Props) {
 
       {inheritanceSlot}
 
-      {/* Active toggle — hidden for create flow (defaults true). The edit
+      {
+        /* Active toggle — hidden for create flow (defaults true). The edit
           page relocates this into the danger zone, so we only render here
-          when we're NOT on /links/[id]. */}
+          when we're NOT on /links/[id]. */
+      }
       {!mapping && (
         <div className="flex items-center space-x-2">
           <Checkbox
@@ -334,9 +334,7 @@ function StepIndicator(
       <span
         className={cn(
           "text-sm font-medium hidden sm:inline",
-          currentStep >= step
-            ? "text-foreground"
-            : "text-muted-foreground",
+          currentStep >= step ? "text-foreground" : "text-muted-foreground",
         )}
       >
         {label}

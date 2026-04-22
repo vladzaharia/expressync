@@ -138,7 +138,10 @@ export function TagRecentTransactionsSection(
                   {rows.map((r) => {
                     const active = r.stoppedAt === null;
                     return (
-                      <tr key={r.steveTransactionId} class="border-b last:border-b-0">
+                      <tr
+                        key={r.steveTransactionId}
+                        class="border-b last:border-b-0"
+                      >
                         <td class="px-3 py-2 align-top font-mono text-xs">
                           <div class="flex items-center gap-1.5">
                             <span>#{r.steveTransactionId}</span>
@@ -156,7 +159,9 @@ export function TagRecentTransactionsSection(
                         </td>
                         <td class="px-3 py-2 align-top">
                           <a
-                            href={`/chargers/${encodeURIComponent(r.chargeBoxId)}`}
+                            href={`/chargers/${
+                              encodeURIComponent(r.chargeBoxId)
+                            }`}
                             class={cn(
                               "inline-flex items-center gap-1 rounded-md border border-orange-500/40 bg-background px-2 py-0.5 text-xs font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                             )}
