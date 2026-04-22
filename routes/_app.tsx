@@ -3,6 +3,7 @@
 // deno-lint-ignore-file react-no-danger
 import { define } from "../utils.ts";
 import { Toaster } from "sonner";
+import CommandPalette from "../islands/CommandPalette.tsx";
 
 export default define.page(function App({ Component }) {
   return (
@@ -32,6 +33,7 @@ export default define.page(function App({ Component }) {
       <body class="min-h-screen bg-background text-foreground antialiased">
         <Component />
         <Toaster richColors position="bottom-right" />
+        <CommandPalette />
       </body>
     </html>
   );

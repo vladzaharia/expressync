@@ -306,6 +306,29 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
           {/* Notifications bell — after ThemeToggle, before User */}
           <NotificationBell variant="mobile" />
 
+          {
+            /* Command palette trigger (Phase P6) — mobile-only; admin-only
+              via API-backed search. Fires `cmdk:open` so this component
+              stays decoupled from the island. */
+          }
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() =>
+                  globalThis.dispatchEvent(new CustomEvent("cmdk:open"))}
+                aria-label="Open command palette"
+                className="flex items-center justify-center shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors font-mono text-sm"
+                style={{ width: CHROME_SIZE, height: CHROME_SIZE }}
+              >
+                <span aria-hidden="true">⌘K</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={8}>
+              Command Palette
+            </TooltipContent>
+          </Tooltip>
+
           {/* User icon */}
           {user && (
             <Tooltip>
