@@ -76,14 +76,14 @@ export default function DashboardStatsCards({ stats: propStats }: Props) {
   const cardColors: Record<string, AccentColor> = {
     tags: "violet", // Links to Tag Linking page (violet)
     lago: "amber", // Billing/financial - amber
-    energy: "green", // Links to Transactions page (green)
+    energy: "green", // Links to Charging Sessions page (green)
     sync: "blue", // Links to Sync page (blue)
   };
 
   return (
-    <div className="grid grid-rows-4 gap-3 h-full">
+    <div className="grid grid-rows-4 gap-4 lg:gap-3 h-full auto-rows-fr">
       {/* Card 1: Active/Blocked Tags - Violet (links to Tag Linking) */}
-      <Card className="relative overflow-hidden flex flex-col">
+      <Card className="relative overflow-hidden flex flex-col min-h-[7rem]">
         <BorderBeam
           size={250}
           duration={12}
@@ -127,7 +127,7 @@ export default function DashboardStatsCards({ stats: propStats }: Props) {
       </Card>
 
       {/* Card 2: Customers/Subscriptions - Amber (billing/financial) */}
-      <Card className="relative overflow-hidden flex flex-col">
+      <Card className="relative overflow-hidden flex flex-col min-h-[7rem]">
         <BorderBeam
           size={250}
           duration={12}
@@ -182,8 +182,8 @@ export default function DashboardStatsCards({ stats: propStats }: Props) {
         </CardContent>
       </Card>
 
-      {/* Card 3: kWh Delivered - Green (links to Transactions) */}
-      <Card className="relative overflow-hidden flex flex-col">
+      {/* Card 3: kWh Delivered - Green (links to Charging Sessions) */}
+      <Card className="relative overflow-hidden flex flex-col min-h-[7rem]">
         <BorderBeam
           size={250}
           duration={12}
@@ -243,7 +243,7 @@ export default function DashboardStatsCards({ stats: propStats }: Props) {
       </Card>
 
       {/* Card 4: Sync Success Rate - Blue (links to Sync) */}
-      <Card className="relative overflow-hidden flex flex-col">
+      <Card className="relative overflow-hidden flex flex-col min-h-[7rem]">
         <BorderBeam
           size={250}
           duration={12}
