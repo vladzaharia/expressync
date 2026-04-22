@@ -100,8 +100,8 @@ Deno.test("session-summary: footer note differs based on cost presence", () => {
   );
 });
 
-Deno.test("session-summary: renders without throwing", () => {
-  const rendered = renderTemplate(
+Deno.test("session-summary: renders without throwing", async () => {
+  const rendered = await renderTemplate(
     buildSessionSummaryEmail({ to: "alice@example.com", session }),
   );
   assertStringIncludes(rendered.html, "Polaris HQ");
@@ -113,8 +113,8 @@ Deno.test("session-summary: renders without throwing", () => {
   );
 });
 
-Deno.test("session-summary: no admin-only data leakage", () => {
-  const rendered = renderTemplate(
+Deno.test("session-summary: no admin-only data leakage", async () => {
+  const rendered = await renderTemplate(
     buildSessionSummaryEmail({ to: "alice@example.com", session }),
   );
   assert(!rendered.html.toLowerCase().includes("expressync"));

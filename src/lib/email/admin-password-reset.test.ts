@@ -38,8 +38,8 @@ Deno.test("admin-password-reset: highlights 24h expiry + single use", () => {
   assertStringIncludes(text, "once");
 });
 
-Deno.test("admin-password-reset: rendered email uses expressync sender + brand", () => {
-  const rendered = renderTemplate(
+Deno.test("admin-password-reset: rendered email uses expressync sender + brand", async () => {
+  const rendered = await renderTemplate(
     buildAdminPasswordResetEmail({ to: "ops@example.com", url: URL }),
   );
   assertEquals(

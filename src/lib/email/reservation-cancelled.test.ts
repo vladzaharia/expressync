@@ -65,8 +65,8 @@ Deno.test("reservation-cancelled: no highlight when reason omitted", () => {
   assertEquals(highlights.length, 0);
 });
 
-Deno.test("reservation-cancelled: renders without throwing", () => {
-  const rendered = renderTemplate(
+Deno.test("reservation-cancelled: renders without throwing", async () => {
+  const rendered = await renderTemplate(
     buildReservationCancelledEmail({
       to: "alice@example.com",
       reservation,
@@ -80,8 +80,8 @@ Deno.test("reservation-cancelled: renders without throwing", () => {
   );
 });
 
-Deno.test("reservation-cancelled: no admin-only data leakage", () => {
-  const rendered = renderTemplate(
+Deno.test("reservation-cancelled: no admin-only data leakage", async () => {
+  const rendered = await renderTemplate(
     buildReservationCancelledEmail({ to: "a@b", reservation }),
   );
   assert(!rendered.html.toLowerCase().includes("expressync"));

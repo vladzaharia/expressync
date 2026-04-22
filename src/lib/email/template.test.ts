@@ -1,8 +1,8 @@
 import {
   assert,
   assertEquals,
+  assertRejects,
   assertStringIncludes,
-  assertThrows,
 } from "@std/assert";
 import { renderTemplate } from "./template.tsx";
 import type { EmailTemplate } from "./types.ts";
@@ -24,8 +24,8 @@ function baseSpec(overrides: Partial<EmailTemplate> = {}): EmailTemplate {
   };
 }
 
-Deno.test("renderTemplate produces valid HTML5 with DOCTYPE", () => {
-  const out = renderTemplate(baseSpec());
+Deno.test("renderTemplate produces valid HTML5 with DOCTYPE", async () => {
+  const out = await renderTemplate(baseSpec());
   assertStringIncludes(out.html, "<!doctype html>");
   assertStringIncludes(out.html, "<html");
   assertStringIncludes(out.html, "</html>");
@@ -35,30 +35,30 @@ Deno.test("renderTemplate produces valid HTML5 with DOCTYPE", () => {
   assertEquals(out.replyTo, "support@polaris.express");
 });
 
-Deno.test("renderTemplate inlines styles via juice", () => {
-  const out = renderTemplate(baseSpec());
+Deno.test("renderTemplate inlines styles via juice", async () => {
+  const out = await renderTemplate(baseSpec());
   // juice converts class/element selectors into inline style="…" attrs.
   // The `<table>` we render with bgcolor F4F1EC + style background-color
   // should end up with inline style attributes.
   assertStringIncludes(out.html, 'style="');
 });
 
-Deno.test("renderTemplate emits MSO conditional + Office settings", () => {
-  const out = renderTemplate(baseSpec());
+Deno.test("renderTemplate emits MSO conditional + Office settings", async () => {
+  const out = await renderTemplate(baseSpec());
   assertStringIncludes(out.html, "<!--[if mso]>");
   assertStringIncludes(out.html, "OfficeDocumentSettings");
   assertStringIncludes(out.html, "v:roundrect");
 });
 
-Deno.test("renderTemplate includes color-scheme + dark-mode meta", () => {
-  const out = renderTemplate(baseSpec());
+Deno.test("renderTemplate includes color-scheme + dark-mode meta", async () => {
+  const out = await renderTemplate(baseSpec());
   assertStringIncludes(out.html, 'name="color-scheme"');
   assertStringIncludes(out.html, "prefers-color-scheme: dark");
   assertStringIncludes(out.html, "[data-ogsc]");
 });
 
-Deno.test("renderTemplate emits hidden preheader", () => {
-  const out = renderTemplate(baseSpec({ preheader: "X".repeat(50) }));
+Deno.test("renderTemplate emits hidden preheader", async () => {
+  const out = await renderTemplate(baseSpec({ preheader: "X".repeat(50) }));
   // Preheader should be rendered with display:none style and contain the text.
   assertStringIncludes(out.html, "display:none");
   assertStringIncludes(out.html, "X".repeat(50));
@@ -66,15 +66,15 @@ Deno.test("renderTemplate emits hidden preheader", () => {
 
 // ---- Block type rendering ------------------------------------------------
 
-Deno.test("paragraph block renders text", () => {
-  const out = renderTemplate(
+Deno.test("paragraph block renders text", async () => {
+  const out = await renderTemplate(
     baseSpec({ body: [{ type: "paragraph", text: "Custom paragraph copy." }] }),
   );
   assertStringIncludes(out.html, "Custom paragraph copy.");
 });
 
-Deno.test("highlight block renders with brand-tinted background", () => {
-  const out = renderTemplate(
+Deno.test("highlight block renders with brand-tinted background", async () => {
+  const out = await renderTemplate(
     baseSpec({ body: [{ type: "highlight", text: "Heads up!" }] }),
   );
   assertStringIncludes(out.html, "Heads up!");
@@ -82,16 +82,16 @@ Deno.test("highlight block renders with brand-tinted background", () => {
   assertStringIncludes(out.html.toLowerCase(), "border-left");
 });
 
-Deno.test("code block uses monospace font family", () => {
-  const out = renderTemplate(
+Deno.test("code block uses monospace font family", async () => {
+  const out = await renderTemplate(
     baseSpec({ body: [{ type: "code", text: "ABC-123-XYZ" }] }),
   );
   assertStringIncludes(out.html, "ABC-123-XYZ");
   assertStringIncludes(out.html.toLowerCase(), "monospace");
 });
 
-Deno.test("divider block renders a horizontal rule row", () => {
-  const out = renderTemplate(
+Deno.test("divider block renders a horizontal rule row", async () => {
+  const out = await renderTemplate(
     baseSpec({
       body: [
         { type: "paragraph", text: "above" },
@@ -107,15 +107,15 @@ Deno.test("divider block renders a horizontal rule row", () => {
 
 // ---- Brand variants -------------------------------------------------------
 
-Deno.test("polaris brand emits Polaris Express from-header + accent", () => {
-  const out = renderTemplate(baseSpec({ brand: "polaris" }));
+Deno.test("polaris brand emits Polaris Express from-header + accent", async () => {
+  const out = await renderTemplate(baseSpec({ brand: "polaris" }));
   assertEquals(out.fromHeader, "Polaris Express <noreply@polaris.express>");
   // Polaris primary accent #0E7C66 should appear in inlined styles (button).
   assertStringIncludes(out.html.toLowerCase(), "#0e7c66");
 });
 
-Deno.test("expressync brand emits ExpresSync admin from-header + accent", () => {
-  const out = renderTemplate(
+Deno.test("expressync brand emits ExpresSync admin from-header + accent", async () => {
+  const out = await renderTemplate(
     baseSpec({
       brand: "expressync",
       category: "admin-password-reset",
@@ -131,14 +131,14 @@ Deno.test("expressync brand emits ExpresSync admin from-header + accent", () => 
 
 // ---- With/without CTA + metadata -----------------------------------------
 
-Deno.test("no CTA → no <a href> button rendered", () => {
-  const out = renderTemplate(baseSpec({ cta: undefined }));
+Deno.test("no CTA → no <a href> button rendered", async () => {
+  const out = await renderTemplate(baseSpec({ cta: undefined }));
   // No anchor with target=_blank (we only add that on the CTA button).
   assert(!out.html.includes('target="_blank"'));
 });
 
-Deno.test("metadata table renders rows with label/value", () => {
-  const out = renderTemplate(
+Deno.test("metadata table renders rows with label/value", async () => {
+  const out = await renderTemplate(
     baseSpec({
       metadata: [
         { label: "Energy", value: "12.34 kWh" },
@@ -154,23 +154,25 @@ Deno.test("metadata table renders rows with label/value", () => {
   assertStringIncludes(out.html, "font-weight:700");
 });
 
-Deno.test("footerNote appears in rendered output", () => {
-  const out = renderTemplate(baseSpec({ footerNote: "Don't forget the cat." }));
+Deno.test("footerNote appears in rendered output", async () => {
+  const out = await renderTemplate(
+    baseSpec({ footerNote: "Don't forget the cat." }),
+  );
   assertStringIncludes(out.html, "Don't forget the cat.");
 });
 
 // ---- Plain-text generation -----------------------------------------------
 
-Deno.test("plain-text version contains the CTA URL", () => {
-  const out = renderTemplate(baseSpec());
+Deno.test("plain-text version contains the CTA URL", async () => {
+  const out = await renderTemplate(baseSpec());
   assertStringIncludes(
     out.text,
     "https://polaris.express/auth/verify?token=abc",
   );
 });
 
-Deno.test("plain-text version uses CRLF line endings", () => {
-  const out = renderTemplate(
+Deno.test("plain-text version uses CRLF line endings", async () => {
+  const out = await renderTemplate(
     baseSpec({
       body: [
         { type: "paragraph", text: "first" },
@@ -181,8 +183,8 @@ Deno.test("plain-text version uses CRLF line endings", () => {
   assertStringIncludes(out.text, "\r\n");
 });
 
-Deno.test("plain-text version includes title + each block + brand wordmark", () => {
-  const out = renderTemplate(
+Deno.test("plain-text version includes title + each block + brand wordmark", async () => {
+  const out = await renderTemplate(
     baseSpec({
       title: "Plain Title",
       body: [
@@ -201,8 +203,8 @@ Deno.test("plain-text version includes title + each block + brand wordmark", () 
   assertStringIncludes(out.text, "Polaris Express");
 });
 
-Deno.test("plain-text version includes metadata rows", () => {
-  const out = renderTemplate(
+Deno.test("plain-text version includes metadata rows", async () => {
+  const out = await renderTemplate(
     baseSpec({
       metadata: [{ label: "Charger", value: "Bay 2" }],
     }),
@@ -212,8 +214,8 @@ Deno.test("plain-text version includes metadata rows", () => {
 
 // ---- XSS / escape tests ---------------------------------------------------
 
-Deno.test("XSS in paragraph: <script> tag rejected at render time", () => {
-  assertThrows(
+Deno.test("XSS in paragraph: <script> tag rejected at render time", async () => {
+  await assertRejects(
     () =>
       renderTemplate(
         baseSpec({
@@ -225,8 +227,8 @@ Deno.test("XSS in paragraph: <script> tag rejected at render time", () => {
   );
 });
 
-Deno.test("XSS in title: <iframe> tag rejected", () => {
-  assertThrows(
+Deno.test("XSS in title: <iframe> tag rejected", async () => {
+  await assertRejects(
     () =>
       renderTemplate(
         baseSpec({ title: "<iframe src='evil'>" }),
@@ -236,8 +238,8 @@ Deno.test("XSS in title: <iframe> tag rejected", () => {
   );
 });
 
-Deno.test("XSS in metadata value: <object> tag rejected", () => {
-  assertThrows(
+Deno.test("XSS in metadata value: <object> tag rejected", async () => {
+  await assertRejects(
     () =>
       renderTemplate(
         baseSpec({
@@ -249,19 +251,19 @@ Deno.test("XSS in metadata value: <object> tag rejected", () => {
   );
 });
 
-Deno.test("XSS in subject: <style> tag rejected", () => {
-  assertThrows(
+Deno.test("XSS in subject: <style> tag rejected", async () => {
+  await assertRejects(
     () => renderTemplate(baseSpec({ subject: "<style>body{}</style>" })),
     Error,
     "forbidden markup",
   );
 });
 
-Deno.test("benign user input is HTML-escaped, not stripped", () => {
+Deno.test("benign user input is HTML-escaped, not stripped", async () => {
   // < as plain text must be escaped to &lt; so the rest of the document
   // doesn't get parsed as a tag. > and quotes don't need to be escaped in
   // text contexts (Preact's renderToString only escapes < and &).
-  const out = renderTemplate(
+  const out = await renderTemplate(
     baseSpec({
       body: [{ type: "paragraph", text: "Cost is < $5 today" }],
     }),
@@ -272,8 +274,8 @@ Deno.test("benign user input is HTML-escaped, not stripped", () => {
 
 // ---- URL allowlist --------------------------------------------------------
 
-Deno.test("CTA with off-allowlist host throws", () => {
-  assertThrows(
+Deno.test("CTA with off-allowlist host throws", async () => {
+  await assertRejects(
     () =>
       renderTemplate(
         baseSpec({
@@ -285,8 +287,8 @@ Deno.test("CTA with off-allowlist host throws", () => {
   );
 });
 
-Deno.test("CTA with javascript: scheme throws", () => {
-  assertThrows(
+Deno.test("CTA with javascript: scheme throws", async () => {
+  await assertRejects(
     () =>
       renderTemplate(
         baseSpec({
@@ -297,8 +299,8 @@ Deno.test("CTA with javascript: scheme throws", () => {
   );
 });
 
-Deno.test("CTA with http:// (insecure) throws", () => {
-  assertThrows(
+Deno.test("CTA with http:// (insecure) throws", async () => {
+  await assertRejects(
     () =>
       renderTemplate(
         baseSpec({
@@ -310,8 +312,8 @@ Deno.test("CTA with http:// (insecure) throws", () => {
   );
 });
 
-Deno.test("CTA with https://manage.polaris.express is allowed", () => {
-  const out = renderTemplate(
+Deno.test("CTA with https://manage.polaris.express is allowed", async () => {
+  const out = await renderTemplate(
     baseSpec({
       cta: {
         label: "Reset",
@@ -322,8 +324,8 @@ Deno.test("CTA with https://manage.polaris.express is allowed", () => {
   assertStringIncludes(out.html, "manage.polaris.express/reset-password");
 });
 
-Deno.test("CTA with mailto: is allowed", () => {
-  const out = renderTemplate(
+Deno.test("CTA with mailto: is allowed", async () => {
+  const out = await renderTemplate(
     baseSpec({
       cta: { label: "Email us", url: "mailto:support@polaris.express" },
     }),
@@ -333,54 +335,54 @@ Deno.test("CTA with mailto: is allowed", () => {
 
 // ---- Subject + preheader length validation -------------------------------
 
-Deno.test("subject > 50 chars throws", () => {
-  assertThrows(
+Deno.test("subject > 50 chars throws", async () => {
+  await assertRejects(
     () => renderTemplate(baseSpec({ subject: "X".repeat(51) })),
     Error,
     "max 50",
   );
 });
 
-Deno.test("subject exactly 50 chars is allowed", () => {
-  const out = renderTemplate(baseSpec({ subject: "X".repeat(50) }));
+Deno.test("subject exactly 50 chars is allowed", async () => {
+  const out = await renderTemplate(baseSpec({ subject: "X".repeat(50) }));
   assertEquals(out.subject.length, 50);
 });
 
-Deno.test("empty subject throws", () => {
-  assertThrows(
+Deno.test("empty subject throws", async () => {
+  await assertRejects(
     () => renderTemplate(baseSpec({ subject: "" })),
     Error,
     "non-empty",
   );
 });
 
-Deno.test("preheader < 40 chars throws", () => {
-  assertThrows(
+Deno.test("preheader < 40 chars throws", async () => {
+  await assertRejects(
     () => renderTemplate(baseSpec({ preheader: "Too short" })),
     Error,
     "must be 40-110",
   );
 });
 
-Deno.test("preheader > 110 chars throws", () => {
-  assertThrows(
+Deno.test("preheader > 110 chars throws", async () => {
+  await assertRejects(
     () => renderTemplate(baseSpec({ preheader: "X".repeat(111) })),
     Error,
     "must be 40-110",
   );
 });
 
-Deno.test("preheader at exactly 40 and 110 chars is allowed", () => {
-  const at40 = renderTemplate(baseSpec({ preheader: "X".repeat(40) }));
+Deno.test("preheader at exactly 40 and 110 chars is allowed", async () => {
+  const at40 = await renderTemplate(baseSpec({ preheader: "X".repeat(40) }));
   assertEquals(at40.preheader.length, 40);
-  const at110 = renderTemplate(baseSpec({ preheader: "Y".repeat(110) }));
+  const at110 = await renderTemplate(baseSpec({ preheader: "Y".repeat(110) }));
   assertEquals(at110.preheader.length, 110);
 });
 
 // ---- Snapshot-shape stability --------------------------------------------
 
-Deno.test("rendered output has stable required fields", () => {
-  const out = renderTemplate(baseSpec());
+Deno.test("rendered output has stable required fields", async () => {
+  const out = await renderTemplate(baseSpec());
   assert(typeof out.subject === "string");
   assert(typeof out.preheader === "string");
   assert(typeof out.html === "string");

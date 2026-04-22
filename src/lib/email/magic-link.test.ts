@@ -34,8 +34,8 @@ Deno.test("magic-link: CTA URL uses polaris.express host", () => {
   );
 });
 
-Deno.test("magic-link: renders without throwing", () => {
-  const rendered = renderTemplate(
+Deno.test("magic-link: renders without throwing", async () => {
+  const rendered = await renderTemplate(
     buildMagicLinkEmail({ to: "alice@example.com", url: URL }),
   );
   assertStringIncludes(rendered.html, "Sign in");
@@ -59,10 +59,10 @@ Deno.test("magic-link: highlights 15-minute expiry", () => {
   );
 });
 
-Deno.test("magic-link: no admin-only data leakage", () => {
+Deno.test("magic-link: no admin-only data leakage", async () => {
   // The magic-link email should NOT mention admin-specific things like
   // "operator", "ExpresSync", or include manage.* URLs.
-  const rendered = renderTemplate(
+  const rendered = await renderTemplate(
     buildMagicLinkEmail({ to: "alice@example.com", url: URL }),
   );
   assert(!rendered.html.toLowerCase().includes("expressync"));

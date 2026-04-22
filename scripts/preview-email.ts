@@ -41,17 +41,17 @@ const TEMPLATES: TemplateName[] = [
   "admin-password-reset",
 ];
 
-function renderByName(name: TemplateName) {
+async function renderByName(name: TemplateName) {
   switch (name) {
     case "magic-link":
-      return renderTemplate(
+      return await renderTemplate(
         buildMagicLinkEmail({
           to: "preview@example.com",
           url: "https://polaris.express/auth/verify?token=preview-token-xyz",
         }),
       );
     case "session-summary":
-      return renderTemplate(
+      return await renderTemplate(
         buildSessionSummaryEmail({
           to: "preview@example.com",
           session: {
@@ -67,7 +67,7 @@ function renderByName(name: TemplateName) {
         }),
       );
     case "reservation-cancelled":
-      return renderTemplate(
+      return await renderTemplate(
         buildReservationCancelledEmail({
           to: "preview@example.com",
           reservation: {
@@ -79,7 +79,7 @@ function renderByName(name: TemplateName) {
         }),
       );
     case "admin-password-reset":
-      return renderTemplate(
+      return await renderTemplate(
         buildAdminPasswordResetEmail({
           to: "ops@example.com",
           url: "https://manage.polaris.express/reset-password?token=preview",
@@ -128,9 +128,9 @@ async function sendByName(name: TemplateName, to: string) {
   }
 }
 
-function indexHtml(): string {
-  const cards = TEMPLATES.map((name) => {
-    const r = renderByName(name);
+async function indexHtml(): Promise<string> {
+  const cards = (await Promise.all(TEMPLATES.map(async (name) => {
+    const r = await renderByName(name);
     return `
 <section style="margin-bottom:32px;border:1px solid #e5e7eb;border-radius:8px;padding:16px;background:#fff;">
   <h2 style="margin:0 0 8px;font-family:system-ui;">${name}</h2>
@@ -155,7 +155,7 @@ function indexHtml(): string {
     }</pre>
   </details>
 </section>`;
-  }).join("");
+  }))).join("");
 
   return `<!doctype html>
 <html><head>
@@ -202,13 +202,13 @@ if (target && !TEMPLATES.includes(target)) {
 const outputPath = "_email-preview.html";
 
 if (!target) {
-  await Deno.writeTextFile(outputPath, indexHtml());
+  await Deno.writeTextFile(outputPath, await indexHtml());
   console.log(`Wrote index of ${TEMPLATES.length} templates → ${outputPath}`);
   console.log(`Open it in a browser:`);
   console.log(`  xdg-open ${outputPath}    # Linux`);
   console.log(`  open ${outputPath}        # macOS`);
 } else {
-  const r = renderByName(target);
+  const r = await renderByName(target);
   await Deno.writeTextFile(outputPath, r.html);
   console.log(`Wrote ${target} → ${outputPath}`);
   console.log(`Subject:   ${r.subject}`);
