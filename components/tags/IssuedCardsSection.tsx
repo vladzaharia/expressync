@@ -19,13 +19,8 @@ import {
   Info,
   Layers,
 } from "lucide-preact";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
+import { SectionCard } from "@/components/shared/SectionCard.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 import MappingIssueCardAction from "@/islands/MappingIssueCardAction.tsx";
 import { formatRelative } from "@/islands/shared/charger-visuals.ts";
@@ -131,15 +126,36 @@ export function IssuedCardsSection(
 ) {
   const showIssueButton = !isMeta && mappingId !== null && !issuedCardsMissing;
 
+  const headerAction = showIssueButton
+    ? (
+      <MappingIssueCardAction
+        userMappingId={mappingId}
+        mappingLabel={mappingLabel}
+        hasLagoCustomer={hasLagoCustomer}
+        isMeta={false}
+      />
+    )
+    : isMeta
+    ? (
+      <div
+        class="flex items-center gap-1.5 rounded-md border border-dashed border-input bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground"
+        title="Meta-tags are hierarchy rollups, not physical cards."
+      >
+        <Layers class="h-3.5 w-3.5" aria-hidden="true" />
+        <span>Meta-tag — issue cards on children</span>
+      </div>
+    )
+    : undefined;
+
   return (
-    <Card id="cards">
-      <CardHeader class="flex flex-row items-center justify-between gap-3">
-        <div class="flex items-center gap-2">
-          <CreditCard
-            class="h-4 w-4 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <CardTitle class="text-base">Issued cards</CardTitle>
+    <SectionCard
+      title="Issued cards"
+      icon={CreditCard}
+      accent="sky"
+      className="scroll-mt-6"
+      contentClassName="p-0 sm:p-5"
+      actions={
+        <>
           {rows.length > 0
             ? (
               <Badge variant="outline" class="font-normal">
@@ -147,29 +163,11 @@ export function IssuedCardsSection(
               </Badge>
             )
             : null}
-        </div>
-        {showIssueButton
-          ? (
-            <MappingIssueCardAction
-              userMappingId={mappingId}
-              mappingLabel={mappingLabel}
-              hasLagoCustomer={hasLagoCustomer}
-              isMeta={false}
-            />
-          )
-          : isMeta
-          ? (
-            <div
-              class="flex items-center gap-1.5 rounded-md border border-dashed border-input bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground"
-              title="Meta-tags are hierarchy rollups, not physical cards."
-            >
-              <Layers class="h-3.5 w-3.5" aria-hidden="true" />
-              <span>Meta-tag — issue cards on children</span>
-            </div>
-          )
-          : null}
-      </CardHeader>
-      <CardContent>
+          {headerAction}
+        </>
+      }
+    >
+      <div id="cards" class="contents">
         {issuedCardsMissing
           ? (
             <div class="flex items-start gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-700 dark:text-amber-400">
@@ -342,7 +340,7 @@ export function IssuedCardsSection(
               </table>
             </div>
           )}
-      </CardContent>
-    </Card>
+      </div>
+    </SectionCard>
   );
 }
