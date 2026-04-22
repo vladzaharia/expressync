@@ -365,7 +365,6 @@ function FilteredEmptyState() {
 
 export default define.page<typeof handler>(
   function TagsIndexPage({ data, url, state }) {
-    const filterActive = hasAnyFilter(data.filter);
     const statActive = whichStatActive(data.filter);
     const statStripTotals: TagsStatStripTotals = data.totals;
 
@@ -423,18 +422,10 @@ export default define.page<typeof handler>(
                 )
                 : null}
 
-              {
-                /* Filter bar island only mounts when a URL filter is present.
-                  Full UI is deferred — see islands/TagsFilterBar.tsx. */
-              }
-              {filterActive
-                ? (
-                  <TagsFilterBar
-                    initial={serializeFilter(data.filter)}
-                    totalCount={data.totals.all}
-                  />
-                )
-                : null}
+              <TagsFilterBar
+                initial={serializeFilter(data.filter)}
+                totalCount={data.totals.all}
+              />
 
               <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {data.rows.length === 0

@@ -6,6 +6,10 @@
  * legacy prop is preserved so the existing `islands/linking/TagPicker.tsx`
  * call site keeps working; new callers should use `onDetected(result)`
  * instead.
+ *
+ * The modal inherits the caller's `accent` colour: the BorderBeam,
+ * countdown ring, and neutral-state iconography all use it. Semantic
+ * states (success/warning/error) keep their fixed tones for clarity.
  */
 
 import { useEffect, useRef } from "preact/hooks";
@@ -20,6 +24,11 @@ import { Button } from "@/components/ui/button.tsx";
 import { BorderBeam } from "@/components/magicui/border-beam.tsx";
 import { BlurFade } from "@/components/magicui/blur-fade.tsx";
 import { ExternalLink, Keyboard } from "lucide-preact";
+import {
+  type AccentColor,
+  borderBeamColors,
+  stripToneClasses,
+} from "@/src/lib/colors.ts";
 import { cn } from "@/src/lib/utils/cn.ts";
 import {
   type ScanResult,
@@ -38,6 +47,12 @@ interface Props {
   confirmMode?: "auto" | "manual";
   /** Default true. When false, the "Enter manually" secondary is hidden. */
   allowManualEntry?: boolean;
+  /**
+   * Page accent that themes the modal chrome. Defaults to `cyan`
+   * (the Tags page accent). BorderBeam, countdown ring, and neutral-state
+   * icons all follow this. Semantic state colours are preserved.
+   */
+  accent?: AccentColor;
   /** Preferred callback; receives the full `ScanResult`. */
   onDetected?: (r: ScanResult) => void | Promise<void>;
   /**
@@ -58,12 +73,10 @@ export default function TapToAddModal({
   timeoutSeconds = 20,
   confirmMode = "manual",
   allowManualEntry = true,
+  accent = "cyan",
   onDetected,
   onTagDetected,
 }: Props) {
-  // Bridge the modal's onDetected contract to the hook's. The hook calls
-  // this synchronously after successful scan-lookup; if neither handler is
-  // supplied we fall back to the pre-refresh default routing.
   const handleDetected = async (r: ScanResult) => {
     if (onDetected) {
       await onDetected(r);
@@ -73,8 +86,6 @@ export default function TapToAddModal({
       onTagDetected(r.idTag);
       return;
     }
-    // Default: route to the tag page or the new-tag flow. Matches the old
-    // `ScanTagAction` behavior so the modal remains drop-in.
     const dest = r.exists && typeof r.tagPk === "number"
       ? `/tags/${r.tagPk}`
       : `/tags/new?idTag=${encodeURIComponent(r.idTag)}`;
@@ -94,8 +105,6 @@ export default function TapToAddModal({
   const primaryCtaRef = useRef<HTMLButtonElement | null>(null);
   const retryCtaRef = useRef<HTMLButtonElement | null>(null);
 
-  // Open / close lifecycle: calling `open()` resets the hook and kicks
-  // off a fresh connect; `close()` tears everything down.
   useEffect(() => {
     if (open) {
       showManual.value = false;
@@ -105,30 +114,39 @@ export default function TapToAddModal({
     } else {
       hook.close();
     }
-    // hook methods are stable — no deps warning needed
   }, [open]);
 
-  // Countdown announcements for screen readers.
+  // Announce the transition into `connecting` so screen-reader users know
+  // the modal is doing something before the waiting state kicks in.
+  useEffect(() => {
+    if (!open) return;
+    if (state.kind === "connecting") {
+      announceMessage.value = "Connecting to charger log stream";
+    }
+  }, [state.kind, open]);
+
+  // Countdown announcements (includes a final "timer expired" when it hits 0).
   const remainingDep = state.kind === "waiting" ? state.remaining : null;
   useEffect(() => {
     if (state.kind !== "waiting") return;
     const r = state.remaining;
+    if (r === 0 && lastAnnouncedRef.current !== 0) {
+      lastAnnouncedRef.current = 0;
+      announceMessage.value = "Countdown finished";
+      return;
+    }
     if (ANNOUNCE_AT.has(r) && lastAnnouncedRef.current !== r) {
       lastAnnouncedRef.current = r;
       announceMessage.value = `${r} seconds remaining`;
     }
   }, [remainingDep]);
 
-  // Reset the "manual entry revealed" toggle on fundamental state jumps
-  // so re-entering `waiting` from a retry doesn't show a stale form.
   useEffect(() => {
     if (state.kind === "resolving" || state.kind === "routing") {
       showManual.value = false;
     }
   }, [state.kind]);
 
-  // Dialog-level key handling. Enter confirms on detected; `r` retries on
-  // recoverable errors (but only when focus isn't inside a text input).
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
@@ -153,8 +171,6 @@ export default function TapToAddModal({
     return () => document.removeEventListener("keydown", handler);
   }, [open, state.kind]);
 
-  // Focus management: primary CTA on `detected`, retry on errors, Close
-  // (dialog default) on connecting/waiting/resolving/routing.
   useEffect(() => {
     if (!open) return;
     if (state.kind === "detected" && primaryCtaRef.current) {
@@ -173,6 +189,9 @@ export default function TapToAddModal({
   };
 
   const showBeam = state.kind === "waiting" || state.kind === "detected";
+  const beam = borderBeamColors[accent];
+  const accentStroke = stripToneClasses[accent].iconWell.split(" ").slice(1)
+    .join(" ");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -198,6 +217,8 @@ export default function TapToAddModal({
           <BlurFade key={state.kind} duration={0.18}>
             <StateBody
               state={state}
+              accent={accent}
+              accentStroke={accentStroke}
               showManual={showManual.value}
               onToggleManual={() => (showManual.value = !showManual.value)}
               allowManualEntry={allowManualEntry}
@@ -215,7 +236,6 @@ export default function TapToAddModal({
           </BlurFade>
         </div>
 
-        {/* sr-only live region dedicated to countdown announcements. */}
         <span class="sr-only" aria-live="polite" aria-atomic="true">
           {announceMessage.value}
         </span>
@@ -224,8 +244,8 @@ export default function TapToAddModal({
           <BorderBeam
             size={180}
             duration={8}
-            colorFrom="var(--glow-cyan, #a855f7)"
-            colorTo="var(--glow-green, #22d3ee)"
+            colorFrom={beam.from}
+            colorTo={beam.to}
           />
         )}
       </DialogContent>
@@ -239,6 +259,8 @@ export default function TapToAddModal({
 
 interface BodyProps {
   state: ScanTagState;
+  accent: AccentColor;
+  accentStroke: string;
   showManual: boolean;
   onToggleManual: () => void;
   allowManualEntry: boolean;
@@ -254,9 +276,73 @@ interface BodyProps {
   retryCtaRef: { current: HTMLButtonElement | null };
 }
 
+/**
+ * Recoverable-error shell used by timeout / unavailable / network_error /
+ * lookup_failed — the same "Try again" verb, the same manual-entry
+ * fallback, the same layout.
+ */
+function ErrorBody({
+  state,
+  copy,
+  onManualSubmit,
+  onToggleManual,
+  showManual,
+  allowManualEntry,
+  retryCtaRef,
+  retryAction,
+  accent,
+}: {
+  state: ScanTagState;
+  copy: string;
+  onManualSubmit: (idTag: string) => void;
+  onToggleManual: () => void;
+  showManual: boolean;
+  allowManualEntry: boolean;
+  retryCtaRef: { current: HTMLButtonElement | null };
+  retryAction: () => void;
+  accent: AccentColor;
+}) {
+  return (
+    <div class="flex flex-col items-center gap-4">
+      <ScanStateIcon state={state} accent={accent} />
+      <p class="text-sm text-destructive text-center max-w-xs">{copy}</p>
+      <p class="text-[11px] uppercase tracking-wide text-muted-foreground">
+        Press R to retry
+      </p>
+      <div class="flex items-center justify-center gap-2 pt-2 flex-wrap">
+        <Button
+          ref={retryCtaRef as unknown as never}
+          size="sm"
+          onClick={retryAction}
+        >
+          Try again
+        </Button>
+        {allowManualEntry && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onToggleManual}
+            aria-expanded={showManual}
+          >
+            <Keyboard class="mr-1 size-4" aria-hidden="true" />
+            Enter manually
+          </Button>
+        )}
+      </div>
+      {allowManualEntry && showManual && (
+        <div class="w-full pt-2">
+          <ManualEntryForm onSubmit={onManualSubmit} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StateBody(props: BodyProps) {
   const {
     state,
+    accent,
+    accentStroke,
     showManual,
     onToggleManual,
     allowManualEntry,
@@ -276,8 +362,8 @@ function StateBody(props: BodyProps) {
     case "idle":
     case "connecting":
       return (
-        <>
-          <ScanStateIcon state={state} />
+        <div class="flex flex-col items-center gap-4">
+          <ScanStateIcon state={state} accent={accent} />
           <p class="text-sm text-muted-foreground text-center max-w-xs">
             Connecting to charger log stream…
           </p>
@@ -286,17 +372,17 @@ function StateBody(props: BodyProps) {
               Cancel
             </Button>
           </div>
-        </>
+        </div>
       );
 
     case "waiting": {
       const lowTime = state.remaining <= 5;
       return (
-        <>
+        <div class="flex flex-col items-center gap-4">
           <ScanCountdownRing
             remaining={state.remaining}
             total={Math.max(state.remaining, 1)}
-            tone={lowTime ? "amber" : "violet"}
+            tone={lowTime ? "amber" : accent}
             reducedMotion={prefersReducedMotion}
           />
           <div class="flex flex-col items-center gap-1 text-center">
@@ -325,7 +411,7 @@ function StateBody(props: BodyProps) {
             </Button>
             {allowManualEntry && (
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 onClick={onToggleManual}
                 aria-expanded={showManual}
@@ -341,15 +427,15 @@ function StateBody(props: BodyProps) {
               <ManualEntryForm onSubmit={onManualSubmit} />
             </div>
           )}
-        </>
+        </div>
       );
     }
 
     case "detected": {
       const auto = confirmMode === "auto";
       return (
-        <>
-          <ScanStateIcon state={state} />
+        <div class="flex flex-col items-center gap-4">
+          <ScanStateIcon state={state} accent={accent} />
           <div class="flex flex-col items-center gap-2">
             <TagChip
               idTag={state.idTag}
@@ -376,24 +462,24 @@ function StateBody(props: BodyProps) {
               Scan again
             </Button>
           </div>
-        </>
+        </div>
       );
     }
 
     case "resolving":
       return (
-        <>
-          <ScanStateIcon state={state} />
+        <div class="flex flex-col items-center gap-4">
+          <ScanStateIcon state={state} accent={accent} />
           <p class="text-sm text-muted-foreground text-center">
             Looking up <span class="font-mono">{state.idTag}</span>…
           </p>
-        </>
+        </div>
       );
 
     case "routing":
       return (
-        <>
-          <ScanStateIcon state={state} />
+        <div class="flex flex-col items-center gap-4">
+          <ScanStateIcon state={state} accent={accent} />
           <p class="text-sm text-muted-foreground text-center">
             Opening{" "}
             <span class="font-mono text-foreground">{state.destination}</span>…
@@ -402,125 +488,75 @@ function StateBody(props: BodyProps) {
             class="mt-2 h-1 w-40 overflow-hidden rounded-full bg-muted"
             role="progressbar"
             aria-label="Navigating"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={50}
           >
             <div
               class={cn(
-                "h-full w-1/3 bg-violet-500",
+                "h-full w-1/3",
+                accentStroke.split(" ")[0].replace("text-", "bg-"),
                 prefersReducedMotion ? "" : "animate-pulse",
               )}
             />
           </div>
-        </>
+        </div>
       );
 
     case "timeout":
       return (
-        <>
-          <ScanStateIcon state={state} />
-          <p class="text-sm text-muted-foreground text-center max-w-xs">
-            No tag detected in 20 seconds.
-          </p>
-          <div class="flex items-center justify-center gap-2 pt-2 flex-wrap">
-            <Button
-              ref={retryCtaRef as unknown as never}
-              size="sm"
-              onClick={onRetry}
-            >
-              Scan again
-            </Button>
-            {allowManualEntry && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onToggleManual}
-                aria-expanded={showManual}
-              >
-                Enter manually
-              </Button>
-            )}
-          </div>
-          {allowManualEntry && showManual && (
-            <div class="w-full pt-2">
-              <ManualEntryForm onSubmit={onManualSubmit} />
-            </div>
-          )}
-        </>
+        <ErrorBody
+          state={state}
+          accent={accent}
+          copy="No tag detected in 20 seconds."
+          onManualSubmit={onManualSubmit}
+          onToggleManual={onToggleManual}
+          showManual={showManual}
+          allowManualEntry={allowManualEntry}
+          retryCtaRef={retryCtaRef}
+          retryAction={onRetry}
+        />
       );
 
     case "unavailable":
       return (
-        <>
-          <ScanStateIcon state={state} />
-          <p class="text-sm text-destructive text-center max-w-xs">
-            Charger log stream is unavailable. Is StEvE running?
-          </p>
-          <div class="flex items-center justify-center gap-2 pt-2 flex-wrap">
-            <Button
-              ref={retryCtaRef as unknown as never}
-              size="sm"
-              onClick={onRetry}
-            >
-              Retry
-            </Button>
-            {allowManualEntry && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onToggleManual}
-                aria-expanded={showManual}
-              >
-                Enter manually
-              </Button>
-            )}
-          </div>
-          {allowManualEntry && showManual && (
-            <div class="w-full pt-2">
-              <ManualEntryForm onSubmit={onManualSubmit} />
-            </div>
-          )}
-        </>
+        <ErrorBody
+          state={state}
+          accent={accent}
+          copy="The charger detection service is unreachable. It may be restarting — try again in a moment."
+          onManualSubmit={onManualSubmit}
+          onToggleManual={onToggleManual}
+          showManual={showManual}
+          allowManualEntry={allowManualEntry}
+          retryCtaRef={retryCtaRef}
+          retryAction={onRetry}
+        />
       );
 
     case "network_error":
       return (
-        <>
-          <ScanStateIcon state={state} />
-          <p class="text-sm text-destructive text-center max-w-xs">
-            Lost connection to detection stream.
-          </p>
-          <div class="flex items-center justify-center gap-2 pt-2 flex-wrap">
-            <Button
-              ref={retryCtaRef as unknown as never}
-              size="sm"
-              onClick={onRetry}
-            >
-              Retry
-            </Button>
-            {allowManualEntry && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onToggleManual}
-                aria-expanded={showManual}
-              >
-                Enter manually
-              </Button>
-            )}
-          </div>
-          {allowManualEntry && showManual && (
-            <div class="w-full pt-2">
-              <ManualEntryForm onSubmit={onManualSubmit} />
-            </div>
-          )}
-        </>
+        <ErrorBody
+          state={state}
+          accent={accent}
+          copy="Lost connection to the detection stream. This is usually transient."
+          onManualSubmit={onManualSubmit}
+          onToggleManual={onToggleManual}
+          showManual={showManual}
+          allowManualEntry={allowManualEntry}
+          retryCtaRef={retryCtaRef}
+          retryAction={onRetry}
+        />
       );
 
     case "lookup_failed":
       return (
-        <>
-          <ScanStateIcon state={state} />
+        <div class="flex flex-col items-center gap-4">
+          <ScanStateIcon state={state} accent={accent} />
           <p class="text-sm text-destructive text-center max-w-xs">
             Couldn't look up <span class="font-mono">{state.idTag}</span>.
+          </p>
+          <p class="text-[11px] uppercase tracking-wide text-muted-foreground">
+            Press R to retry
           </p>
           <div class="flex items-center justify-center gap-2 pt-2 flex-wrap">
             <Button
@@ -528,8 +564,19 @@ function StateBody(props: BodyProps) {
               size="sm"
               onClick={() => onManualSubmit(state.idTag)}
             >
-              Retry lookup
+              Try again
             </Button>
+            {allowManualEntry && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onToggleManual}
+                aria-expanded={showManual}
+              >
+                <Keyboard class="mr-1 size-4" aria-hidden="true" />
+                Enter manually
+              </Button>
+            )}
             <Button variant="outline" size="sm" asChild>
               <a
                 href={`/tags/new?idTag=${encodeURIComponent(state.idTag)}`}
@@ -541,7 +588,12 @@ function StateBody(props: BodyProps) {
               </a>
             </Button>
           </div>
-        </>
+          {allowManualEntry && showManual && (
+            <div class="w-full pt-2">
+              <ManualEntryForm onSubmit={onManualSubmit} />
+            </div>
+          )}
+        </div>
       );
 
     case "dismissed":

@@ -48,6 +48,8 @@ import ChargerOperationLogTable, {
   type OperationLogRow,
 } from "../../islands/ChargerOperationLogTable.tsx";
 import RemoteActionsPanel from "../../islands/charger-actions/RemoteActionsPanel.tsx";
+import { SectionCard } from "../../components/shared/SectionCard.tsx";
+import { ClipboardList } from "lucide-preact";
 
 // ---------------------------------------------------------------------------
 // Loader DTO
@@ -530,21 +532,17 @@ export default define.page<typeof handler>(
                 rows={data.recentTransactions}
                 steveFetchFailed={data.steveFetchFailed}
               />
-              <section
-                aria-label="Operation log"
-                class="flex flex-col gap-3 rounded-xl border bg-card p-4"
+              <SectionCard
+                title="Operation audit"
+                description={`Last ${data.operationLog.length} entries`}
+                icon={ClipboardList}
+                accent="orange"
               >
-                <div class="flex items-center justify-between">
-                  <h2 class="text-sm font-semibold">Operation audit</h2>
-                  <span class="text-xs text-muted-foreground">
-                    last {data.operationLog.length} entries
-                  </span>
-                </div>
                 <ChargerOperationLogTable
                   rows={data.operationLog}
                   isAdmin={data.isAdmin}
                 />
-              </section>
+              </SectionCard>
             </div>
 
             {/* Row 4: admin-only actions palette */}

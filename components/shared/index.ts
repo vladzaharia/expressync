@@ -15,6 +15,8 @@ export type { SyncStatus } from "./SyncStatusBadge.tsx";
 export { InvoiceStatusBadge } from "./InvoiceStatusBadge.tsx";
 
 export { MetricTile } from "./MetricTile.tsx";
+export { StatStrip } from "./StatStrip.tsx";
+export type { StatStripItem, StatStripProps } from "./StatStrip.tsx";
 export { EmptyState } from "./EmptyState.tsx";
 export type { EmptyStateAction, EmptyStateProps } from "./EmptyState.tsx";
 export { SectionCard } from "./SectionCard.tsx";

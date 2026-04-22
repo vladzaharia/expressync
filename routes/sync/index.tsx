@@ -10,7 +10,10 @@ import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
 import SyncRunsTable from "../../islands/SyncRunsTable.tsx";
 import SyncRunsFilters from "../../islands/SyncRunsFilters.tsx";
-import { MetricTile } from "../../components/shared/MetricTile.tsx";
+import {
+  StatStrip,
+  type StatStripItem,
+} from "../../components/shared/StatStrip.tsx";
 import { Activity, CheckCircle2, Clock, Timer } from "lucide-preact";
 
 const PAGE_SIZE = 15;
@@ -103,35 +106,6 @@ export default define.page<typeof handler>(function SyncPage(
       accentColor="blue"
       user={state.user}
     >
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-        <MetricTile
-          icon={Activity}
-          label="Runs (24h)"
-          value={stats.runs24h}
-          accent="blue"
-        />
-        <MetricTile
-          icon={CheckCircle2}
-          label="Success rate (7d)"
-          value={`${stats.successRate7d.toFixed(0)}%`}
-          accent="blue"
-        />
-        <MetricTile
-          icon={Timer}
-          label="Avg duration (7d)"
-          value={formatDurationSeconds(stats.avgDurationSec7d)}
-          accent="blue"
-        />
-        <MetricTile
-          icon={Clock}
-          label="Last run"
-          value={lastRunValue}
-          accent="blue"
-        />
-      </div>
-
-      <SyncRunsFilters initial={data.filters} />
-
       <PageCard
         title="Sync History"
         description={`${data.totalCount} sync run${
@@ -139,6 +113,42 @@ export default define.page<typeof handler>(function SyncPage(
         } match${data.totalCount === 1 ? "es" : ""} your filters`}
         colorScheme="blue"
       >
+        <div class="mb-4">
+          <StatStrip
+            accent="blue"
+            items={[
+              {
+                key: "runs-24h",
+                label: "Runs (24h)",
+                value: stats.runs24h,
+                icon: Activity,
+              },
+              {
+                key: "success-7d",
+                label: "Success rate (7d)",
+                value: `${stats.successRate7d.toFixed(0)}%`,
+                icon: CheckCircle2,
+              },
+              {
+                key: "avg-duration",
+                label: "Avg duration (7d)",
+                value: formatDurationSeconds(stats.avgDurationSec7d),
+                icon: Timer,
+              },
+              {
+                key: "last-run",
+                label: "Last run",
+                value: lastRunValue,
+                icon: Clock,
+              },
+            ] satisfies StatStripItem[]}
+          />
+        </div>
+
+        <div class="mb-4">
+          <SyncRunsFilters initial={data.filters} />
+        </div>
+
         <SyncRunsTable
           syncRuns={data.syncRuns}
           totalCount={data.totalCount}
