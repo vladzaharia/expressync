@@ -58,7 +58,7 @@ export default function SubscriptionPicker(props: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/subscription");
+        const res = await fetch("/api/admin/subscription");
         const data = await res.json();
         if (!cancelled && Array.isArray(data)) subscriptions.value = data;
       } catch (err) {

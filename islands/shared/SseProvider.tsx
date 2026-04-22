@@ -2,7 +2,7 @@
  * SseProvider (Phase P7)
  *
  * A single tab-scoped island that holds the browser's EventSource connections
- * to `/api/stream/chargers` and `/api/notifications/stream`, then fans
+ * to `/api/admin/stream/chargers` and `/api/admin/notifications/stream`, then fans
  * received events out to two audiences:
  *
  *   1. Other islands in the same tab — via a minimal in-page emitter exposed
@@ -99,7 +99,7 @@ const STREAMS: Array<{
   lastId: number | null;
 }> = [
   {
-    url: "/api/stream/chargers",
+    url: "/api/admin/stream/chargers",
     types: [
       "charger.state",
       "transaction.meter",
@@ -109,7 +109,7 @@ const STREAMS: Array<{
     lastId: null,
   },
   {
-    url: "/api/notifications/stream",
+    url: "/api/admin/notifications/stream",
     types: ["notification.created", "notification.read"],
     lastId: null,
   },

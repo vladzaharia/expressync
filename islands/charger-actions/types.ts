@@ -76,7 +76,7 @@ export async function submitOperation(args: {
   dryRun?: boolean;
 }): Promise<OperationResult> {
   const startedAt = new Date();
-  const res = await fetch("/api/charger/operation", {
+  const res = await fetch("/api/admin/charger/operation", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

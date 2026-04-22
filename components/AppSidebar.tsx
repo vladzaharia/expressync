@@ -21,11 +21,11 @@ import { Particles } from "./magicui/particles.tsx";
 import { ExpresSyncBrand } from "./brand/ExpresSyncBrand.tsx";
 import { type AccentColor, accentTailwindClasses } from "@/src/lib/colors.ts";
 import {
+  ADMIN_NAV_SECTIONS as NAV_SECTIONS,
   getAllNavItems,
   isPathActive,
-  NAV_SECTIONS,
   type NavItem,
-} from "@/src/lib/navigation.ts";
+} from "@/src/lib/admin-navigation.ts";
 
 // Shared chrome size - used by both sidebar and top bar
 export const CHROME_SIZE = "3.5rem"; // 56px

@@ -17,7 +17,7 @@ import { formatDate } from "@/src/lib/utils/format.ts";
  * rows can surface the Phase E1 Remote Stop button.
  *
  * When `stopTimestamp === null`, we render an inline red Stop button in the
- * actions column. Clicking it POSTs to `/api/charger/operation` with
+ * actions column. Clicking it POSTs to `/api/admin/charger/operation` with
  * `operation: "RemoteStopTransaction"`. After success, a 5-second Undo toast
  * offers to re-issue `RemoteStartTransaction` with the original ocppIdTag +
  * connectorId.
@@ -71,7 +71,7 @@ function StopButton({ event }: { event: TransactionEventWithTag }) {
     }, 10_000);
 
     try {
-      const response = await fetch("/api/charger/operation", {
+      const response = await fetch("/api/admin/charger/operation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -107,7 +107,7 @@ function StopButton({ event }: { event: TransactionEventWithTag }) {
             label: "Undo",
             onClick: async () => {
               try {
-                const undoRes = await fetch("/api/charger/operation", {
+                const undoRes = await fetch("/api/admin/charger/operation", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -259,7 +259,7 @@ export default function TransactionsPaginatedTable({
       columns={columns}
       totalCount={totalCount}
       pageSize={pageSize}
-      fetchUrl="/api/transaction"
+      fetchUrl="/api/admin/transaction"
       showLoadMore={showLoadMore}
       emptyMessage="No billing events found"
       onRowClick={handleRowClick}

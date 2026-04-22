@@ -2,7 +2,7 @@
  * CustomerPicker — owns the Lago-customer side of the linking form.
  *
  * Behavior:
- *   - Fetches `/api/customer` (Lago customers, name+external_id).
+ *   - Fetches `/api/admin/customer` (Lago customers, name+external_id).
  *   - Client-side search (filters on name / external_id).
  *   - Selected view collapses to a summary chip with a `Change` button.
  *   - Empty-state (zero Lago customers) renders an external deep-link to
@@ -43,7 +43,7 @@ export default function CustomerPicker(
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/customer");
+        const res = await fetch("/api/admin/customer");
         const data = await res.json();
         if (!cancelled && Array.isArray(data)) customers.value = data;
       } catch (err) {
