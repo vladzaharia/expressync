@@ -6,13 +6,8 @@
  */
 
 import { CornerDownRight, Layers, Link2Off } from "lucide-preact";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
+import { SectionCard } from "@/components/shared/SectionCard.tsx";
 import { TagChip } from "@/components/tags/TagChip.tsx";
 
 export interface RelationTag {
@@ -35,24 +30,19 @@ export function TagRelationsSection({ isMeta, parent, childTags }: Props) {
   const emptyChildren = childTags.length === 0;
 
   return (
-    <Card>
-      <CardHeader class="flex flex-row items-center justify-between gap-3">
-        <div class="flex items-center gap-2">
-          <Layers
-            class="h-4 w-4 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <CardTitle class="text-base">Hierarchy</CardTitle>
-          {childTags.length > 0
-            ? (
-              <Badge variant="outline" class="font-normal">
-                {childTags.length} child{childTags.length === 1 ? "" : "ren"}
-              </Badge>
-            )
-            : null}
-        </div>
-      </CardHeader>
-      <CardContent class="space-y-4">
+    <SectionCard
+      title="Hierarchy"
+      icon={Layers}
+      accent="cyan"
+      actions={childTags.length > 0
+        ? (
+          <Badge variant="outline" class="font-normal">
+            {childTags.length} child{childTags.length === 1 ? "" : "ren"}
+          </Badge>
+        )
+        : undefined}
+    >
+      <div class="space-y-4">
         {/* Parent block */}
         <div>
           <div class="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
@@ -136,7 +126,7 @@ export function TagRelationsSection({ isMeta, parent, childTags }: Props) {
               </div>
             )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </SectionCard>
   );
 }

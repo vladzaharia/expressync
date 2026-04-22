@@ -401,22 +401,30 @@ export default function ReservationWizard(
       )}
 
       {step === 3 && selectedCharger && (
-        <StepWindow
-          startAtDate={startAtDate}
-          endAtDate={endAtDate}
-          onRangeChange={(startAt, endAt) => {
-            setStartLocal(isoAt(startAt));
-            const newDuration = Math.max(
-              15,
-              Math.round((endAt.getTime() - startAt.getTime()) / 60_000),
-            );
-            setDuration(newDuration);
-          }}
-          checking={checkingConflicts}
-          conflicts={conflicts}
-          onPickSuggestion={onPickSuggestion}
-          tz={displayTz ?? null}
-        />
+        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+          <StepWindow
+            startAtDate={startAtDate}
+            endAtDate={endAtDate}
+            onRangeChange={(startAt, endAt) => {
+              setStartLocal(isoAt(startAt));
+              const newDuration = Math.max(
+                15,
+                Math.round((endAt.getTime() - startAt.getTime()) / 60_000),
+              );
+              setDuration(newDuration);
+            }}
+            checking={checkingConflicts}
+            conflicts={conflicts}
+            onPickSuggestion={onPickSuggestion}
+            tz={displayTz ?? null}
+          />
+          <WizardContextAside
+            charger={selectedCharger}
+            connectorId={connectorId}
+            tag={selectedTag ?? null}
+            onEditStep={setStep}
+          />
+        </div>
       )}
 
       {step === 4 && selectedCharger && selectedTag && startAtDate &&
@@ -680,6 +688,77 @@ function StepWindow(
         onPickSuggestion={onPickSuggestion}
       />
     </div>
+  );
+}
+
+/**
+ * Compact summary aside shown alongside the Window step on desktop, so the
+ * operator doesn't lose sight of the charger / connector / tag they already
+ * chose (and the picker itself stays narrower).
+ */
+function WizardContextAside(
+  { charger, connectorId, tag, onEditStep }: {
+    charger: WizardChargerOption;
+    connectorId: number | null;
+    tag: WizardTagOption | null;
+    onEditStep: (step: number) => void;
+  },
+) {
+  const rows: Array<{
+    label: string;
+    value: preact.ComponentChildren;
+    editStep: number;
+  }> = [
+    {
+      label: "Charger",
+      value: charger.friendlyName ?? charger.chargeBoxId,
+      editStep: 0,
+    },
+    {
+      label: "Connector",
+      value: connectorId == null
+        ? <span class="italic text-muted-foreground">Not chosen</span>
+        : connectorId === 0
+        ? "All (charger-wide)"
+        : `#${connectorId}`,
+      editStep: 1,
+    },
+    {
+      label: "Tag",
+      value: tag
+        ? (
+          <span class="truncate">
+            {tag.displayName ?? tag.idTag}
+          </span>
+        )
+        : <span class="italic text-muted-foreground">Not chosen</span>,
+      editStep: 2,
+    },
+  ];
+
+  return (
+    <aside class="flex flex-col gap-3 rounded-lg border bg-muted/20 p-4 h-fit lg:sticky lg:top-4">
+      <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Reservation context
+      </h3>
+      <dl class="grid gap-2 text-sm">
+        {rows.map((r) => (
+          <div key={r.label} class="flex flex-col gap-0.5">
+            <dt class="flex items-center justify-between gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+              <span>{r.label}</span>
+              <button
+                type="button"
+                onClick={() => onEditStep(r.editStep)}
+                class="text-[11px] font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+              >
+                Edit
+              </button>
+            </dt>
+            <dd class="truncate text-sm text-foreground">{r.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </aside>
   );
 }
 
