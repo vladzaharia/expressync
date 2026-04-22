@@ -85,9 +85,7 @@ export function RecentActivityMini({ rows, tagPk, class: className }: Props) {
                       )}
                     >
                       <Zap class="size-3" aria-hidden="true" />
-                      {row.kwh == null
-                        ? "—"
-                        : `${row.kwh.toFixed(2)} kWh`}
+                      {row.kwh == null ? "—" : `${row.kwh.toFixed(2)} kWh`}
                     </div>
                   </a>
                 </li>

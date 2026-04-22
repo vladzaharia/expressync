@@ -367,8 +367,10 @@ export default function UsersTable({
         </DialogContent>
       </Dialog>
 
-      {/* Accessible delete-confirm (replaces browser confirm()). Default focus
-          lands on Cancel; destructive label is explicit. */}
+      {
+        /* Accessible delete-confirm (replaces browser confirm()). Default focus
+          lands on Cancel; destructive label is explicit. */
+      }
       <Dialog
         open={deleteTarget.value !== null}
         onOpenChange={(open) => {

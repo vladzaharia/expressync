@@ -1,4 +1,5 @@
 import {
+  type AnyPgColumn,
   boolean,
   check,
   index,
@@ -562,6 +563,15 @@ export const lagoWebhookEvents = pgTable("lago_webhook_events", {
   processedAt: timestamp("processed_at", { withTimezone: true }),
   processingError: text("processing_error"),
   notificationFired: boolean("notification_fired").notNull().default(false),
+  // === Phase P4: webhook replay tracking (added columns) ===
+  replayedAt: timestamp("replayed_at", { withTimezone: true }), // Phase P4: replay tracking
+  replayedByUserId: text("replayed_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }), // Phase P4: replay tracking
+  replayedFromId: integer("replayed_from_id").references(
+    (): AnyPgColumn => lagoWebhookEvents.id,
+    { onDelete: "set null" },
+  ), // Phase P4: replay tracking
 }, (table) => [
   index("idx_lago_webhook_events_type_received").on(
     table.webhookType,
@@ -571,6 +581,9 @@ export const lagoWebhookEvents = pgTable("lago_webhook_events", {
     table.externalCustomerId,
     table.receivedAt.desc(),
   ),
+  index("idx_lago_webhook_events_replayed_from").on(
+    table.replayedFromId,
+  ).where(sql`${table.replayedFromId} IS NOT NULL`),
 ]);
 
 export type LagoWebhookEvent = typeof lagoWebhookEvents.$inferSelect;
@@ -696,4 +709,163 @@ export interface ReservationRowDTO {
   status: ReservationStatus;
   lagoSubscriptionExternalId: string | null;
   chargingProfileTaskId: number | null;
+}
+
+// ============================================================================
+// === Phase P1: notifications ===
+// ============================================================================
+
+/**
+ * Notifications — in-app admin notification feed.
+ *
+ * Replaces the `notify()` log stub in lago-webhook-handler.service.ts. Each row
+ * is a single notification surfaced in the header bell + archive page.
+ *
+ * Broadcast model (MVP): rows with `admin_user_id = NULL` are visible to every
+ * admin. Per-admin routing is a post-MVP iteration — we keep the column so the
+ * API surface can stabilize before then.
+ *
+ * Severity CHECK matches the UI's NotificationSeverityDot mapping:
+ *   info → sky, success → emerald, warn → amber, error → rose.
+ *
+ * `source_type` + `source_id` identify the originating entity so rows can
+ * render outlined cross-domain chips and deep-link on click. Known source
+ * types: 'invoice' | 'alert' | 'subscription' | 'wallet_transaction' |
+ * 'webhook_event' | 'system' (null link) | 'mapping' | 'charger' | 'reservation'.
+ *
+ * `context` is free-form JSONB for payload fields the row rendering may want
+ * (invoice number, external_id, etc.). Never a source of truth.
+ */
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  kind: text("kind").notNull(),
+  severity: text("severity").notNull(),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  sourceType: text("source_type"),
+  sourceId: text("source_id"),
+  context: jsonb("context"),
+  adminUserId: text("admin_user_id").references(() => users.id, {
+    onDelete: "cascade",
+  }),
+  readAt: timestamp("read_at", { withTimezone: true }),
+  dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+}, (table) => [
+  check(
+    "notifications_severity_check",
+    sql`${table.severity} IN ('info', 'success', 'warn', 'error')`,
+  ),
+  index("idx_notifications_source").on(table.sourceType, table.sourceId),
+  index("idx_notifications_created_at").on(table.createdAt.desc()),
+]);
+
+export type Notification = typeof notifications.$inferSelect;
+export type NewNotification = typeof notifications.$inferInsert;
+
+/** Allowed severity values (keep in sync with CHECK constraint). */
+export const NOTIFICATION_SEVERITIES = [
+  "info",
+  "success",
+  "warn",
+  "error",
+] as const;
+export type NotificationSeverityValue =
+  (typeof NOTIFICATION_SEVERITIES)[number];
+
+// ============================================================================
+// === Phase P5: charging profiles ===
+// ============================================================================
+
+/**
+ * Charging Profiles - Per-Lago-subscription charging schedule + power cap
+ *
+ * Primary storage for subscription-level charging profiles (keyed by
+ * `lago_subscription_external_id`). A best-effort mirror is written to
+ * Lago's subscription metadata; our DB is the source of truth.
+ *
+ * Presets:
+ * - unlimited: no windows, no cap (clears any profile)
+ * - offpeak: weekday nights + weekends, no cap within window
+ * - cap7kw: 24/7 at 7000W
+ * - cap11kw: 24/7 at 11000W
+ * - solar: disabled stub (coming soon)
+ * - custom: user-defined windows via grid editor
+ */
+export const chargingProfiles = pgTable("charging_profiles", {
+  id: serial("id").primaryKey(),
+
+  /** Lago subscription external ID this profile belongs to (1:1) */
+  lagoSubscriptionExternalId: text("lago_subscription_external_id")
+    .notNull()
+    .unique(),
+
+  /** Preset identifier */
+  preset: text("preset").notNull().default("unlimited"),
+
+  /**
+   * Time windows for charging allowance (array of {dayOfWeek, startMin, endMin, maxW?})
+   * For presets that imply windows (offpeak, custom), this is populated.
+   * For 24/7 caps (cap7kw, cap11kw), this is empty and maxWGlobal is used.
+   */
+  windows: jsonb("windows").notNull().default([]),
+
+  /** Global power cap in Watts (applies 24/7 outside of window overrides) */
+  maxWGlobal: integer("max_w_global"),
+
+  /**
+   * Monotonic counter used as `chargingProfileId` in OCPP SetChargingProfile
+   * calls (enables ClearChargingProfile targeting even though we never
+   * expose a destructive clear — we always apply an Unlimited profile).
+   */
+  ocppChargingProfileId: integer("ocpp_charging_profile_id")
+    .notNull()
+    .default(1),
+
+  /** Whether last save requested apply-to-active-sessions */
+  applyToActiveSessions: boolean("apply_to_active_sessions").default(false),
+
+  /** Last successful Lago metadata mirror timestamp */
+  lagoSyncedAt: timestamp("lago_synced_at"),
+
+  /** Last Lago mirror error (informational; doesn't block UI) */
+  lagoSyncError: text("lago_sync_error"),
+
+  /** Audit */
+  createdByUserId: text("created_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  updatedByUserId: text("updated_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  subscriptionIdx: index("charging_profiles_subscription_idx")
+    .on(table.lagoSubscriptionExternalId),
+}));
+
+export type ChargingProfile = typeof chargingProfiles.$inferSelect;
+export type NewChargingProfile = typeof chargingProfiles.$inferInsert;
+
+export type ChargingProfilePreset =
+  | "unlimited"
+  | "offpeak"
+  | "cap7kw"
+  | "cap11kw"
+  | "solar"
+  | "custom";
+
+/** A charging time-window slot (half-open: [startMin, endMin) within a day) */
+export interface ChargingWindow {
+  /** 0 = Sunday, 1 = Monday, ... 6 = Saturday */
+  dayOfWeek: number;
+  /** Minutes from midnight (0-1440) */
+  startMin: number;
+  /** Minutes from midnight (0-1440; endMin > startMin) */
+  endMin: number;
+  /** Optional per-window power cap in Watts (overrides maxWGlobal) */
+  maxW?: number;
 }

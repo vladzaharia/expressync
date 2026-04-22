@@ -85,6 +85,34 @@
       "when": 1777910700000,
       "tag": "0011_add_billing_profile",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1777910760000,
+      "tag": "0012_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1777910820000,
+      "tag": "0013_reservations",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1777910880000,
+      "tag": "0014_charging_profiles",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1777910940000,
+      "tag": "0015_webhook_replay_tracking",
+      "breakpoints": true
     }
   ]
 }

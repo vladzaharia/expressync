@@ -15,13 +15,7 @@
  * refreshed surfaces).
  */
 
-import {
-  AlertTriangle,
-  Gauge,
-  Wifi,
-  WifiOff,
-  Zap,
-} from "lucide-preact";
+import { AlertTriangle, Gauge, Wifi, WifiOff, Zap } from "lucide-preact";
 import type { ComponentChildren } from "preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 

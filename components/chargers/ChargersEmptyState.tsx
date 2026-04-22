@@ -20,9 +20,7 @@ export function ChargersEmptyState({ steveUrl }: Props) {
 
   return (
     <div class="relative overflow-hidden rounded-xl border bg-card p-12 text-center">
-      <GridPattern
-        class="absolute inset-0 -z-10 opacity-40 [mask-image:radial-gradient(300px_circle_at_center,white,transparent)] text-orange-500/30"
-      />
+      <GridPattern class="absolute inset-0 -z-10 opacity-40 [mask-image:radial-gradient(300px_circle_at_center,white,transparent)] text-orange-500/30" />
       <BatteryCharging
         class="mx-auto size-12 text-orange-500"
         aria-hidden="true"

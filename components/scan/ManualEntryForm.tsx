@@ -44,12 +44,15 @@ export function ManualEntryForm({
         placeholder="Enter idTag"
         class="font-mono"
         value={value.value}
-        onInput={(e) =>
-          (value.value = (e.target as HTMLInputElement).value)}
+        onInput={(e) => (value.value = (e.target as HTMLInputElement).value)}
         autoFocus={autoFocus}
         aria-label="OCPP id tag"
       />
-      <Button type="submit" size="sm" disabled={disabled || !value.value.trim()}>
+      <Button
+        type="submit"
+        size="sm"
+        disabled={disabled || !value.value.trim()}
+      >
         Look up
       </Button>
     </form>

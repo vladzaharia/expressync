@@ -15,7 +15,7 @@
  * `scan-tag:error` fire on their respective terminal transitions.
  */
 
-import { signal, type Signal } from "@preact/signals";
+import { type Signal, signal } from "@preact/signals";
 import { useEffect, useMemo } from "preact/hooks";
 
 export type ScanTagState =
@@ -247,7 +247,9 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
         }
         if (!idTag) return;
         const cur = state.value;
-        const remaining = cur.kind === "waiting" ? cur.remaining : timeoutSeconds;
+        const remaining = cur.kind === "waiting"
+          ? cur.remaining
+          : timeoutSeconds;
         closeEventSource();
         setState({ kind: "detected", idTag, remaining });
         dispatch("scan-tag:detected", { idTag });

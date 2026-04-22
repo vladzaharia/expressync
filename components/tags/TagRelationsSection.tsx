@@ -28,11 +28,11 @@ export interface RelationTag {
 interface Props {
   isMeta: boolean;
   parent: RelationTag | null;
-  children: RelationTag[];
+  childTags: RelationTag[];
 }
 
-export function TagRelationsSection({ isMeta, parent, children }: Props) {
-  const emptyChildren = children.length === 0;
+export function TagRelationsSection({ isMeta, parent, childTags }: Props) {
+  const emptyChildren = childTags.length === 0;
 
   return (
     <Card>
@@ -43,10 +43,10 @@ export function TagRelationsSection({ isMeta, parent, children }: Props) {
             aria-hidden="true"
           />
           <CardTitle class="text-base">Hierarchy</CardTitle>
-          {children.length > 0
+          {childTags.length > 0
             ? (
               <Badge variant="outline" class="font-normal">
-                {children.length} child{children.length === 1 ? "" : "ren"}
+                {childTags.length} child{childTags.length === 1 ? "" : "ren"}
               </Badge>
             )
             : null}
@@ -107,7 +107,7 @@ export function TagRelationsSection({ isMeta, parent, children }: Props) {
             )
             : (
               <div class="flex flex-wrap gap-2">
-                {children.map((c) =>
+                {childTags.map((c) =>
                   c.tagPk !== null
                     ? (
                       <TagChip

@@ -122,8 +122,8 @@ export default function ChargerLiveStatusCard({
         >
           <AlertCircle class="size-4" />
           <span>
-            StEvE is unreachable — live status below is from the local cache
-            and may be out of date.
+            StEvE is unreachable — live status below is from the local cache and
+            may be out of date.
           </span>
         </div>
       )}
@@ -147,7 +147,8 @@ export default function ChargerLiveStatusCard({
               style={{ background: STATUS_HALO[uiStatus] }}
             />
             {uiStatus}
-            {lastStatus && lastStatus.toLowerCase() !== uiStatus.toLowerCase() &&
+            {lastStatus &&
+              lastStatus.toLowerCase() !== uiStatus.toLowerCase() &&
               (
                 <span class="text-xs font-normal opacity-80">
                   ({lastStatus})

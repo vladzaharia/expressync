@@ -69,7 +69,10 @@ export function ScanCountdownRing({
             stroke="currentColor"
             stroke-width="6"
             stroke-linecap="round"
-            class={cn("transition-[stroke-dashoffset] duration-500", strokeClass)}
+            class={cn(
+              "transition-[stroke-dashoffset] duration-500",
+              strokeClass,
+            )}
             style={{
               strokeDasharray: CIRC,
               strokeDashoffset: dashoffset,

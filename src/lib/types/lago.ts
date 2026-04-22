@@ -102,6 +102,40 @@ export const LagoSubscriptionSchema = z.object({
 export type LagoSubscription = z.infer<typeof LagoSubscriptionSchema>;
 
 /**
+ * Extended Lago Subscription schema that permits a `metadata` record.
+ *
+ * Lago's subscription API historically exposes metadata as an array of
+ * key/value entries (similar to the customer metadata shape). We accept
+ * either an array or a loose record because our P5 charging-profile mirror
+ * only writes a single JSON blob under key "charging_profile" — we do not
+ * attempt to reinterpret Lago's canonical metadata shape.
+ *
+ * Used by `lagoClient.getSubscription` / `updateSubscription` for the
+ * charging-profile mirror; all other callers continue to use
+ * `LagoSubscriptionSchema`.
+ */
+export const LagoSubscriptionWithMetadataSchema = LagoSubscriptionSchema.extend(
+  {
+    metadata: z.union([
+      z.record(z.string(), z.unknown()),
+      z.array(
+        z.object({
+          key: z.string(),
+          value: z.string(),
+          lago_id: z.string().optional(),
+          display_in_invoice: z.boolean().optional(),
+          created_at: z.string().optional(),
+        }),
+      ),
+    ]).optional(),
+  },
+);
+
+export type LagoSubscriptionWithMetadata = z.infer<
+  typeof LagoSubscriptionWithMetadataSchema
+>;
+
+/**
  * Zod schema for Lago Customer
  * Based on lago-api.yml CustomerBaseObject schema
  * All required fields per OpenAPI spec are non-optional
@@ -534,7 +568,9 @@ export type LagoLifetimeUsage = z.infer<typeof LagoLifetimeUsageSchema>;
 export const LagoInvoiceExtendedSchema = LagoInvoiceSchema.extend({
   file_url: z.string().nullable().optional(),
   fees: z.array(z.any()).optional(),
+  fees_amount_cents: z.number().optional(),
   applied_taxes: z.array(z.any()).optional(),
+  payment_overdue: z.boolean().optional(),
   customer: z.any().optional(),
   subscriptions: z.array(z.any()).optional(),
   credit_notes: z.array(z.any()).optional(),

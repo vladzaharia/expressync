@@ -119,8 +119,10 @@ export function ChargerHeaderStrip({
 
   return (
     <div class="flex flex-col gap-3">
-      {/* chargeBoxId (mono). Copy control lives on the identity card below so
-       *  this server component stays island-free. */}
+      {
+        /* chargeBoxId (mono). Copy control lives on the identity card below so
+       *  this server component stays island-free. */
+      }
       <div class="flex items-center gap-2">
         <code class="rounded border bg-muted/40 px-2 py-0.5 font-mono text-xs">
           {chargeBoxId}

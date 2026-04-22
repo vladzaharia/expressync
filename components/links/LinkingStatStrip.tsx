@@ -37,13 +37,20 @@ interface CellProps {
 import type { ComponentChildren } from "preact";
 
 function Cell(
-  { label, value, icon, tone = "violet", href }:
-    { label: string; value: number; icon: ComponentChildren; tone?: CellProps["tone"]; href?: string },
+  { label, value, icon, tone = "violet", href }: {
+    label: string;
+    value: number;
+    icon: ComponentChildren;
+    tone?: CellProps["tone"];
+    href?: string;
+  },
 ) {
   const toneClass = {
-    violet: "border-violet-500/30 bg-violet-500/5 text-violet-700 dark:text-violet-300",
+    violet:
+      "border-violet-500/30 bg-violet-500/5 text-violet-700 dark:text-violet-300",
     cyan: "border-cyan-500/30 bg-cyan-500/5 text-cyan-700 dark:text-cyan-300",
-    amber: "border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400",
+    amber:
+      "border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400",
     muted: "border-border bg-muted/20 text-foreground",
   }[tone];
 
@@ -119,9 +126,7 @@ export function LinkingStatStrip({ totals, class: className }: Props) {
           />
         }
         tone={totals.unlinkedTagCount > 0 ? "amber" : "muted"}
-        href={totals.unlinkedTagCount > 0
-          ? "/tags?filter=unlinked"
-          : undefined}
+        href={totals.unlinkedTagCount > 0 ? "/tags?filter=unlinked" : undefined}
       />
     </div>
   );

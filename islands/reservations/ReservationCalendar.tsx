@@ -266,7 +266,7 @@ interface BlockProps {
 function CalendarBlock(
   { r, displayTz, focused, onFocus, registerRef, fullWidth }: BlockProps,
 ) {
-  const aria = `${r.steveOcppIdTag} at ${r.chargeBoxId}, ${
+  const aria = `${r.ocppTagId} at ${r.chargeBoxId}, ${
     new Date(r.startAtIso).toLocaleString()
   } – ${new Date(r.endAtIso).toLocaleString()}, ${r.status}`;
 
@@ -287,7 +287,7 @@ function CalendarBlock(
         <div class={cn("flex flex-col gap-1", fullWidth && "flex-1")}>
           <div class="flex items-center justify-between gap-2">
             <span class="truncate font-mono text-[11px]">
-              {r.steveOcppIdTag}
+              {r.ocppTagId}
             </span>
             <ReservationStatusChip status={r.status} />
           </div>

@@ -27,10 +27,7 @@ interface Props {
   };
 }
 
-import {
-  tagTypeBgClass,
-  tagTypeTextClass,
-} from "@/src/lib/tag-visuals.ts";
+import { tagTypeBgClass, tagTypeTextClass } from "@/src/lib/tag-visuals.ts";
 
 function coerceTagType(value: string | null | undefined): TagType {
   return value && (TAG_TYPES as readonly string[]).includes(value)
@@ -124,12 +121,12 @@ export default function TagMetadataForm({
         <Label for="tm-display-name">Display name</Label>
         <Input
           id="tm-display-name"
-          placeholder={meta
-            ? "e.g. Vlad (group)"
-            : "e.g. Vlad's primary card"}
+          placeholder={meta ? "e.g. Vlad (group)" : "e.g. Vlad's primary card"}
           value={displayName.value}
-          onInput={(e) =>
-            (displayName.value = (e.currentTarget as HTMLInputElement).value)}
+          onInput={(
+            e,
+          ) => (displayName.value =
+            (e.currentTarget as HTMLInputElement).value)}
           disabled={saving.value}
         />
         <p class="text-xs text-muted-foreground">
@@ -191,8 +188,9 @@ export default function TagMetadataForm({
           id="tm-notes"
           placeholder="Free-text notes for ops (e.g. 'replacement for lost card')."
           value={notes.value}
-          onInput={(e) =>
-            (notes.value = (e.currentTarget as HTMLTextAreaElement).value)}
+          onInput={(
+            e,
+          ) => (notes.value = (e.currentTarget as HTMLTextAreaElement).value)}
           disabled={saving.value}
           class="flex min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         />
@@ -228,9 +226,7 @@ export default function TagMetadataForm({
           )
           : null}
         <Button onClick={onSave} disabled={saving.value}>
-          {saving.value
-            ? <Loader2 class="mr-2 h-4 w-4 animate-spin" />
-            : null}
+          {saving.value ? <Loader2 class="mr-2 h-4 w-4 animate-spin" /> : null}
           Save metadata
         </Button>
       </div>

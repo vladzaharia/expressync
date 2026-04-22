@@ -51,10 +51,7 @@ import {
   type TagType,
   tagTypeLabels,
 } from "@/src/lib/types/tags.ts";
-import {
-  tagTypeBgClass,
-  tagTypeTextClass,
-} from "@/src/lib/tag-visuals.ts";
+import { tagTypeBgClass, tagTypeTextClass } from "@/src/lib/tag-visuals.ts";
 import { isMetaTag } from "@/src/lib/tag-hierarchy.ts";
 
 function coerceTagType(value: string | null | undefined): TagType {
@@ -99,7 +96,12 @@ export default function TagLinkingGrid(
   const deletingId = useSignal<number | null>(null);
   // Mapping id currently targeted by the delete dialog, null = closed.
   const deleteTarget = useSignal<
-    { mappingId: number; isMeta: boolean; cascadeCount: number; idTag: string }
+    | {
+      mappingId: number;
+      isMeta: boolean;
+      cascadeCount: number;
+      idTag: string;
+    }
     | null
   >(null);
 
@@ -293,7 +295,8 @@ export default function TagLinkingGrid(
                   : "Delete tag link?"}
               </DialogTitle>
               <DialogDescription>
-                {deleteTarget.value.isMeta && deleteTarget.value.cascadeCount > 1
+                {deleteTarget.value.isMeta &&
+                    deleteTarget.value.cascadeCount > 1
                   ? (
                     <>
                       This will delete this meta-tag link and{" "}
@@ -503,7 +506,14 @@ function TagCard(
 }
 
 function LinkingRowActions(
-  { mappingId, isActive, isMeta: _isMeta, onToggleActive, onRequestDelete, deleting }: {
+  {
+    mappingId,
+    isActive,
+    isMeta: _isMeta,
+    onToggleActive,
+    onRequestDelete,
+    deleting,
+  }: {
     mappingId: number;
     isActive: boolean;
     isMeta: boolean;

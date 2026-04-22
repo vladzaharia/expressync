@@ -109,6 +109,7 @@ export default function TapToAddModal({
   }, [open]);
 
   // Countdown announcements for screen readers.
+  const remainingDep = state.kind === "waiting" ? state.remaining : null;
   useEffect(() => {
     if (state.kind !== "waiting") return;
     const r = state.remaining;
@@ -116,7 +117,7 @@ export default function TapToAddModal({
       lastAnnouncedRef.current = r;
       announceMessage.value = `${r} seconds remaining`;
     }
-  }, [state.kind === "waiting" ? state.remaining : null]);
+  }, [remainingDep]);
 
   // Reset the "manual entry revealed" toggle on fundamental state jumps
   // so re-entering `waiting` from a retry doesn't show a stale form.
@@ -357,7 +358,9 @@ function StateBody(props: BodyProps) {
               href={null}
             />
             <p class="text-xs text-muted-foreground">
-              {auto ? "Opening in 0.8s… (cancel to scan another)" : "Looking up…"}
+              {auto
+                ? "Opening in 0.8s… (cancel to scan another)"
+                : "Looking up…"}
             </p>
           </div>
 

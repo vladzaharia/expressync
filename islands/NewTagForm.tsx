@@ -13,10 +13,7 @@ import {
   tagTypeLabels,
 } from "@/src/lib/types/tags.ts";
 import { isMetaTag, META_TAG_PREFIX } from "@/src/lib/tag-hierarchy.ts";
-import {
-  tagTypeBgClass,
-  tagTypeTextClass,
-} from "@/src/lib/tag-visuals.ts";
+import { tagTypeBgClass, tagTypeTextClass } from "@/src/lib/tag-visuals.ts";
 
 interface Props {
   /** Prefilled id-tag (from scanner or URL query). */
@@ -30,7 +27,9 @@ interface Props {
  * Metadata only — Lago linking happens later on /links. Redirects to
  * /tags/{newTagPk} on success.
  */
-export default function NewTagForm({ prefilledIdTag, parentCandidates }: Props) {
+export default function NewTagForm(
+  { prefilledIdTag, parentCandidates }: Props,
+) {
   const idTag = useSignal(prefilledIdTag ?? "");
   const parentIdTag = useSignal("");
   const displayName = useSignal("");
@@ -108,9 +107,10 @@ export default function NewTagForm({ prefilledIdTag, parentCandidates }: Props) 
           class="font-mono"
         />
         <p class="text-xs text-muted-foreground">
-          Exact string sent by the physical card/keytag/sticker.
-          Use the <code>{META_TAG_PREFIX}</code> prefix to create a meta-tag (a
-          rollup parent for grouping other tags under one customer).
+          Exact string sent by the physical card/keytag/sticker. Use the{" "}
+          <code>{META_TAG_PREFIX}</code>{" "}
+          prefix to create a meta-tag (a rollup parent for grouping other tags
+          under one customer).
         </p>
       </div>
 
@@ -167,8 +167,10 @@ export default function NewTagForm({ prefilledIdTag, parentCandidates }: Props) 
           id="nt-display-name"
           placeholder="e.g. Vlad's primary card"
           value={displayName.value}
-          onInput={(e) =>
-            (displayName.value = (e.currentTarget as HTMLInputElement).value)}
+          onInput={(
+            e,
+          ) => (displayName.value =
+            (e.currentTarget as HTMLInputElement).value)}
           disabled={saving.value}
         />
       </div>
@@ -179,8 +181,10 @@ export default function NewTagForm({ prefilledIdTag, parentCandidates }: Props) 
           id="nt-parent"
           placeholder={`e.g. ${META_TAG_PREFIX}VLAD`}
           value={parentIdTag.value}
-          onInput={(e) =>
-            (parentIdTag.value = (e.currentTarget as HTMLInputElement).value)}
+          onInput={(
+            e,
+          ) => (parentIdTag.value =
+            (e.currentTarget as HTMLInputElement).value)}
           disabled={saving.value}
           list={parentCandidates && parentCandidates.length > 0
             ? "nt-parent-options"
@@ -208,8 +212,9 @@ export default function NewTagForm({ prefilledIdTag, parentCandidates }: Props) 
           id="nt-notes"
           placeholder="e.g. 'Handed to Vlad at install'"
           value={notes.value}
-          onInput={(e) =>
-            (notes.value = (e.currentTarget as HTMLTextAreaElement).value)}
+          onInput={(
+            e,
+          ) => (notes.value = (e.currentTarget as HTMLTextAreaElement).value)}
           disabled={saving.value}
           class="flex min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         />

@@ -23,8 +23,8 @@ import {
   type TagLinkingInfo,
 } from "../../components/tags/TagLinkingCard.tsx";
 import {
-  IssuedCardsSection,
   type IssuedCardRow,
+  IssuedCardsSection,
 } from "../../components/tags/IssuedCardsSection.tsx";
 import {
   type RecentTransactionRow,
@@ -34,7 +34,10 @@ import {
   type RelationTag,
   TagRelationsSection,
 } from "../../components/tags/TagRelationsSection.tsx";
-import type { LagoCustomer, LagoSubscription } from "../../src/lib/types/lago.ts";
+import type {
+  LagoCustomer,
+  LagoSubscription,
+} from "../../src/lib/types/lago.ts";
 import type { StEvEOcppTag } from "../../src/lib/types/steve.ts";
 
 interface LoaderData {
@@ -150,8 +153,8 @@ export const handler = define.handlers({
         // Fall through: pick the first active subscription if the mapping
         // doesn't name one (or the named one is gone).
         if (!lagoSubscription) {
-          lagoSubscription =
-            subscriptions.find((s) => s.status === "active") ?? null;
+          lagoSubscription = subscriptions.find((s) => s.status === "active") ??
+            null;
         }
       } catch (err) {
         lagoFetchFailed = true;
@@ -210,7 +213,9 @@ export const handler = define.handlers({
       id: r.id,
       cardType: r.cardType,
       billingMode: r.billingMode,
-      issuedAt: r.issuedAt ? r.issuedAt.toISOString() : new Date(0).toISOString(),
+      issuedAt: r.issuedAt
+        ? r.issuedAt.toISOString()
+        : new Date(0).toISOString(),
       issuedByEmail: r.issuedByEmail ?? null,
       note: r.note,
       lagoInvoiceId: r.lagoInvoiceId,
@@ -452,7 +457,7 @@ export default define.page<typeof handler>(
       <TagRelationsSection
         isMeta={isMeta}
         parent={relations.parent}
-        children={relations.children}
+        childTags={relations.children}
       />
     );
 

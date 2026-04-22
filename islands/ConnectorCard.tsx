@@ -60,7 +60,10 @@ interface StatusStyle {
  *   (green halo when >0 kW) · Reserved=violet · Unavailable=zinc-400 ·
  *   Faulted=destructive (rose-600) · Offline=zinc-500 dashed.
  */
-function styleFor(status: ConnectorUiStatus, isDrawingPower: boolean): StatusStyle {
+function styleFor(
+  status: ConnectorUiStatus,
+  isDrawingPower: boolean,
+): StatusStyle {
   switch (status) {
     case "Available":
       return {
@@ -220,9 +223,7 @@ export default function ConnectorCard(
             )}
           </dl>
         )
-        : (
-          <div class="text-xs text-muted-foreground">No active session</div>
-        )}
+        : <div class="text-xs text-muted-foreground">No active session</div>}
 
       {isAdmin && (
         <div class="mt-auto flex flex-wrap gap-1.5 pt-2">

@@ -6,9 +6,11 @@ import {
   useSidebar,
 } from "./ui/sidebar.tsx";
 import ThemeToggle, { useThemeToggle } from "../islands/ThemeToggle.tsx";
+import NotificationBell from "../islands/NotificationBell.tsx";
 import {
   BatteryCharging,
   CalendarClock,
+  FileText,
   LayoutDashboard,
   Link2,
   LogOut,
@@ -75,6 +77,12 @@ export const mainNavItems: Array<{
     url: "/transactions",
     icon: Receipt,
     accentColor: "green",
+  },
+  {
+    title: "Invoices",
+    url: "/invoices",
+    icon: FileText,
+    accentColor: "teal",
   },
   {
     title: "Chargers",
@@ -276,7 +284,7 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Right section: Theme, User, Logout - square buttons */}
+        {/* Right section: Theme, Notifications, User, Logout - square buttons */}
         <div className="flex items-center h-full">
           {/* Theme toggle */}
           <Tooltip>
@@ -294,6 +302,9 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
               Toggle Theme
             </TooltipContent>
           </Tooltip>
+
+          {/* Notifications bell — after ThemeToggle, before User */}
+          <NotificationBell variant="mobile" />
 
           {/* User icon */}
           {user && (
@@ -441,6 +452,9 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
       <SidebarFooter className="p-0 mt-auto gap-0">
         {/* Theme toggle section - matches nav items exactly */}
         <ThemeToggleSection isCollapsed={isCollapsed} />
+
+        {/* Notifications bell — before User section (Phase P1) */}
+        <NotificationBell variant="desktop" isCollapsed={isCollapsed} />
 
         {/* User info section */}
         {user && (

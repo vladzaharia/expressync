@@ -158,7 +158,7 @@ export default function SubscriptionPicker(props: Props) {
                       aria-hidden="true"
                     />
                     <span>Create subscription in Lago</span>
-                    <span className="sr-only"> (opens in new tab)</span>
+                    <span className="sr-only">(opens in new tab)</span>
                   </a>
                 </Button>
               )}

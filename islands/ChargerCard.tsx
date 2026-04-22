@@ -58,7 +58,6 @@ import {
   REFRESH_COOLDOWN_MS,
   STALE_DIM_MS,
   STATUS_HALO,
-  type UiStatus,
 } from "./shared/charger-visuals.ts";
 
 export default function ChargerCard(

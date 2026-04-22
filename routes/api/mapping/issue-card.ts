@@ -180,7 +180,8 @@ export const handler = define.handlers({
       // Build the fee description from the card id + OCPP tag so the invoice
       // line pinpoints exactly which physical card was issued. Operator's note
       // (if provided) is appended after the structured header.
-      const structuredDescription = `Card #${insertedId} · ${mapping.steveOcppIdTag}`;
+      const structuredDescription =
+        `Card #${insertedId} · ${mapping.steveOcppIdTag}`;
       const description = noteStr
         ? `${structuredDescription} — ${noteStr}`
         : structuredDescription;
