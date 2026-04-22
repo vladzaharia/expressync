@@ -23,7 +23,6 @@ import { ArrowRight, Link2, Tag, Zap } from "lucide-preact";
 import { accentTailwindClasses, borderBeamColors } from "../src/lib/colors.ts";
 import { cn } from "../src/lib/utils/cn.ts";
 import { EmptyState } from "../components/shared/EmptyState.tsx";
-import LiveChargerTicker from "../islands/dashboard/LiveChargerTicker.tsx";
 
 interface DashboardStats {
   tags: {
@@ -264,11 +263,6 @@ export default define.page<typeof handler>(
             height={20}
             cr={1}
           />
-
-          {/* Header strip: live SSE status chip + first-run banner */}
-          <div className="mb-3 flex items-center justify-end">
-            <LiveChargerTicker />
-          </div>
 
           {data.isFirstRun
             ? (
