@@ -13,7 +13,12 @@ import { lagoClient } from "../lib/lago-client.ts";
 import { logger } from "../lib/utils/logger.ts";
 import { config } from "../lib/config.ts";
 import type { StEvEOcppTag } from "../lib/types/steve.ts";
-import type { UserMapping } from "../db/schema.ts";
+import { db } from "../db/index.ts";
+import {
+  tagChangeLog,
+  type TagChangeType,
+  type UserMapping,
+} from "../db/schema.ts";
 import { buildMappingLookupWithInheritance } from "./mapping-resolver.ts";
 
 export interface TagSyncResult {
@@ -81,18 +86,25 @@ async function fetchEntityInfo(
       }
     }
   } catch (error) {
-    logger.warn("TagSync", "Failed to fetch Lago entities for note generation", {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    logger.warn(
+      "TagSync",
+      "Failed to fetch Lago entities for note generation",
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+    );
   }
 
   // Build info map for each mapping
   for (const mapping of mappings) {
-    if (!mapping.lagoCustomerExternalId || !mapping.lagoSubscriptionExternalId) {
+    if (
+      !mapping.lagoCustomerExternalId || !mapping.lagoSubscriptionExternalId
+    ) {
       continue;
     }
 
-    const key = `${mapping.lagoCustomerExternalId}:${mapping.lagoSubscriptionExternalId}`;
+    const key =
+      `${mapping.lagoCustomerExternalId}:${mapping.lagoSubscriptionExternalId}`;
     const customerName = customerNames.get(mapping.lagoCustomerExternalId) ||
       mapping.lagoCustomerExternalId;
     const subscriptionName =
@@ -101,7 +113,9 @@ async function fetchEntityInfo(
 
     // Get Lago internal IDs for URL generation
     const customerLagoId = customerLagoIds.get(mapping.lagoCustomerExternalId);
-    const subscriptionLagoId = subscriptionLagoIds.get(mapping.lagoSubscriptionExternalId);
+    const subscriptionLagoId = subscriptionLagoIds.get(
+      mapping.lagoSubscriptionExternalId,
+    );
 
     // Lago URL format uses internal lago_id: /customer/{lagoId} and /customer/{lagoId}/subscription/{lagoSubId}/overview
     infoMap.set(key, {
@@ -165,11 +179,38 @@ function generateUnlinkedNote(timestamp: string): string {
 }
 
 /**
+ * Classify the kind of change observed on a tag.
+ *
+ * Rules (order matters):
+ *   - activated:   limit was 0 -> desired is -1
+ *   - deactivated: limit was -1 (or >0) -> desired is 0
+ *   - updated:     status unchanged, but note changed
+ */
+function classifyTagChange(
+  currentLimit: number,
+  desiredLimit: number,
+  noteChanged: boolean,
+): TagChangeType | null {
+  if (currentLimit !== desiredLimit) {
+    if (desiredLimit === -1 && currentLimit === 0) return "activated";
+    if (desiredLimit === 0 && currentLimit !== 0) return "deactivated";
+    // Any other numeric transition gets logged as "updated" for now.
+    return "updated";
+  }
+  if (noteChanged) return "updated";
+  return null;
+}
+
+/**
  * Sync all OCPP tags based on their mapping status
+ *
+ * @param syncRunId Optional syncRun id; when provided, tag_change_log rows
+ *                  written during this run will reference it.
  */
 export async function syncTagStatus(
   mappings: UserMapping[],
   allTags: StEvEOcppTag[],
+  syncRunId?: number,
 ): Promise<TagSyncResult> {
   logger.info("TagSync", "Starting tag status synchronization", {
     totalMappings: mappings.length,
@@ -220,8 +261,10 @@ export async function syncTagStatus(
       // Compare current state vs desired state - only update if something changed
       // Strip timestamp line from comparison so that "Last synced on ..." alone
       // doesn't force an update every cycle.
-      const stripTimestamp = (note: string) => note.replace(/Last synced on .+$/, '').trim();
-      const noteChanged = stripTimestamp(tag.note ?? "") !== stripTimestamp(desiredNote);
+      const stripTimestamp = (note: string) =>
+        note.replace(/Last synced on .+$/, "").trim();
+      const noteChanged =
+        stripTimestamp(tag.note ?? "") !== stripTimestamp(desiredNote);
 
       if (!statusChanged && !noteChanged) {
         // Nothing changed, skip the API call
@@ -248,6 +291,39 @@ export async function syncTagStatus(
         maxActiveTransactionCount: desiredLimit,
         note: desiredNote,
       };
+
+      // Phase C: record the change in tag_change_log BEFORE the StEvE write
+      // so activity is captured even if upstream fails. This feeds the
+      // adaptive scheduler's "any tag change in 30d" signal.
+      const changeType = classifyTagChange(
+        currentLimit,
+        desiredLimit,
+        noteChanged,
+      );
+      if (changeType) {
+        try {
+          await db.insert(tagChangeLog).values({
+            ocppTagPk: tag.ocppTagPk,
+            idTag: tag.idTag,
+            changeType,
+            before: {
+              maxActiveTransactionCount: currentLimit,
+              note: tag.note ?? null,
+            },
+            after: {
+              maxActiveTransactionCount: desiredLimit,
+              note: desiredNote,
+            },
+            syncRunId: syncRunId ?? null,
+          });
+        } catch (logErr) {
+          // Never let audit-log failures block the StEvE update.
+          logger.warn("TagSync", "Failed to persist tag_change_log row", {
+            tagId: tag.idTag,
+            error: logErr instanceof Error ? logErr.message : String(logErr),
+          });
+        }
+      }
 
       await steveClient.updateOcppTag(updatedTag);
 
@@ -279,5 +355,3 @@ export async function syncTagStatus(
 
   return result;
 }
-
-

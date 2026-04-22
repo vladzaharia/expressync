@@ -2,7 +2,6 @@ import { define } from "../utils.ts";
 import LoginForm from "../islands/LoginForm.tsx";
 import { GridPattern } from "../components/magicui/grid-pattern.tsx";
 import { Particles } from "../components/magicui/particles.tsx";
-import { Ripple } from "../components/magicui/ripple.tsx";
 import { ShineBorder } from "../components/magicui/shine-border.tsx";
 import { ExpresSyncBrand } from "../components/brand/ExpresSyncBrand.tsx";
 import { BlurFade } from "../components/magicui/blur-fade.tsx";
@@ -40,7 +39,7 @@ export default define.page(function LoginPage() {
             <div class="relative">
               <ExpresSyncBrand
                 variant="login"
-                showParticles={true}
+                showParticles
               />
             </div>
           </div>

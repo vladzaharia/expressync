@@ -77,9 +77,15 @@ export const handler = define.handlers({
       // Fetch kWh delivered by all three timeframes in a single SQL query
       const [kwhStats] = await db
         .select({
-          kwhDay: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncedTransactionEvents.syncedAt} >= ${todayIso} THEN ${schema.syncedTransactionEvents.kwhDelta} ELSE 0 END), 0)`,
-          kwhWeek: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncedTransactionEvents.syncedAt} >= ${weekIso} THEN ${schema.syncedTransactionEvents.kwhDelta} ELSE 0 END), 0)`,
-          kwhMonth: sql<number>`COALESCE(SUM(${schema.syncedTransactionEvents.kwhDelta}), 0)`,
+          kwhDay: sql<
+            number
+          >`COALESCE(SUM(CASE WHEN ${schema.syncedTransactionEvents.syncedAt} >= ${todayIso} THEN ${schema.syncedTransactionEvents.kwhDelta} ELSE 0 END), 0)`,
+          kwhWeek: sql<
+            number
+          >`COALESCE(SUM(CASE WHEN ${schema.syncedTransactionEvents.syncedAt} >= ${weekIso} THEN ${schema.syncedTransactionEvents.kwhDelta} ELSE 0 END), 0)`,
+          kwhMonth: sql<
+            number
+          >`COALESCE(SUM(${schema.syncedTransactionEvents.kwhDelta}), 0)`,
         })
         .from(schema.syncedTransactionEvents)
         .where(gte(schema.syncedTransactionEvents.syncedAt, monthStart));
@@ -91,12 +97,22 @@ export const handler = define.handlers({
       // Fetch sync success rates by all three timeframes in a single SQL query
       const [syncStats] = await db
         .select({
-          dayTotal: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${todayIso} THEN 1 ELSE 0 END), 0)`,
-          daySuccess: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${todayIso} AND ${schema.syncRuns.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
-          weekTotal: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${weekIso} THEN 1 ELSE 0 END), 0)`,
-          weekSuccess: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${weekIso} AND ${schema.syncRuns.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
+          dayTotal: sql<
+            number
+          >`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${todayIso} THEN 1 ELSE 0 END), 0)`,
+          daySuccess: sql<
+            number
+          >`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${todayIso} AND ${schema.syncRuns.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
+          weekTotal: sql<
+            number
+          >`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${weekIso} THEN 1 ELSE 0 END), 0)`,
+          weekSuccess: sql<
+            number
+          >`COALESCE(SUM(CASE WHEN ${schema.syncRuns.startedAt} >= ${weekIso} AND ${schema.syncRuns.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
           monthTotal: sql<number>`COALESCE(SUM(1), 0)`,
-          monthSuccess: sql<number>`COALESCE(SUM(CASE WHEN ${schema.syncRuns.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
+          monthSuccess: sql<
+            number
+          >`COALESCE(SUM(CASE WHEN ${schema.syncRuns.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
         })
         .from(schema.syncRuns)
         .where(gte(schema.syncRuns.startedAt, monthStart));
@@ -104,9 +120,18 @@ export const handler = define.handlers({
       const calcRate = (success: number, total: number) =>
         total === 0 ? 100 : Math.round((success / total) * 100);
 
-      const syncSuccessDay = calcRate(Number(syncStats.daySuccess), Number(syncStats.dayTotal));
-      const syncSuccessWeek = calcRate(Number(syncStats.weekSuccess), Number(syncStats.weekTotal));
-      const syncSuccessMonth = calcRate(Number(syncStats.monthSuccess), Number(syncStats.monthTotal));
+      const syncSuccessDay = calcRate(
+        Number(syncStats.daySuccess),
+        Number(syncStats.dayTotal),
+      );
+      const syncSuccessWeek = calcRate(
+        Number(syncStats.weekSuccess),
+        Number(syncStats.weekTotal),
+      );
+      const syncSuccessMonth = calcRate(
+        Number(syncStats.monthSuccess),
+        Number(syncStats.monthTotal),
+      );
 
       return new Response(
         JSON.stringify({

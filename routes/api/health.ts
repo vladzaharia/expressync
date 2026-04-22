@@ -1,6 +1,6 @@
 import { define } from "../../utils.ts";
 import { db, syncRuns } from "../../src/db/index.ts";
-import { desc, eq, and, lte, sql } from "drizzle-orm";
+import { and, desc, eq, lte, sql } from "drizzle-orm";
 import { config } from "../../src/lib/config.ts";
 import { logger } from "../../src/lib/utils/logger.ts";
 
@@ -27,7 +27,9 @@ export const handler = define.handlers({
 
     const degrade = (status: CheckStatus) => {
       if (status === "unhealthy") overallStatus = "unhealthy";
-      else if (status === "degraded" && overallStatus !== "unhealthy") overallStatus = "degraded";
+      else if (status === "degraded" && overallStatus !== "unhealthy") {
+        overallStatus = "degraded";
+      }
     };
 
     // Database connectivity check
@@ -38,7 +40,10 @@ export const handler = define.handlers({
       checks.database = { status: "ok", latencyMs };
     } catch (error) {
       logger.error("Health", "Database check failed", error as Error);
-      checks.database = { status: "unhealthy", error: (error as Error).message };
+      checks.database = {
+        status: "unhealthy",
+        error: (error as Error).message,
+      };
       degrade("unhealthy");
     }
 
@@ -97,7 +102,7 @@ export const handler = define.handlers({
       degrade("unhealthy");
     }
 
-    const httpStatus = overallStatus === "unhealthy" ? 503 : 200;
+    const httpStatus = (overallStatus as string) === "unhealthy" ? 503 : 200;
 
     return new Response(
       JSON.stringify({

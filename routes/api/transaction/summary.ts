@@ -61,9 +61,15 @@ export const handler = define.handlers({
             totalKwhBilled: schema.transactionSyncState.totalKwhBilled,
             isFinalized: schema.transactionSyncState.isFinalized,
             updatedAt: schema.transactionSyncState.updatedAt,
-            eventCount: sql<number>`COALESCE(COUNT(${schema.syncedTransactionEvents.id}), 0)`,
-            lastSyncedAt: sql<Date>`MAX(${schema.syncedTransactionEvents.syncedAt})`,
-            ocppTagId: sql<string | null>`MIN(${schema.userMappings.steveOcppIdTag})`,
+            eventCount: sql<
+              number
+            >`COALESCE(COUNT(${schema.syncedTransactionEvents.id}), 0)`,
+            lastSyncedAt: sql<
+              Date
+            >`MAX(${schema.syncedTransactionEvents.syncedAt})`,
+            ocppTagId: sql<
+              string | null
+            >`MIN(${schema.userMappings.steveOcppIdTag})`,
           })
           .from(schema.transactionSyncState)
           .leftJoin(
@@ -75,7 +81,10 @@ export const handler = define.handlers({
           )
           .leftJoin(
             schema.userMappings,
-            eq(schema.syncedTransactionEvents.userMappingId, schema.userMappings.id),
+            eq(
+              schema.syncedTransactionEvents.userMappingId,
+              schema.userMappings.id,
+            ),
           )
           .groupBy(
             schema.transactionSyncState.id,
@@ -110,7 +119,11 @@ export const handler = define.handlers({
         },
       );
     } catch (error) {
-      logger.error("API", "Failed to fetch transaction summaries", error as Error);
+      logger.error(
+        "API",
+        "Failed to fetch transaction summaries",
+        error as Error,
+      );
       return new Response(
         JSON.stringify({ error: "Failed to fetch transaction summaries" }),
         {

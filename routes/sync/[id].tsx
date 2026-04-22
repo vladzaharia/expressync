@@ -60,6 +60,7 @@ export default define.page<typeof handler>(
     const transactionSyncLogs = logs.filter((l) =>
       l.segment === "transaction_sync"
     );
+    const schedulingLogs = logs.filter((l) => l.segment === "scheduling");
 
     return (
       <SidebarLayout
@@ -229,6 +230,7 @@ export default define.page<typeof handler>(
               run={run}
               tagLinkingLogs={tagLinkingLogs}
               transactionSyncLogs={transactionSyncLogs}
+              schedulingLogs={schedulingLogs}
             />
           </PageCard>
 

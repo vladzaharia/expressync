@@ -44,7 +44,9 @@ export function Particles({
   const mousePosition = useRef({ x: 0, y: 0 });
   const mouse = useRef({ x: 0, y: 0 });
   const canvasSize = useRef({ w: 0, h: 0 });
-  const dpr = typeof window !== "undefined" ? window.devicePixelRatio : 1;
+  const dpr = typeof globalThis !== "undefined"
+    ? globalThis.devicePixelRatio
+    : 1;
 
   useEffect(() => {
     if (canvasRef.current) {

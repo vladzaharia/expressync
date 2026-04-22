@@ -1,4 +1,3 @@
-import { FreshContext } from "fresh";
 import { auth } from "../src/lib/auth.ts";
 import { db } from "../src/db/index.ts";
 import { users } from "../src/db/schema.ts";
@@ -141,9 +140,8 @@ export const handler = define.middleware(async (ctx) => {
 
   // Role-based access control: check if path requires admin role
   // "/" is checked as an exact match to avoid matching all paths as a prefix
-  const isAdminOnlyPath = url.pathname === "/" || ADMIN_ONLY_PATHS.some((prefix) =>
-    url.pathname.startsWith(prefix)
-  );
+  const isAdminOnlyPath = url.pathname === "/" ||
+    ADMIN_ONLY_PATHS.some((prefix) => url.pathname.startsWith(prefix));
 
   if (isAdminOnlyPath && userRole !== "admin") {
     if (url.pathname.startsWith("/api/")) {

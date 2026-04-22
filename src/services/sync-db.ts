@@ -57,7 +57,9 @@ export async function getRunningSync(): Promise<{ id: number } | null> {
       syncRunId: runningSync.id,
       elapsedMs: elapsed,
     });
-    await markSyncFailed(runningSync.id, ["Sync timed out (stale lock detected)"]);
+    await markSyncFailed(runningSync.id, [
+      "Sync timed out (stale lock detected)",
+    ]);
     return null;
   }
 
@@ -334,7 +336,12 @@ export async function getSyncRunLogs(
     query = db
       .select()
       .from(syncRunLogs)
-      .where(and(eq(syncRunLogs.syncRunId, syncRunId), eq(syncRunLogs.segment, segment)))
+      .where(
+        and(
+          eq(syncRunLogs.syncRunId, syncRunId),
+          eq(syncRunLogs.segment, segment),
+        ),
+      )
       .orderBy(syncRunLogs.createdAt);
   }
 

@@ -4,9 +4,11 @@ import { ThemeProvider } from "@/hooks/use-theme.tsx";
 
 interface User {
   id: string;
-  name: string | null;
+  // BetterAuth types these as string | null | undefined; accept the wider shape
+  // rather than force every caller to normalize.
+  name: string | null | undefined;
   email: string;
-  image: string | null;
+  image?: string | null | undefined;
 }
 
 interface SidebarLayoutProps {

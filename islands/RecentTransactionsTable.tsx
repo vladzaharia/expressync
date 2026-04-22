@@ -82,7 +82,7 @@ export default function RecentTransactionsTable({
             <TableCell className="text-right text-muted-foreground text-xs">
               <span className="flex items-center justify-end gap-1">
                 <Clock className="size-3" />
-                {formatRelativeTime(new Date(tx.syncedAt))}
+                {tx.syncedAt ? formatRelativeTime(new Date(tx.syncedAt)) : "—"}
               </span>
             </TableCell>
           </TableRow>

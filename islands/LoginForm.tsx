@@ -35,14 +35,15 @@ export default function LoginForm() {
       const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
-        window.location.href = "/";
+        globalThis.location.href = "/";
       } else {
         error.value = data.error?.message || data.message ||
           `Login failed (${res.status}). Please check your credentials.`;
       }
     } catch (e) {
       console.error("Login error:", e);
-      error.value = `An error occurred: ${e.message || "Please try again."}`;
+      const message = e instanceof Error ? e.message : "";
+      error.value = `An error occurred: ${message || "Please try again."}`;
     } finally {
       loading.value = false;
     }

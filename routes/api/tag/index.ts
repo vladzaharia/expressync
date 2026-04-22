@@ -1,6 +1,7 @@
 import { define } from "../../../utils.ts";
 import { steveClient } from "../../../src/lib/steve-client.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
+import { isTagType, TAG_TYPES } from "../../../src/lib/types/tags.ts";
 
 export const handler = define.handlers({
   async GET(_ctx) {
@@ -49,6 +50,23 @@ export const handler = define.handlers({
           }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
+      }
+
+      // Phase I: validate optional tag_type if provided (forward-compatible —
+      // this route creates StEvE OCPP tags, not user_mappings, so the field
+      // is not persisted here, but we reject garbage early).
+      const rawTagType = body.tag_type ?? body.tagType;
+      if (rawTagType !== undefined && rawTagType !== null) {
+        if (!isTagType(rawTagType)) {
+          return new Response(
+            JSON.stringify({
+              error: `Invalid tag_type. Must be one of: ${
+                TAG_TYPES.join(", ")
+              }`,
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+        }
       }
 
       const result = await steveClient.createOcppTag(idTag, {

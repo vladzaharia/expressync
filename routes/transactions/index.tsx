@@ -36,9 +36,15 @@ export const handler = define.handlers({
           totalKwhBilled: schema.transactionSyncState.totalKwhBilled,
           isFinalized: schema.transactionSyncState.isFinalized,
           updatedAt: schema.transactionSyncState.updatedAt,
-          eventCount: sql<number>`COALESCE(COUNT(${schema.syncedTransactionEvents.id}), 0)`,
-          lastSyncedAt: sql<Date>`MAX(${schema.syncedTransactionEvents.syncedAt})`,
-          ocppTagId: sql<string | null>`MIN(${schema.userMappings.steveOcppIdTag})`,
+          eventCount: sql<
+            number
+          >`COALESCE(COUNT(${schema.syncedTransactionEvents.id}), 0)`,
+          lastSyncedAt: sql<
+            Date
+          >`MAX(${schema.syncedTransactionEvents.syncedAt})`,
+          ocppTagId: sql<
+            string | null
+          >`MIN(${schema.userMappings.steveOcppIdTag})`,
         })
         .from(schema.transactionSyncState)
         .leftJoin(
@@ -50,7 +56,10 @@ export const handler = define.handlers({
         )
         .leftJoin(
           schema.userMappings,
-          eq(schema.syncedTransactionEvents.userMappingId, schema.userMappings.id),
+          eq(
+            schema.syncedTransactionEvents.userMappingId,
+            schema.userMappings.id,
+          ),
         )
         .groupBy(
           schema.transactionSyncState.id,
@@ -94,7 +103,7 @@ export default define.page<typeof handler>(
             transactions={data.transactions}
             totalCount={data.totalCount}
             pageSize={PAGE_SIZE}
-            showLoadMore={true}
+            showLoadMore
           />
         </PageCard>
       </SidebarLayout>

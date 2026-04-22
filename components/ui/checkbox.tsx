@@ -13,7 +13,15 @@ export interface CheckboxProps {
 
 const Checkbox = forwardRef<HTMLButtonElement, CheckboxProps>(
   (
-    { className, checked, onCheckedChange, disabled, id, name, ...props },
+    {
+      className,
+      checked,
+      onCheckedChange,
+      disabled,
+      id,
+      name: _name,
+      ...props
+    },
     ref,
   ) => {
     return (

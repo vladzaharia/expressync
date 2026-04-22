@@ -1,22 +1,77 @@
+/**
+ * TagLinkingGrid — orchestrator for the customer/tag rows on `/links`.
+ *
+ * The grid renders one row per (customer, subscription) pair plus its tags.
+ * The visual tokens are split into three sub-components so `/links/[id]`
+ * can reuse them later:
+ *
+ *   - `CustomerCard` — the left-hand identity block.
+ *   - `TagCard`      — a single OCPP tag card (with meta-tag treatment).
+ *   - `LinkingRowActions` — Active/Edit/Delete button trio.
+ *
+ * Meta-tag rows swap the form-factor icon for `Layers`, add a tinted
+ * violet background, stamp a `META` outlined badge, and hide the row-level
+ * Issue Card button.
+ *
+ * The legacy `confirm()` delete is replaced with an accessible `<Dialog>`
+ * whose default focus lands on the safe Cancel button; the destructive
+ * label is explicit ("Delete link") per the plan's a11y rules.
+ */
+
 import { useSignal } from "@preact/signals";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button.tsx";
-import { Card, CardContent } from "@/components/ui/card.tsx";
-import { cn } from "@/src/lib/utils/cn.ts";
 import {
   ArrowDown,
   ArrowRight,
   Check,
   CornerDownRight,
   CreditCard,
+  Layers,
+  Loader2,
   Pencil,
-  Tag,
   Trash2,
   User,
   X,
 } from "lucide-preact";
+import { Button } from "@/components/ui/button.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Card, CardContent } from "@/components/ui/card.tsx";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog.tsx";
+import { cn } from "@/src/lib/utils/cn.ts";
+import { tagTypeIcons } from "@/components/brand/tags/index.ts";
+import {
+  TAG_TYPES,
+  type TagType,
+  tagTypeLabels,
+} from "@/src/lib/types/tags.ts";
+import {
+  tagTypeBgClass,
+  tagTypeTextClass,
+} from "@/src/lib/tag-visuals.ts";
+import { isMetaTag } from "@/src/lib/tag-hierarchy.ts";
 
-interface MappingGroup {
+function coerceTagType(value: string | null | undefined): TagType {
+  return value && (TAG_TYPES as readonly string[]).includes(value)
+    ? (value as TagType)
+    : "other";
+}
+
+interface RowTag {
+  id: string;
+  ocppTagPk: number;
+  mappingId: number;
+  isChild: boolean;
+  tagType: string;
+}
+
+export interface MappingGroup {
   customerId: string;
   customerName: string;
   customerEmail?: string;
@@ -25,12 +80,7 @@ interface MappingGroup {
   subscriptionName?: string;
   subscriptionLagoId?: string;
   isActive: boolean;
-  tags: Array<{
-    id: string;
-    ocppTagPk: number;
-    mappingId: number;
-    isChild: boolean;
-  }>;
+  tags: RowTag[];
 }
 
 interface Props {
@@ -39,288 +89,470 @@ interface Props {
   steveDashboardUrl?: string;
 }
 
-export default function TagLinkingGrid({
-  groups: initialGroups,
-  lagoDashboardUrl,
-  steveDashboardUrl,
-}: Props) {
-  const groups = useSignal(initialGroups);
-  const deleting = useSignal<number | null>(null);
+// Shared card height for consistency across customer/tag cards.
+const CARD_HEIGHT_CLASS = "min-h-[52px]";
 
-  // Build URLs for external links using Lago internal IDs
-  // Lago URL format: /customer/{lagoCustomerId} and /customer/{lagoCustomerId}/subscription/{lagoSubscriptionId}/overview
-  const getCustomerUrl = (lagoCustomerId?: string) =>
+export default function TagLinkingGrid(
+  { groups: initialGroups, lagoDashboardUrl, steveDashboardUrl }: Props,
+) {
+  const groups = useSignal(initialGroups);
+  const deletingId = useSignal<number | null>(null);
+  // Mapping id currently targeted by the delete dialog, null = closed.
+  const deleteTarget = useSignal<
+    { mappingId: number; isMeta: boolean; cascadeCount: number; idTag: string }
+    | null
+  >(null);
+
+  // URL builders
+  const customerUrl = (lagoCustomerId?: string) =>
     lagoDashboardUrl && lagoCustomerId
       ? `${lagoDashboardUrl}/customer/${lagoCustomerId}`
       : null;
 
-  const getSubscriptionUrl = (lagoCustomerId?: string, lagoSubscriptionId?: string) =>
+  const subscriptionUrl = (
+    lagoCustomerId?: string,
+    lagoSubscriptionId?: string,
+  ) =>
     lagoDashboardUrl && lagoCustomerId && lagoSubscriptionId
       ? `${lagoDashboardUrl}/customer/${lagoCustomerId}/subscription/${lagoSubscriptionId}/overview`
       : null;
 
-  const getOcppTagUrl = (ocppTagPk: number) =>
+  const ocppTagUrl = (ocppTagPk: number) =>
     steveDashboardUrl
       ? `${steveDashboardUrl}/manager/ocppTags/details/${ocppTagPk}`
       : null;
 
-  const handleDelete = async (mappingId: number) => {
-    const group = groups.value.find((g) =>
-      g.tags.some((t) => t.mappingId === mappingId)
-    );
-    const tagCount = group?.tags.length || 1;
-
-    const confirmMsg = tagCount > 1
-      ? `This will delete ${tagCount} tag links (1 parent + ${
-        tagCount - 1
-      } children). Are you sure?`
-      : "Are you sure you want to delete this tag mapping?";
-
-    if (!confirm(confirmMsg)) return;
-
-    deleting.value = mappingId;
+  const handleConfirmDelete = async () => {
+    const target = deleteTarget.value;
+    if (!target) return;
+    deletingId.value = target.mappingId;
     try {
-      const res = await fetch(`/api/tag/link?id=${mappingId}`, {
+      const res = await fetch(`/api/tag/link?id=${target.mappingId}`, {
         method: "DELETE",
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (data.deletedCount && data.deletedCount > 1) {
           toast.success(
             `Deleted ${data.deletedCount} mappings (1 parent + ${
               data.deletedCount - 1
             } children)`,
           );
+        } else {
+          toast.success("Link deleted");
         }
-        window.location.reload();
+        globalThis.location.reload();
       } else {
         toast.error("Failed to delete mapping");
+        deletingId.value = null;
+        deleteTarget.value = null;
       }
     } catch (_e) {
       toast.error("An error occurred");
-    } finally {
-      deleting.value = null;
+      deletingId.value = null;
+      deleteTarget.value = null;
     }
   };
 
   const handleToggleActive = async (mappingId: number, isActive: boolean) => {
+    // Optimistic flip; toast failure is a soft rollback on the same page.
+    const idx = groups.value.findIndex((g) =>
+      g.tags.some((t) => t.mappingId === mappingId)
+    );
+    if (idx < 0) return;
+    const next = [...groups.value];
+    next[idx] = { ...next[idx], isActive: !isActive };
+    groups.value = next;
+
     try {
       const res = await fetch(`/api/tag/link?id=${mappingId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: !isActive }),
       });
-
-      if (res.ok) {
-        window.location.reload();
-      } else {
-        toast.error("Failed to update mapping");
-      }
+      if (!res.ok) throw new Error("server");
+      toast.success(!isActive ? "Link activated" : "Link deactivated");
     } catch (_e) {
-      toast.error("An error occurred");
+      // Roll back
+      const rollback = [...groups.value];
+      rollback[idx] = { ...rollback[idx], isActive };
+      groups.value = rollback;
+      toast.error("Failed to update — reverted.");
     }
   };
 
   if (groups.value.length === 0) {
+    // The list route owns the richer empty-state component; fall back to a
+    // tiny text-only block if this grid ever renders with zero groups.
     return (
-      <div className="text-center py-12 text-muted-foreground">
-        <p className="mb-4">No tag links found.</p>
-        <p className="text-sm">
-          Create your first tag link to start billing for EV charging sessions.
-        </p>
+      <div class="text-center py-12 text-muted-foreground">
+        <p class="mb-4">No tag links found.</p>
       </div>
     );
   }
 
-  // Shared card height for consistency
-  const cardHeightClass = "min-h-[52px]";
-
   return (
-    <div className="space-y-4">
-      {groups.value.map((group) => {
-        const parentTags = group.tags.filter((t) => !t.isChild);
-        const childTags = group.tags.filter((t) => t.isChild);
-        const primaryMappingId = parentTags[0]?.mappingId;
+    <>
+      <div class="space-y-4">
+        {groups.value.map((group) => {
+          const parentTags = group.tags.filter((t) => !t.isChild);
+          const childTags = group.tags.filter((t) => t.isChild);
+          const primaryMappingId = parentTags[0]?.mappingId;
+          const primaryTag = parentTags[0];
+          const primaryIsMeta = primaryTag ? isMetaTag(primaryTag.id) : false;
 
-        // Extract customer/subscription card logic
-        const hasSubscription = !!group.subscriptionId;
-        const linkUrl = hasSubscription
-          ? getSubscriptionUrl(group.customerLagoId, group.subscriptionLagoId)
-          : getCustomerUrl(group.customerLagoId);
-        const Icon = hasSubscription ? CreditCard : User;
-        const displayName = group.customerName || group.customerEmail ||
-          group.customerId;
-        let subtext = "";
-        if (hasSubscription) {
-          subtext = group.subscriptionName || group.subscriptionId;
-        }
+          const allTags: RowTag[] = [
+            ...parentTags.map((t) => ({ ...t, isChild: false })),
+            ...childTags.map((t) => ({ ...t, isChild: true })),
+          ];
 
-        // Customer/Subscription card content - smaller vertical, larger horizontal padding
-        const customerCardContent = (
-          <CardContent className={cn("px-5 py-1.5 h-full flex flex-col justify-center", cardHeightClass)}>
-            <div className="flex items-center gap-4">
-              <div className="flex size-8 items-center justify-center rounded-lg bg-violet-500/10 shrink-0">
-                <Icon className="size-4 text-violet-500" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold truncate text-sm">{displayName}</p>
-                {subtext && (
-                  <p className="text-xs text-muted-foreground truncate">
-                    {subtext}
-                  </p>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        );
+          const cascadeCount = group.tags.length; // 1 parent + N children
+          const hasSubscription = !!group.subscriptionId;
+          const linkUrl = hasSubscription
+            ? subscriptionUrl(group.customerLagoId, group.subscriptionLagoId)
+            : customerUrl(group.customerLagoId);
 
-        // OCPP Tag card component
-        // isLastOdd: true if this is the last tag and there's an odd total count
-        const renderTagCard = (
-          tag: { id: string; ocppTagPk: number; isChild: boolean },
-          isLastOdd: boolean,
-        ) => {
-          const tagUrl = getOcppTagUrl(tag.ocppTagPk);
-          const tagCardContent = (
-            <CardContent className={cn("px-5 py-1.5 h-full flex items-center gap-4", cardHeightClass)}>
-              {tag.isChild
-                ? <CornerDownRight className="size-4 text-muted-foreground" />
-                : <Tag className="size-4 text-violet-500" />}
-              <span className={cn("font-mono text-sm", !tag.isChild && "font-medium")}>
-                {tag.id}
-              </span>
-            </CardContent>
-          );
-
-          const cardClasses = cn(
-            "shrink-0 h-full border-2 transition-colors",
-            tag.isChild && "bg-muted/30",
-            tagUrl && "hover:border-violet-500/70 cursor-pointer",
-          );
-
-          // Mobile: last odd tag spans full width (col-span-2), others take 1 column
-          // Desktop: auto width with min-w-44
-          const wrapperClasses = cn(
-            "md:w-auto md:min-w-44",
-            isLastOdd ? "col-span-2" : "col-span-1",
-          );
-
-          return tagUrl
-            ? (
-              <a
-                key={tag.id}
-                href={tagUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={wrapperClasses}
-              >
-                <Card className={cardClasses}>{tagCardContent}</Card>
-              </a>
-            )
-            : (
-              <Card key={tag.id} className={cn(cardClasses, wrapperClasses)}>
-                {tagCardContent}
-              </Card>
-            );
-        };
-
-        return (
-          <div
-            key={`${group.customerId}:${group.subscriptionId}`}
-            className={cn(
-              "flex flex-col md:flex-row md:items-center gap-4 p-4 rounded-lg border bg-card",
-              !group.isActive && "opacity-60",
-            )}
-          >
-            {/* Customer/Subscription Card */}
-            {linkUrl
-              ? (
-                <a
-                  href={linkUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="shrink-0 self-stretch"
-                >
-                  <Card className="min-w-56 h-full border-2 hover:border-violet-500/70 transition-colors cursor-pointer">
-                    {customerCardContent}
-                  </Card>
-                </a>
-              )
-              : (
-                <Card className="min-w-56 shrink-0 self-stretch">
-                  {customerCardContent}
-                </Card>
+          return (
+            <div
+              key={`${group.customerId}:${group.subscriptionId}`}
+              class={cn(
+                "flex flex-col md:flex-row md:items-center gap-4 p-4 rounded-lg border bg-card",
+                !group.isActive && "opacity-60",
+                primaryIsMeta && "bg-violet-500/10",
               )}
+            >
+              <CustomerCard
+                group={group}
+                linkUrl={linkUrl}
+                hasSubscription={hasSubscription}
+              />
 
-            {/* Arrow - horizontal on desktop, vertical on mobile */}
-            <div className="hidden md:flex items-center text-muted-foreground shrink-0">
-              <ArrowRight className="size-5" />
-            </div>
-            <div className="flex md:hidden items-center justify-center text-muted-foreground">
-              <ArrowDown className="size-5" />
-            </div>
-
-            {/* OCPP Tags - grid on mobile (max 2 per row), flex wrap on desktop */}
-            {(() => {
-              const allTags = [
-                ...parentTags.map((t) => ({ ...t, isChild: false })),
-                ...childTags.map((t) => ({ ...t, isChild: true })),
-              ];
-              const totalTags = allTags.length;
-              const hasOddCount = totalTags % 2 === 1;
-
-              return (
-                <div className="flex-1 grid grid-cols-2 md:flex md:flex-wrap items-stretch content-start gap-2 min-w-0 overflow-hidden">
-                  {allTags.map((tag, index) => {
-                    const isLastOdd = hasOddCount && index === totalTags - 1;
-                    return renderTagCard(tag, isLastOdd);
-                  })}
-                </div>
-              );
-            })()}
-
-            {/* Status & Actions */}
-            <div className="flex items-center justify-center md:justify-end gap-2 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-border w-full md:w-auto md:ml-auto">
-              {/* Action buttons */}
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={cn(
-                    "gap-2 md:gap-0",
-                    group.isActive
-                      ? "border-green-500 text-green-600 hover:bg-green-500/10 hover:text-green-600 dark:text-green-400 dark:hover:text-green-400"
-                      : "border-muted-foreground/50 text-muted-foreground hover:bg-muted/50"
-                  )}
-                  onClick={() =>
-                    primaryMappingId &&
-                    handleToggleActive(primaryMappingId, group.isActive)}
-                >
-                  {group.isActive ? <Check className="size-4" /> : <X className="size-4" />}
-                  <span className="md:hidden">{group.isActive ? "Active" : "Inactive"}</span>
-                </Button>
-                <Button variant="outline" size="sm" asChild className="gap-2 md:gap-0 border-purple-500 text-purple-600 hover:bg-purple-500/10 hover:text-purple-600 dark:text-purple-400 dark:hover:text-purple-400">
-                  <a href={`/links/${primaryMappingId}`}>
-                    <Pencil className="size-4" />
-                    <span className="md:hidden">Edit</span>
-                  </a>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2 md:gap-0 border-red-500 text-red-600 hover:bg-red-500/10 hover:text-red-600 dark:text-red-400 dark:hover:text-red-400"
-                  onClick={() =>
-                    primaryMappingId && handleDelete(primaryMappingId)}
-                  disabled={deleting.value === primaryMappingId}
-                >
-                  <Trash2 className="size-4" />
-                  <span className="md:hidden">{deleting.value === primaryMappingId ? "Deleting..." : "Delete"}</span>
-                </Button>
+              {/* Arrow — horizontal on desktop, vertical on mobile */}
+              <div class="hidden md:flex items-center text-muted-foreground shrink-0">
+                <ArrowRight class="size-5" aria-hidden="true" />
               </div>
+              <div class="flex md:hidden items-center justify-center text-muted-foreground">
+                <ArrowDown class="size-5" aria-hidden="true" />
+              </div>
+
+              {/* Tags */}
+              {(() => {
+                const totalTags = allTags.length;
+                const hasOddCount = totalTags % 2 === 1;
+                return (
+                  <div class="flex-1 grid grid-cols-2 md:flex md:flex-wrap items-stretch content-start gap-2 min-w-0 overflow-hidden">
+                    {allTags.map((tag, index) => (
+                      <TagCard
+                        key={tag.id}
+                        tag={tag}
+                        href={ocppTagUrl(tag.ocppTagPk)}
+                        isLastOdd={hasOddCount && index === totalTags - 1}
+                      />
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {/* Row actions */}
+              {primaryMappingId !== undefined && primaryTag && (
+                <LinkingRowActions
+                  mappingId={primaryMappingId}
+                  isActive={group.isActive}
+                  isMeta={primaryIsMeta}
+                  onToggleActive={() =>
+                    handleToggleActive(primaryMappingId, group.isActive)}
+                  onRequestDelete={() => {
+                    deleteTarget.value = {
+                      mappingId: primaryMappingId,
+                      isMeta: primaryIsMeta,
+                      cascadeCount,
+                      idTag: primaryTag.id,
+                    };
+                  }}
+                  deleting={deletingId.value === primaryMappingId}
+                />
+              )}
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+
+      {/* Accessible delete confirmation dialog */}
+      <Dialog
+        open={deleteTarget.value !== null}
+        onOpenChange={(open) => {
+          if (!open) deleteTarget.value = null;
+        }}
+      >
+        {deleteTarget.value && (
+          <DialogContent onClose={() => (deleteTarget.value = null)}>
+            <DialogHeader>
+              <DialogTitle>
+                {deleteTarget.value.isMeta
+                  ? "Delete meta-tag link?"
+                  : "Delete tag link?"}
+              </DialogTitle>
+              <DialogDescription>
+                {deleteTarget.value.isMeta && deleteTarget.value.cascadeCount > 1
+                  ? (
+                    <>
+                      This will delete this meta-tag link and{" "}
+                      <strong>
+                        {deleteTarget.value.cascadeCount - 1}{" "}
+                        inherited child link
+                        {deleteTarget.value.cascadeCount - 1 === 1 ? "" : "s"}
+                      </strong>. The underlying OCPP tags are not removed.
+                    </>
+                  )
+                  : deleteTarget.value.cascadeCount > 1
+                  ? (
+                    <>
+                      This will delete this link and{" "}
+                      <strong>
+                        {deleteTarget.value.cascadeCount - 1} child link
+                        {deleteTarget.value.cascadeCount - 1 === 1 ? "" : "s"}
+                      </strong>. The underlying OCPP tags are not removed.
+                    </>
+                  )
+                  : (
+                    <>
+                      This will delete the mapping for{" "}
+                      <code class="font-mono">{deleteTarget.value.idTag}</code>.
+                      The underlying OCPP tag is not removed.
+                    </>
+                  )}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => (deleteTarget.value = null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="border-red-500 text-red-600 hover:bg-red-500/10 hover:text-red-600 dark:text-red-400 dark:hover:text-red-400"
+                onClick={handleConfirmDelete}
+                disabled={deletingId.value !== null}
+              >
+                {deletingId.value !== null
+                  ? <Loader2 class="size-4 animate-spin" aria-hidden="true" />
+                  : <Trash2 class="size-4" aria-hidden="true" />}
+                <span class="ml-2">
+                  {deletingId.value !== null
+                    ? "Deleting…"
+                    : deleteTarget.value.isMeta
+                    ? "Delete meta-tag link"
+                    : "Delete link"}
+                </span>
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        )}
+      </Dialog>
+    </>
+  );
+}
+
+/* --------------------------------------------------------------------------
+ * Sub-components
+ * ------------------------------------------------------------------------ */
+
+function CustomerCard(
+  { group, linkUrl, hasSubscription }: {
+    group: MappingGroup;
+    linkUrl: string | null;
+    hasSubscription: boolean;
+  },
+) {
+  const Icon = hasSubscription ? CreditCard : User;
+  const displayName = group.customerName || group.customerEmail ||
+    group.customerId;
+  const subtext = hasSubscription
+    ? (group.subscriptionName || group.subscriptionId)
+    : "";
+
+  const content = (
+    <CardContent
+      class={cn(
+        "px-5 py-1.5 h-full flex flex-col justify-center",
+        CARD_HEIGHT_CLASS,
+      )}
+    >
+      <div class="flex items-center gap-4">
+        <div class="flex size-8 items-center justify-center rounded-lg bg-violet-500/10 shrink-0">
+          <Icon class="size-4 text-violet-500" aria-hidden="true" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="font-semibold truncate text-sm">{displayName}</p>
+          {subtext && (
+            <p class="text-xs text-muted-foreground truncate">
+              {subtext}
+            </p>
+          )}
+        </div>
+      </div>
+    </CardContent>
+  );
+
+  if (linkUrl) {
+    return (
+      <a
+        href={linkUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="shrink-0 self-stretch"
+        aria-label={`${displayName} — open in Lago (opens in new tab)`}
+      >
+        <Card class="min-w-56 h-full border-2 hover:border-violet-500/70 transition-colors cursor-pointer">
+          {content}
+        </Card>
+      </a>
+    );
+  }
+  return (
+    <Card class="min-w-56 shrink-0 self-stretch">
+      {content}
+    </Card>
+  );
+}
+
+function TagCard(
+  { tag, href, isLastOdd }: {
+    tag: RowTag;
+    href: string | null;
+    isLastOdd: boolean;
+  },
+) {
+  const meta = isMetaTag(tag.id);
+  const tt = coerceTagType(tag.tagType);
+  const TypeIcon = meta ? Layers : tagTypeIcons[tt];
+
+  const body = (
+    <CardContent
+      class={cn(
+        "px-4 py-1.5 h-full flex items-center gap-3",
+        CARD_HEIGHT_CLASS,
+      )}
+    >
+      <div
+        class={cn(
+          "flex size-8 items-center justify-center rounded-lg shrink-0",
+          meta ? "bg-violet-500/10" : tagTypeBgClass[tt],
+        )}
+        aria-label={meta ? "Meta-tag" : `${tagTypeLabels[tt]} tag`}
+      >
+        {meta
+          ? <Layers class="size-4 text-violet-500" aria-hidden="true" />
+          : <TypeIcon size="sm" class={tagTypeTextClass[tt]} />}
+      </div>
+      {tag.isChild && (
+        <CornerDownRight
+          class="size-4 text-muted-foreground shrink-0"
+          aria-hidden="true"
+        />
+      )}
+      <span
+        class={cn(
+          "font-mono text-sm flex-1 truncate",
+          !tag.isChild && "font-medium",
+        )}
+      >
+        {tag.id}
+      </span>
+      {meta && (
+        <Badge variant="outline" className="text-[10px] uppercase shrink-0">
+          META
+        </Badge>
+      )}
+    </CardContent>
+  );
+
+  const cardClasses = cn(
+    "shrink-0 h-full border-2 transition-colors",
+    tag.isChild && !meta && "bg-muted/30",
+    href && "hover:border-violet-500/70 cursor-pointer",
+  );
+
+  const wrapperClasses = cn(
+    "md:w-auto md:min-w-44",
+    isLastOdd ? "col-span-2" : "col-span-1",
+  );
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        class={wrapperClasses}
+        aria-label={`${tag.id} — open in StEvE (opens in new tab)`}
+      >
+        <Card class={cardClasses}>{body}</Card>
+      </a>
+    );
+  }
+  return (
+    <Card class={cn(cardClasses, wrapperClasses)}>
+      {body}
+    </Card>
+  );
+}
+
+function LinkingRowActions(
+  { mappingId, isActive, isMeta: _isMeta, onToggleActive, onRequestDelete, deleting }: {
+    mappingId: number;
+    isActive: boolean;
+    isMeta: boolean;
+    onToggleActive: () => void;
+    onRequestDelete: () => void;
+    deleting: boolean;
+  },
+) {
+  return (
+    <div class="flex items-center justify-center md:justify-end gap-2 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-border w-full md:w-auto md:ml-auto">
+      <Button
+        variant="outline"
+        size="sm"
+        className={cn(
+          "gap-2 md:gap-0",
+          isActive
+            ? "border-green-500 text-green-600 hover:bg-green-500/10 hover:text-green-600 dark:text-green-400 dark:hover:text-green-400"
+            : "border-muted-foreground/50 text-muted-foreground hover:bg-muted/50",
+        )}
+        onClick={onToggleActive}
+        aria-label={isActive ? "Deactivate link" : "Activate link"}
+      >
+        {isActive
+          ? <Check class="size-4" aria-hidden="true" />
+          : <X class="size-4" aria-hidden="true" />}
+        <span class="md:hidden">{isActive ? "Active" : "Inactive"}</span>
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        asChild
+        className="gap-2 md:gap-0 border-purple-500 text-purple-600 hover:bg-purple-500/10 hover:text-purple-600 dark:text-purple-400 dark:hover:text-purple-400"
+      >
+        <a href={`/links/${mappingId}`} aria-label="Edit link">
+          <Pencil class="size-4" aria-hidden="true" />
+          <span class="md:hidden">Edit</span>
+        </a>
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        className="gap-2 md:gap-0 border-red-500 text-red-600 hover:bg-red-500/10 hover:text-red-600 dark:text-red-400 dark:hover:text-red-400"
+        onClick={onRequestDelete}
+        disabled={deleting}
+        aria-label="Delete link"
+      >
+        <Trash2 class="size-4" aria-hidden="true" />
+        <span class="md:hidden">{deleting ? "Deleting…" : "Delete"}</span>
+      </Button>
     </div>
   );
 }

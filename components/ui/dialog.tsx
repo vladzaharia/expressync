@@ -1,6 +1,6 @@
 import { X } from "lucide-preact";
-import type { ComponentProps, ComponentChildren } from "preact";
-import { useEffect, useState, useCallback, useRef } from "preact/hooks";
+import type { ComponentChildren, ComponentProps } from "preact";
+import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
 import { cn } from "@/src/lib/utils/cn.ts";
 
@@ -15,7 +15,9 @@ interface DialogProps {
   children: ComponentChildren;
 }
 
-function Dialog({ open = false, onOpenChange, children }: DialogProps) {
+function Dialog(
+  { open = false, onOpenChange: _onOpenChange, children }: DialogProps,
+) {
   return <>{open && children}</>;
 }
 
@@ -77,7 +79,7 @@ function DialogContent({
         onClose();
       }
     },
-    [onClose]
+    [onClose],
   );
 
   if (!mounted) return null;
@@ -89,7 +91,7 @@ function DialogContent({
         data-slot="dialog-overlay"
         className={cn(
           "fixed inset-0 z-50 bg-black/50 transition-opacity duration-200",
-          isVisible ? "opacity-100" : "opacity-0"
+          isVisible ? "opacity-100" : "opacity-0",
         )}
         onClick={handleOverlayClick}
       />
@@ -102,7 +104,7 @@ function DialogContent({
         className={cn(
           "bg-background fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg transition-all duration-200 sm:max-w-lg",
           isVisible ? "opacity-100 scale-100" : "opacity-0 scale-95",
-          className
+          className,
         )}
         {...props}
       >
@@ -117,7 +119,7 @@ function DialogContent({
         </button>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }
 

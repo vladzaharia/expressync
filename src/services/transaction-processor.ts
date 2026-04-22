@@ -1,7 +1,18 @@
 import type { StEvETransaction } from "../lib/types/steve.ts";
 import type { TransactionSyncState, UserMapping } from "../db/schema.ts";
 import { logger } from "../lib/utils/logger.ts";
-import { resolveSubscriptionId } from "./mapping-resolver.ts";
+import {
+  resolveSubscription,
+  type SubscriptionResolutionCache,
+} from "./mapping-resolver.ts";
+
+/**
+ * Plan codes for which we intentionally do NOT post kWh events to Lago.
+ * ExpressChargeM is a flat-rate membership plan — kWh usage is not billed
+ * per-unit, and the current limit is enforced at the OCPP layer via a
+ * StEvE charging profile rather than by Lago.
+ */
+const NON_USAGE_PLAN_CODES = new Set<string>(["ExpressChargeM"]);
 
 export interface ProcessedTransaction {
   steveTransactionId: number;
@@ -12,8 +23,13 @@ export interface ProcessedTransaction {
   meterValueTo: number;
   isFinal: boolean;
   lagoEventTransactionId: string;
-  shouldSendToLago: boolean; // False if no subscription available
+  shouldSendToLago: boolean; // False if no subscription available or plan is non-usage
+  skipReason: "no_subscription" | "non_usage_plan" | null;
   stopTimestamp: string | null; // ISO timestamp of when the transaction stopped
+  // === Phase D: event enrichment metadata (threaded through for lago events) ===
+  chargeBoxId: string;
+  connectorId: number;
+  startTimestamp: string;
 }
 
 export interface TransactionWithCompletion extends StEvETransaction {
@@ -66,7 +82,7 @@ export async function processTransaction(
   tx: TransactionWithCompletion,
   syncState: TransactionSyncState | null,
   mapping: UserMapping | undefined,
-  subscriptionCache?: Map<string, string | null>,
+  subscriptionCache?: SubscriptionResolutionCache,
 ): Promise<ProcessedTransaction | null> {
   logger.debug("TransactionProcessor", "Processing transaction", {
     transactionId: tx.id,
@@ -102,7 +118,11 @@ export async function processTransaction(
   }
 
   // Try to resolve subscription (auto-select if not specified)
-  const subscriptionId = await resolveSubscriptionId(mapping, subscriptionCache);
+  const resolved = await resolveSubscription(mapping, subscriptionCache);
+  const subscriptionId = resolved?.externalId ?? null;
+  const planCode = resolved?.planCode ?? null;
+
+  let skipReason: ProcessedTransaction["skipReason"] = null;
 
   if (!subscriptionId) {
     logger.warn(
@@ -115,7 +135,20 @@ export async function processTransaction(
         hasExplicitSubscription: !!mapping.lagoSubscriptionExternalId,
       },
     );
-    // Continue processing but mark as not ready for Lago
+    skipReason = "no_subscription";
+  } else if (planCode && NON_USAGE_PLAN_CODES.has(planCode)) {
+    logger.info(
+      "TransactionProcessor",
+      "Skipping Lago event for non-usage plan",
+      {
+        transactionId: tx.id,
+        ocppIdTag: tx.ocppIdTag,
+        mappingId: mapping.id,
+        subscriptionId,
+        planCode,
+      },
+    );
+    skipReason = "non_usage_plan";
   }
 
   // Calculate delta
@@ -139,7 +172,7 @@ export async function processTransaction(
   // Post-transaction billing: one event per completed session, deterministic ID
   const lagoEventTransactionId = `steve_tx_${tx.id}_final`;
 
-  const result = {
+  const result: ProcessedTransaction = {
     steveTransactionId: tx.id,
     userMappingId: mapping.id,
     lagoSubscriptionExternalId: subscriptionId,
@@ -148,8 +181,13 @@ export async function processTransaction(
     meterValueTo: delta.meterValueTo,
     isFinal: tx.isCompleted,
     lagoEventTransactionId,
-    shouldSendToLago: !!subscriptionId, // Only send if we have a subscription
+    shouldSendToLago: skipReason === null,
+    skipReason,
     stopTimestamp: tx.stopTimestamp,
+    // Phase D: threaded through for lago-event-builder enrichment.
+    chargeBoxId: tx.chargeBoxId,
+    connectorId: tx.connectorId,
+    startTimestamp: tx.startTimestamp,
   };
 
   logger.debug("TransactionProcessor", "Transaction processed successfully", {
@@ -157,7 +195,9 @@ export async function processTransaction(
     kwhDelta: result.kwhDelta,
     isFinal: result.isFinal,
     hasSubscription: !!subscriptionId,
+    planCode,
     shouldSendToLago: result.shouldSendToLago,
+    skipReason: result.skipReason,
   });
 
   return result;
@@ -186,13 +226,18 @@ export async function processTransactions(
 
   // Per-invocation cache for subscription lookups to avoid redundant Lago API calls
   // when multiple transactions share the same customer
-  const subscriptionCache = new Map<string, string | null>();
+  const subscriptionCache: SubscriptionResolutionCache = new Map();
 
   for (const [txId, tx] of transactions) {
     const syncState = syncStates.get(txId) || null;
     const mapping = mappings.get(tx.ocppIdTag);
 
-    const result = await processTransaction(tx, syncState, mapping, subscriptionCache);
+    const result = await processTransaction(
+      tx,
+      syncState,
+      mapping,
+      subscriptionCache,
+    );
 
     if (result) {
       processed.push(result);

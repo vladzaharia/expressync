@@ -138,16 +138,70 @@ export class SyncLogger {
       await db.insert(syncRunLogs).values(logs);
     }
 
-    // Update segment status on sync run
+    // Update segment status on sync run. Only tag_linking and transaction_sync
+    // have first-class status columns on sync_runs; scheduling-segment logs are
+    // persisted but don't update a segment column on the parent row.
     const statusField = segment === "tag_linking"
       ? "tagLinkingStatus"
-      : "transactionSyncStatus";
-    await db
-      .update(syncRuns)
-      .set({ [statusField]: finalStatus })
-      .where(eq(syncRuns.id, this.syncRunId));
+      : segment === "transaction_sync"
+      ? "transactionSyncStatus"
+      : null;
+    if (statusField) {
+      await db
+        .update(syncRuns)
+        .set({ [statusField]: finalStatus })
+        .where(eq(syncRuns.id, this.syncRunId));
+    }
 
     this.currentSegment = null;
+  }
+
+  /**
+   * Log a scheduler tier transition.
+   *
+   * Emits an INFO-level log on the "scheduling" segment. Safe to call outside
+   * a started segment: it opens+closes the segment so the log is persisted
+   * even when invoked standalone from the scheduler evaluation path.
+   */
+  async logTierTransition(
+    from: string,
+    to: string,
+    reason: string,
+    nextRunAt: Date | null,
+  ): Promise<void> {
+    const wasInSegment = this.currentSegment !== null;
+    const previousSegment = this.currentSegment;
+
+    if (!wasInSegment) {
+      this.startSegment("scheduling");
+    } else if (this.currentSegment !== "scheduling") {
+      // Already inside another segment; briefly switch contexts.
+      this.currentSegment = "scheduling";
+      if (!this.segmentLogs.has("scheduling")) {
+        this.segmentLogs.set("scheduling", []);
+        this.segmentHasError.set("scheduling", false);
+        this.segmentHasWarning.set("scheduling", false);
+      }
+    }
+
+    this.info(`Tier transition: ${from} -> ${to}`, {
+      from,
+      to,
+      reason,
+      nextRunAt: nextRunAt ? nextRunAt.toISOString() : null,
+    });
+
+    if (!wasInSegment) {
+      await this.endSegment();
+    } else if (previousSegment !== "scheduling") {
+      // Flush the scheduling log buffer we just filled, then restore previous.
+      const logs = this.segmentLogs.get("scheduling") || [];
+      if (logs.length > 0) {
+        await db.insert(syncRunLogs).values(logs);
+        this.segmentLogs.set("scheduling", []);
+      }
+      this.currentSegment = previousSegment;
+    }
   }
 
   /**

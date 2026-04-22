@@ -8,6 +8,7 @@ import {
 import ThemeToggle, { useThemeToggle } from "../islands/ThemeToggle.tsx";
 import {
   BatteryCharging,
+  CalendarClock,
   LayoutDashboard,
   Link2,
   LogOut,
@@ -15,6 +16,7 @@ import {
   PanelLeftOpen,
   Receipt,
   RefreshCw,
+  Tag,
   User,
   Users,
 } from "lucide-preact";
@@ -31,9 +33,9 @@ const SIDEBAR_EXPANDED_WIDTH = "12rem"; // 192px when expanded
 
 interface UserInfo {
   id: string;
-  name: string | null;
+  name: string | null | undefined;
   email: string;
-  image: string | null;
+  image?: string | null | undefined;
 }
 
 interface AppSidebarProps {
@@ -55,6 +57,12 @@ export const mainNavItems: Array<{
     url: "/",
     icon: LayoutDashboard,
     accentColor: "primary",
+  },
+  {
+    title: "Tags",
+    url: "/tags",
+    icon: Tag,
+    accentColor: "cyan",
   },
   {
     title: "Tag Linking",
@@ -85,6 +93,12 @@ export const mainNavItems: Array<{
     url: "/users",
     icon: Users,
     accentColor: "amber",
+  },
+  {
+    title: "Reservations",
+    url: "/reservations",
+    icon: CalendarClock,
+    accentColor: "indigo",
   },
 ];
 
@@ -157,6 +171,7 @@ function ThemeToggleSection({ isCollapsed }: { isCollapsed: boolean }) {
 
   const content = (
     <button
+      type="button"
       onClick={toggleTheme}
       className={cn(
         "flex items-center border-t hover:bg-muted/50 transition-colors cursor-pointer shrink-0 w-full text-muted-foreground hover:text-foreground",
@@ -198,7 +213,7 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
 
   const handleSignOut = async () => {
     await fetch("/api/auth/sign-out", { method: "POST" });
-    window.location.href = "/login";
+    globalThis.location.href = "/login";
   };
 
   const toggleTheme = useThemeToggle();
@@ -240,12 +255,10 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
                     href={item.url}
                     className={cn(
                       "flex items-center justify-center shrink-0 transition-colors",
-                      active
-                        ? cn(accent.bg, accent.text)
-                        : cn(
-                            "text-muted-foreground hover:text-foreground",
-                            accent.bgHover,
-                          ),
+                      active ? cn(accent.bg, accent.text) : cn(
+                        "text-muted-foreground hover:text-foreground",
+                        accent.bgHover,
+                      ),
                     )}
                     style={{ width: CHROME_SIZE, height: CHROME_SIZE }}
                   >
@@ -269,6 +282,7 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
           <Tooltip>
             <TooltipTrigger asChild>
               <button
+                type="button"
                 onClick={toggleTheme}
                 className="flex items-center justify-center shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
                 style={{ width: CHROME_SIZE, height: CHROME_SIZE }}
@@ -302,6 +316,7 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
           <Tooltip>
             <TooltipTrigger asChild>
               <button
+                type="button"
                 onClick={handleSignOut}
                 className="flex items-center justify-center shrink-0 bg-red-950/50 hover:bg-red-950/70 text-red-400 hover:text-red-300 transition-colors"
                 style={{ width: CHROME_SIZE, height: CHROME_SIZE }}
@@ -309,7 +324,11 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
                 <LogOut className="size-5" />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={8} className={accentClasses.red.tooltip}>
+            <TooltipContent
+              side="bottom"
+              sideOffset={8}
+              className={accentClasses.red.tooltip}
+            >
               Sign Out
             </TooltipContent>
           </Tooltip>
@@ -322,6 +341,7 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
   // Logo content - ExpresSync brand that morphs to sidebar toggle on hover
   const logoContent = (
     <button
+      type="button"
       onClick={toggleSidebar}
       className={cn(
         "relative flex items-center border-b transition-colors shrink-0 overflow-hidden group/logo cursor-pointer w-full",
@@ -449,6 +469,7 @@ export function AppSidebar({ currentPath, user }: AppSidebarProps) {
         {(() => {
           const signOutContent = (
             <button
+              type="button"
               onClick={handleSignOut}
               className={cn(
                 "flex items-center border-t bg-red-950/50 hover:bg-red-950/70 text-red-400 hover:text-red-300 transition-colors w-full shrink-0 cursor-pointer",

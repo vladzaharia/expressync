@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { buildLagoEvent, batchEvents } from "./lago-event-builder.ts";
+import { batchEvents, buildLagoEvent } from "./lago-event-builder.ts";
 import type { ProcessedTransaction } from "./transaction-processor.ts";
 import type { LagoEvent } from "../lib/types/lago.ts";
 
@@ -16,6 +16,11 @@ function makeProcessed(
     isFinal: true,
     lagoEventTransactionId: "steve_tx_42_final",
     shouldSendToLago: true,
+    skipReason: null,
+    stopTimestamp: null,
+    chargeBoxId: "CB01",
+    connectorId: 1,
+    startTimestamp: "2025-01-01T00:00:00Z",
     ...overrides,
   };
 }
@@ -26,7 +31,7 @@ function makeDummyEvent(id: number): LagoEvent {
     external_subscription_id: "sub_001",
     code: "ev_charging_kwh",
     timestamp: 1700000000,
-    properties: { kwh: "1.000" },
+    properties: { value: "1.000" },
   };
 }
 
@@ -36,23 +41,26 @@ Deno.test("buildLagoEvent - correct event structure and fields", () => {
 
   assertEquals(event.transaction_id, "steve_tx_42_final");
   assertEquals(event.external_subscription_id, "sub_ext_001");
-  assertEquals(event.code, Deno.env.get("LAGO_METRIC_CODE") || "ev_charging_kwh");
+  assertEquals(
+    event.code,
+    Deno.env.get("LAGO_METRIC_CODE") || "ev_charging_kwh",
+  );
   assertEquals(typeof event.timestamp, "number");
-  assertEquals(typeof event.properties.kwh, "string");
+  assertEquals(typeof event.properties.value, "string");
 });
 
 Deno.test("buildLagoEvent - kWh rounded to 3 decimal places", () => {
   const processed = makeProcessed({ kwhDelta: 1.23456789 });
   const event = buildLagoEvent(processed);
 
-  assertEquals(event.properties.kwh, "1.235");
+  assertEquals(event.properties.value, "1.235");
 });
 
 Deno.test("buildLagoEvent - kWh with exact 3 decimal places", () => {
   const processed = makeProcessed({ kwhDelta: 5.1 });
   const event = buildLagoEvent(processed);
 
-  assertEquals(event.properties.kwh, "5.100");
+  assertEquals(event.properties.value, "5.100");
 });
 
 Deno.test("batchEvents - 100 events produce 1 batch", () => {

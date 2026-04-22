@@ -1,3 +1,6 @@
+// The inline theme bootstrap script uses dangerouslySetInnerHTML intentionally —
+// it must execute before hydration to prevent a flash of the wrong theme.
+// deno-lint-ignore-file react-no-danger
 import { define } from "../utils.ts";
 import { Toaster } from "sonner";
 

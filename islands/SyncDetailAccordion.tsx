@@ -9,6 +9,7 @@ import {
   AlertCircle,
   AlertTriangle,
   CheckCircle2,
+  Clock,
   Info,
   Link2,
   MinusCircle,
@@ -20,6 +21,7 @@ interface SyncDetailAccordionProps {
   run: SyncRun;
   tagLinkingLogs: SyncRunLog[];
   transactionSyncLogs: SyncRunLog[];
+  schedulingLogs?: SyncRunLog[];
 }
 
 function SegmentStatusBadge({
@@ -148,9 +150,23 @@ function SegmentCard({
 }
 
 export default function SyncDetailAccordion(
-  { run, tagLinkingLogs, transactionSyncLogs }: SyncDetailAccordionProps,
+  {
+    run,
+    tagLinkingLogs,
+    transactionSyncLogs,
+    schedulingLogs = [],
+  }: SyncDetailAccordionProps,
 ) {
   const isCompleted = run.status === "completed" || run.status === "failed";
+  // Phase C: scheduling segment has no dedicated column on sync_runs; derive
+  // a status from the logs themselves (any log => success, any error => error).
+  const schedulingStatus = schedulingLogs.length === 0
+    ? null
+    : schedulingLogs.some((l) => l.level === "error")
+    ? "error"
+    : schedulingLogs.some((l) => l.level === "warn")
+    ? "warning"
+    : "success";
 
   return (
     <Accordion type="single" className="space-y-2">
@@ -168,6 +184,15 @@ export default function SyncDetailAccordion(
         logs={transactionSyncLogs}
         runCompleted={isCompleted}
       />
+      {schedulingLogs.length > 0 && (
+        <SegmentCard
+          title="Scheduling"
+          icon={Clock}
+          status={schedulingStatus}
+          logs={schedulingLogs}
+          runCompleted={isCompleted}
+        />
+      )}
     </Accordion>
   );
 }

@@ -12,7 +12,9 @@ if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
   console.error(
     "❌ ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required.",
   );
-  console.error("   Usage: ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD=yourpassword deno run -A scripts/seed-admin.ts");
+  console.error(
+    "   Usage: ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD=yourpassword deno run -A scripts/seed-admin.ts",
+  );
   Deno.exit(1);
 }
 

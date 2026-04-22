@@ -24,9 +24,12 @@ export const TAG_REJECTION_PATTERNS = [
   /AuthorizationStatus:\s*Invalid.*idTag\s+(\S+)/i,
   // Pattern: "Authorize.req received for unknown tag: ABC123"
   /Authorize\.req.*unknown.*tag:\s*(\S+)/i,
-  // Pattern: "REJECTED" with idTag in context
-  /idTag[=:\s]+["']?(\S+?)["']?.*(?:REJECTED|INVALID|BLOCKED)/i,
-  /(?:REJECTED|INVALID|BLOCKED).*idTag[=:\s]+["']?(\S+?)["']?/i,
+  // Pattern: "idTag=X ... REJECTED/INVALID/BLOCKED"
+  // Use [^\s"'] greedy instead of \S+? so we capture the full tag id rather
+  // than a single char before the lazy quantifier hands off to .*
+  /idTag[=:\s]+["']?([^\s"']+)["']?.*?(?:REJECTED|INVALID|BLOCKED)/i,
+  // Pattern: "REJECTED/INVALID/BLOCKED ... idTag=X"
+  /(?:REJECTED|INVALID|BLOCKED).*?idTag[=:\s]+["']?([^\s"']+)["']?/i,
 ];
 
 /**

@@ -10,6 +10,8 @@ interface BorderBeamProps {
   colorFrom?: string;
   colorTo?: string;
   delay?: number;
+  /** Reverse the travel direction of the beam around the border. */
+  reverse?: boolean;
 }
 
 export function BorderBeam({
@@ -21,6 +23,7 @@ export function BorderBeam({
   colorFrom = "var(--glow-cyan)",
   colorTo = "var(--glow-green)",
   delay = 0,
+  reverse = false,
 }: BorderBeamProps) {
   return (
     <div
@@ -32,13 +35,18 @@ export function BorderBeam({
         "--color-from": colorFrom,
         "--color-to": colorTo,
         "--delay": `-${delay}s`,
+        ...(reverse ? { animationDirection: "reverse" } : {}),
       }}
       className={cn(
         "pointer-events-none absolute inset-0 rounded-[inherit] [border:calc(var(--border-width))_solid_transparent]",
         // mask styles
         "![mask-clip:padding-box,border-box] ![mask-composite:intersect] [mask:linear-gradient(transparent,transparent),linear-gradient(white,white)]",
-        // pseudo styles
-        "after:absolute after:aspect-square after:w-[var(--size)] after:animate-border-beam after:[animation-delay:var(--delay)] after:[background:linear-gradient(to_left,var(--color-from),var(--color-to),transparent)] after:[offset-anchor:calc(var(--anchor))_50%] after:[offset-path:rect(0_auto_auto_0_round_calc(var(--size)))]",
+        // pseudo styles — gate animation on prefers-reduced-motion. When
+        // reduce-motion is set we hide the beam entirely (a static beam has
+        // no information content; it's purely a motion affordance).
+        "after:absolute after:aspect-square after:w-[var(--size)] after:[animation-delay:var(--delay)] after:[background:linear-gradient(to_left,var(--color-from),var(--color-to),transparent)] after:[offset-anchor:calc(var(--anchor))_50%] after:[offset-path:rect(0_auto_auto_0_round_calc(var(--size)))]",
+        "motion-safe:after:animate-border-beam motion-reduce:after:hidden",
+        reverse && "after:[animation-direction:reverse]",
         className,
       )}
     />

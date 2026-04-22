@@ -1,13 +1,16 @@
 import {
   boolean,
+  check,
   index,
   integer,
+  jsonb,
   numeric,
   pgTable,
   serial,
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 // ============================================================================
 // BETTERAUTH TABLES
@@ -58,8 +61,12 @@ export const accounts = pgTable("accounts", {
   providerId: text("provider_id").notNull(), // "credential" for email/password
   accessToken: text("access_token"),
   refreshToken: text("refresh_token"),
-  accessTokenExpiresAt: timestamp("access_token_expires_at", { withTimezone: true }),
-  refreshTokenExpiresAt: timestamp("refresh_token_expires_at", { withTimezone: true }),
+  accessTokenExpiresAt: timestamp("access_token_expires_at", {
+    withTimezone: true,
+  }),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at", {
+    withTimezone: true,
+  }),
   scope: text("scope"),
   password: text("password"), // Hashed password for credential provider
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
@@ -104,6 +111,20 @@ export const userMappings = pgTable("user_mappings", {
   displayName: text("display_name"),
   notes: text("notes"),
 
+  // === Phase I: tag type ===
+  // Form-factor category — see `src/lib/types/tags.ts` (TAG_TYPES) for the
+  // allowed values. CHECK constraint enforced at the DB level; keep this
+  // column and `TAG_TYPES` in sync.
+  tagType: text("tag_type").notNull().default("other"),
+
+  // === Phase P2: billing profile ===
+  // 'standard' users get normal usage billing. 'comped' users have the
+  // `free_charging` 100%-off coupon applied in Lago (reconciled on flip).
+  billingTier: text("billing_tier").notNull().default("standard"),
+  // Running count of EV cards / tokens issued to this user — used to drive
+  // "first card free" logic (legacy) and to size the issued_cards audit.
+  cardsIssued: integer("cards_issued").notNull().default(0),
+
   // Status
   isActive: boolean("is_active").default(true),
 
@@ -112,8 +133,63 @@ export const userMappings = pgTable("user_mappings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 }, (table) => [
   index("idx_user_mappings_is_active").on(table.isActive),
-  index("idx_user_mappings_lago_customer_external_id").on(table.lagoCustomerExternalId),
+  index("idx_user_mappings_lago_customer_external_id").on(
+    table.lagoCustomerExternalId,
+  ),
+  check(
+    "user_mappings_billing_tier_check",
+    sql`${table.billingTier} IN ('standard', 'comped')`,
+  ),
 ]);
+
+/**
+ * Issued Cards — audit of EV-card/token issuances per mapping.
+ *
+ * Written from `POST /api/mapping/issue-card`. `billing_mode` captures the
+ * operator's choice at issuance time:
+ *   - `charged`: a one-off Lago invoice was created with the `ev_card`
+ *     add-on ($3). `lago_invoice_id` is set.
+ *   - `no_cost`: same one-off invoice, plus the `free_card` coupon applied.
+ *     Both `lago_invoice_id` and `lago_applied_coupon_id` are set.
+ *   - `skipped_sync`: no Lago call was made. Both FKs are null.
+ *
+ * `sync_error` is populated when a Lago call failed after the local row was
+ * written, so the operator can retry from the UI.
+ */
+export const issuedCards = pgTable("issued_cards", {
+  id: serial("id").primaryKey(),
+  userMappingId: integer("user_mapping_id")
+    .notNull()
+    .references(() => userMappings.id, { onDelete: "cascade" }),
+  /**
+   * Physical form factor of the card / token / fob. Limited to the three
+   * issuable options in the Add Card UX; broader `tag_type` values (app /
+   * guest_qr / phone_nfc / other) are never produced by this flow.
+   */
+  cardType: text("card_type").notNull().default("ev_card"),
+  billingMode: text("billing_mode").notNull(),
+  lagoInvoiceId: text("lago_invoice_id"),
+  lagoAppliedCouponId: text("lago_applied_coupon_id"),
+  note: text("note"),
+  syncError: text("sync_error"),
+  issuedBy: text("issued_by").references(() => users.id),
+  issuedAt: timestamp("issued_at", { withTimezone: true }).notNull()
+    .defaultNow(),
+}, (table) => [
+  index("idx_issued_cards_user_mapping_id").on(table.userMappingId),
+  index("idx_issued_cards_issued_at").on(table.issuedAt),
+  check(
+    "issued_cards_billing_mode_check",
+    sql`${table.billingMode} IN ('charged', 'no_cost', 'skipped_sync')`,
+  ),
+  check(
+    "issued_cards_card_type_check",
+    sql`${table.cardType} IN ('ev_card', 'keytag', 'sticker')`,
+  ),
+]);
+
+export type IssuedCard = typeof issuedCards.$inferSelect;
+export type NewIssuedCard = typeof issuedCards.$inferInsert;
 
 /**
  * Sync Runs - Tracks each sync execution
@@ -124,7 +200,8 @@ export const syncRuns = pgTable("sync_runs", {
   id: serial("id").primaryKey(),
 
   // Timing
-  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull()
+    .defaultNow(),
   completedAt: timestamp("completed_at", { withTimezone: true }),
 
   // Status: "running" | "completed" | "failed"
@@ -177,9 +254,13 @@ export const syncRunLogs = pgTable("sync_run_logs", {
   context: text("context"),
 
   // Timestamp
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+    .defaultNow(),
 }, (table) => [
-  index("idx_sync_run_logs_sync_run_id_created_at").on(table.syncRunId, table.createdAt),
+  index("idx_sync_run_logs_sync_run_id_created_at").on(
+    table.syncRunId,
+    table.createdAt,
+  ),
 ]);
 
 /**
@@ -202,7 +283,8 @@ export const transactionSyncState = pgTable("transaction_sync_state", {
   lastSyncedMeterValue: integer("last_synced_meter_value").notNull(),
 
   // Total kWh billed so far for this transaction
-  totalKwhBilled: numeric("total_kwh_billed", { precision: 12, scale: 6 }).default("0"),
+  totalKwhBilled: numeric("total_kwh_billed", { precision: 12, scale: 6 })
+    .default("0"),
 
   // Reference to the last sync run that updated this
   lastSyncRunId: integer("last_sync_run_id").references(() => syncRuns.id),
@@ -256,7 +338,9 @@ export const syncedTransactionEvents = pgTable("synced_transaction_events", {
   syncedAt: timestamp("synced_at", { withTimezone: true }).defaultNow(),
 }, (table) => [
   index("idx_synced_transaction_events_sync_run_id").on(table.syncRunId),
-  index("idx_synced_transaction_events_steve_transaction_id").on(table.steveTransactionId),
+  index("idx_synced_transaction_events_steve_transaction_id").on(
+    table.steveTransactionId,
+  ),
 ]);
 
 // ============================================================================
@@ -293,6 +377,323 @@ export type SyncRunLog = typeof syncRunLogs.$inferSelect;
 export type NewSyncRunLog = typeof syncRunLogs.$inferInsert;
 
 // Sync segment types
-export type SyncSegment = "tag_linking" | "transaction_sync";
+export type SyncSegment = "tag_linking" | "transaction_sync" | "scheduling";
 export type SyncSegmentStatus = "success" | "warning" | "error" | "skipped";
 export type SyncLogLevel = "info" | "warn" | "error" | "debug";
+
+// ============================================================================
+// === Phase C: adaptive sync cadence ===
+// ============================================================================
+
+/**
+ * Sync Schedule State - singleton row (id = 1)
+ *
+ * Tracks the adaptive sync scheduler's current tier, last activity, hysteresis
+ * counter, and optional admin-pinned tier override. All time math is done with
+ * DB `now()` (not `Date.now()`) to avoid worker/DB clock skew.
+ */
+export const syncScheduleState = pgTable("sync_schedule_state", {
+  id: integer("id").primaryKey().default(1),
+  currentTier: text("current_tier").notNull().default("idle"),
+  lastActivityAt: timestamp("last_activity_at", { withTimezone: true }),
+  lastEvaluatedAt: timestamp("last_evaluated_at", { withTimezone: true }),
+  nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+  consecutiveIdleTicks: integer("consecutive_idle_ticks").notNull().default(0),
+  pinnedUntil: timestamp("pinned_until", { withTimezone: true }),
+  pinnedTier: text("pinned_tier"),
+}, (table) => [
+  check("sync_schedule_state_singleton", sql`${table.id} = 1`),
+  check(
+    "sync_schedule_state_current_tier_check",
+    sql`${table.currentTier} IN ('active','idle','dormant')`,
+  ),
+  check(
+    "sync_schedule_state_pinned_tier_check",
+    sql`${table.pinnedTier} IN ('active','idle','dormant')`,
+  ),
+]);
+
+/**
+ * Tag Change Log - append-only audit of tag modifications detected during sync
+ *
+ * Written by `tag-sync.service` before the StEvE write so activity is recorded
+ * even if the upstream call fails. Feeds the scheduler's "any activity in
+ * the last 30 days" signal.
+ */
+export const tagChangeLog = pgTable("tag_change_log", {
+  id: serial("id").primaryKey(),
+  ocppTagPk: integer("ocpp_tag_pk"),
+  idTag: text("id_tag").notNull(),
+  changeType: text("change_type").notNull(), // "activated" | "deactivated" | "updated" | "created"
+  before: jsonb("before"),
+  after: jsonb("after"),
+  detectedAt: timestamp("detected_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  syncRunId: integer("sync_run_id").references(() => syncRuns.id, {
+    onDelete: "set null",
+  }),
+}, (table) => [
+  index("idx_tag_change_log_detected_at").on(table.detectedAt.desc()),
+]);
+
+export type SyncScheduleState = typeof syncScheduleState.$inferSelect;
+export type NewSyncScheduleState = typeof syncScheduleState.$inferInsert;
+
+export type TagChangeLog = typeof tagChangeLog.$inferSelect;
+export type NewTagChangeLog = typeof tagChangeLog.$inferInsert;
+
+export type SyncTier = "active" | "idle" | "dormant";
+export type TagChangeType = "activated" | "deactivated" | "updated" | "created";
+
+// ============================================================================
+// === Phase B: chargers cache ===
+// ============================================================================
+
+/**
+ * Chargers Cache - sticky list of known chargers
+ *
+ * StEvE 3.12.0 has no REST endpoint for listing charge boxes; we derive the
+ * roster from distinct transactions + charger_operation_log, and persist it
+ * here so the UI has a stable source of truth even when no transactions exist.
+ *
+ * `form_factor` drives the SVG icon shown in the charger card grid (Phase J).
+ * Defaults to `'wallbox'`; admin-editable in the detail page.
+ * `last_status`/`last_status_at` are stamped when a TriggerMessage response
+ * arrives; beyond 10m the UI dims the status dot, beyond 1h it shows "Offline".
+ */
+export const chargersCache = pgTable("chargers_cache", {
+  chargeBoxId: text("charge_box_id").primaryKey(),
+  chargeBoxPk: integer("charge_box_pk"),
+  friendlyName: text("friendly_name"),
+  formFactor: text("form_factor").notNull().default("wallbox"),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  lastStatus: text("last_status"),
+  lastStatusAt: timestamp("last_status_at", { withTimezone: true }),
+}, (table) => [
+  check(
+    "chargers_cache_form_factor_check",
+    sql`${table.formFactor} IN ('wallbox','pulsar','commander','wall_mount','generic')`,
+  ),
+  index("idx_chargers_cache_last_seen").on(table.lastSeenAt.desc()),
+]);
+
+export type ChargerCache = typeof chargersCache.$inferSelect;
+export type NewChargerCache = typeof chargersCache.$inferInsert;
+
+// ============================================================================
+// === Phase A: charger operation log ===
+// ============================================================================
+
+/**
+ * Charger Operation Log — audit + pending tracker for StEvE OCPP operations
+ *
+ * Every admin-initiated op (RemoteStart/Stop, Unlock, Reserve, TriggerMessage,
+ * GetConfiguration, etc.) writes a row here BEFORE the StEvE call so the
+ * request is not lost if upstream fails. `task_id` is filled from StEvE's
+ * synchronous `{ taskId }` response; the full OCPP round-trip (success/error)
+ * is async and may never appear — polling is best-effort.
+ *
+ * `status` values: 'pending' | 'submitted' | 'failed' | 'completed' | 'dry_run'
+ * Destructive operations (Reset, ClearCache, UpdateFirmware, SendLocalList,
+ * ClearChargingProfile, ChangeConfiguration) are explicitly NOT exposed — see
+ * `ALLOWED_OPERATIONS` in `src/lib/types/steve.ts`.
+ */
+export const chargerOperationLog = pgTable("charger_operation_log", {
+  id: serial("id").primaryKey(),
+  chargeBoxId: text("charge_box_id").notNull(),
+  operation: text("operation").notNull(),
+  params: jsonb("params"),
+  taskId: integer("task_id"),
+  requestedByUserId: text("requested_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  status: text("status").notNull().default("pending"),
+  result: jsonb("result"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (table) => [
+  index("idx_charger_operation_log_charge_box_created").on(
+    table.chargeBoxId,
+    table.createdAt.desc(),
+  ),
+]);
+
+export type ChargerOperationLog = typeof chargerOperationLog.$inferSelect;
+export type NewChargerOperationLog = typeof chargerOperationLog.$inferInsert;
+
+// === Phase I: tag type ===
+// Re-export from the single source of truth so other modules can pull the
+// allowlist + type from `@/src/db/schema.ts` if that's more convenient.
+export { TAG_TYPES } from "../lib/types/tags.ts";
+export type { TagType } from "../lib/types/tags.ts";
+
+// ============================================================================
+// === Phase D: lago webhook events ===
+// ============================================================================
+
+/**
+ * Lago Webhook Events - append-only audit of every Lago webhook we receive
+ *
+ * The route handler persists each payload FIRST (so we never lose data even if
+ * dispatch throws), then the dispatcher parses with a discriminated-union Zod
+ * schema keyed on `webhook_type` and reacts per-type. `processed_at` and
+ * `processing_error` are updated in place after dispatch. `notification_fired`
+ * is true when the handler triggered an admin alert (Phase K will read this).
+ */
+export const lagoWebhookEvents = pgTable("lago_webhook_events", {
+  id: serial("id").primaryKey(),
+  webhookType: text("webhook_type").notNull(),
+  objectType: text("object_type"),
+  lagoObjectId: text("lago_object_id"),
+  externalCustomerId: text("external_customer_id"),
+  externalSubscriptionId: text("external_subscription_id"),
+  rawPayload: jsonb("raw_payload").notNull(),
+  receivedAt: timestamp("received_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  processedAt: timestamp("processed_at", { withTimezone: true }),
+  processingError: text("processing_error"),
+  notificationFired: boolean("notification_fired").notNull().default(false),
+}, (table) => [
+  index("idx_lago_webhook_events_type_received").on(
+    table.webhookType,
+    table.receivedAt.desc(),
+  ),
+  index("idx_lago_webhook_events_customer_received").on(
+    table.externalCustomerId,
+    table.receivedAt.desc(),
+  ),
+]);
+
+export type LagoWebhookEvent = typeof lagoWebhookEvents.$inferSelect;
+export type NewLagoWebhookEvent = typeof lagoWebhookEvents.$inferInsert;
+
+// ============================================================================
+// === Phase P3: reservations ===
+// ============================================================================
+
+/**
+ * Reservations — admin-booked charging windows against a specific
+ * (charge_box, connector) using a known StEvE OCPP tag.
+ *
+ * Time windows are stored in UTC as `timestamptz` and treated as half-open
+ * intervals `[start_at, end_at)` for conflict detection; two reservations on
+ * the same connector overlap iff `a.start < b.end AND a.end > b.start`.
+ *
+ * `status` lifecycle (see CHECK):
+ *   pending    — row written; StEvE ReserveNow dispatched
+ *   confirmed  — StEvE returned a taskId
+ *   active     — currently within the window
+ *   completed  — window ended naturally
+ *   cancelled  — admin or system cancelled
+ *   conflicted — overlap detected post-insert
+ *   orphaned   — StEvE no longer tracks this reservation
+ *
+ * `charging_profile_task_id` is populated by the (optional) P5 apply-hook.
+ */
+export const reservations = pgTable("reservations", {
+  id: serial("id").primaryKey(),
+
+  // Charger target
+  chargeBoxId: text("charge_box_id").notNull(),
+  connectorId: integer("connector_id").notNull(),
+
+  // StEvE tag reference
+  steveOcppTagPk: integer("steve_ocpp_tag_pk").notNull(),
+  steveOcppIdTag: text("steve_ocpp_id_tag").notNull(),
+
+  // Lago subscription (nullable; drives optional profile hook)
+  lagoSubscriptionExternalId: text("lago_subscription_external_id"),
+
+  // Time window (UTC)
+  startAt: timestamp("start_at", { withTimezone: true }).notNull(),
+  endAt: timestamp("end_at", { withTimezone: true }).notNull(),
+  // Cached duration for display + filters
+  durationMinutes: integer("duration_minutes").notNull(),
+
+  // Status
+  status: text("status").notNull().default("pending"),
+
+  // StEvE integration
+  steveReservationId: integer("steve_reservation_id"),
+  chargingProfileTaskId: integer("charging_profile_task_id"),
+
+  // Audit
+  createdByUserId: text("created_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+}, (table) => [
+  check(
+    "reservations_status_check",
+    sql`${table.status} IN ('pending','confirmed','active','completed','cancelled','conflicted','orphaned')`,
+  ),
+  check(
+    "reservations_time_window_check",
+    sql`${table.endAt} > ${table.startAt}`,
+  ),
+  index("idx_reservations_conflict").on(
+    table.chargeBoxId,
+    table.connectorId,
+    table.startAt,
+    table.endAt,
+  ),
+  index("idx_reservations_tag_start").on(
+    table.steveOcppTagPk,
+    table.startAt.desc(),
+  ),
+  index("idx_reservations_status_start").on(
+    table.status,
+    table.startAt.desc(),
+  ),
+]);
+
+export type Reservation = typeof reservations.$inferSelect;
+export type NewReservation = typeof reservations.$inferInsert;
+
+export type ReservationStatus =
+  | "pending"
+  | "confirmed"
+  | "active"
+  | "completed"
+  | "cancelled"
+  | "conflicted"
+  | "orphaned";
+
+export const RESERVATION_STATUSES: readonly ReservationStatus[] = [
+  "pending",
+  "confirmed",
+  "active",
+  "completed",
+  "cancelled",
+  "conflicted",
+  "orphaned",
+] as const;
+
+/** DTO shape consumed by sibling surfaces (Tag/Charger/Link detail). */
+export interface ReservationRowDTO {
+  id: number;
+  chargeBoxId: string;
+  connectorId: number;
+  ocppTagPk: number;
+  ocppTagId: string;
+  startAtIso: string;
+  endAtIso: string;
+  status: ReservationStatus;
+  lagoSubscriptionExternalId: string | null;
+  chargingProfileTaskId: number | null;
+}

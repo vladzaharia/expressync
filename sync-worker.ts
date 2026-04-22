@@ -3,7 +3,9 @@
  * OCPP Billing Sync Worker
  *
  * This is a dedicated service that runs the sync process on a schedule.
- * It uses Croner for reliable, production-ready cron scheduling.
+ * It uses Croner for reliable, production-ready cron scheduling, driven by
+ * the adaptive SyncScheduler (Phase C) — cadence shifts between 15m / 1h /
+ * weekly based on observed activity.
  *
  * Architecture:
  * - Runs as a separate Docker container
@@ -16,14 +18,23 @@
  *   deno run --allow-net --allow-env --allow-read sync-worker.ts
  */
 
-import { Cron } from "croner";
 import postgres from "postgres";
 import { config, validateSyncWorkerConfig } from "./src/lib/config.ts";
-import { runSync } from "./src/services/sync.service.ts";
+import { runSync, type SyncResult } from "./src/services/sync.service.ts";
+import { SyncScheduler } from "./src/services/sync-scheduler.ts";
+import { ensureLagoMetricSafety } from "./src/services/lago-safety.service.ts";
 
 // Validate configuration on startup
 console.log("[Sync Worker] Starting OCPP Billing Sync Worker...");
-console.log(`[Sync Worker] Schedule: ${config.SYNC_CRON_SCHEDULE}`);
+if (config.SYNC_CRON_SCHEDULE && config.SYNC_CRON_SCHEDULE.trim()) {
+  console.log(
+    `[Sync Worker] SYNC_CRON_SCHEDULE override active: ${config.SYNC_CRON_SCHEDULE}`,
+  );
+} else {
+  console.log(
+    "[Sync Worker] Using adaptive cadence (active 15m / idle 1h / dormant weekly)",
+  );
+}
 
 try {
   validateSyncWorkerConfig();
@@ -32,6 +43,10 @@ try {
   console.error("[Sync Worker] Configuration validation failed:", error);
   Deno.exit(1);
 }
+
+// Phase D: verify Lago billable metric aggregation type is sum_agg; degrades
+// enrichment silently if not. Fire-and-forget — never blocks worker startup.
+ensureLagoMetricSafety().catch(() => {/* already logged */});
 
 // Track if a sync is currently running (for additional safety)
 let isSyncing = false;
@@ -64,10 +79,11 @@ function createListenClient() {
 
 /**
  * Sync handler function
- * This is called by Croner on the schedule
+ * Called by the adaptive SyncScheduler on every tick.
+ * After each run we let the scheduler re-evaluate the tier based on the
+ * observed result.
  */
-async function handleSync() {
-  // Extra safety check (Croner already prevents overlaps, but this is belt-and-suspenders)
+async function handleSync(): Promise<SyncResult | void> {
   if (isSyncing) {
     console.warn("[Sync Worker] Sync already in progress, skipping...");
     return;
@@ -76,20 +92,22 @@ async function handleSync() {
   isSyncing = true;
   const startTime = Date.now();
 
+  let result: SyncResult | undefined;
   currentSyncPromise = runSync()
-    .then((result) => {
+    .then((r) => {
+      result = r;
       const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 
       console.log(
         `[Sync Worker] Sync completed in ${duration}s: ` +
-          `${result.eventsCreated} events created, ` +
-          `${result.transactionsProcessed} transactions processed`,
+          `${r.eventsCreated} events created, ` +
+          `${r.transactionsProcessed} transactions processed`,
       );
 
-      if (result.errors.length > 0) {
+      if (r.errors.length > 0) {
         console.error(
-          `[Sync Worker] Sync had ${result.errors.length} errors:`,
-          result.errors,
+          `[Sync Worker] Sync had ${r.errors.length} errors:`,
+          r.errors,
         );
       }
     })
@@ -103,23 +121,24 @@ async function handleSync() {
     });
 
   await currentSyncPromise;
+
+  // Post-sync: let the scheduler re-evaluate cadence based on observed state.
+  try {
+    await SyncScheduler.evaluateAndReschedule(result);
+  } catch (err) {
+    console.error("[Sync Worker] Scheduler evaluation failed:", err);
+  }
+
+  return result;
 }
 
-// Create the cron job
-// Croner automatically prevents overlapping executions
-const job = new Cron(
-  config.SYNC_CRON_SCHEDULE,
-  {
-    // Prevent overlapping executions (Croner feature)
-    protect: true,
-    // Use UTC timezone for consistency
-    timezone: "UTC",
-  },
-  handleSync,
+// Start the adaptive scheduler (replaces the old fixed Cron).
+await SyncScheduler.start(handleSync);
+console.log("[Sync Worker] Adaptive scheduler started");
+console.log(
+  `[Sync Worker] Current tier: ${SyncScheduler.currentTier()}; ` +
+    `next run: ${SyncScheduler.nextRunAt()?.toISOString() ?? "unknown"}`,
 );
-
-console.log("[Sync Worker] Cron job scheduled successfully");
-console.log(`[Sync Worker] Next run: ${job.nextRun()?.toISOString()}`);
 
 // Set up LISTEN for manual sync triggers with reconnection logic
 async function setupListen() {
@@ -132,9 +151,20 @@ async function setupListen() {
           console.log(
             `[Sync Worker] Received sync trigger notification from ${data.source}`,
           );
-          handleSync().catch((error) => {
-            console.error("[Sync Worker] Manual sync failed:", error);
-          });
+          // Bump tier to Active first (so cadence is 15m going forward),
+          // then fire the handler which will evaluate cadence when done.
+          SyncScheduler.onActivityDetected(`manual:${data.source ?? "unknown"}`)
+            .catch((err) => {
+              console.error(
+                "[Sync Worker] Failed to record manual activity:",
+                err,
+              );
+            })
+            .finally(() => {
+              handleSync().catch((error) => {
+                console.error("[Sync Worker] Manual sync failed:", error);
+              });
+            });
         } catch (error) {
           console.error(
             "[Sync Worker] Failed to parse notification payload:",
@@ -170,8 +200,8 @@ if (config.SYNC_ON_STARTUP === "true") {
 const shutdown = async () => {
   isShuttingDown = true;
   console.log("[Sync Worker] Shutting down gracefully...");
-  job.stop();
-  console.log("[Sync Worker] Cron job stopped");
+  SyncScheduler.stop();
+  console.log("[Sync Worker] Scheduler stopped");
 
   if (currentSyncPromise) {
     console.log("[Sync Worker] Waiting for in-flight sync to complete...");

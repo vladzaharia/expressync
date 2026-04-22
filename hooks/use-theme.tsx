@@ -37,8 +37,8 @@ export function ThemeProvider({
 
   const [resolvedTheme, setResolvedTheme] = useState<"dark" | "light">(() => {
     if (theme === "system") {
-      if (typeof window === "undefined") return "dark";
-      return window.matchMedia("(prefers-color-scheme: dark)").matches
+      if (typeof globalThis === "undefined") return "dark";
+      return globalThis.matchMedia("(prefers-color-scheme: dark)").matches
         ? "dark"
         : "light";
     }
@@ -46,7 +46,7 @@ export function ThemeProvider({
   });
 
   useEffect(() => {
-    const root = window.document.documentElement;
+    const root = globalThis.document.documentElement;
 
     const applyTheme = (newTheme: "dark" | "light") => {
       root.classList.remove("light", "dark");
@@ -55,7 +55,7 @@ export function ThemeProvider({
     };
 
     if (theme === "system") {
-      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      const mediaQuery = globalThis.matchMedia("(prefers-color-scheme: dark)");
       const handleChange = () => {
         applyTheme(mediaQuery.matches ? "dark" : "light");
       };

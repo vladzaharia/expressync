@@ -1,15 +1,30 @@
 import { config } from "./config.ts";
 import {
+  type ApplyCouponPayload,
+  ApplyCouponPayloadSchema,
+  type LagoAppliedCoupon,
+  LagoAppliedCouponSchema,
+  type LagoBillableMetric,
+  LagoBillableMetricSchema,
   type LagoCurrentUsage,
   LagoCurrentUsageSchema,
   type LagoCustomer,
   LagoCustomerSchema,
   type LagoEvent,
-  LagoEventSchema,
   type LagoInvoice,
+  type LagoInvoiceExtended,
+  LagoInvoiceExtendedSchema,
   LagoInvoiceSchema,
+  type LagoLifetimeUsage,
+  LagoLifetimeUsageSchema,
   type LagoSubscription,
+  type LagoSubscriptionAlert,
+  LagoSubscriptionAlertSchema,
   LagoSubscriptionSchema,
+  type LagoWallet,
+  LagoWalletSchema,
+  type LagoWalletTransaction,
+  LagoWalletTransactionSchema,
 } from "./types/lago.ts";
 import { z } from "zod";
 import { retry } from "./utils/retry.ts";
@@ -35,7 +50,7 @@ class LagoClient {
     schema: z.ZodSchema<T>,
     options: RequestInit = {},
   ): Promise<T> {
-    return retry(async () => {
+    return await retry(async () => {
       const url = `${this.baseUrl}${path}`;
       const method = options.method || "GET";
 
@@ -134,7 +149,7 @@ class LagoClient {
         logger.warn("Lago", "Max page limit reached", { path, page });
         break;
       }
-      const separator = path.includes('?') ? '&' : '?';
+      const separator = path.includes("?") ? "&" : "?";
       const data = await this.request(
         `${path}${separator}page=${page}&per_page=100`,
         z.object({ [dataKey]: z.array(itemSchema) }).passthrough(),
@@ -237,7 +252,7 @@ class LagoClient {
    * @returns Object with customer data
    */
   async getCustomer(externalId: string): Promise<{ customer: LagoCustomer }> {
-    return this.request(
+    return await this.request(
       `/customers/${encodeURIComponent(externalId)}`,
       z.object({ customer: LagoCustomerSchema }),
     );
@@ -310,6 +325,407 @@ class LagoClient {
     );
 
     return result;
+  }
+
+  // ==========================================================================
+  // === Phase D: Lago surface expansion ===
+  // ==========================================================================
+
+  /**
+   * Fetch a single invoice by Lago ID (extended fields including `file_url`,
+   * `fees[]`, `applied_taxes[]`).
+   */
+  async getInvoice(
+    lagoId: string,
+  ): Promise<{ invoice: LagoInvoiceExtended }> {
+    return await this.request(
+      `/invoices/${encodeURIComponent(lagoId)}`,
+      z.object({ invoice: LagoInvoiceExtendedSchema }),
+    );
+  }
+
+  /**
+   * Finalize a draft invoice. Fails if already finalized.
+   */
+  async finalizeInvoice(
+    lagoId: string,
+  ): Promise<{ invoice: LagoInvoiceExtended }> {
+    return await this.request(
+      `/invoices/${encodeURIComponent(lagoId)}/finalize`,
+      z.object({ invoice: LagoInvoiceExtendedSchema }),
+      { method: "PUT" },
+    );
+  }
+
+  /**
+   * Void a finalized invoice. Body is optional; we pass an empty object so the
+   * Content-Type header is respected upstream.
+   */
+  async voidInvoice(
+    lagoId: string,
+    body: Record<string, unknown> = {},
+  ): Promise<{ invoice: LagoInvoiceExtended }> {
+    return await this.request(
+      `/invoices/${encodeURIComponent(lagoId)}/void`,
+      z.object({ invoice: LagoInvoiceExtendedSchema }),
+      { method: "POST", body: JSON.stringify(body) },
+    );
+  }
+
+  /**
+   * Refresh a draft invoice — re-computes fees against current usage.
+   */
+  async refreshInvoice(
+    lagoId: string,
+  ): Promise<{ invoice: LagoInvoiceExtended }> {
+    return await this.request(
+      `/invoices/${encodeURIComponent(lagoId)}/refresh`,
+      z.object({ invoice: LagoInvoiceExtendedSchema }),
+      { method: "PUT" },
+    );
+  }
+
+  /**
+   * Retry a failed invoice payment.
+   */
+  async retryPayment(
+    lagoId: string,
+  ): Promise<{ invoice: LagoInvoiceExtended }> {
+    return await this.request(
+      `/invoices/${encodeURIComponent(lagoId)}/retry_payment`,
+      z.object({ invoice: LagoInvoiceExtendedSchema }),
+      { method: "POST" },
+    );
+  }
+
+  /**
+   * Trigger async PDF generation for an invoice.
+   *
+   * Lago responds with the invoice object; `file_url` may be null until the
+   * background job completes. Callers should poll `getInvoice` until the URL
+   * populates.
+   */
+  async downloadInvoicePdf(
+    lagoId: string,
+  ): Promise<{ invoice: LagoInvoiceExtended }> {
+    return await this.request(
+      `/invoices/${encodeURIComponent(lagoId)}/download`,
+      z.object({ invoice: LagoInvoiceExtendedSchema }),
+      { method: "POST" },
+    );
+  }
+
+  /**
+   * Create (or upsert) a customer. Lago's `POST /customers` is upsert-by-
+   * external_id semantics.
+   */
+  async createCustomer(
+    payload: Record<string, unknown>,
+  ): Promise<{ customer: LagoCustomer }> {
+    return await this.request(
+      `/customers`,
+      z.object({ customer: LagoCustomerSchema }),
+      { method: "POST", body: JSON.stringify({ customer: payload }) },
+    );
+  }
+
+  /**
+   * Update a customer — same endpoint as `createCustomer` (upsert). We keep
+   * the two methods separate for call-site intent, but both map to POST.
+   */
+  async updateCustomer(
+    externalId: string,
+    payload: Record<string, unknown>,
+  ): Promise<{ customer: LagoCustomer }> {
+    const body = { customer: { ...payload, external_id: externalId } };
+    return await this.request(
+      `/customers`,
+      z.object({ customer: LagoCustomerSchema }),
+      { method: "POST", body: JSON.stringify(body) },
+    );
+  }
+
+  /**
+   * Get the signed portal URL for a customer (iframe-able self-service).
+   */
+  async getCustomerPortalUrl(
+    externalId: string,
+  ): Promise<{ customer: { portal_url: string } }> {
+    return await this.request(
+      `/customer_portal/${encodeURIComponent(externalId)}/url`,
+      z.object({ customer: z.object({ portal_url: z.string() }) }),
+    );
+  }
+
+  /**
+   * Create a wallet for a customer.
+   */
+  async createWallet(
+    payload: Record<string, unknown>,
+  ): Promise<{ wallet: LagoWallet }> {
+    return await this.request(
+      `/wallets`,
+      z.object({ wallet: LagoWalletSchema }),
+      { method: "POST", body: JSON.stringify({ wallet: payload }) },
+    );
+  }
+
+  /**
+   * Fetch a wallet by its Lago ID.
+   */
+  async getWallet(lagoId: string): Promise<{ wallet: LagoWallet }> {
+    return await this.request(
+      `/wallets/${encodeURIComponent(lagoId)}`,
+      z.object({ wallet: LagoWalletSchema }),
+    );
+  }
+
+  /**
+   * List wallet transactions (paginated).
+   */
+  async listWalletTransactions(
+    walletId: string,
+    params: { page?: number; perPage?: number } = {},
+  ): Promise<{
+    wallet_transactions: LagoWalletTransaction[];
+    meta?: { current_page: number; total_pages: number; total_count: number };
+  }> {
+    const page = params.page ?? 1;
+    const perPage = params.perPage ?? 20;
+    return await this.request(
+      `/wallets/${
+        encodeURIComponent(walletId)
+      }/wallet_transactions?page=${page}&per_page=${perPage}`,
+      z.object({
+        wallet_transactions: z.array(LagoWalletTransactionSchema),
+        meta: z.object({
+          current_page: z.number(),
+          total_pages: z.number(),
+          total_count: z.number(),
+        }).optional(),
+      }),
+    );
+  }
+
+  /**
+   * Add credit to a wallet (inbound wallet_transaction).
+   */
+  async addWalletCredit(
+    walletId: string,
+    params: {
+      paid_credits?: string;
+      granted_credits?: string;
+      invoice_requires_successful_payment?: boolean;
+      metadata?: Array<{ key: string; value: string }>;
+    },
+  ): Promise<{ wallet_transactions: LagoWalletTransaction[] }> {
+    return await this.request(
+      `/wallet_transactions`,
+      z.object({
+        wallet_transactions: z.array(LagoWalletTransactionSchema),
+      }),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          wallet_transaction: { wallet_id: walletId, ...params },
+        }),
+      },
+    );
+  }
+
+  /**
+   * Apply a coupon to a customer. Schema enforces exactly one of
+   * `coupon_code` or `lago_coupon_id` (mutual exclusivity).
+   */
+  async applyCoupon(
+    payload: ApplyCouponPayload,
+  ): Promise<{ applied_coupon: LagoAppliedCoupon }> {
+    const validated = ApplyCouponPayloadSchema.parse(payload);
+    return await this.request(
+      `/applied_coupons`,
+      z.object({ applied_coupon: LagoAppliedCouponSchema }),
+      {
+        method: "POST",
+        body: JSON.stringify({ applied_coupon: validated }),
+      },
+    );
+  }
+
+  /**
+   * Remove an applied coupon from a customer.
+   */
+  async removeCoupon(
+    externalCustomerId: string,
+    appliedCouponId: string,
+  ): Promise<{ applied_coupon: LagoAppliedCoupon }> {
+    return await this.request(
+      `/customers/${encodeURIComponent(externalCustomerId)}/applied_coupons/${
+        encodeURIComponent(appliedCouponId)
+      }`,
+      z.object({ applied_coupon: LagoAppliedCouponSchema }),
+      { method: "DELETE" },
+    );
+  }
+
+  /**
+   * Create a subscription alert (usage/percentage threshold).
+   */
+  async createSubscriptionAlert(
+    subscriptionExternalId: string,
+    payload: Record<string, unknown>,
+  ): Promise<{ alert: LagoSubscriptionAlert }> {
+    const body = {
+      alert: {
+        ...payload,
+        subscription_external_id: subscriptionExternalId,
+      },
+    };
+    return await this.request(
+      `/alerts`,
+      z.object({ alert: LagoSubscriptionAlertSchema }),
+      { method: "POST", body: JSON.stringify(body) },
+    );
+  }
+
+  /**
+   * List alerts for a subscription.
+   */
+  async getSubscriptionAlerts(
+    subscriptionExternalId: string,
+  ): Promise<{ alerts: LagoSubscriptionAlert[] }> {
+    const alerts = await this.requestAllPages(
+      `/alerts?subscription_external_id=${
+        encodeURIComponent(subscriptionExternalId)
+      }`,
+      "alerts",
+      LagoSubscriptionAlertSchema,
+    );
+    return { alerts };
+  }
+
+  /**
+   * Lifetime usage for a subscription (all-time totals).
+   */
+  async getLifetimeUsage(
+    subscriptionExternalId: string,
+  ): Promise<{ lifetime_usage: LagoLifetimeUsage }> {
+    return await this.request(
+      `/subscriptions/${
+        encodeURIComponent(subscriptionExternalId)
+      }/lifetime_usage`,
+      z.object({ lifetime_usage: LagoLifetimeUsageSchema }),
+    );
+  }
+
+  /**
+   * Fetch a billable metric by its code. Used by the startup safety gate to
+   * verify `aggregation_type === "sum_agg"` before enriching event properties.
+   */
+  async getBillableMetric(
+    code: string,
+  ): Promise<{ billable_metric: LagoBillableMetric }> {
+    return await this.request(
+      `/billable_metrics/${encodeURIComponent(code)}`,
+      z.object({ billable_metric: LagoBillableMetricSchema }),
+    );
+  }
+
+  /**
+   * Create a one-off invoice with add-on line items.
+   *
+   * Lago OSS v1.45 has no `/applied_add_ons` endpoint — one-off add-on
+   * billing goes through `POST /invoices` with `InvoiceOneOffCreateInput`.
+   * See `lago-api.yml` section `InvoiceOneOffCreateInput`.
+   */
+  async createOneOffInvoice(input: {
+    external_customer_id: string;
+    currency: string;
+    fees: Array<{
+      add_on_code: string;
+      units?: number;
+      description?: string;
+      invoice_display_name?: string;
+    }>;
+  }): Promise<{ invoice: LagoInvoice }> {
+    return await this.request(
+      "/invoices",
+      z.object({ invoice: LagoInvoiceSchema }),
+      {
+        method: "POST",
+        body: JSON.stringify({ invoice: input }),
+      },
+    );
+  }
+
+  /**
+   * Apply a coupon to a customer. The coupon attaches to the customer's
+   * next invoice (if frequency=once) or to every invoice until exhausted
+   * (recurring / forever).
+   */
+  async createAppliedCoupon(input: {
+    external_customer_id: string;
+    coupon_code: string;
+  }): Promise<{ applied_coupon: LagoAppliedCoupon }> {
+    return await this.request(
+      "/applied_coupons",
+      z.object({ applied_coupon: LagoAppliedCouponSchema }),
+      {
+        method: "POST",
+        body: JSON.stringify({ applied_coupon: input }),
+      },
+    );
+  }
+
+  /**
+   * Terminate an applied coupon (e.g. when flipping a user back from
+   * `comped` to `standard`).
+   */
+  async terminateAppliedCoupon(lagoAppliedCouponId: string): Promise<void> {
+    await this.request(
+      `/applied_coupons/${encodeURIComponent(lagoAppliedCouponId)}`,
+      z.object({}).passthrough(),
+      { method: "DELETE" },
+    );
+  }
+
+  /**
+   * Fetch Lago's webhook-signing RSA public key (base64-encoded PEM).
+   *
+   * Lago returns a base64 blob whose decoded contents are a standard
+   * `-----BEGIN PUBLIC KEY----- … -----END PUBLIC KEY-----` PEM. Callers
+   * typically cache the result for an hour and re-fetch on verification
+   * failure.
+   */
+  async getWebhookPublicKey(): Promise<string> {
+    const url = `${this.baseUrl}/webhooks/public_key`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          "Authorization": `Bearer ${this.apiKey}`,
+        },
+      });
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(
+          `Lago /webhooks/public_key failed: ${response.status} ${response.statusText} - ${body}`,
+        );
+      }
+      const base64 = (await response.text()).trim();
+      try {
+        return atob(base64);
+      } catch (err) {
+        throw new Error(
+          `Lago /webhooks/public_key returned non-base64 body: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
