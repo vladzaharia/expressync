@@ -7,13 +7,8 @@
  */
 
 import { ExternalLink, Zap } from "lucide-preact";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
+import { SectionCard } from "@/components/shared/SectionCard.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { formatRelative } from "@/islands/shared/charger-visuals.ts";
 
@@ -74,11 +69,14 @@ export function TagRecentTransactionsSection(
   { idTag, rows, steveFetchFailed }: Props,
 ) {
   return (
-    <Card id="activity">
-      <CardHeader class="flex flex-row items-center justify-between gap-3">
-        <div class="flex items-center gap-2">
-          <Zap class="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-          <CardTitle class="text-base">Recent charging</CardTitle>
+    <SectionCard
+      title="Recent charging"
+      icon={Zap}
+      accent="green"
+      className="scroll-mt-6"
+      contentClassName="p-0 sm:p-5"
+      actions={
+        <>
           {rows.length > 0
             ? (
               <Badge variant="outline" class="font-normal">
@@ -86,15 +84,16 @@ export function TagRecentTransactionsSection(
               </Badge>
             )
             : null}
-        </div>
-        <a
-          href={`/transactions?idTag=${encodeURIComponent(idTag)}`}
-          class="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-        >
-          View all →
-        </a>
-      </CardHeader>
-      <CardContent>
+          <a
+            href={`/transactions?idTag=${encodeURIComponent(idTag)}`}
+            class="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          >
+            View all →
+          </a>
+        </>
+      }
+    >
+      <div id="activity" class="contents">
         {steveFetchFailed
           ? (
             <div class="mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400">
@@ -210,7 +209,7 @@ export function TagRecentTransactionsSection(
               </table>
             </div>
           )}
-      </CardContent>
-    </Card>
+      </div>
+    </SectionCard>
   );
 }

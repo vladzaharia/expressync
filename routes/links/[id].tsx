@@ -221,63 +221,59 @@ export default define.page<typeof handler>(
               tagPk={mapping.steveOcppTagPk}
             />
 
-            <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-              <SectionCard
-                title="Billing configuration"
-                description={meta
-                  ? "Meta-tag rollup — child tags inherit this customer"
-                  : "Customer + subscription that this tag bills to"}
-                icon={Settings}
-                accent="violet"
-              >
-                <MappingForm
-                  mapping={{
-                    id: mapping.id,
-                    steveOcppIdTag: mapping.steveOcppIdTag,
-                    steveOcppTagPk: mapping.steveOcppTagPk,
-                    lagoCustomerExternalId: mapping.lagoCustomerExternalId,
-                    lagoSubscriptionExternalId:
-                      mapping.lagoSubscriptionExternalId,
-                    isActive: mapping.isActive,
-                  }}
-                  lagoDashboardUrl={lagoDashboardUrl}
-                />
-              </SectionCard>
-              <aside class="space-y-4">
-                <LinkageSummaryCard
-                  idTag={mapping.steveOcppIdTag}
-                  tagPk={mapping.steveOcppTagPk}
-                  customer={lagoCustomer
-                    ? {
-                      externalId: lagoCustomer.externalId,
-                      name: lagoCustomer.name,
-                      lagoUrl: customerLagoUrl,
-                    }
-                    : null}
-                  subscription={lagoSubscription
-                    ? {
-                      externalId: lagoSubscription.externalId,
-                      name: lagoSubscription.name,
-                      lagoUrl: subscriptionLagoUrl,
-                    }
-                    : null}
-                />
-                <RecentActivityMini
-                  rows={recentTransactions}
-                  tagPk={mapping.steveOcppTagPk}
-                />
-                {
-                  /* Scan another tag that should bill the same customer.
-                    Only shown once a Lago customer is actually linked. */
+            <SectionCard
+              title="Billing configuration"
+              description={meta
+                ? "Meta-tag rollup — child tags inherit this customer"
+                : "Customer + subscription that this tag bills to"}
+              icon={Settings}
+              accent="violet"
+            >
+              <MappingForm
+                mapping={{
+                  id: mapping.id,
+                  steveOcppIdTag: mapping.steveOcppIdTag,
+                  steveOcppTagPk: mapping.steveOcppTagPk,
+                  lagoCustomerExternalId: mapping.lagoCustomerExternalId,
+                  lagoSubscriptionExternalId:
+                    mapping.lagoSubscriptionExternalId,
+                  isActive: mapping.isActive,
+                }}
+                lagoDashboardUrl={lagoDashboardUrl}
+              />
+            </SectionCard>
+
+            <LinkageSummaryCard
+              idTag={mapping.steveOcppIdTag}
+              tagPk={mapping.steveOcppTagPk}
+              customer={lagoCustomer
+                ? {
+                  externalId: lagoCustomer.externalId,
+                  name: lagoCustomer.name,
+                  lagoUrl: customerLagoUrl,
                 }
-                {hasLagoCustomer && mapping.lagoCustomerExternalId
-                  ? (
-                    <ScanAnotherForCustomer
-                      customerExternalId={mapping.lagoCustomerExternalId}
-                    />
-                  )
-                  : null}
-              </aside>
+                : null}
+              subscription={lagoSubscription
+                ? {
+                  externalId: lagoSubscription.externalId,
+                  name: lagoSubscription.name,
+                  lagoUrl: subscriptionLagoUrl,
+                }
+                : null}
+            />
+
+            <div class="grid gap-6 lg:grid-cols-2">
+              <RecentActivityMini
+                rows={recentTransactions}
+                tagPk={mapping.steveOcppTagPk}
+              />
+              {hasLagoCustomer && mapping.lagoCustomerExternalId
+                ? (
+                  <ScanAnotherForCustomer
+                    customerExternalId={mapping.lagoCustomerExternalId}
+                  />
+                )
+                : null}
             </div>
 
             <LinkingDangerZone

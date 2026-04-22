@@ -9,13 +9,8 @@
  */
 
 import { ExternalLink, Link2, Pencil } from "lucide-preact";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
+import { SectionCard } from "@/components/shared/SectionCard.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 
 export interface TagLinkingInfo {
@@ -100,11 +95,8 @@ export function TagLinkingCard(
 ) {
   if (!linking) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle class="text-base">Linking</CardTitle>
-        </CardHeader>
-        <CardContent class="flex flex-col items-center gap-3 text-center">
+      <SectionCard title="Linking" icon={Link2} accent="cyan">
+        <div class="flex flex-col items-center gap-3 text-center py-4">
           <div
             class="flex size-14 items-center justify-center rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
             aria-hidden="true"
@@ -131,8 +123,8 @@ export function TagLinkingCard(
               </p>
             )
             : null}
-        </CardContent>
-      </Card>
+        </div>
+      </SectionCard>
     );
   }
 
@@ -146,9 +138,11 @@ export function TagLinkingCard(
     : null;
 
   return (
-    <Card>
-      <CardHeader class="flex flex-row items-start justify-between gap-2">
-        <CardTitle class="text-base">Linking</CardTitle>
+    <SectionCard
+      title="Linking"
+      icon={Link2}
+      accent="cyan"
+      actions={
         <span
           class={cn(
             "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium",
@@ -158,8 +152,9 @@ export function TagLinkingCard(
         >
           {tier.label}
         </span>
-      </CardHeader>
-      <CardContent class="space-y-4">
+      }
+    >
+      <div class="space-y-4">
         {/* Customer block */}
         <div class="space-y-1">
           <div class="text-xs uppercase tracking-wide text-muted-foreground">
@@ -277,7 +272,7 @@ export function TagLinkingCard(
             </a>
           )
           : null}
-      </CardContent>
-    </Card>
+      </div>
+    </SectionCard>
   );
 }
