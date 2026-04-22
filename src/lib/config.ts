@@ -79,6 +79,14 @@ export const config = {
   AUTH_SECRET: Deno.env.get("AUTH_SECRET")!,
   AUTH_URL: Deno.env.get("AUTH_URL") || "http://localhost:8000",
 
+  // Cloudflare Email Worker (Track D — Polaris Express customer portal).
+  // Leave CF_EMAIL_WORKER_URL unset in dev to fall back to console-logging
+  // rendered emails instead of POSTing them.
+  CF_EMAIL_WORKER_URL: stripTrailingSlash(
+    Deno.env.get("CF_EMAIL_WORKER_URL") || "",
+  ),
+  CF_EMAIL_WORKER_SECRET: Deno.env.get("CF_EMAIL_WORKER_SECRET") || "",
+
   // Phase P7: SSE backbone. Defaults to enabled; set to "false" to force all
   // SSE endpoints to return 503 so client islands fall back to polling. Useful
   // behind proxies or on constrained networks where long-lived connections
