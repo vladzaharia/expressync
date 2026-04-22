@@ -19,6 +19,7 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
+  Receipt,
   Tag,
   Zap,
 } from "lucide-preact";
@@ -283,12 +284,13 @@ export default define.page<typeof handler>(function TransactionDetailsPage({
           )}
         </PageCard>
 
-        {/* Billing Events Table */}
         <SectionCard
-          title="Billing Events"
+          title="Billing events"
           description={`${billingEvents.length} event${
             billingEvents.length !== 1 ? "s" : ""
           } sent to Lago`}
+          icon={Receipt}
+          accent="green"
         >
           <BillingEventsTable events={billingEvents} />
         </SectionCard>
