@@ -2,29 +2,19 @@
  * `/tags` — OCPP tag listing page.
  *
  * Loader pattern: fetch the authoritative tag roster from StEvE and
- * left-join on `user_mappings` for display metadata. An aggregate on
- * `issued_cards` decorates each row with an issued-count; the aggregate is
- * wrapped in try/catch because migration 0011 may not be applied in all
- * environments — on failure we zero every count and flag `issuedCountsMissing`
- * so the UI can surface the caveat (rather than quietly misreporting).
+ * left-join on `user_mappings` for display metadata.
  *
  * The URL is the filter source of truth:
  *   ?q=<substring>        — id-tag / display-name substring match
  *   ?linked=1|0           — filter by whether a Lago customer is attached
  *   ?active=1|0           — filter by `isActive`
  *   ?meta=1|0             — filter by the `OCPP-` meta-tag prefix
- *   ?issued=1             — only show tags with `issuedCardsCount > 0`
  *   ?types=a,b,c          — CSV of `TagType` values to include
- *
- * The hidden `TagsFilterBar` island only mounts when at least one filter
- * is present in the URL (friends-and-family scale doesn't need the bar
- * by default — see its scaffold for the growth plan).
  */
 
 import { define } from "../../utils.ts";
 import { db } from "../../src/db/index.ts";
 import * as schema from "../../src/db/schema.ts";
-import { count } from "drizzle-orm";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
 import { steveClient } from "../../src/lib/steve-client.ts";
@@ -63,7 +53,6 @@ interface TagListRow {
   hasMapping: boolean;
   hasLagoCustomer: boolean;
   isMeta: boolean;
-  issuedCardsCount: number;
   childCount: number;
 }
 
@@ -73,7 +62,6 @@ interface TagsTotals {
   unlinked: number;
   meta: number;
   inactive: number;
-  withIssuedCards: number;
 }
 
 interface TagsFilterState {
@@ -81,7 +69,6 @@ interface TagsFilterState {
   linked: TriState;
   active: TriState;
   meta: TriState;
-  issued: TriState;
   types: Set<TagType>;
 }
 
@@ -91,7 +78,6 @@ interface TagsIndexData {
   filter: TagsFilterState;
   grouping: "flat";
   steveFetchFailed: boolean;
-  issuedCountsMissing: boolean;
 }
 
 // ---- URL → filter state -----------------------------------------------------
@@ -108,11 +94,6 @@ function parseFilterFromUrl(url: URL): TagsFilterState {
   const linked = coerceTriState(sp.get("linked"));
   const active = coerceTriState(sp.get("active"));
   const meta = coerceTriState(sp.get("meta"));
-  // `issued=1` means "has issued cards"; we don't support a negative case yet.
-  const issuedRaw = sp.get("issued");
-  const issued: TriState = issuedRaw === "1" || issuedRaw === "yes"
-    ? "yes"
-    : "any";
 
   const typesRaw = sp.get("types") ?? "";
   const types = new Set<TagType>();
@@ -120,7 +101,7 @@ function parseFilterFromUrl(url: URL): TagsFilterState {
     if (isTagType(t)) types.add(t);
   }
 
-  return { q, linked, active, meta, issued, types };
+  return { q, linked, active, meta, types };
 }
 
 function hasAnyFilter(f: TagsFilterState): boolean {
@@ -129,7 +110,6 @@ function hasAnyFilter(f: TagsFilterState): boolean {
     f.linked !== "any" ||
     f.active !== "any" ||
     f.meta !== "any" ||
-    f.issued !== "any" ||
     f.types.size > 0
   );
 }
@@ -139,9 +119,6 @@ function whichStatActive(f: TagsFilterState): TagsStatStripActive {
   if (f.linked === "no") return "unlinked";
   if (f.meta === "yes") return "meta";
   if (f.active === "no") return "inactive";
-  if (f.issued === "yes") return "issued";
-  // Only highlight "all" when no other filter is set — otherwise we'd light
-  // up "all" even with a substring-search active which would be misleading.
   if (!hasAnyFilter(f)) return "all";
   return null;
 }
@@ -182,28 +159,6 @@ export const handler = define.handlers({
       }
     }
 
-    // Issued-cards aggregate. Wrapped in try/catch because migration 0011
-    // may not be applied in the live DB yet — in that case we degrade to
-    // zero counts and set `issuedCountsMissing=true` so the UI can surface
-    // the caveat rather than silently misreporting.
-    let issuedCountsMissing = false;
-    const issuedByMappingId = new Map<number, number>();
-    try {
-      const rows = await db
-        .select({
-          userMappingId: schema.issuedCards.userMappingId,
-          n: count(schema.issuedCards.id),
-        })
-        .from(schema.issuedCards)
-        .groupBy(schema.issuedCards.userMappingId);
-      for (const r of rows) {
-        issuedByMappingId.set(r.userMappingId, Number(r.n));
-      }
-    } catch (err) {
-      console.error("[tags/index] issued_cards aggregate failed:", err);
-      issuedCountsMissing = true;
-    }
-
     // Build the row set from the StEvE roster.
     const allRows: TagListRow[] = ocppTags.map((t) => {
       const mapping = mappingByTagPk.get(t.ocppTagPk);
@@ -217,9 +172,6 @@ export const handler = define.handlers({
         ? tagPkByIdTag.get(parentIdTag) ?? null
         : null;
       const mappingId = mapping?.id ?? null;
-      const issuedCardsCount = !issuedCountsMissing && mappingId !== null
-        ? issuedByMappingId.get(mappingId) ?? 0
-        : 0;
 
       return {
         ocppTagPk: t.ocppTagPk,
@@ -234,7 +186,6 @@ export const handler = define.handlers({
         hasMapping: Boolean(mapping),
         hasLagoCustomer: Boolean(mapping?.lagoCustomerExternalId),
         isMeta,
-        issuedCardsCount,
         childCount: childCountByParentIdTag.get(t.idTag) ?? 0,
       };
     });
@@ -247,7 +198,6 @@ export const handler = define.handlers({
       unlinked: allRows.filter((r) => !r.hasLagoCustomer).length,
       meta: allRows.filter((r) => r.isMeta).length,
       inactive: allRows.filter((r) => !r.isActive).length,
-      withIssuedCards: allRows.filter((r) => r.issuedCardsCount > 0).length,
     };
 
     // Apply the URL filter.
@@ -264,7 +214,6 @@ export const handler = define.handlers({
       if (filter.active === "no" && r.isActive) return false;
       if (filter.meta === "yes" && !r.isMeta) return false;
       if (filter.meta === "no" && r.isMeta) return false;
-      if (filter.issued === "yes" && r.issuedCardsCount <= 0) return false;
       if (filter.types.size > 0) {
         if (!r.tagType || !filter.types.has(r.tagType)) return false;
       }
@@ -283,7 +232,6 @@ export const handler = define.handlers({
       filter,
       grouping: "flat",
       steveFetchFailed,
-      issuedCountsMissing,
     };
     return { data };
   },
@@ -308,7 +256,6 @@ function serializeFilter(f: TagsFilterState): TagsFilterStateSerialized {
     linked: f.linked,
     active: f.active,
     meta: f.meta,
-    issued: f.issued,
     types: Array.from(f.types),
   };
 }
@@ -411,17 +358,6 @@ export default define.page<typeof handler>(
                 )
                 : null}
 
-              {data.issuedCountsMissing
-                ? (
-                  <div
-                    role="alert"
-                    class="rounded-md border border-amber-500/40 bg-amber-500/5 px-4 py-2 text-sm text-amber-700 dark:text-amber-400"
-                  >
-                    Issued-card counts unavailable (migration pending).
-                  </div>
-                )
-                : null}
-
               <TagsFilterBar
                 initial={serializeFilter(data.filter)}
                 totalCount={data.totals.all}
@@ -442,7 +378,6 @@ export default define.page<typeof handler>(
                       isActive={row.isActive}
                       isMeta={row.isMeta}
                       hasLagoCustomer={row.hasLagoCustomer}
-                      issuedCardsCount={row.issuedCardsCount}
                     />
                   ))}
               </div>

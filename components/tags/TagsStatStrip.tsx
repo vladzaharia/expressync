@@ -1,25 +1,17 @@
 /**
  * TagsStatStrip — tags listing stat strip.
  *
- * Six cells, each a filter-shortcut:
- *   1. Total tags    — cyan,    `/tags`                  (reset; always live)
- *   2. Linked        — emerald, `/tags?linked=1`
- *   3. Unlinked      — amber,   `/tags?linked=0`         (dashed)
- *   4. Meta-tags     — violet,  `/tags?meta=1`           (dashed)
- *   5. Inactive      — muted,   `/tags?active=0`
- *   6. Cards issued  — sky,     `/tags?issued=1`
+ * Five cells, each a filter-shortcut:
+ *   1. Total tags — cyan,    `/tags`              (reset; always live)
+ *   2. Linked     — emerald, `/tags?linked=1`
+ *   3. Unlinked   — amber,   `/tags?linked=0`     (dashed)
+ *   4. Meta-tags  — violet,  `/tags?meta=1`       (dashed)
+ *   5. Inactive   — muted,   `/tags?active=0`
  *
  * Thin wrapper over the shared `StatStrip` primitive.
  */
 
-import {
-  CircleSlash,
-  CreditCard,
-  Layers,
-  Link2,
-  Tag,
-  Unlink,
-} from "lucide-preact";
+import { CircleSlash, Layers, Link2, Tag, Unlink } from "lucide-preact";
 import {
   StatStrip,
   type StatStripItem,
@@ -31,7 +23,6 @@ export interface TagsStatStripTotals {
   unlinked: number;
   meta: number;
   inactive: number;
-  withIssuedCards: number;
 }
 
 /** Which stat-strip cell is currently selected by the URL filter, if any. */
@@ -41,7 +32,6 @@ export type TagsStatStripActive =
   | "unlinked"
   | "meta"
   | "inactive"
-  | "issued"
   | null;
 
 interface Props {
@@ -103,16 +93,6 @@ export function TagsStatStrip(
       tone: "muted",
       href: "/tags?active=0",
       active: active === "inactive",
-      disabledWhenZero: true,
-    },
-    {
-      key: "issued",
-      label: "Cards issued",
-      value: totals.withIssuedCards,
-      icon: CreditCard,
-      tone: "sky",
-      href: "/tags?issued=1",
-      active: active === "issued",
       disabledWhenZero: true,
     },
   ];

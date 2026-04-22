@@ -52,7 +52,6 @@ export interface TagListCardProps {
   isActive: boolean;
   isMeta: boolean;
   hasLagoCustomer: boolean;
-  issuedCardsCount: number;
 }
 
 function coerceTagType(value: string | null | undefined): TagType {
@@ -72,7 +71,6 @@ export function TagListCard(props: TagListCardProps) {
     isActive,
     isMeta,
     hasLagoCustomer,
-    issuedCardsCount,
   } = props;
 
   const tt = coerceTagType(tagType);
@@ -101,16 +99,6 @@ export function TagListCard(props: TagListCardProps) {
       live: true,
     });
   }
-  if (issuedCardsCount > 0) {
-    pills.push({
-      label: `Cards: ${issuedCardsCount}`,
-      tone: "sky",
-      title: `${issuedCardsCount} issued card${
-        issuedCardsCount === 1 ? "" : "s"
-      }`,
-    });
-  }
-
   const quickAction = buildQuickAction({
     ocppTagPk,
     hasLagoCustomer,

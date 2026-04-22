@@ -13,7 +13,7 @@
  * Server-rendered.
  */
 
-import { CreditCard, ExternalLink, Layers, Tag, User } from "lucide-preact";
+import { CreditCard, ExternalLink, Layers, User } from "lucide-preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { Badge } from "@/components/ui/badge.tsx";
 import { type Pill, StatusPillRow } from "@/components/tags/StatusPillRow.tsx";
@@ -40,8 +40,7 @@ interface Props {
     name: string;
     lagoUrl?: string | null;
   };
-  cardsIssued: number;
-  /** Tag-details route for the cards-issued pill. */
+  /** Tag-details route for drill-down. */
   tagPk: number;
 }
 
@@ -59,8 +58,7 @@ export function LinkingHeaderStrip(props: Props) {
     isActive,
     customer,
     subscription,
-    cardsIssued,
-    tagPk,
+    tagPk: _tagPk,
   } = props;
 
   const tt = coerceTagType(tagType);
@@ -185,19 +183,6 @@ export function LinkingHeaderStrip(props: Props) {
               No active subscription
             </span>
           )}
-
-        {cardsIssued > 0 && !isMeta && (
-          <a
-            href={`/tags/${tagPk}#cards`}
-            class="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-xs hover:bg-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
-            aria-label={`${cardsIssued} cards issued — view history`}
-          >
-            <Tag class="size-3" aria-hidden="true" />
-            <span>
-              {cardsIssued} card{cardsIssued === 1 ? "" : "s"} issued
-            </span>
-          </a>
-        )}
 
         {isMeta && (
           <Badge variant="outline" className="text-[10px] uppercase">
