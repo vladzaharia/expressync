@@ -84,6 +84,21 @@ export const config = {
   // behind proxies or on constrained networks where long-lived connections
   // aren't viable.
   ENABLE_SSE: Deno.env.get("ENABLE_SSE") !== "false",
+
+  // Wave A8: pluggable SSE transport. "memory" keeps the default in-process
+  // fan-out (single worker); "postgres" activates LISTEN/NOTIFY on the
+  // `sse_events` channel so multiple worker processes can cooperate.
+  SSE_TRANSPORT: (() => {
+    const raw = (Deno.env.get("SSE_TRANSPORT") || "memory").toLowerCase();
+    return raw === "postgres" ? "postgres" : "memory";
+  })() as "memory" | "postgres",
+
+  // Wave A8: maximum queued SSE frames per client before we start dropping.
+  // Slow clients are recovered via Last-Event-ID replay on reconnect.
+  SSE_MAX_PENDING_PER_CLIENT: (() => {
+    const val = parseInt(Deno.env.get("SSE_MAX_PENDING_PER_CLIENT") || "100");
+    return isNaN(val) || val <= 0 ? 100 : val;
+  })(),
 } as const;
 
 /**
