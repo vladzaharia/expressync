@@ -11,7 +11,6 @@ import {
 } from "../../components/ui/card.tsx";
 import {
   AlertCircle,
-  ArrowLeft,
   CheckCircle2,
   Clock,
   Link2,
@@ -21,7 +20,7 @@ import {
   Zap,
 } from "lucide-preact";
 import SyncDetailAccordion from "../../islands/SyncDetailAccordion.tsx";
-import { CHROME_SIZE } from "../../components/AppSidebar.tsx";
+import { BackAction } from "../../components/shared/BackAction.tsx";
 import { formatDate, formatDuration } from "../../src/lib/utils/format.ts";
 
 export const handler = define.handlers({
@@ -40,19 +39,6 @@ export const handler = define.handlers({
   },
 });
 
-function BackAction() {
-  return (
-    <a
-      href="/sync"
-      className="flex items-center justify-center gap-2 px-4 transition-colors"
-      style={{ height: CHROME_SIZE }}
-    >
-      <ArrowLeft className="size-5" />
-      <span className="text-sm font-medium">Back</span>
-    </a>
-  );
-}
-
 export default define.page<typeof handler>(
   function SyncDetailsPage({ data, url, state }) {
     const { run, logs } = data;
@@ -67,7 +53,7 @@ export default define.page<typeof handler>(
         currentPath={url.pathname}
         user={state.user}
         accentColor="blue"
-        actions={<BackAction />}
+        actions={<BackAction href="/sync" />}
       >
         <div className="space-y-6">
           {/* Summary Card */}

@@ -3,8 +3,7 @@ import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
 import { lagoClient } from "../../src/lib/lago-client.ts";
 import { config } from "../../src/lib/config.ts";
-import { CHROME_SIZE } from "../../components/AppSidebar.tsx";
-import { ArrowLeft } from "lucide-preact";
+import { BackAction } from "../../components/shared/BackAction.tsx";
 import InvoiceDetail from "../../islands/invoices/InvoiceDetail.tsx";
 import {
   deriveInvoiceUiStatus,
@@ -130,19 +129,6 @@ export const handler = define.handlers({
   },
 });
 
-function BackAction() {
-  return (
-    <a
-      href="/invoices"
-      className="flex items-center justify-center gap-2 px-4 transition-colors"
-      style={{ height: CHROME_SIZE }}
-    >
-      <ArrowLeft className="size-5" />
-      <span className="text-sm font-medium">Back</span>
-    </a>
-  );
-}
-
 export default define.page<typeof handler>(function InvoiceDetailPage({
   data,
   url,
@@ -153,7 +139,7 @@ export default define.page<typeof handler>(function InvoiceDetailPage({
       currentPath={url.pathname}
       user={state.user}
       accentColor="teal"
-      actions={<BackAction />}
+      actions={<BackAction href="/invoices" />}
     >
       {data.invoice
         ? (
