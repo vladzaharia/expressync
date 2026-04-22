@@ -95,28 +95,40 @@ function DialogContent({
         )}
         onClick={handleOverlayClick}
       />
-      {/* Content */}
-      <div
-        ref={contentRef}
-        data-slot="dialog-content"
-        role="dialog"
-        aria-modal="true"
-        className={cn(
-          "bg-background fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg transition-all duration-200 sm:max-w-lg",
-          isVisible ? "opacity-100 scale-100" : "opacity-0 scale-95",
-          className,
-        )}
-        {...props}
-      >
-        {children}
-        <button
-          type="button"
-          onClick={onClose}
-          className="ring-offset-background focus:ring-ring absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+      {
+        /*
+        Centering wrapper — uses flex instead of top/left+translate because
+        combining translate utilities with the `scale-95` enter animation
+        conflicts on the `transform` property (Tailwind 4 doesn't compose
+        them cleanly when arbitrary values are involved), which caused the
+        dialog to render at the bottom of the viewport in some states.
+        This wrapper ignores pointer events so the overlay stays clickable.
+      */
+      }
+      <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
+        {/* Content */}
+        <div
+          ref={contentRef}
+          data-slot="dialog-content"
+          role="dialog"
+          aria-modal="true"
+          className={cn(
+            "pointer-events-auto bg-background grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-lg border p-6 shadow-lg transition-[opacity,transform] duration-200 sm:max-w-lg",
+            isVisible ? "opacity-100 scale-100" : "opacity-0 scale-95",
+            className,
+          )}
+          {...props}
         >
-          <X />
-          <span className="sr-only">Close</span>
-        </button>
+          {children}
+          <button
+            type="button"
+            onClick={onClose}
+            className="ring-offset-background focus:ring-ring absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+          >
+            <X />
+            <span className="sr-only">Close</span>
+          </button>
+        </div>
       </div>
     </div>,
     document.body,
