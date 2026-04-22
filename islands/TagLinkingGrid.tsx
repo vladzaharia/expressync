@@ -27,7 +27,6 @@ import {
   CornerDownRight,
   CreditCard,
   Layers,
-  Loader2,
   Pencil,
   Trash2,
   User,
@@ -36,14 +35,7 @@ import {
 import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog.tsx";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { tagTypeIcons } from "@/components/brand/tags/index.ts";
 import {
@@ -280,82 +272,52 @@ export default function TagLinkingGrid(
       </div>
 
       {/* Accessible delete confirmation dialog */}
-      <Dialog
+      <ConfirmDialog
         open={deleteTarget.value !== null}
         onOpenChange={(open) => {
           if (!open) deleteTarget.value = null;
         }}
-      >
-        {deleteTarget.value && (
-          <DialogContent onClose={() => (deleteTarget.value = null)}>
-            <DialogHeader>
-              <DialogTitle>
-                {deleteTarget.value.isMeta
-                  ? "Delete meta-tag link?"
-                  : "Delete tag link?"}
-              </DialogTitle>
-              <DialogDescription>
-                {deleteTarget.value.isMeta &&
-                    deleteTarget.value.cascadeCount > 1
-                  ? (
-                    <>
-                      This will delete this meta-tag link and{" "}
-                      <strong>
-                        {deleteTarget.value.cascadeCount - 1}{" "}
-                        inherited child link
-                        {deleteTarget.value.cascadeCount - 1 === 1 ? "" : "s"}
-                      </strong>. The underlying OCPP tags are not removed.
-                    </>
-                  )
-                  : deleteTarget.value.cascadeCount > 1
-                  ? (
-                    <>
-                      This will delete this link and{" "}
-                      <strong>
-                        {deleteTarget.value.cascadeCount - 1} child link
-                        {deleteTarget.value.cascadeCount - 1 === 1 ? "" : "s"}
-                      </strong>. The underlying OCPP tags are not removed.
-                    </>
-                  )
-                  : (
-                    <>
-                      This will delete the mapping for{" "}
-                      <code class="font-mono">{deleteTarget.value.idTag}</code>.
-                      The underlying OCPP tag is not removed.
-                    </>
-                  )}
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => (deleteTarget.value = null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="border-red-500 text-red-600 hover:bg-red-500/10 hover:text-red-600 dark:text-red-400 dark:hover:text-red-400"
-                onClick={handleConfirmDelete}
-                disabled={deletingId.value !== null}
-              >
-                {deletingId.value !== null
-                  ? <Loader2 class="size-4 animate-spin" aria-hidden="true" />
-                  : <Trash2 class="size-4" aria-hidden="true" />}
-                <span class="ml-2">
-                  {deletingId.value !== null
-                    ? "Deleting…"
-                    : deleteTarget.value.isMeta
-                    ? "Delete meta-tag link"
-                    : "Delete link"}
-                </span>
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        )}
-      </Dialog>
+        title={deleteTarget.value?.isMeta
+          ? "Delete meta-tag link?"
+          : "Delete tag link?"}
+        description={deleteTarget.value
+          ? (
+            deleteTarget.value.isMeta && deleteTarget.value.cascadeCount > 1
+              ? (
+                <>
+                  This will delete this meta-tag link and{" "}
+                  <strong>
+                    {deleteTarget.value.cascadeCount - 1} inherited child link
+                    {deleteTarget.value.cascadeCount - 1 === 1 ? "" : "s"}
+                  </strong>. The underlying OCPP tags are not removed.
+                </>
+              )
+              : deleteTarget.value.cascadeCount > 1
+              ? (
+                <>
+                  This will delete this link and{" "}
+                  <strong>
+                    {deleteTarget.value.cascadeCount - 1} child link
+                    {deleteTarget.value.cascadeCount - 1 === 1 ? "" : "s"}
+                  </strong>. The underlying OCPP tags are not removed.
+                </>
+              )
+              : (
+                <>
+                  This will delete the mapping for{" "}
+                  <code className="font-mono">{deleteTarget.value.idTag}</code>.
+                  The underlying OCPP tag is not removed.
+                </>
+              )
+          )
+          : null}
+        variant="destructive"
+        confirmLabel={deleteTarget.value?.isMeta
+          ? "Delete meta-tag link"
+          : "Delete link"}
+        onConfirm={handleConfirmDelete}
+        isLoading={deletingId.value !== null}
+      />
     </>
   );
 }
