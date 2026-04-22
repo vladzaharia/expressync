@@ -1,7 +1,18 @@
 import { define } from "../../../utils.ts";
 import { db } from "../../../src/db/index.ts";
 import * as schema from "../../../src/db/schema.ts";
-import { count, desc, eq, sql } from "drizzle-orm";
+import {
+  and,
+  count,
+  countDistinct,
+  desc,
+  eq,
+  gte,
+  ilike,
+  lte,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { logger } from "../../../src/lib/utils/logger.ts";
 
 // Transaction summary type for the table
@@ -22,10 +33,14 @@ export interface TransactionSummary {
  * Query params:
  * - skip: number of items to skip (default: 0)
  * - limit: number of items to return (default: 15)
+ * - status: "active" | "completed" | "all" (default: all)
+ * - from: ISO date (inclusive)
+ * - to: ISO date (inclusive)
+ * - tag: substring match against user_mappings.steveOcppIdTag
  *
  * Returns:
  * - items: array of transaction summaries
- * - total: total count of transactions
+ * - total: total count of transactions (after filters)
  */
 export const handler = define.handlers({
   async GET(ctx) {
@@ -46,32 +61,50 @@ export const handler = define.handlers({
         );
       }
 
-      // Get total count
-      const [{ value: total }] = await db
-        .select({ value: count() })
-        .from(schema.transactionSyncState);
+      const statusParam = url.searchParams.get("status") ?? "all";
+      const from = url.searchParams.get("from") ?? "";
+      const to = url.searchParams.get("to") ?? "";
+      const tag = url.searchParams.get("tag") ?? "";
 
-      // Get paginated transactions with event counts, OCPP tags, and last synced times
-      // via a single JOIN query instead of N+1 queries
-      const items: TransactionSummary[] = (
-        await db
-          .select({
-            id: schema.transactionSyncState.id,
-            steveTransactionId: schema.transactionSyncState.steveTransactionId,
-            totalKwhBilled: schema.transactionSyncState.totalKwhBilled,
-            isFinalized: schema.transactionSyncState.isFinalized,
-            updatedAt: schema.transactionSyncState.updatedAt,
-            eventCount: sql<
-              number
-            >`COALESCE(COUNT(${schema.syncedTransactionEvents.id}), 0)`,
-            lastSyncedAt: sql<
-              Date
-            >`MAX(${schema.syncedTransactionEvents.syncedAt})`,
-            ocppTagId: sql<
-              string | null
-            >`MIN(${schema.userMappings.steveOcppIdTag})`,
-          })
-          .from(schema.transactionSyncState)
+      const conditions: SQL[] = [];
+      if (statusParam === "active") {
+        conditions.push(eq(schema.transactionSyncState.isFinalized, false));
+      } else if (statusParam === "completed") {
+        conditions.push(eq(schema.transactionSyncState.isFinalized, true));
+      }
+      if (from) {
+        conditions.push(
+          gte(schema.transactionSyncState.updatedAt, new Date(from)),
+        );
+      }
+      if (to) {
+        conditions.push(
+          lte(
+            schema.transactionSyncState.updatedAt,
+            new Date(to + "T23:59:59"),
+          ),
+        );
+      }
+      if (tag) {
+        conditions.push(
+          ilike(schema.userMappings.steveOcppIdTag, `%${tag}%`),
+        );
+      }
+      const whereClause = conditions.length > 0
+        ? and(...conditions)
+        : undefined;
+      const needsTagJoin = Boolean(tag);
+
+      // Get total count (filtered)
+      const countBase = db
+        .select({
+          value: needsTagJoin
+            ? countDistinct(schema.transactionSyncState.id)
+            : count(),
+        })
+        .from(schema.transactionSyncState);
+      const countWithJoins = needsTagJoin
+        ? countBase
           .leftJoin(
             schema.syncedTransactionEvents,
             eq(
@@ -86,6 +119,51 @@ export const handler = define.handlers({
               schema.userMappings.id,
             ),
           )
+        : countBase;
+      const totalRows = whereClause
+        ? await countWithJoins.where(whereClause)
+        : await countWithJoins;
+      const total = Number(totalRows[0]?.value ?? 0);
+
+      // Get paginated transactions with event counts, OCPP tags, and last synced times
+      // via a single JOIN query instead of N+1 queries
+      const baseQuery = db
+        .select({
+          id: schema.transactionSyncState.id,
+          steveTransactionId: schema.transactionSyncState.steveTransactionId,
+          totalKwhBilled: schema.transactionSyncState.totalKwhBilled,
+          isFinalized: schema.transactionSyncState.isFinalized,
+          updatedAt: schema.transactionSyncState.updatedAt,
+          eventCount: sql<
+            number
+          >`COALESCE(COUNT(${schema.syncedTransactionEvents.id}), 0)`,
+          lastSyncedAt: sql<
+            Date
+          >`MAX(${schema.syncedTransactionEvents.syncedAt})`,
+          ocppTagId: sql<
+            string | null
+          >`MIN(${schema.userMappings.steveOcppIdTag})`,
+        })
+        .from(schema.transactionSyncState)
+        .leftJoin(
+          schema.syncedTransactionEvents,
+          eq(
+            schema.transactionSyncState.steveTransactionId,
+            schema.syncedTransactionEvents.steveTransactionId,
+          ),
+        )
+        .leftJoin(
+          schema.userMappings,
+          eq(
+            schema.syncedTransactionEvents.userMappingId,
+            schema.userMappings.id,
+          ),
+        );
+      const filteredQuery = whereClause
+        ? baseQuery.where(whereClause)
+        : baseQuery;
+      const items: TransactionSummary[] = (
+        await filteredQuery
           .groupBy(
             schema.transactionSyncState.id,
             schema.transactionSyncState.steveTransactionId,
