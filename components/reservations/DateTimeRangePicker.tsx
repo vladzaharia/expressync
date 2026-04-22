@@ -43,7 +43,8 @@
  *   `loadingConflicts`      Show a skeleton shimmer while the parent refetches.
  *   `variant`               `"inline" | "compact"`.
  *   `minDate`               Optional floor — days before it are disabled.
- *   `durationPresetsMin`    Chips (in minutes). Defaults to `[60,120,240]`.
+ *   `durationPresetsMin`    Chips (in minutes). Defaults to `[60,120,240,480,720]`
+ *                           (1h / 2h / 4h / 8h / 12h).
  */
 
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
@@ -241,7 +242,7 @@ export function DateTimeRangePicker(props: Props) {
     loadingConflicts = false,
     variant = "inline",
     minDate,
-    durationPresetsMin = [60, 120, 240],
+    durationPresetsMin = [60, 120, 240, 480, 720],
     idPrefix = "dtrp",
   } = props;
 
