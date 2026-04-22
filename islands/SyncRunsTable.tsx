@@ -1,16 +1,12 @@
-import { Badge } from "@/components/ui/badge.tsx";
 import {
   PaginatedTable,
   type PaginatedTableColumn,
 } from "@/components/ui/paginated-table.tsx";
+import { Clock } from "lucide-preact";
 import {
-  AlertCircle,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  Loader2,
-  MinusCircle,
-} from "lucide-preact";
+  SegmentSyncStatusBadge,
+  SyncStatusBadge,
+} from "@/components/shared/index.ts";
 import type { SyncRun } from "@/src/db/schema.ts";
 import { formatDate, formatDuration } from "@/src/lib/utils/format.ts";
 
@@ -21,92 +17,6 @@ interface Props {
   showLoadMore?: boolean;
   hideHeader?: boolean;
   hideFooterText?: boolean;
-}
-
-function SegmentStatusBadge({
-  status,
-  runCompleted,
-}: {
-  status: string | null;
-  runCompleted: boolean;
-}) {
-  if (!status) {
-    if (runCompleted) {
-      return (
-        <Badge variant="outline" className="text-muted-foreground">
-          <MinusCircle className="size-3 mr-1" />
-          Unknown
-        </Badge>
-      );
-    }
-    return (
-      <Badge variant="outline" className="text-muted-foreground">
-        <MinusCircle className="size-3 mr-1" />
-        Pending
-      </Badge>
-    );
-  }
-
-  switch (status) {
-    case "success":
-      return (
-        <Badge variant="success" className="gap-1">
-          <CheckCircle2 className="size-3" />
-          Success
-        </Badge>
-      );
-    case "warning":
-      return (
-        <Badge variant="warning" className="gap-1">
-          <AlertTriangle className="size-3" />
-          Warning
-        </Badge>
-      );
-    case "error":
-      return (
-        <Badge variant="destructive" className="gap-1">
-          <AlertCircle className="size-3" />
-          Error
-        </Badge>
-      );
-    case "skipped":
-      return (
-        <Badge variant="secondary" className="gap-1">
-          <MinusCircle className="size-3" />
-          Skipped
-        </Badge>
-      );
-    default:
-      return <Badge variant="outline">{status}</Badge>;
-  }
-}
-
-function OverallStatusBadge({ status }: { status: string }) {
-  switch (status) {
-    case "running":
-      return (
-        <Badge variant="outline" className="gap-1">
-          <Loader2 className="size-3 animate-spin" />
-          Running
-        </Badge>
-      );
-    case "completed":
-      return (
-        <Badge variant="success" className="gap-1">
-          <CheckCircle2 className="size-3" />
-          Completed
-        </Badge>
-      );
-    case "failed":
-      return (
-        <Badge variant="destructive" className="gap-1">
-          <AlertCircle className="size-3" />
-          Failed
-        </Badge>
-      );
-    default:
-      return <Badge variant="outline">{status}</Badge>;
-  }
 }
 
 const columns: PaginatedTableColumn<SyncRun>[] = [
@@ -130,7 +40,7 @@ const columns: PaginatedTableColumn<SyncRun>[] = [
   {
     key: "status",
     header: "Status",
-    render: (run) => <OverallStatusBadge status={run.status} />,
+    render: (run) => <SyncStatusBadge status={run.status} />,
   },
   {
     key: "tagLinking",
@@ -139,7 +49,7 @@ const columns: PaginatedTableColumn<SyncRun>[] = [
     render: (run) => {
       const isCompleted = run.status === "completed" || run.status === "failed";
       return (
-        <SegmentStatusBadge
+        <SegmentSyncStatusBadge
           status={run.tagLinkingStatus}
           runCompleted={isCompleted}
         />
@@ -153,7 +63,7 @@ const columns: PaginatedTableColumn<SyncRun>[] = [
     render: (run) => {
       const isCompleted = run.status === "completed" || run.status === "failed";
       return (
-        <SegmentStatusBadge
+        <SegmentSyncStatusBadge
           status={run.transactionSyncStatus}
           runCompleted={isCompleted}
         />

@@ -1,9 +1,9 @@
-import { Badge } from "@/components/ui/badge.tsx";
 import {
   PaginatedTable,
   type PaginatedTableColumn,
 } from "@/components/ui/paginated-table.tsx";
-import { Calendar, CheckCircle2, Clock, Hash, Zap } from "lucide-preact";
+import { Calendar, Hash, Zap } from "lucide-preact";
+import { TransactionStatusBadge } from "@/components/shared/index.ts";
 import type { TransactionSummary } from "@/routes/transactions/index.tsx";
 
 interface Props {
@@ -50,26 +50,11 @@ const columns: PaginatedTableColumn<TransactionSummary>[] = [
   {
     key: "status",
     header: "Status",
-    render: (tx) =>
-      tx.isFinalized
-        ? (
-          <Badge
-            variant="outline"
-            className="gap-1 text-success border-success/30 bg-success/10"
-          >
-            <CheckCircle2 className="size-3" />
-            Complete
-          </Badge>
-        )
-        : (
-          <Badge
-            variant="outline"
-            className="gap-1 text-warning border-warning/30 bg-warning/10"
-          >
-            <Clock className="size-3" />
-            In Progress
-          </Badge>
-        ),
+    render: (tx) => (
+      <TransactionStatusBadge
+        status={tx.isFinalized ? "completed" : "in_progress"}
+      />
+    ),
   },
   {
     key: "lastSyncedAt",
