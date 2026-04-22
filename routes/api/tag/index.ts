@@ -2,6 +2,8 @@ import { define } from "../../../utils.ts";
 import { steveClient } from "../../../src/lib/steve-client.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
 import { isTagType, TAG_TYPES } from "../../../src/lib/types/tags.ts";
+import { db } from "../../../src/db/index.ts";
+import { userMappings } from "../../../src/db/schema.ts";
 
 export const handler = define.handlers({
   async GET(_ctx) {
@@ -9,13 +11,51 @@ export const handler = define.handlers({
       // Use the properly configured StEvE client
       const tags = await steveClient.getOcppTags();
 
-      // Transform to format for the UI, including parent information
-      // Note: OCPP tag notes are not user-visible, used only for sync metadata
-      const simplifiedTags = tags.map((tag) => ({
-        id: tag.idTag,
-        ocppTagPk: tag.ocppTagPk,
-        parentIdTag: tag.parentIdTag,
-      }));
+      // Wave A5: fetch all user_mappings in one extra query and zip by
+      // `steveOcppTagPk` so the picker UI can render display info alongside
+      // the StEvE-owned tag list without a full rewrite to DB-only.
+      const mappings = await db
+        .select({
+          steveOcppTagPk: userMappings.steveOcppTagPk,
+          displayName: userMappings.displayName,
+          lagoCustomerExternalId: userMappings.lagoCustomerExternalId,
+          isActive: userMappings.isActive,
+        })
+        .from(userMappings);
+
+      const byOcppTagPk = new Map<
+        number,
+        {
+          displayName: string | null;
+          lagoCustomerExternalId: string | null;
+          isActive: boolean | null;
+        }
+      >();
+      for (const m of mappings) {
+        byOcppTagPk.set(m.steveOcppTagPk, {
+          displayName: m.displayName,
+          lagoCustomerExternalId: m.lagoCustomerExternalId,
+          isActive: m.isActive,
+        });
+      }
+
+      // Transform to format for the UI, including parent information and
+      // picker-friendly fields from user_mappings. New fields are OPTIONAL
+      // extensions — existing consumers ignore unknown keys.
+      const simplifiedTags = tags.map((tag) => {
+        const mapping = byOcppTagPk.get(tag.ocppTagPk);
+        const isActive = mapping
+          ? mapping.isActive === true
+          : tag.maxActiveTransactionCount !== 0;
+        return {
+          id: tag.idTag,
+          ocppTagPk: tag.ocppTagPk,
+          parentIdTag: tag.parentIdTag,
+          displayName: mapping?.displayName ?? null,
+          lagoCustomerExternalId: mapping?.lagoCustomerExternalId ?? null,
+          isActive,
+        };
+      });
 
       return new Response(JSON.stringify(simplifiedTags), {
         headers: { "Content-Type": "application/json" },
