@@ -6,8 +6,7 @@ import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
 import MappingForm from "../../islands/MappingForm.tsx";
 import MappingIssueCardAction from "../../islands/MappingIssueCardAction.tsx";
-import { ArrowLeft } from "lucide-preact";
-import { CHROME_SIZE } from "../../components/AppSidebar.tsx";
+import { BackAction } from "../../components/shared/BackAction.tsx";
 import { getAllChildTags, isMetaTag } from "../../src/lib/tag-hierarchy.ts";
 import { config } from "../../src/lib/config.ts";
 import { lagoClient } from "../../src/lib/lago-client.ts";
@@ -153,19 +152,6 @@ export const handler = define.handlers({
   },
 });
 
-function BackAction() {
-  return (
-    <a
-      href="/links"
-      className="flex items-center justify-center gap-2 px-4 transition-colors"
-      style={{ height: CHROME_SIZE }}
-    >
-      <ArrowLeft className="size-5" />
-      <span className="text-sm font-medium">Back</span>
-    </a>
-  );
-}
-
 export default define.page<typeof handler>(
   function EditTagLinkingPage({ data, url, state }) {
     const { mapping, lagoCustomer, lagoSubscription, recentTransactions } =
@@ -192,7 +178,7 @@ export default define.page<typeof handler>(
         currentPath={url.pathname}
         user={state.user}
         accentColor="violet"
-        actions={<BackAction />}
+        actions={<BackAction href="/links" />}
       >
         <PageCard
           title={meta ? "Edit meta-tag link" : "Edit tag link"}

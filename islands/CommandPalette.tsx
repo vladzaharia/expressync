@@ -166,6 +166,7 @@ export default function CommandPalette() {
     const detach = attachPaletteHotkeys({
       isOpen: () => open.value,
       open: () => {
+        migrateRecentV1();
         triggeringElement.current = document.activeElement;
         open.value = true;
         recent.value = loadRecent();
@@ -192,6 +193,7 @@ export default function CommandPalette() {
   useEffect(() => {
     const onOpen = () => {
       if (!open.value) {
+        migrateRecentV1();
         triggeringElement.current = document.activeElement;
         open.value = true;
         recent.value = loadRecent();
