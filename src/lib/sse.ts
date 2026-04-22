@@ -20,6 +20,8 @@ import {
   type EventBusEventType,
 } from "../../src/services/event-bus.service.ts";
 import { logger } from "./utils/logger.ts";
+import { config } from "./config.ts";
+import { emitMetric } from "./sse-metrics.ts";
 
 const log = logger.child("SSE");
 
@@ -76,11 +78,28 @@ export function openSseStream(opts: SseStreamOptions): Response | null {
   const stream = new TransformStream<Uint8Array, Uint8Array>();
   const writer = stream.writable.getWriter();
 
+  const sseStreamId = crypto.randomUUID();
+  const openTs = Date.now();
   let closed = false;
-  let lastWriteTs = Date.now();
+  let lastWriteTs = openTs;
+  let pendingWrites = 0;
+  let eventsDelivered = 0;
+  let eventsDropped = 0;
   openConnections += 1;
 
-  const safeClose = () => {
+  // Structured connect log (parseable by log scrapers).
+  console.log(JSON.stringify({
+    level: "info",
+    event: "SSE_CONNECT",
+    sseStreamId,
+    label: opts.label,
+    openConnections,
+    hasReplay: !!opts.lastEventId,
+    lastEventId: opts.lastEventId ?? 0,
+    ts: openTs,
+  }));
+
+  const safeClose = (reason: string) => {
     if (closed) return;
     closed = true;
     openConnections = Math.max(0, openConnections - 1);
@@ -89,25 +108,52 @@ export function openSseStream(opts: SseStreamOptions): Response | null {
     } catch {
       /* ignore */
     }
+    const closeTs = Date.now();
+    console.log(JSON.stringify({
+      level: "info",
+      event: "SSE_DISCONNECT",
+      sseStreamId,
+      label: opts.label,
+      reason,
+      eventsDelivered,
+      eventsDropped,
+      duration_ms: closeTs - openTs,
+      ts: closeTs,
+    }));
   };
 
   const writeRaw = async (chunk: string) => {
     if (closed) return;
+    pendingWrites += 1;
     try {
       await writer.write(encoder.encode(chunk));
       lastWriteTs = Date.now();
     } catch (err) {
       log.debug("SSE write failed; closing stream", {
         label: opts.label,
+        sseStreamId,
         error: err instanceof Error ? err.message : String(err),
       });
-      safeClose();
+      safeClose("write_error");
+    } finally {
+      pendingWrites = Math.max(0, pendingWrites - 1);
     }
   };
 
   const writeEvent = (e: DeliveredEvent) => {
+    // Backpressure ceiling: slow client — drop this event. Last-Event-ID
+    // replay on reconnect will recover missed events within the 60s window.
+    if (pendingWrites >= config.SSE_MAX_PENDING_PER_CLIENT) {
+      eventsDropped += 1;
+      emitMetric("events_dropped_total", 1, {
+        reason: "slow_client",
+        label: opts.label,
+      });
+      return;
+    }
     // SSE frame: `id: {seq}\nevent: {type}\ndata: {JSON}\n\n`
     const data = JSON.stringify(e.payload);
+    eventsDelivered += 1;
     void writeRaw(
       `id: ${e.seq}\nevent: ${e.type}\ndata: ${data}\n\n`,
     );
@@ -141,12 +187,12 @@ export function openSseStream(opts: SseStreamOptions): Response | null {
   const idleId = setInterval(() => {
     if (closed) return;
     if (Date.now() - lastWriteTs > IDLE_TIMEOUT_MS) {
-      log.info("Closing idle SSE stream", { label: opts.label });
-      cleanup();
+      log.info("Closing idle SSE stream", { label: opts.label, sseStreamId });
+      cleanup("idle_timeout");
     }
   }, HEARTBEAT_MS);
 
-  const cleanup = () => {
+  const cleanup = (reason: string) => {
     clearInterval(heartbeatId);
     clearInterval(idleId);
     try {
@@ -154,18 +200,21 @@ export function openSseStream(opts: SseStreamOptions): Response | null {
     } catch {
       /* ignore */
     }
-    safeClose();
+    safeClose(reason);
   };
 
   // Client-initiated disconnect (tab closed, navigation, abort).
   if (opts.signal.aborted) {
-    cleanup();
+    cleanup("client_abort");
   } else {
-    opts.signal.addEventListener("abort", cleanup, { once: true });
+    opts.signal.addEventListener("abort", () => cleanup("client_abort"), {
+      once: true,
+    });
   }
 
   log.debug("SSE stream opened", {
     label: opts.label,
+    sseStreamId,
     openConnections,
     hasReplay: !!opts.lastEventId,
   });

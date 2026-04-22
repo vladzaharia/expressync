@@ -20,6 +20,13 @@ import {
 
 export const handler = define.handlers({
   GET(ctx) {
+    // Defense-in-depth admin gate. `/api/stream` is already admin-gated in
+    // `routes/_middleware.ts`, but we re-check here so this handler is safe
+    // in isolation if the middleware prefix list ever regresses.
+    if (ctx.state.user?.role !== "admin") {
+      return new Response("Forbidden", { status: 403 });
+    }
+
     if (!config.ENABLE_SSE) {
       return sseDisabledResponse("SSE disabled (ENABLE_SSE=false)");
     }

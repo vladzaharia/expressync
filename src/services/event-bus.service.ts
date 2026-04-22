@@ -20,6 +20,12 @@
  */
 
 import { logger } from "../lib/utils/logger.ts";
+import { config } from "../lib/config.ts";
+import {
+  InMemoryTransport,
+  PostgresNotifyTransport,
+  type SseTransport,
+} from "../lib/sse-transport.ts";
 
 const log = logger.child("EventBus");
 
@@ -109,7 +115,17 @@ export interface DeliveredEvent {
   type: EventBusEventType;
   // deno-lint-ignore no-explicit-any
   payload: any;
+  /**
+   * Opaque identifier of the worker process that originally published
+   * this event. Added by Wave A8 so the Postgres transport can dedupe
+   * the NOTIFY echo it receives back on its own LISTEN connection.
+   * Optional for backwards compat.
+   */
+  workerId?: string;
 }
+
+/** Unique per-process id tagged onto every event this worker publishes. */
+export const WORKER_ID: string = crypto.randomUUID();
 
 export type EventHandler = (event: DeliveredEvent) => void;
 
@@ -130,6 +146,78 @@ class EventBus {
   private seq = 0;
   private subs = new Set<Subscription>();
   private buffer: DeliveredEvent[] = [];
+  private transport: SseTransport = new InMemoryTransport();
+  private transportUnsub: (() => void) | null = null;
+  private transportKind: "memory" | "postgres" = "memory";
+
+  constructor() {
+    // Default transport handler: fan-out delivered events to local subs.
+    // Wired up synchronously; for postgres it's rewired in `setTransport`.
+    void this.transport
+      .subscribe((ev) => this.onTransportEvent(ev))
+      .then((unsub) => {
+        this.transportUnsub = unsub;
+      });
+  }
+
+  private onTransportEvent(ev: DeliveredEvent): void {
+    // Postgres echoes our own NOTIFY back — skip to avoid double delivery.
+    if (
+      this.transportKind === "postgres" &&
+      ev.workerId === WORKER_ID
+    ) {
+      return;
+    }
+    if (this.transportKind === "postgres") {
+      // Cross-worker event: record in local ring buffer so same-worker
+      // Last-Event-ID replay keeps working after reconnects.
+      this.buffer.push(ev);
+      this.trimBuffer();
+    }
+    this.fanOut(ev);
+  }
+
+  /**
+   * Swap the underlying transport. Called once at module init based on
+   * `SSE_TRANSPORT` config. Idempotent for the same kind.
+   */
+  async setTransport(
+    transport: SseTransport,
+    kind: "memory" | "postgres",
+  ): Promise<void> {
+    if (this.transportUnsub) {
+      try {
+        this.transportUnsub();
+      } catch {
+        /* ignore */
+      }
+      this.transportUnsub = null;
+    }
+    try {
+      await this.transport.close();
+    } catch {
+      /* ignore */
+    }
+    this.transport = transport;
+    this.transportKind = kind;
+    this.transportUnsub = await transport.subscribe((ev) =>
+      this.onTransportEvent(ev)
+    );
+  }
+
+  private fanOut(delivered: DeliveredEvent): void {
+    for (const sub of this.subs) {
+      if (sub.types !== null && !sub.types.has(delivered.type)) continue;
+      try {
+        sub.handler(delivered);
+      } catch (err) {
+        log.warn("Subscriber threw — isolating", {
+          type: delivered.type,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+  }
 
   publish<E extends EventBusEvent>(event: E): DeliveredEvent {
     this.seq += 1;
@@ -138,23 +226,28 @@ class EventBus {
       ts: Date.now(),
       type: event.type,
       payload: event.payload,
+      workerId: WORKER_ID,
     };
 
     // Record in ring buffer first so late subscribers still see history.
     this.buffer.push(delivered);
     this.trimBuffer();
 
-    for (const sub of this.subs) {
-      if (sub.types !== null && !sub.types.has(event.type)) continue;
-      try {
-        sub.handler(delivered);
-      } catch (err) {
-        log.warn("Subscriber threw — isolating", {
-          type: event.type,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
+    // Forward to transport for cross-worker broadcast. For postgres the
+    // NOTIFY echo is ignored via WORKER_ID dedup in onTransportEvent, so
+    // we must also fan-out locally here. For in-memory, the transport
+    // handler fans out synchronously — fan-out in publish would double;
+    // so we only do the direct fan-out for postgres.
+    if (this.transportKind === "postgres") {
+      this.fanOut(delivered);
     }
+
+    void this.transport.publish(delivered).catch((err) => {
+      log.warn("Transport publish failed", {
+        type: event.type,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
 
     return delivered;
   }
@@ -203,6 +296,11 @@ class EventBus {
     this.buffer = [];
   }
 
+  /** Test hook. */
+  _currentTransportKind(): "memory" | "postgres" {
+    return this.transportKind;
+  }
+
   private trimBuffer(): void {
     const cutoff = Date.now() - BUFFER_WINDOW_MS;
     // Drop time-expired events from the head.
@@ -218,3 +316,34 @@ class EventBus {
 
 // Singleton per worker process.
 export const eventBus = new EventBus();
+
+// ---------------------------------------------------------------------------
+// Transport bootstrap (Wave A8)
+// ---------------------------------------------------------------------------
+
+/**
+ * Kick off the configured SSE transport. Safe to call at module import:
+ * errors are caught so a temporarily-unreachable Postgres doesn't crash
+ * the web server — in-memory fallback remains active.
+ */
+if (config.SSE_TRANSPORT === "postgres") {
+  try {
+    const pg = new PostgresNotifyTransport(config.DATABASE_URL);
+    eventBus
+      .setTransport(pg, "postgres")
+      .then(() => pg.start())
+      .then(() => {
+        log.info("SSE transport initialized", { kind: "postgres" });
+      })
+      .catch((err) => {
+        log.error(
+          "Failed to initialize Postgres SSE transport; staying on memory",
+          { error: err instanceof Error ? err.message : String(err) },
+        );
+      });
+  } catch (err) {
+    log.error("Failed to construct Postgres SSE transport", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
