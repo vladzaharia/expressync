@@ -19,7 +19,8 @@ import {
   RefreshCw,
   Zap,
 } from "lucide-preact";
-import SyncDetailAccordion from "../../islands/SyncDetailAccordion.tsx";
+import SyncSegmentTabs from "../../islands/SyncSegmentTabs.tsx";
+import SyncRetryButton from "../../islands/SyncRetryButton.tsx";
 import { BackAction } from "../../components/shared/BackAction.tsx";
 import { MetricTile } from "../../components/shared/MetricTile.tsx";
 import { formatDate, formatDuration } from "../../src/lib/utils/format.ts";
@@ -48,6 +49,9 @@ export default define.page<typeof handler>(
       l.segment === "transaction_sync"
     );
     const schedulingLogs = logs.filter((l) => l.segment === "scheduling");
+    const isAdmin = state.user?.role === "admin";
+    const runIsRunning = run.status === "running";
+    const canRetry = run.status === "failed" && isAdmin;
 
     return (
       <SidebarLayout
@@ -58,7 +62,13 @@ export default define.page<typeof handler>(
       >
         <div className="space-y-6">
           {/* Summary Card */}
-          <PageCard title="Sync Summary" colorScheme="blue">
+          <PageCard
+            title="Sync Summary"
+            colorScheme="blue"
+            headerActions={canRetry
+              ? <SyncRetryButton runId={run.id} />
+              : undefined}
+          >
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-2">
               <div className="flex items-center gap-3">
                 <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
@@ -167,14 +177,15 @@ export default define.page<typeof handler>(
           {/* Segment Logs */}
           <PageCard
             title="Segment Details"
-            description="Expand each segment to view detailed logs"
+            description="Switch tabs to inspect logs from each segment"
             colorScheme="blue"
           >
-            <SyncDetailAccordion
+            <SyncSegmentTabs
               run={run}
               tagLinkingLogs={tagLinkingLogs}
               transactionSyncLogs={transactionSyncLogs}
               schedulingLogs={schedulingLogs}
+              runIsRunning={runIsRunning}
             />
           </PageCard>
 
