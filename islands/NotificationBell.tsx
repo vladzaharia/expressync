@@ -37,8 +37,13 @@ const POLL_INTERVAL_MS = 30_000;
 const DROPDOWN_LIMIT = 5;
 
 interface NotificationBellProps {
-  /** `"mobile" | "desktop"` — drives chrome sizing + tooltip placement. */
-  variant?: "mobile" | "desktop";
+  /**
+   * `"mobile" | "desktop" | "topbar"` — drives chrome sizing + tooltip placement.
+   * - `mobile`: full CHROME_SIZE square, used in the mobile sidebar top bar.
+   * - `desktop`: sidebar-footer button; honors `isCollapsed` for expand/collapse.
+   * - `topbar`: compact size-9 icon button for the desktop top bar right cluster.
+   */
+  variant?: "mobile" | "desktop" | "topbar";
   /** Show the label next to the icon (expanded desktop sidebar). */
   isCollapsed?: boolean;
 }
@@ -324,7 +329,36 @@ export default function NotificationBell({
     </button>
   );
 
-  const trigger = variant === "mobile" || isCollapsed
+  const triggerTopBar = (
+    <button
+      ref={triggerRef}
+      type="button"
+      onClick={handleToggle}
+      aria-haspopup="menu"
+      aria-expanded={dropdownOpen.value}
+      aria-label={ariaLabel}
+      className={cn(
+        "relative inline-flex items-center justify-center size-9 rounded-full shrink-0",
+        "text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+      )}
+    >
+      <Bell className="size-4" aria-hidden="true" />
+      {displayCount.value !== null && (
+        <span
+          aria-live="polite"
+          aria-atomic="true"
+          className="absolute -top-0.5 -right-0.5 min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-rose-500 text-white text-[10px] font-semibold leading-[1.125rem] text-center tabular-nums shadow-sm"
+        >
+          {displayCount.value}
+        </span>
+      )}
+    </button>
+  );
+
+  const trigger = variant === "topbar"
+    ? triggerTopBar
+    : variant === "mobile" || isCollapsed
     ? triggerSquare
     : triggerFull;
 
@@ -341,6 +375,8 @@ export default function NotificationBell({
             "absolute z-50 w-[22rem] max-w-[calc(100vw-1rem)] rounded-lg border bg-popover shadow-lg overflow-hidden",
             variant === "mobile"
               ? "top-full right-0 mt-1"
+              : variant === "topbar"
+              ? "top-full right-0 mt-2"
               : isCollapsed
               ? "bottom-0 left-full ml-2"
               : "bottom-full left-0 mb-1",
