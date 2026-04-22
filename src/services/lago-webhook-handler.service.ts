@@ -24,9 +24,14 @@
  * and can replay from fixtures later via `scripts/replay-lago-webhook.ts`.
  */
 
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db/index.ts";
-import { lagoWebhookEvents, type NewLagoWebhookEvent } from "../db/schema.ts";
+import {
+  lagoWebhookEvents,
+  type NewLagoWebhookEvent,
+  userMappings,
+  users,
+} from "../db/schema.ts";
 import {
   type LagoWebhook,
   type LagoWebhookEnvelope,
@@ -40,6 +45,7 @@ import {
   type NotificationSourceType,
 } from "./notification.service.ts";
 import { eventBus } from "./event-bus.service.ts";
+import { syncSingleTagToSteve } from "./tag-sync.service.ts";
 
 const log = logger.child("LagoWebhookHandler");
 
@@ -400,7 +406,7 @@ export async function dispatch(
     let notificationFired = false;
 
     if (parsed.success) {
-      notificationFired = reactTo(parsed.data, rowId);
+      notificationFired = await reactTo(parsed.data, rowId);
     } else {
       // Unknown or malformed payload — log, but keep the audit row.
       const envelope = LagoWebhookEnvelopeSchema.safeParse(body);
@@ -458,7 +464,7 @@ async function markProcessed(
  * notification row deep-links to the right surface (invoice detail, webhook
  * audit, Lago dashboard, etc.) via `resolveSourceUrl`.
  */
-function reactTo(payload: LagoWebhook, rowId: number): boolean {
+async function reactTo(payload: LagoWebhook, rowId: number): Promise<boolean> {
   // `webhook_event` is the universal fallback source: every reaction has a
   // persisted webhook row it originated from, so even if a more specific
   // deep-link isn't possible, the notification can still reach `/admin/
@@ -610,12 +616,290 @@ function reactTo(payload: LagoWebhook, rowId: number): boolean {
       return true;
     }
 
+    // ----------------------------------------------------------------------
+    // Polaris Track A — capability sync via Lago lifecycle webhooks.
+    //
+    // - subscription.terminated[_and_downgraded] → soft-deactivate every
+    //   user_mappings row on that subscription. Each affected mapping is
+    //   then pushed to StEvE inline via `syncSingleTagToSteve` (fire-async
+    //   so the webhook response stays fast).
+    // - subscription.started/created → re-activate previously-deactivated
+    //   mappings on the subscription. Same async push.
+    // - customer.updated → compare emails; flag drift via admin notification
+    //   without altering the local users.email (portal email is the user's
+    //   stable identity; Lago email is billing-side; they may legitimately
+    //   diverge).
+    //
+    // NO email is sent to the customer for any of these events.
+    // ----------------------------------------------------------------------
+
+    case "subscription.terminated":
+    case "subscription.terminated_and_downgraded": {
+      const externalSubscriptionId = pickExternalSubscriptionId(payload);
+      if (!externalSubscriptionId) {
+        log.warn("subscription.terminated without external_subscription_id", {
+          webhookType: payload.webhook_type,
+          rowId,
+        });
+        return false;
+      }
+      await handleSubscriptionStateChange({
+        externalSubscriptionId,
+        webhookType: payload.webhook_type,
+        rowId,
+        targetActive: false,
+      });
+      return true;
+    }
+
+    case "subscription.started":
+    case "subscription.created": {
+      const externalSubscriptionId = pickExternalSubscriptionId(payload);
+      if (!externalSubscriptionId) {
+        log.warn("subscription.started without external_subscription_id", {
+          webhookType: payload.webhook_type,
+          rowId,
+        });
+        return false;
+      }
+      await handleSubscriptionStateChange({
+        externalSubscriptionId,
+        webhookType: payload.webhook_type,
+        rowId,
+        targetActive: true,
+      });
+      return true;
+    }
+
+    case "customer.updated": {
+      const customer = pickCustomer(payload);
+      if (!customer?.external_id) {
+        log.debug("customer.updated without external_id", { rowId });
+        return false;
+      }
+      await handleCustomerUpdated({
+        externalCustomerId: customer.external_id,
+        lagoEmail: customer.email ?? null,
+        rowId,
+      });
+      // We may not always emit a notification (only on drift) — the
+      // helper returns true when a row was inserted.
+      return true;
+    }
+
     default:
       // All other known types are currently audit-only.
       log.debug("Audit-only webhook", { webhookType: payload.webhook_type });
       return false;
   }
 }
+
+// ============================================================================
+// Polaris Track A — subscription/customer webhook helpers
+// ============================================================================
+
+/**
+ * Pull `external_subscription_id` from a webhook payload. The payload object
+ * lives under either `subscription.external_id`, `subscriptions[0].external_id`
+ * (for multi-sub events), or directly on the top-level object, depending on
+ * the Lago event type. We probe in order.
+ */
+function pickExternalSubscriptionId(payload: LagoWebhook): string | null {
+  const p = payload as unknown as Record<string, unknown>;
+  const sub = p.subscription as Record<string, unknown> | undefined;
+  if (sub && typeof sub.external_id === "string") {
+    return sub.external_id;
+  }
+  const subs = p.subscriptions as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(subs) && subs.length > 0) {
+    const first = subs[0];
+    if (typeof first.external_id === "string") return first.external_id;
+  }
+  if (typeof p.external_subscription_id === "string") {
+    return p.external_subscription_id;
+  }
+  return null;
+}
+
+/**
+ * Pull the customer object out of a customer.* webhook. Lago wraps it under
+ * `customer`.
+ */
+function pickCustomer(
+  payload: LagoWebhook,
+): { external_id?: string; email?: string | null } | null {
+  const p = payload as unknown as Record<string, unknown>;
+  const customer = p.customer as
+    | { external_id?: string; email?: string | null }
+    | undefined;
+  return customer ?? null;
+}
+
+/**
+ * Flip `is_active` on every user_mappings row attached to the given Lago
+ * subscription, then push the changes to StEvE inline (fire-async per-mapping
+ * so the webhook response stays under our Lago timeout budget). Inserts an
+ * admin-audience notification row for visibility.
+ *
+ * `targetActive=true` only flips rows currently `is_active=false` (so a
+ * resubscribe doesn't trample explicitly-deactivated mappings — admin always
+ * has the final say). `targetActive=false` flips everything currently active.
+ */
+async function handleSubscriptionStateChange(args: {
+  externalSubscriptionId: string;
+  webhookType: string;
+  rowId: number;
+  targetActive: boolean;
+}): Promise<void> {
+  const { externalSubscriptionId, webhookType, rowId, targetActive } = args;
+
+  // For terminated webhooks: flip active rows to inactive.
+  // For started/created webhooks: flip inactive rows to active.
+  const updated = await db
+    .update(userMappings)
+    .set({ isActive: targetActive, updatedAt: new Date() })
+    .where(
+      and(
+        eq(userMappings.lagoSubscriptionExternalId, externalSubscriptionId),
+        eq(userMappings.isActive, !targetActive),
+      ),
+    )
+    .returning();
+
+  if (updated.length === 0) {
+    log.info("Subscription webhook produced no mapping flips", {
+      webhookType,
+      externalSubscriptionId,
+      targetActive,
+    });
+    // Still surface the lifecycle event in the admin feed so a no-op flip
+    // is observable.
+    notify({
+      kind: targetActive
+        ? "lago_subscription_started"
+        : "lago_subscription_terminated",
+      severity: "info",
+      title: `Lago ${webhookType}`,
+      body:
+        `Subscription ${externalSubscriptionId} fired ${webhookType}; no mapping rows changed (target isActive=${targetActive}).`,
+      sourceType: "subscription",
+      sourceId: externalSubscriptionId,
+      context: {
+        webhookType,
+        externalSubscriptionId,
+        targetActive,
+        affectedCount: 0,
+        webhookEventId: rowId,
+      },
+    });
+    return;
+  }
+
+  // Fire-and-forget StEvE sync per flipped mapping. We deliberately do NOT
+  // await because the webhook response budget to Lago is tighter than
+  // N x 100-500ms StEvE calls. Each call is best-effort and emits its own
+  // admin notification on failure (see syncSingleTagToSteve).
+  for (const m of updated) {
+    void syncSingleTagToSteve(m).catch((err) => {
+      log.error("syncSingleTagToSteve threw unexpectedly (caught)", {
+        mappingId: m.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+  }
+
+  notify({
+    kind: targetActive
+      ? "lago_subscription_started"
+      : "lago_subscription_terminated",
+    severity: targetActive ? "info" : "warn",
+    title: targetActive
+      ? `Subscription started: ${externalSubscriptionId}`
+      : `Subscription terminated: ${externalSubscriptionId}`,
+    body: targetActive
+      ? `Reactivated ${updated.length} mapping(s) for subscription ${externalSubscriptionId}.`
+      : `Soft-deactivated ${updated.length} mapping(s) for subscription ${externalSubscriptionId}.`,
+    sourceType: "subscription",
+    sourceId: externalSubscriptionId,
+    context: {
+      webhookType,
+      externalSubscriptionId,
+      targetActive,
+      affectedCount: updated.length,
+      mappingIds: updated.map((m) => m.id),
+      webhookEventId: rowId,
+    },
+  });
+}
+
+/**
+ * Compare the email Lago sent us in a customer.updated event to the email
+ * stored on the linked `users` row. If they differ, emit an admin
+ * notification so the operator can reconcile manually. NEVER auto-update
+ * users.email — portal email is the user's stable identity for login.
+ *
+ * Returns true when a drift notification is created.
+ */
+async function handleCustomerUpdated(args: {
+  externalCustomerId: string;
+  lagoEmail: string | null;
+  rowId: number;
+}): Promise<boolean> {
+  const { externalCustomerId, lagoEmail, rowId } = args;
+
+  // Find the user this Lago customer is linked to via any of their mappings.
+  const rows = await db
+    .select({
+      userId: userMappings.userId,
+      email: users.email,
+    })
+    .from(userMappings)
+    .leftJoin(users, eq(users.id, userMappings.userId))
+    .where(
+      eq(userMappings.lagoCustomerExternalId, externalCustomerId),
+    )
+    .limit(1);
+
+  const linked = rows[0];
+  if (!linked || !linked.userId || !linked.email) {
+    log.debug("customer.updated: no linked user — skipping drift check", {
+      externalCustomerId,
+    });
+    return false;
+  }
+
+  if (!lagoEmail) {
+    // Nothing to compare against; not drift.
+    return false;
+  }
+
+  if (linked.email.toLowerCase() === lagoEmail.toLowerCase()) {
+    // Aligned — nothing to do.
+    return false;
+  }
+
+  notify({
+    kind: "lago_email_drift",
+    severity: "warn",
+    title: "Lago/portal email mismatch",
+    body:
+      `Lago customer ${externalCustomerId} email is "${lagoEmail}", portal email is "${linked.email}". Update one or both manually.`,
+    sourceType: "subscription",
+    sourceId: externalCustomerId,
+    context: {
+      externalCustomerId,
+      lagoEmail,
+      portalEmail: linked.email,
+      portalUserId: linked.userId,
+      webhookEventId: rowId,
+    },
+  });
+  return true;
+}
+
+// Suppress unused-import warning when the `sql` import is only kept for
+// future helpers.
+void sql;
 
 // Re-export envelope type for callers that want to peek at payloads.
 export type { LagoWebhook, LagoWebhookEnvelope };

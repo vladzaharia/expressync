@@ -1,19 +1,23 @@
 import { define } from "../../../../utils.ts";
-import { dockerClient } from "../../../../src/lib/docker-client.ts";
 import { logger } from "../../../../src/lib/utils/logger.ts";
-import { extractRejectedTag } from "../../../../src/lib/utils/tag-patterns.ts";
+import { subscribe } from "../../../../src/services/docker-log-subscriber.ts";
 
 /**
- * GET /api/tag/detect
+ * GET /api/admin/tag/detect
  *
  * Server-Sent Events endpoint for real-time OCPP tag detection.
  * Streams detected rejected/unknown tags from StEvE Docker logs.
+ *
+ * Polaris Track C: this used to open a fresh Docker log stream per
+ * request. It now subscribes to the shared `docker-log-subscriber`
+ * singleton so we don't fan out N Docker connections for N concurrent
+ * SSE consumers (admin tag-detect + customer scan-detect).
  *
  * Query parameters:
  * - timeout: Maximum duration in seconds (default: 60)
  */
 export const handler = define.handlers({
-  async GET(ctx) {
+  GET(ctx) {
     const url = new URL(ctx.req.url);
     const timeout = parseInt(url.searchParams.get("timeout") || "60", 10);
     if (isNaN(timeout) || timeout < 1 || timeout > 300) {
@@ -23,104 +27,142 @@ export const handler = define.handlers({
       );
     }
 
-    // Check if Docker is available
-    const dockerAvailable = await dockerClient.isAvailable();
-    if (!dockerAvailable) {
-      return new Response(
-        JSON.stringify({
-          error: "Docker socket not available",
-          message: "Cannot connect to Docker to stream StEvE logs",
-        }),
-        {
-          status: 503,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
     logger.info("TagDetection", "Starting tag detection stream", { timeout });
 
-    // Create SSE stream
-    const stream = new ReadableStream({
-      async start(controller) {
-        const encoder = new TextEncoder();
-        const seenTags = new Set<string>();
-        const startTime = Date.now();
-        const timeoutMs = timeout * 1000;
+    const encoder = new TextEncoder();
+    const seenTags = new Set<string>();
+    const startTime = Date.now();
+    const timeoutMs = timeout * 1000;
+    let unsubscribe: (() => void) | null = null;
+    let keepaliveInterval: ReturnType<typeof setInterval> | null = null;
+    let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
+    let closed = false;
+    // Holds the controller so we can fan out from event handlers / timers.
+    let ctlRef: ReadableStreamDefaultController<Uint8Array> | null = null;
 
-        // Send initial connection event
-        controller.enqueue(
-          encoder.encode(
-            `event: connected\ndata: ${JSON.stringify({ timeout })}\n\n`,
-          ),
-        );
+    const safeEnqueue = (chunk: Uint8Array): void => {
+      if (closed || !ctlRef) return;
+      try {
+        ctlRef.enqueue(chunk);
+      } catch {
+        closed = true;
+      }
+    };
 
-        // Keepalive heartbeat every 15 seconds to prevent proxy/browser timeouts
-        const keepaliveInterval = setInterval(() => {
-          try {
-            controller.enqueue(encoder.encode(`: keepalive\n\n`));
-          } catch {
-            // Controller may already be closed
-            clearInterval(keepaliveInterval);
-          }
-        }, 15_000);
+    const cleanup = (): void => {
+      if (closed) return;
+      closed = true;
+      if (keepaliveInterval) clearInterval(keepaliveInterval);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      if (unsubscribe) unsubscribe();
+      try {
+        ctlRef?.close();
+      } catch { /* already closed */ }
+    };
 
-        try {
-          // Stream logs from Docker
-          const logStream = dockerClient.streamLogs({
-            follow: true,
-            tail: 0, // Only new logs
-            since: Math.floor(Date.now() / 1000), // From now
-          });
+    const stream = new ReadableStream<Uint8Array>({
+      start: async (controller) => {
+        ctlRef = controller;
 
-          for await (const line of logStream) {
-            // Check timeout
+        // Subscribe to the shared Docker log singleton. If Docker is
+        // unavailable, we close the stream immediately and the client
+        // will see the connection close (matches the previous 503-via-
+        // HEAD-probe behavior — clients HEAD-probe before the EventSource).
+        const sub = await subscribe(
+          (event) => {
+            if (closed) return;
+            // Admin flow: dedupe by tag id + check timeout.
             if (Date.now() - startTime > timeoutMs) {
-              controller.enqueue(
+              safeEnqueue(
                 encoder.encode(
                   `event: timeout\ndata: ${
                     JSON.stringify({ message: "Detection timeout reached" })
                   }\n\n`,
                 ),
               );
-              break;
+              cleanup();
+              return;
             }
+            if (seenTags.has(event.idTag)) return;
+            seenTags.add(event.idTag);
+            logger.info("TagDetection", "Detected rejected tag", {
+              tagId: event.idTag,
+              chargeBoxId: event.chargeBoxId,
+            });
+            safeEnqueue(
+              encoder.encode(
+                `event: tag-detected\ndata: ${
+                  JSON.stringify({
+                    tagId: event.idTag,
+                    chargeBoxId: event.chargeBoxId,
+                    timestamp: new Date(event.t).toISOString(),
+                    logLine: event.rawLine.substring(0, 200),
+                  })
+                }\n\n`,
+              ),
+            );
+          },
+          (err) => {
+            if (closed) return;
+            logger.error(
+              "TagDetection",
+              "Stream error from shared subscriber",
+              err,
+            );
+            safeEnqueue(
+              encoder.encode(
+                `event: error\ndata: ${
+                  JSON.stringify({ error: err.message })
+                }\n\n`,
+              ),
+            );
+            cleanup();
+          },
+        );
 
-            // Try to extract rejected tag
-            const tagId = extractRejectedTag(line);
-            if (tagId && !seenTags.has(tagId)) {
-              seenTags.add(tagId);
-              logger.info("TagDetection", "Detected rejected tag", {
-                tagId,
-                line,
-              });
-
-              controller.enqueue(
-                encoder.encode(
-                  `event: tag-detected\ndata: ${
-                    JSON.stringify({
-                      tagId,
-                      timestamp: new Date().toISOString(),
-                      logLine: line.substring(0, 200), // Truncate for safety
-                    })
-                  }\n\n`,
-                ),
-              );
-            }
-          }
-        } catch (error) {
-          logger.error("TagDetection", "Stream error", error as Error);
-          controller.enqueue(
+        if (!sub.available) {
+          safeEnqueue(
             encoder.encode(
               `event: error\ndata: ${
-                JSON.stringify({ error: (error as Error).message })
+                JSON.stringify({
+                  error: "Docker socket not available",
+                  message: "Cannot connect to Docker to stream StEvE logs",
+                })
               }\n\n`,
             ),
           );
-        } finally {
-          clearInterval(keepaliveInterval);
-          controller.close();
+          cleanup();
+          return;
         }
+        unsubscribe = sub.unsubscribe;
+
+        // Initial connected event (matches existing client contract).
+        safeEnqueue(
+          encoder.encode(
+            `event: connected\ndata: ${JSON.stringify({ timeout })}\n\n`,
+          ),
+        );
+
+        // Keepalive every 15s to prevent proxy/browser timeouts.
+        keepaliveInterval = setInterval(() => {
+          safeEnqueue(encoder.encode(`: keepalive\n\n`));
+        }, 15_000);
+
+        // Hard server-side timeout cap.
+        timeoutTimer = setTimeout(() => {
+          if (closed) return;
+          safeEnqueue(
+            encoder.encode(
+              `event: timeout\ndata: ${
+                JSON.stringify({ message: "Detection timeout reached" })
+              }\n\n`,
+            ),
+          );
+          cleanup();
+        }, timeoutMs);
+      },
+      cancel: () => {
+        cleanup();
       },
     });
 

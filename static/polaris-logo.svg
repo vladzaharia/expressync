@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Polaris Express brand glyph — 8-point compass star ("Polaris" north star)
+  inside the brand squircle. White star on a Polaris-green (#0E7C66) field
+  so it works as a standalone favicon source. Mirrored from the inline
+  React glyph in components/brand/PolarisExpressBrand.tsx.
+-->
+<svg
+  width="40"
+  height="40"
+  viewBox="0 0 40 40"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <rect x="0" y="0" width="40" height="40" rx="12" ry="12" fill="#0E7C66" />
+  <g transform="translate(8 8) scale(1)">
+    <!-- Long cardinal spokes -->
+    <polygon points="12,1 13.2,12 12,23 10.8,12" fill="#FFFFFF" />
+    <polygon points="23,12 12,13.2 1,12 12,10.8" fill="#FFFFFF" />
+    <!-- Shorter diagonal spokes (rotated 45deg) -->
+    <g transform="rotate(45 12 12)">
+      <polygon
+        points="12,4 12.7,12 12,20 11.3,12"
+        fill="#FFFFFF"
+        fill-opacity="0.85"
+      />
+      <polygon
+        points="20,12 12,12.7 4,12 12,11.3"
+        fill="#FFFFFF"
+        fill-opacity="0.85"
+      />
+    </g>
+    <!-- Center dot -->
+    <circle cx="12" cy="12" r="1.4" fill="#FFFFFF" />
+  </g>
+</svg>

@@ -725,8 +725,14 @@ export const InvoiceAddOnAddedWebhookSchema = simpleWebhook(
 export const SubscriptionStartedWebhookSchema = simpleWebhook(
   "subscription.started",
 );
+export const SubscriptionCreatedWebhookSchema = simpleWebhook(
+  "subscription.created",
+);
 export const SubscriptionTerminatedWebhookSchema = simpleWebhook(
   "subscription.terminated",
+);
+export const SubscriptionTerminatedAndDowngradedWebhookSchema = simpleWebhook(
+  "subscription.terminated_and_downgraded",
 );
 export const SubscriptionUpdatedWebhookSchema = simpleWebhook(
   "subscription.updated",
@@ -800,7 +806,9 @@ export const LagoWebhookSchema = z.discriminatedUnion("webhook_type", [
   InvoicePaidCreditAddedWebhookSchema,
   InvoiceAddOnAddedWebhookSchema,
   SubscriptionStartedWebhookSchema,
+  SubscriptionCreatedWebhookSchema,
   SubscriptionTerminatedWebhookSchema,
+  SubscriptionTerminatedAndDowngradedWebhookSchema,
   SubscriptionUpdatedWebhookSchema,
   SubscriptionTerminationAlertWebhookSchema,
   SubscriptionTrialEndedWebhookSchema,

@@ -6,19 +6,44 @@ import { Toaster } from "sonner";
 import CommandPalette from "../islands/CommandPalette.tsx";
 import SseProvider from "../islands/shared/SseProvider.tsx";
 
-export default define.page(function App({ Component }) {
-  return (
-    <html lang="en" class="dark">
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>ExpresSync</title>
-        <link rel="stylesheet" href="/assets/styles.css" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
+/**
+ * Polaris Track A — root document. Hostname-aware: reads
+ * `ctx.state.surface` (set by `_middleware.ts` after hostname dispatch) and
+ * picks the right manifest, favicon set, theme bootstrap, and theme-color
+ * meta. Customer (`polaris.express`) and admin (`manage.polaris.express`)
+ * each install as separate PWAs because the manifest URL differs per
+ * surface and PWA installability keys off the manifest URL.
+ *
+ * Defaults to the admin surface when `state.surface` is missing (e.g.
+ * during static-asset prefetch or middleware bypass) — matches pre-Polaris
+ * behavior so existing tests keep passing.
+ */
+export default define.page(function App({ Component, state }) {
+  const surface = state.surface ?? "admin";
+  const isAdmin = surface === "admin";
+
+  const manifestHref = isAdmin ? "/manifest.admin.json" : "/manifest.json";
+  const themeColor = isAdmin ? "#0ea5e9" : "#0E7C66";
+  const title = isAdmin ? "ExpresSync" : "Polaris Express";
+  // Admin keeps the previously-default `dark` class so SSR markup matches
+  // the bootstrap script for admin sessions; customer renders without an
+  // initial class and the bootstrap script applies `light` on the client.
+  const htmlClass = isAdmin ? "dark" : "";
+
+  // Favicon set per surface — matches the manifest icon entries so the
+  // browser's <link rel=icon> picker finds the right asset before the
+  // manifest is fetched.
+  const faviconBase = isAdmin ? "favicon" : "polaris-favicon";
+
+  // Per-surface localStorage key + default theme. Kept in sync with
+  // `hooks/use-theme.tsx` (storageKey + defaultTheme) and the SSR class
+  // above so there's no flash on first paint.
+  const themeBootstrap = `
               (function() {
-                const theme = localStorage.getItem('ev-billing-theme') || 'dark';
+                const isAdmin = location.hostname.startsWith('manage.') || location.hostname === 'localhost';
+                const key = isAdmin ? 'ev-billing-theme' : 'polaris-theme';
+                const stored = localStorage.getItem(key);
+                const theme = stored || (isAdmin ? 'dark' : 'light');
                 if (theme === 'system') {
                   const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
                   document.documentElement.classList.add(systemTheme);
@@ -27,7 +52,55 @@ export default define.page(function App({ Component }) {
                   document.documentElement.classList.add(theme);
                 }
               })();
-            `,
+            `;
+
+  return (
+    <html lang="en" class={htmlClass}>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="theme-color" content={themeColor} />
+        <title>{title}</title>
+        <link rel="manifest" href={manifestHref} />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="16x16"
+          href={`/${faviconBase}-16.png`}
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="32x32"
+          href={`/${faviconBase}-32.png`}
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="48x48"
+          href={`/${faviconBase}-48.png`}
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="192x192"
+          href={`/${faviconBase}-192.png`}
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="512x512"
+          href={`/${faviconBase}-512.png`}
+        />
+        <link
+          rel="apple-touch-icon"
+          sizes="180x180"
+          href="/apple-touch-icon.png"
+        />
+        <link rel="stylesheet" href="/assets/styles.css" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: themeBootstrap,
           }}
         />
       </head>

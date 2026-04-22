@@ -11,6 +11,10 @@ import NotificationBell from "@/islands/NotificationBell.tsx";
 import UserMenu from "@/islands/UserMenu.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { type AccentColor, accentTailwindClasses } from "@/src/lib/colors.ts";
+import {
+  ADMIN_NAV_SECTIONS,
+  type NavSection,
+} from "@/src/lib/admin-navigation.ts";
 
 interface User {
   id: string;
@@ -28,6 +32,10 @@ interface SidebarWrapperProps {
   actions?: ComponentChildren;
   accentColor?: AccentColor;
   user?: User;
+  /** Polaris Track A: nav module forwarded to AppSidebar. */
+  navSections?: NavSection[];
+  /** Polaris Track A: surface role forwarded to AppSidebar. */
+  role?: "admin" | "customer";
 }
 
 function TopBarContent({
@@ -92,10 +100,17 @@ export default function SidebarWrapper({
   actions,
   accentColor,
   user,
+  navSections = ADMIN_NAV_SECTIONS,
+  role = "admin",
 }: SidebarWrapperProps) {
   return (
     <SidebarProvider defaultOpen={false}>
-      <AppSidebar currentPath={currentPath} user={user} />
+      <AppSidebar
+        currentPath={currentPath}
+        user={user}
+        navSections={navSections}
+        role={role}
+      />
       <SidebarInset>
         <TopBarContent
           currentPath={currentPath}

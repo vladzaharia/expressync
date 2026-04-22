@@ -88,6 +88,16 @@ function shouldRewriteAdminPath(pathname: string): boolean {
   if (pathname === "/manifest.json") return false;
   if (pathname === "/manifest.admin.json") return false;
   if (pathname === "/robots.txt") return false;
+  // Static favicon PNGs (admin: /favicon-*.png; customer: /polaris-favicon-*.png;
+  // shared: /apple-touch-icon.png) live at the URL root and are served by
+  // Fresh's static-files middleware. Skip the rewrite so the assets resolve
+  // before the admin path-rewrite would mangle them into /admin/favicon-X.png.
+  if (
+    /^\/(favicon|polaris-favicon)-(16|32|48|180|192|512)\.png$/.test(pathname)
+  ) {
+    return false;
+  }
+  if (pathname === "/apple-touch-icon.png") return false;
   // Avoid double-prepending if path already has /admin (shouldn't happen
   // in normal browser navigation but defends against intermediate proxies).
   if (pathname === "/admin" || pathname.startsWith("/admin/")) return false;
