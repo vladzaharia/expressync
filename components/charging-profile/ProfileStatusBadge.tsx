@@ -2,11 +2,14 @@
  * Phase P5 — ProfileStatusBadge
  *
  * Renders the current sync state of a charging profile. Emerald when the
- * Lago mirror is up to date, amber when the mirror is behind with an error.
+ * Lago mirror is up to date, amber when the mirror is behind with an error,
+ * muted when the profile has not been saved yet.
+ *
+ * Implementation now routes through the canonical `<StatusBadge>` primitive.
  */
 
-import { Badge } from "@/components/ui/badge.tsx";
 import { AlertTriangle, CheckCircle2 } from "lucide-preact";
+import { StatusBadge } from "@/components/shared/StatusBadge.tsx";
 
 export interface ProfileStatusBadgeProps {
   lagoSynced: boolean;
@@ -18,30 +21,22 @@ export function ProfileStatusBadge(
 ) {
   if (error) {
     return (
-      <Badge
-        variant="outline"
-        className="border-amber-500/60 text-amber-700 dark:text-amber-400"
+      <StatusBadge
+        tone="warning"
+        label="Lago mirror pending"
         title={error}
-      >
-        <AlertTriangle className="size-3" aria-hidden="true" />
-        Lago mirror pending
-      </Badge>
+        icon={<AlertTriangle class="size-3" />}
+      />
     );
   }
   if (lagoSynced) {
     return (
-      <Badge
-        variant="outline"
-        className="border-emerald-500/60 text-emerald-700 dark:text-emerald-400"
-      >
-        <CheckCircle2 className="size-3" aria-hidden="true" />
-        Synced
-      </Badge>
+      <StatusBadge
+        tone="success"
+        label="Synced"
+        icon={<CheckCircle2 class="size-3" />}
+      />
     );
   }
-  return (
-    <Badge variant="outline" className="text-muted-foreground">
-      Not saved
-    </Badge>
-  );
+  return <StatusBadge tone="muted" label="Not saved" />;
 }
