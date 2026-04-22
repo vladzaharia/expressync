@@ -1,4 +1,4 @@
-import { findSectionByPath } from "@/src/lib/navigation.ts";
+import { findSectionByPath } from "@/src/lib/admin-navigation.ts";
 import { BlurFade } from "@/components/magicui/blur-fade.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 

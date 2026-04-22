@@ -196,7 +196,7 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
     // "connection lost" for an operational misconfiguration.
     (async () => {
       try {
-        const probe = await fetch(`/api/tag/detect?timeout=1`, {
+        const probe = await fetch(`/api/admin/tag/detect?timeout=1`, {
           method: "HEAD",
         });
         if (mySession !== refs.sessionId) return;
@@ -212,7 +212,7 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
 
       let es: EventSource;
       try {
-        es = new EventSource(`/api/tag/detect?timeout=${timeoutSeconds}`);
+        es = new EventSource(`/api/admin/tag/detect?timeout=${timeoutSeconds}`);
       } catch {
         setState({ kind: "network_error", phase: "connect" });
         dispatch("scan-tag:error", { reason: "connect" });
@@ -295,7 +295,7 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
 
     (async () => {
       try {
-        const res = await fetch("/api/tag/scan-lookup", {
+        const res = await fetch("/api/admin/tag/scan-lookup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ idTag }),
@@ -351,7 +351,7 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
 
     (async () => {
       try {
-        const res = await fetch("/api/tag/scan-lookup", {
+        const res = await fetch("/api/admin/tag/scan-lookup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ idTag: trimmed }),

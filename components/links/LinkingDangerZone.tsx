@@ -10,8 +10,8 @@
  * Implemented as a client island because billing_tier flips and isActive
  * toggles need to roll back on server failure without a full reload.
  *
- * Server contract unchanged: `PUT /api/tag/link?id=` for the toggles, and
- * `DELETE /api/tag/link?id=` for the delete.
+ * Server contract unchanged: `PUT /api/admin/tag/link?id=` for the toggles, and
+ * `DELETE /api/admin/tag/link?id=` for the delete.
  */
 
 import { useSignal } from "@preact/signals";
@@ -59,7 +59,7 @@ export default function LinkingDangerZone(props: Props) {
     active.value = next;
     activeSaving.value = true;
     try {
-      const res = await fetch(`/api/tag/link?id=${props.mappingId}`, {
+      const res = await fetch(`/api/admin/tag/link?id=${props.mappingId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: next }),
@@ -81,7 +81,7 @@ export default function LinkingDangerZone(props: Props) {
     tier.value = next;
     tierSaving.value = true;
     try {
-      const res = await fetch(`/api/tag/link?id=${props.mappingId}`, {
+      const res = await fetch(`/api/admin/tag/link?id=${props.mappingId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         // NB: the server already accepts arbitrary `body.*` keys on PUT; we
@@ -106,7 +106,7 @@ export default function LinkingDangerZone(props: Props) {
   const handleDelete = async () => {
     deleting.value = true;
     try {
-      const res = await fetch(`/api/tag/link?id=${props.mappingId}`, {
+      const res = await fetch(`/api/admin/tag/link?id=${props.mappingId}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("server");

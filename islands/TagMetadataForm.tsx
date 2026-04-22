@@ -65,7 +65,7 @@ export default function TagMetadataForm({
     errorMessage.value = null;
     savedTick.value = false;
     try {
-      const res = await fetch("/api/tag/metadata", {
+      const res = await fetch("/api/admin/tag/metadata", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

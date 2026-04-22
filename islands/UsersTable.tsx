@@ -57,7 +57,7 @@ export default function UsersTable({
   const handleRoleChange = async (userId: string, newRoleValue: string) => {
     updatingRole.value = userId;
     try {
-      const res = await fetch(`/api/user/${userId}`, {
+      const res = await fetch(`/api/admin/user/${userId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role: newRoleValue }),
@@ -93,7 +93,7 @@ export default function UsersTable({
     deleteTarget.value = null;
     deleting.value = target.id;
     try {
-      const res = await fetch(`/api/user/${target.id}`, {
+      const res = await fetch(`/api/admin/user/${target.id}`, {
         method: "DELETE",
       });
 

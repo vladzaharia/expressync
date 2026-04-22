@@ -120,6 +120,83 @@
       "when": 1777911000000,
       "tag": "0016_rate_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1777911060000,
+      "tag": "0017_add_userid_to_user_mappings",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1777911120000,
+      "tag": "0018_user_mappings_userid_must_be_customer_trigger",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1777911180000,
+      "tag": "0019_flip_users_role_default",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1777911240000,
+      "tag": "0020_add_users_onboarded_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1777911300000,
+      "tag": "0021_add_notifications_audience",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1777911360000,
+      "tag": "0022_create_auth_audit",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1777911420000,
+      "tag": "0023_create_magic_link_audit",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1777911480000,
+      "tag": "0024_create_impersonation_audit",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1777911540000,
+      "tag": "0025_add_charger_operation_log_user_id_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1777911600000,
+      "tag": "0026_user_mapping_lago_user_consistency_trigger",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1777911660000,
+      "tag": "0027_users_email_lower_unique",
+      "breakpoints": true
     }
   ]
 }

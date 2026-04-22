@@ -99,6 +99,62 @@ export const config = {
     const val = parseInt(Deno.env.get("SSE_MAX_PENDING_PER_CLIENT") || "100");
     return isNaN(val) || val <= 0 ? 100 : val;
   })(),
+
+  // ===========================================================================
+  // Polaris Track A: customer portal + email Worker
+  // ===========================================================================
+
+  /** Cloudflare Email Worker base URL — POST /send accepts HMAC-signed bodies. */
+  CF_EMAIL_WORKER_URL: stripTrailingSlash(
+    Deno.env.get("CF_EMAIL_WORKER_URL") || "",
+  ),
+  /** 32-byte shared secret for HMAC-signing email Worker requests. */
+  CF_EMAIL_WORKER_SECRET: Deno.env.get("CF_EMAIL_WORKER_SECRET") || "",
+  /** Default From: header for customer-bound emails. */
+  EMAIL_FROM: Deno.env.get("EMAIL_FROM") ||
+    "Polaris Express <noreply@polaris.express>",
+  /** From: header for admin-bound emails (forgot-password, ops alerts). */
+  EMAIL_FROM_ADMIN: Deno.env.get("EMAIL_FROM_ADMIN") ||
+    "ExpresSync Operator <admin-noreply@polaris.express>",
+  /** Magic-link TTL for the standard "email me a sign-in link" path (seconds). */
+  MAGIC_LINK_TTL_SECONDS: (() => {
+    const val = parseInt(Deno.env.get("MAGIC_LINK_TTL_SECONDS") || "900");
+    return isNaN(val) || val <= 0 ? 900 : val;
+  })(),
+  /** Longer TTL for first-time customer invite links (24h default). */
+  MAGIC_LINK_INVITE_TTL_SECONDS: (() => {
+    const val = parseInt(
+      Deno.env.get("MAGIC_LINK_INVITE_TTL_SECONDS") || "86400",
+    );
+    return isNaN(val) || val <= 0 ? 86400 : val;
+  })(),
+  /** Admin password-reset link TTL (24h default — accommodates work hours). */
+  ADMIN_PASSWORD_RESET_TTL_SECONDS: (() => {
+    const val = parseInt(
+      Deno.env.get("ADMIN_PASSWORD_RESET_TTL_SECONDS") || "86400",
+    );
+    return isNaN(val) || val <= 0 ? 86400 : val;
+  })(),
+  /** Customer session TTL ceiling (8h default). Admins keep the 7-day session. */
+  CUSTOMER_SESSION_TTL_SECONDS: (() => {
+    const val = parseInt(
+      Deno.env.get("CUSTOMER_SESSION_TTL_SECONDS") || "28800",
+    );
+    return isNaN(val) || val <= 0 ? 28800 : val;
+  })(),
+  /** Feature flag — when false, magic-link endpoints respond 503. */
+  FEATURE_MAGIC_LINK: Deno.env.get("FEATURE_MAGIC_LINK") !== "false",
+  /** Feature flag — when false, scan-to-login endpoints respond 503. */
+  FEATURE_SCAN_LOGIN: Deno.env.get("FEATURE_SCAN_LOGIN") !== "false",
+  /** Canonical admin host URL (used in admin redirects + reset-link composition). */
+  ADMIN_BASE_URL: stripTrailingSlash(
+    Deno.env.get("ADMIN_BASE_URL") || "https://manage.polaris.express",
+  ),
+  /** Cookie Domain attribute used by Better-Auth so admin + customer share. */
+  COOKIE_DOMAIN: Deno.env.get("COOKIE_DOMAIN") || ".polaris.express",
+  /** mailto: target shown to inactive customers + on hard error pages. */
+  OPERATOR_CONTACT_EMAIL: Deno.env.get("OPERATOR_CONTACT_EMAIL") ||
+    "support@polaris.express",
 } as const;
 
 /**

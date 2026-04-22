@@ -97,7 +97,7 @@ export default function SyncControls({ isAdmin = false }: SyncControlsProps) {
 
   async function fetchState() {
     try {
-      const res = await fetch("/api/sync/state");
+      const res = await fetch("/api/admin/sync/state");
       if (!res.ok) return;
       const body = await res.json() as StateResponse;
       state.value = body;
@@ -138,7 +138,7 @@ export default function SyncControls({ isAdmin = false }: SyncControlsProps) {
     triggerDialogOpen.value = false;
     loading.value = true;
     try {
-      const res = await fetch("/api/sync/trigger", { method: "POST" });
+      const res = await fetch("/api/admin/sync/trigger", { method: "POST" });
       if (res.ok) {
         toast.success("Sync triggered");
         // Refresh state quickly so the tier jumps to Active.
@@ -160,8 +160,8 @@ export default function SyncControls({ isAdmin = false }: SyncControlsProps) {
     pinBusy.value = true;
     try {
       const res = pinTier === null
-        ? await fetch("/api/sync/pin", { method: "DELETE" })
-        : await fetch("/api/sync/pin", {
+        ? await fetch("/api/admin/sync/pin", { method: "DELETE" })
+        : await fetch("/api/admin/sync/pin", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tier: pinTier, hours }),

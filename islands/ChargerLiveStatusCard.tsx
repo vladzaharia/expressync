@@ -6,7 +6,7 @@
  *     charging — the same "charging is genuine live state" visual vocabulary
  *     established by `ChargerCard`.
  *   - `Refresh from StEvE` button fires a `TriggerMessage(StatusNotification)`
- *     op via `/api/charger/operation`. Uses the shared `REFRESH_COOLDOWN_MS`
+ *     op via `/api/admin/charger/operation`. Uses the shared `REFRESH_COOLDOWN_MS`
  *     so the per-card and detail-page buttons behave the same way.
  */
 
@@ -85,7 +85,7 @@ export default function ChargerLiveStatusCard({
     setRefreshError(null);
     setLastRefreshAt(now);
     try {
-      const res = await fetch("/api/charger/operation", {
+      const res = await fetch("/api/admin/charger/operation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

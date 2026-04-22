@@ -67,7 +67,7 @@ export function TagPickerCombobox(props: TagPickerComboboxProps) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/tag");
+        const res = await fetch("/api/admin/tag");
         const data = await res.json();
         if (cancelled) return;
         if (Array.isArray(data)) setTags(data as TagRow[]);

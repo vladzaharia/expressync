@@ -1,6 +1,6 @@
 /**
  * SyncRetryButton — admin-only "Retry from this run" action for a failed
- * sync on `/sync/[id]`. Posts to `/api/sync/trigger` after `ConfirmDialog`.
+ * sync on `/sync/[id]`. Posts to `/api/admin/sync/trigger` after `ConfirmDialog`.
  *
  * The trigger endpoint is global (it kicks the scheduler) rather than
  * per-run, so "retry from this run" really means "kick off a new sync now";
@@ -25,7 +25,7 @@ export default function SyncRetryButton({ runId }: Props) {
   async function confirm() {
     busy.value = true;
     try {
-      const res = await fetch("/api/sync/trigger", { method: "POST" });
+      const res = await fetch("/api/admin/sync/trigger", { method: "POST" });
       if (res.ok) {
         toast.success("Sync triggered");
         open.value = false;

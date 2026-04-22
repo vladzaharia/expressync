@@ -2,7 +2,7 @@
  * TagPicker — owns the OCPP-tag side of the linking form.
  *
  * Responsibilities:
- *   - Fetch `/api/tag` (all OCPP tags in StEvE) and `/api/tag/link` (existing
+ *   - Fetch `/api/admin/tag` (all OCPP tags in StEvE) and `/api/admin/tag/link` (existing
  *     user_mappings) so we can annotate availability.
  *   - Render three entry points for creating/finding a tag:
  *       1. Tap to add (opens the shared `TapToAddModal` island — NFC path).
@@ -99,8 +99,8 @@ export default function TagPicker(props: Props) {
       loadError.value = null;
       try {
         const [tagsRes, mappingsRes] = await Promise.all([
-          fetch("/api/tag"),
-          fetch("/api/tag/link"),
+          fetch("/api/admin/tag"),
+          fetch("/api/admin/tag/link"),
         ]);
         const tagsData = await tagsRes.json();
         const mappingsData = await mappingsRes.json();

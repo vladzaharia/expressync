@@ -13,7 +13,7 @@
 
 import { LayoutDashboard, Plus, RefreshCw, Shield, Zap } from "lucide-preact";
 import type { AccentColor } from "@/src/lib/colors.ts";
-import { getAllNavItems, type NavItem } from "@/src/lib/navigation.ts";
+import { getAllNavItems, type NavItem } from "@/src/lib/admin-navigation.ts";
 
 export type CommandKind = "navigate" | "action";
 export type CommandAccent = AccentColor | "primary" | "neutral";
@@ -98,7 +98,7 @@ export function buildActionCommands(env: ActionEnv): PaletteCommand[] {
       accent: "blue",
       keywords: ["refresh", "pull", "reconcile"],
       run: () => {
-        const p = postJson("/api/sync/trigger").then((r) => {
+        const p = postJson("/api/admin/sync/trigger").then((r) => {
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           return r.json();
         });
@@ -119,7 +119,7 @@ export function buildActionCommands(env: ActionEnv): PaletteCommand[] {
       accent: "blue",
       keywords: ["unpin", "adaptive", "schedule"],
       run: () => {
-        const p = fetch("/api/sync/pin", {
+        const p = fetch("/api/admin/sync/pin", {
           method: "DELETE",
           credentials: "same-origin",
         }).then((r) => {

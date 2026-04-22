@@ -115,7 +115,9 @@ export default function MappingForm(props: Props) {
     successMessage.value = "";
 
     try {
-      const url = mapping ? `/api/tag/link?id=${mapping.id}` : "/api/tag/link";
+      const url = mapping
+        ? `/api/admin/tag/link?id=${mapping.id}`
+        : "/api/admin/tag/link";
       const method = mapping ? "PUT" : "POST";
 
       const body = mapping
