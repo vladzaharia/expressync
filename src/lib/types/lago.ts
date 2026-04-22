@@ -15,10 +15,10 @@ export const LagoEventSchema = z.object({
   code: z.string(),
 
   /** Unix timestamp when the usage occurred */
-  timestamp: z.number(),
+  timestamp: z.union([z.number(), z.string()]),
 
   /** Usage properties (metric-specific) */
-  properties: z.record(z.string(), z.string()),
+  properties: z.record(z.string(), z.union([z.string(), z.number()])),
 });
 
 export type LagoEvent = z.infer<typeof LagoEventSchema>;
@@ -92,8 +92,8 @@ export const LagoSubscriptionSchema = z.object({
   /** On termination credit note - can be null - REQUIRED */
   on_termination_credit_note: z.string().nullable(),
 
-  /** On termination invoice - can be null - REQUIRED */
-  on_termination_invoice: z.string().nullable(),
+  /** On termination invoice - REQUIRED */
+  on_termination_invoice: z.enum(["generate", "skip"]),
 
   /** Plan details - optional, only in SubscriptionObjectExtended */
   plan: z.any().optional(),
@@ -266,6 +266,59 @@ export const LagoCurrentUsageSchema = z.object({
 });
 
 export type LagoCurrentUsage = z.infer<typeof LagoCurrentUsageSchema>;
+
+/**
+ * Zod schema for Lago Invoice (basic fields)
+ * Based on lago-api.yml InvoiceObject schema
+ */
+export const LagoInvoiceSchema = z.object({
+  /** Lago internal ID */
+  lago_id: z.string(),
+
+  /** Sequential ID */
+  sequential_id: z.number(),
+
+  /** Invoice number */
+  number: z.string(),
+
+  /** Issuing date */
+  issuing_date: z.string(),
+
+  /** Payment due date */
+  payment_due_date: z.string().nullable(),
+
+  /** Invoice type: credit, one_off, subscription, advance_charges */
+  invoice_type: z.string(),
+
+  /** Invoice status: draft, finalized, voided, pending, failed */
+  status: z.string(),
+
+  /** Payment status: pending, succeeded, failed */
+  payment_status: z.string(),
+
+  /** Currency code */
+  currency: z.string(),
+
+  /** Total amount in cents */
+  total_amount_cents: z.number(),
+
+  /** Taxes amount in cents */
+  taxes_amount_cents: z.number(),
+
+  /** Sub-total excluding taxes in cents */
+  sub_total_excluding_taxes_amount_cents: z.number(),
+
+  /** Customer external ID */
+  external_customer_id: z.string().optional(),
+
+  /** Created at timestamp */
+  created_at: z.string().optional(),
+
+  /** Updated at timestamp */
+  updated_at: z.string().optional(),
+});
+
+export type LagoInvoice = z.infer<typeof LagoInvoiceSchema>;
 
 /**
  * Request body for creating a Lago event

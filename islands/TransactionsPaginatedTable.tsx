@@ -5,20 +5,20 @@ import {
 import { Badge } from "@/components/ui/badge.tsx";
 import { Activity, Calendar, Hash, Zap } from "lucide-preact";
 import type { SyncedTransactionEvent } from "@/src/db/schema.ts";
+import { formatDate } from "@/src/lib/utils/format.ts";
+
+type TransactionEventWithTag = SyncedTransactionEvent & {
+  ocppTag?: string | null;
+};
 
 interface Props {
-  events: SyncedTransactionEvent[];
+  events: TransactionEventWithTag[];
   totalCount?: number;
   pageSize?: number;
   showLoadMore?: boolean;
 }
 
-function formatDate(date: Date | null): string {
-  if (!date) return "-";
-  return new Date(date).toLocaleString();
-}
-
-const columns: PaginatedTableColumn<SyncedTransactionEvent>[] = [
+const columns: PaginatedTableColumn<TransactionEventWithTag>[] = [
   {
     key: "transactionId",
     header: "Transaction ID",
@@ -37,7 +37,7 @@ const columns: PaginatedTableColumn<SyncedTransactionEvent>[] = [
     render: (event) => (
       <div className="flex items-center gap-2">
         <Hash className="size-4 text-muted-foreground" />
-        <span>{event.ocppTagId}</span>
+        <span>{event.ocppTag ?? "—"}</span>
       </div>
     ),
   },
@@ -47,7 +47,7 @@ const columns: PaginatedTableColumn<SyncedTransactionEvent>[] = [
     render: (event) => (
       <div className="flex items-center gap-2">
         <Activity className="size-4 text-accent" />
-        <span className="font-medium">{event.kwhDelta.toFixed(2)}</span>
+        <span className="font-medium">{Number(event.kwhDelta).toFixed(2)}</span>
         {event.isFinal && (
           <Badge variant="outline" className="text-xs">Final</Badge>
         )}
@@ -59,7 +59,7 @@ const columns: PaginatedTableColumn<SyncedTransactionEvent>[] = [
     header: "Lago Event ID",
     className: "font-mono text-xs text-muted-foreground max-w-[200px] truncate",
     render: (event) => (
-      <span title={event.lagoEventId}>{event.lagoEventId}</span>
+      <span title={event.lagoEventTransactionId}>{event.lagoEventTransactionId}</span>
     ),
   },
   {
@@ -81,12 +81,12 @@ export default function TransactionsPaginatedTable({
   pageSize = 15,
   showLoadMore = true,
 }: Props) {
-  const handleRowClick = (event: SyncedTransactionEvent) => {
+  const handleRowClick = (event: TransactionEventWithTag) => {
     globalThis.location.href = `/transactions/${event.steveTransactionId}`;
   };
 
   return (
-    <PaginatedTable
+    <PaginatedTable<TransactionEventWithTag>
       initialItems={events}
       columns={columns}
       totalCount={totalCount}

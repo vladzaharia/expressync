@@ -7,6 +7,7 @@ import {
 } from "./ui/sidebar.tsx";
 import ThemeToggle, { useThemeToggle } from "../islands/ThemeToggle.tsx";
 import {
+  BatteryCharging,
   LayoutDashboard,
   Link2,
   LogOut,
@@ -15,6 +16,7 @@ import {
   Receipt,
   RefreshCw,
   User,
+  Users,
 } from "lucide-preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip.tsx";
@@ -67,10 +69,22 @@ export const mainNavItems: Array<{
     accentColor: "green",
   },
   {
+    title: "Chargers",
+    url: "/chargers",
+    icon: BatteryCharging,
+    accentColor: "orange",
+  },
+  {
     title: "Sync",
     url: "/sync",
     icon: RefreshCw,
     accentColor: "blue",
+  },
+  {
+    title: "Users",
+    url: "/users",
+    icon: Users,
+    accentColor: "amber",
   },
 ];
 

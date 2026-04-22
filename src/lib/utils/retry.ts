@@ -97,36 +97,3 @@ export async function retry<T>(
   throw lastError!;
 }
 
-/**
- * Retry a function with custom retry logic
- *
- * @param fn - The async function to retry
- * @param shouldRetry - Function to determine if we should retry based on the error
- * @param maxAttempts - Maximum number of attempts
- * @returns The result of the function
- */
-export async function retryIf<T>(
-  fn: () => Promise<T>,
-  shouldRetry: (error: Error, attempt: number) => boolean,
-  maxAttempts: number = 3,
-): Promise<T> {
-  let lastError: Error;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error as Error;
-
-      if (attempt === maxAttempts || !shouldRetry(lastError, attempt)) {
-        throw lastError;
-      }
-
-      console.warn(
-        `[RetryIf] Attempt ${attempt}/${maxAttempts} failed: ${lastError.message}. Retrying...`,
-      );
-    }
-  }
-
-  throw lastError!;
-}

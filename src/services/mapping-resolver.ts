@@ -92,7 +92,7 @@ export function buildMappingLookupWithInheritance(
   // First, create a map of direct mappings
   const directMappingsByTag = new Map(
     directMappings
-      .filter((m) => m.lagoSubscriptionExternalId) // Only mappings with subscriptions
+      .filter((m) => m.lagoSubscriptionExternalId || m.lagoCustomerExternalId) // Mappings with subscriptions or customer IDs
       .map((m) => [m.steveOcppIdTag, m]),
   );
 
@@ -140,11 +140,16 @@ export function buildMappingLookupWithInheritance(
  * 2. Find the first active subscription
  * 3. Return that subscription's external ID
  *
+ * An optional cache can be provided to avoid redundant Lago API calls
+ * when multiple transactions share the same customer.
+ *
  * @param mapping - The user mapping (may have null subscription)
+ * @param cache - Optional Map keyed by lagoCustomerExternalId to cache resolved subscription IDs
  * @returns The subscription external ID, or null if none found
  */
 export async function resolveSubscriptionId(
   mapping: UserMapping,
+  cache?: Map<string, string | null>,
 ): Promise<string | null> {
   // If mapping already has a subscription, use it
   if (mapping.lagoSubscriptionExternalId) {
@@ -171,6 +176,21 @@ export async function resolveSubscriptionId(
     return null;
   }
 
+  // Check cache first to avoid redundant Lago API calls
+  if (cache && cache.has(mapping.lagoCustomerExternalId)) {
+    const cached = cache.get(mapping.lagoCustomerExternalId)!;
+    logger.debug(
+      "MappingResolver",
+      "Using cached subscription for customer",
+      {
+        mappingId: mapping.id,
+        customerId: mapping.lagoCustomerExternalId,
+        cachedSubscriptionId: cached,
+      },
+    );
+    return cached;
+  }
+
   logger.info("MappingResolver", "Auto-selecting subscription for customer", {
     mappingId: mapping.id,
     customerId: mapping.lagoCustomerExternalId,
@@ -178,9 +198,7 @@ export async function resolveSubscriptionId(
 
   try {
     // Fetch all subscriptions for the customer
-    const { subscriptions } = await lagoClient.getSubscriptions({
-      external_customer_id: mapping.lagoCustomerExternalId,
-    });
+    const { subscriptions } = await lagoClient.getSubscriptions(mapping.lagoCustomerExternalId);
 
     // Find first active subscription
     const activeSubscription = subscriptions.find(
@@ -193,6 +211,10 @@ export async function resolveSubscriptionId(
         subscriptionId: activeSubscription.external_id,
         subscriptionName: activeSubscription.name,
       });
+      // Cache the result
+      if (cache) {
+        cache.set(mapping.lagoCustomerExternalId, activeSubscription.external_id);
+      }
       return activeSubscription.external_id;
     }
 
@@ -205,6 +227,10 @@ export async function resolveSubscriptionId(
         totalSubscriptions: subscriptions.length,
       },
     );
+    // Cache null result too, to avoid retrying for the same customer
+    if (cache) {
+      cache.set(mapping.lagoCustomerExternalId, null);
+    }
     return null;
   } catch (error) {
     logger.error(

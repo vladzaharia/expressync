@@ -1,4 +1,5 @@
 import { useSignal } from "@preact/signals";
+import { toast } from "sonner";
 import { Loader2, RefreshCw } from "lucide-preact";
 import { CHROME_SIZE } from "@/components/AppSidebar.tsx";
 
@@ -16,9 +17,11 @@ export default function SyncControls() {
         setTimeout(() => {
           globalThis.location.reload();
         }, 500);
+      } else {
+        toast.error("Failed to trigger sync");
       }
     } catch (_e) {
-      // Silent fail
+      toast.error("Failed to trigger sync");
     } finally {
       loading.value = false;
     }

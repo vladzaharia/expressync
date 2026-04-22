@@ -1,8 +1,9 @@
 import {
   boolean,
+  index,
   integer,
+  numeric,
   pgTable,
-  real,
   serial,
   text,
   timestamp,
@@ -23,8 +24,9 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false),
   image: text("image"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  role: text("role").notNull().default("admin"), // "admin" | "customer"
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
 /**
@@ -36,11 +38,11 @@ export const sessions = pgTable("sessions", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   token: text("token").notNull().unique(),
-  expiresAt: timestamp("expires_at").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
 /**
@@ -56,12 +58,12 @@ export const accounts = pgTable("accounts", {
   providerId: text("provider_id").notNull(), // "credential" for email/password
   accessToken: text("access_token"),
   refreshToken: text("refresh_token"),
-  accessTokenExpiresAt: timestamp("access_token_expires_at"),
-  refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+  accessTokenExpiresAt: timestamp("access_token_expires_at", { withTimezone: true }),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at", { withTimezone: true }),
   scope: text("scope"),
   password: text("password"), // Hashed password for credential provider
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
 /**
@@ -71,9 +73,9 @@ export const verifications = pgTable("verifications", {
   id: text("id").primaryKey(),
   identifier: text("identifier").notNull(), // Email address
   value: text("value").notNull(), // Verification token
-  expiresAt: timestamp("expires_at").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
 // ============================================================================
@@ -106,9 +108,12 @@ export const userMappings = pgTable("user_mappings", {
   isActive: boolean("is_active").default(true),
 
   // Timestamps
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index("idx_user_mappings_is_active").on(table.isActive),
+  index("idx_user_mappings_lago_customer_external_id").on(table.lagoCustomerExternalId),
+]);
 
 /**
  * Sync Runs - Tracks each sync execution
@@ -119,8 +124,8 @@ export const syncRuns = pgTable("sync_runs", {
   id: serial("id").primaryKey(),
 
   // Timing
-  startedAt: timestamp("started_at").notNull().defaultNow(),
-  completedAt: timestamp("completed_at"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
 
   // Status: "running" | "completed" | "failed"
   status: text("status").notNull().default("running"),
@@ -140,7 +145,10 @@ export const syncRuns = pgTable("sync_runs", {
 
   // Error tracking (JSON array of error messages)
   errors: text("errors"),
-});
+}, (table) => [
+  index("idx_sync_runs_status").on(table.status),
+  index("idx_sync_runs_started_at").on(table.startedAt),
+]);
 
 /**
  * Sync Run Logs - Detailed logs for each sync run segment
@@ -169,8 +177,10 @@ export const syncRunLogs = pgTable("sync_run_logs", {
   context: text("context"),
 
   // Timestamp
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("idx_sync_run_logs_sync_run_id_created_at").on(table.syncRunId, table.createdAt),
+]);
 
 /**
  * Transaction Sync State - Tracks incremental meter readings per transaction
@@ -192,7 +202,7 @@ export const transactionSyncState = pgTable("transaction_sync_state", {
   lastSyncedMeterValue: integer("last_synced_meter_value").notNull(),
 
   // Total kWh billed so far for this transaction
-  totalKwhBilled: real("total_kwh_billed").default(0),
+  totalKwhBilled: numeric("total_kwh_billed", { precision: 12, scale: 6 }).default("0"),
 
   // Reference to the last sync run that updated this
   lastSyncRunId: integer("last_sync_run_id").references(() => syncRuns.id),
@@ -201,8 +211,8 @@ export const transactionSyncState = pgTable("transaction_sync_state", {
   isFinalized: boolean("is_finalized").default(false),
 
   // Timestamps
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
 /**
@@ -229,7 +239,7 @@ export const syncedTransactionEvents = pgTable("synced_transaction_events", {
     .references(() => userMappings.id),
 
   // Usage details for this event (delta, not total)
-  kwhDelta: real("kwh_delta").notNull(),
+  kwhDelta: numeric("kwh_delta", { precision: 12, scale: 6 }).notNull(),
 
   // Meter values at time of this event
   meterValueFrom: integer("meter_value_from").notNull(), // Base (Wh)
@@ -243,8 +253,11 @@ export const syncedTransactionEvents = pgTable("synced_transaction_events", {
     .references(() => syncRuns.id),
 
   // When this event was created/sent
-  syncedAt: timestamp("synced_at").defaultNow(),
-});
+  syncedAt: timestamp("synced_at", { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index("idx_synced_transaction_events_sync_run_id").on(table.syncRunId),
+  index("idx_synced_transaction_events_steve_transaction_id").on(table.steveTransactionId),
+]);
 
 // ============================================================================
 // TYPE EXPORTS

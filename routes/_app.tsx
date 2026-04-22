@@ -1,9 +1,7 @@
 import { define } from "../utils.ts";
+import { Toaster } from "sonner";
 
-export default define.page(function App({ Component, state, url }) {
-  // Don't show navbar on login page - we'll use sidebar layout instead
-  const isLoginPage = url.pathname === "/login";
-
+export default define.page(function App({ Component }) {
   return (
     <html lang="en" class="dark">
       <head>
@@ -30,6 +28,7 @@ export default define.page(function App({ Component, state, url }) {
       </head>
       <body class="min-h-screen bg-background text-foreground antialiased">
         <Component />
+        <Toaster richColors position="bottom-right" />
       </body>
     </html>
   );

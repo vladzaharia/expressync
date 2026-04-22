@@ -1,5 +1,6 @@
 import { define } from "../../../utils.ts";
 import { triggerSync } from "../../../src/services/sync-notifier.service.ts";
+import { logger } from "../../../src/lib/utils/logger.ts";
 
 /**
  * POST /api/sync/trigger
@@ -13,12 +14,11 @@ import { triggerSync } from "../../../src/services/sync-notifier.service.ts";
 export const handler = define.handlers({
   async POST(_req) {
     try {
-      console.log("[API] Manual sync triggered via notification");
+      logger.info("API", "Manual sync triggered via notification");
       await triggerSync("api");
 
       return new Response(
         JSON.stringify({
-          success: true,
           message: "Sync trigger notification sent to worker",
         }),
         {
@@ -27,12 +27,9 @@ export const handler = define.handlers({
         },
       );
     } catch (error) {
-      console.error("[API] Failed to trigger sync:", error);
+      logger.error("API", "Failed to trigger sync", error as Error);
       return new Response(
-        JSON.stringify({
-          success: false,
-          error: (error as Error).message,
-        }),
+        JSON.stringify({ error: "Failed to trigger sync" }),
         {
           status: 500,
           headers: { "Content-Type": "application/json" },

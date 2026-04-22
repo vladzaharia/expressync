@@ -1,5 +1,6 @@
 import { define } from "../../../utils.ts";
 import { steveClient } from "../../../src/lib/steve-client.ts";
+import { logger } from "../../../src/lib/utils/logger.ts";
 
 export const handler = define.handlers({
   async GET(_ctx) {
@@ -19,7 +20,7 @@ export const handler = define.handlers({
         headers: { "Content-Type": "application/json" },
       });
     } catch (error) {
-      console.error("Failed to fetch OCPP tags:", error);
+      logger.error("API", "Failed to fetch OCPP tags", error as Error);
       return new Response(
         JSON.stringify({ error: "Failed to fetch OCPP tags" }),
         { status: 500, headers: { "Content-Type": "application/json" } },
@@ -64,7 +65,7 @@ export const handler = define.handlers({
         { status: 201, headers: { "Content-Type": "application/json" } },
       );
     } catch (error) {
-      console.error("Failed to create OCPP tag:", error);
+      logger.error("API", "Failed to create OCPP tag", error as Error);
       const message = error instanceof Error
         ? error.message
         : "Failed to create OCPP tag";

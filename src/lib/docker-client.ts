@@ -62,7 +62,7 @@ export class DockerClient {
       // Read response
       const reader = conn.readable.getReader();
       const decoder = new TextDecoder();
-      let buffer = "";
+      let rawBuffer = new Uint8Array(0);
       let headersParsed = false;
 
       try {
@@ -70,13 +70,35 @@ export class DockerClient {
           const { done, value } = await reader.read();
           if (done) break;
 
-          buffer += decoder.decode(value, { stream: true });
+          // Append new bytes to raw buffer
+          const tmp = new Uint8Array(rawBuffer.length + value.length);
+          tmp.set(rawBuffer);
+          tmp.set(value, rawBuffer.length);
+          rawBuffer = tmp;
 
-          // Skip HTTP headers on first chunk
+          // Parse and validate HTTP headers before processing frames
           if (!headersParsed) {
-            const headerEnd = buffer.indexOf("\r\n\r\n");
+            // Look for end-of-headers in raw bytes
+            const headerStr = decoder.decode(rawBuffer, { stream: true });
+            const headerEnd = headerStr.indexOf("\r\n\r\n");
             if (headerEnd !== -1) {
-              buffer = buffer.slice(headerEnd + 4);
+              // Validate HTTP status code
+              const headerSection = headerStr.slice(0, headerEnd);
+              const statusMatch = headerSection.match(
+                /^HTTP\/\d\.\d\s+(\d+)/,
+              );
+              if (!statusMatch || parseInt(statusMatch[1], 10) >= 400) {
+                const statusCode = statusMatch ? statusMatch[1] : "unknown";
+                throw new Error(
+                  `Docker API returned HTTP ${statusCode} for ${this.containerName}`,
+                );
+              }
+
+              // Find byte offset of header end
+              const headerBytes = new TextEncoder().encode(
+                headerStr.slice(0, headerEnd + 4),
+              );
+              rawBuffer = rawBuffer.slice(headerBytes.length);
               headersParsed = true;
             } else {
               continue;
@@ -85,17 +107,14 @@ export class DockerClient {
 
           // Docker log stream format: 8-byte header + payload
           // Header: [stream_type(1), 0, 0, 0, size(4)]
-          while (buffer.length >= 8) {
-            const header = new Uint8Array(
-              buffer.slice(0, 8).split("").map((c) => c.charCodeAt(0)),
-            );
-            const size = (header[4] << 24) | (header[5] << 16) |
-              (header[6] << 8) | header[7];
+          while (rawBuffer.length >= 8) {
+            const size = (rawBuffer[4] << 24) | (rawBuffer[5] << 16) |
+              (rawBuffer[6] << 8) | rawBuffer[7];
 
-            if (buffer.length < 8 + size) break;
+            if (rawBuffer.length < 8 + size) break;
 
-            const payload = buffer.slice(8, 8 + size);
-            buffer = buffer.slice(8 + size);
+            const payload = decoder.decode(rawBuffer.slice(8, 8 + size));
+            rawBuffer = rawBuffer.slice(8 + size);
 
             // Yield each line
             const lines = payload.split("\n").filter((l) => l.trim());

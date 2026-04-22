@@ -4,14 +4,23 @@ import * as schema from "../../../src/db/schema.ts";
 import { eq } from "drizzle-orm";
 import { steveClient } from "../../../src/lib/steve-client.ts";
 import { getAllChildTags } from "../../../src/lib/tag-hierarchy.ts";
+import { logger } from "../../../src/lib/utils/logger.ts";
 
 export const handler = define.handlers({
   // Get all mappings
   async GET(_ctx) {
-    const mappings = await db.select().from(schema.userMappings);
-    return new Response(JSON.stringify(mappings), {
-      headers: { "Content-Type": "application/json" },
-    });
+    try {
+      const mappings = await db.select().from(schema.userMappings);
+      return new Response(JSON.stringify(mappings), {
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      logger.error("API", "Failed to fetch mappings", error as Error);
+      return new Response(
+        JSON.stringify({ error: "Failed to fetch mappings" }),
+        { status: 500, headers: { "Content-Type": "application/json" } },
+      );
+    }
   },
 
   // Create new mapping
@@ -71,10 +80,7 @@ export const handler = define.handlers({
           childMappings.push(childMapping);
         } catch (error) {
           // Skip if child mapping already exists
-          console.warn(
-            `Failed to create mapping for child tag ${childTag.idTag}:`,
-            error,
-          );
+          logger.warn("API", `Failed to create mapping for child tag ${childTag.idTag}`, error as Error);
         }
       }
 
@@ -90,7 +96,7 @@ export const handler = define.handlers({
         },
       );
     } catch (error) {
-      console.error("Failed to create mapping:", error);
+      logger.error("API", "Failed to create mapping", error as Error);
       return new Response(
         JSON.stringify({ error: "Failed to create mapping" }),
         { status: 500, headers: { "Content-Type": "application/json" } },
@@ -171,7 +177,7 @@ export const handler = define.handlers({
         headers: { "Content-Type": "application/json" },
       });
     } catch (error) {
-      console.error("Failed to update mapping:", error);
+      logger.error("API", "Failed to update mapping", error as Error);
       return new Response(
         JSON.stringify({ error: "Failed to update mapping" }),
         { status: 500, headers: { "Content-Type": "application/json" } },
@@ -231,7 +237,7 @@ export const handler = define.handlers({
         },
       );
     } catch (error) {
-      console.error("Failed to delete mapping:", error);
+      logger.error("API", "Failed to delete mapping", error as Error);
       return new Response(
         JSON.stringify({ error: "Failed to delete mapping" }),
         { status: 500, headers: { "Content-Type": "application/json" } },

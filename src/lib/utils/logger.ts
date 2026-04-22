@@ -5,9 +5,9 @@
  * Controlled via DEBUG_LEVEL environment variable.
  *
  * Log Levels:
- * - ERROR: Only errors (default)
+ * - ERROR: Only errors
  * - WARN: Warnings and errors
- * - INFO: Info, warnings, and errors
+ * - INFO: Info, warnings, and errors (default)
  * - DEBUG: All logs including detailed debug information
  *
  * Usage:
@@ -36,7 +36,7 @@ class Logger {
     DEBUG: 3,
   };
 
-  constructor(level: LogLevel = "ERROR") {
+  constructor(level: LogLevel = "INFO") {
     this.level = level;
   }
 
@@ -62,7 +62,7 @@ class Logger {
   }
 
   /**
-   * Format a log message with timestamp and context
+   * Format a log message as single-line JSON for log aggregation
    */
   private formatMessage(
     level: LogLevel,
@@ -70,23 +70,21 @@ class Logger {
     message: string,
     context?: LogContext | Error,
   ): string {
-    const timestamp = new Date().toISOString();
-    const prefix = `[${timestamp}] [${level}] [${category}]`;
-
-    if (!context) {
-      return `${prefix} ${message}`;
-    }
+    const base: Record<string, unknown> = {
+      timestamp: new Date().toISOString(),
+      level,
+      category,
+      message,
+    };
 
     if (context instanceof Error) {
-      return `${prefix} ${message}\n  Error: ${context.message}\n  Stack: ${context.stack}`;
+      base.error = context.message;
+      base.stack = context.stack;
+    } else if (context) {
+      Object.assign(base, context);
     }
 
-    // Format context object
-    const contextStr = Object.keys(context).length > 0
-      ? `\n  ${JSON.stringify(context, null, 2).split("\n").join("\n  ")}`
-      : "";
-
-    return `${prefix} ${message}${contextStr}`;
+    return JSON.stringify(base);
   }
 
   /**
@@ -143,7 +141,7 @@ class Logger {
 }
 
 // Get log level from environment variable
-const DEBUG_LEVEL = (Deno.env.get("DEBUG_LEVEL") || "ERROR") as LogLevel;
+const DEBUG_LEVEL = (Deno.env.get("DEBUG_LEVEL") || "INFO") as LogLevel;
 
 // Export singleton logger instance
 export const logger = new Logger(DEBUG_LEVEL);

@@ -2,6 +2,7 @@ import { define } from "../../../utils.ts";
 import { db } from "../../../src/db/index.ts";
 import * as schema from "../../../src/db/schema.ts";
 import { count, desc } from "drizzle-orm";
+import { logger } from "../../../src/lib/utils/logger.ts";
 
 /**
  * GET /api/sync
@@ -20,7 +21,19 @@ export const handler = define.handlers({
     try {
       const url = new URL(ctx.req.url);
       const skip = parseInt(url.searchParams.get("skip") || "0");
+      if (isNaN(skip) || skip < 0) {
+        return new Response(
+          JSON.stringify({ error: "Invalid skip parameter" }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
       const limit = parseInt(url.searchParams.get("limit") || "15");
+      if (isNaN(limit) || limit < 1 || limit > 100) {
+        return new Response(
+          JSON.stringify({ error: "Invalid limit parameter (1-100)" }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
 
       // Get total count
       const [{ value: total }] = await db
@@ -48,7 +61,7 @@ export const handler = define.handlers({
         },
       );
     } catch (error) {
-      console.error("Failed to fetch sync runs:", error);
+      logger.error("API", "Failed to fetch sync runs", error as Error);
       return new Response(
         JSON.stringify({ error: "Failed to fetch sync runs" }),
         {

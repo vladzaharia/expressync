@@ -13,48 +13,44 @@ export interface ProcessedTransaction {
   isFinal: boolean;
   lagoEventTransactionId: string;
   shouldSendToLago: boolean; // False if no subscription available
+  stopTimestamp: string | null; // ISO timestamp of when the transaction stopped
 }
 
 export interface TransactionWithCompletion extends StEvETransaction {
+  /** Always true in the current post-transaction billing model (only completed transactions are processed). */
   isCompleted: boolean;
 }
 
 /**
- * Calculate kWh delta for a transaction
+ * Calculate total kWh for a completed transaction
  *
- * @param tx - The transaction from StEvE
- * @param syncState - Existing sync state (if any)
- * @returns Delta in kWh, or null if no new usage
+ * Uses post-transaction billing: one event per completed session
+ * with total energy delivered (stopValue - startValue).
+ *
+ * @param tx - The completed transaction from StEvE
+ * @returns Total kWh and meter range, or null if invalid
  */
 export function calculateDelta(
   tx: TransactionWithCompletion,
-  syncState: TransactionSyncState | null,
 ): { kwhDelta: number; meterValueFrom: number; meterValueTo: number } | null {
-  // Determine current meter value
-  const currentValue = tx.isCompleted
-    ? parseInt(tx.stopValue!, 10) // Completed: use stop value
-    : parseInt((tx as any).latestMeterValue || tx.startValue, 10); // Active: use latest or start
+  // Only bill completed transactions
+  if (!tx.isCompleted || !tx.stopValue) {
+    return null;
+  }
 
-  // Determine base meter value (where we left off last time)
-  const baseValue = syncState
-    ? syncState.lastSyncedMeterValue // Use last synced value
-    : parseInt(tx.startValue, 10); // First time: use start value
+  const startValue = parseInt(tx.startValue, 10);
+  const stopValue = parseInt(tx.stopValue, 10);
+  const deltaWh = stopValue - startValue;
 
-  // Calculate delta in Wh
-  const deltaWh = currentValue - baseValue;
-
-  // Skip if no new usage (or negative, which shouldn't happen)
+  // Skip if no usage (or negative, which shouldn't happen)
   if (deltaWh <= 0) {
     return null;
   }
 
-  // Convert Wh to kWh
-  const kwhDelta = deltaWh / 1000;
-
   return {
-    kwhDelta,
-    meterValueFrom: baseValue,
-    meterValueTo: currentValue,
+    kwhDelta: deltaWh / 1000,
+    meterValueFrom: startValue,
+    meterValueTo: stopValue,
   };
 }
 
@@ -64,14 +60,13 @@ export function calculateDelta(
  * @param tx - Transaction from StEvE
  * @param syncState - Existing sync state (if any)
  * @param mapping - User mapping for this OCPP tag
- * @param syncRunId - Current sync run ID
  * @returns Processed transaction data, or null if should be skipped
  */
 export async function processTransaction(
   tx: TransactionWithCompletion,
   syncState: TransactionSyncState | null,
   mapping: UserMapping | undefined,
-  syncRunId: number,
+  subscriptionCache?: Map<string, string | null>,
 ): Promise<ProcessedTransaction | null> {
   logger.debug("TransactionProcessor", "Processing transaction", {
     transactionId: tx.id,
@@ -107,7 +102,7 @@ export async function processTransaction(
   }
 
   // Try to resolve subscription (auto-select if not specified)
-  const subscriptionId = await resolveSubscriptionId(mapping);
+  const subscriptionId = await resolveSubscriptionId(mapping, subscriptionCache);
 
   if (!subscriptionId) {
     logger.warn(
@@ -124,7 +119,7 @@ export async function processTransaction(
   }
 
   // Calculate delta
-  const delta = calculateDelta(tx, syncState);
+  const delta = calculateDelta(tx);
 
   if (!delta) {
     logger.debug("TransactionProcessor", "No new usage, skipping", {
@@ -141,8 +136,8 @@ export async function processTransaction(
   });
 
   // Generate unique transaction ID for Lago (for idempotency)
-  // Format: steve_tx_{id}_sync_{syncRunId}
-  const lagoEventTransactionId = `steve_tx_${tx.id}_sync_${syncRunId}`;
+  // Post-transaction billing: one event per completed session, deterministic ID
+  const lagoEventTransactionId = `steve_tx_${tx.id}_final`;
 
   const result = {
     steveTransactionId: tx.id,
@@ -154,6 +149,7 @@ export async function processTransaction(
     isFinal: tx.isCompleted,
     lagoEventTransactionId,
     shouldSendToLago: !!subscriptionId, // Only send if we have a subscription
+    stopTimestamp: tx.stopTimestamp,
   };
 
   logger.debug("TransactionProcessor", "Transaction processed successfully", {
@@ -173,29 +169,30 @@ export async function processTransaction(
  * @param transactions - Map of transactions from StEvE
  * @param syncStates - Map of existing sync states
  * @param mappings - Map of user mappings by OCPP tag
- * @param syncRunId - Current sync run ID
  * @returns Array of processed transactions
  */
 export async function processTransactions(
   transactions: Map<number, TransactionWithCompletion>,
   syncStates: Map<number, TransactionSyncState>,
   mappings: Map<string, UserMapping>,
-  syncRunId: number,
 ): Promise<ProcessedTransaction[]> {
   logger.info("TransactionProcessor", "Processing batch of transactions", {
     totalTransactions: transactions.size,
     syncStatesCount: syncStates.size,
     mappingsCount: mappings.size,
-    syncRunId,
   });
 
   const processed: ProcessedTransaction[] = [];
+
+  // Per-invocation cache for subscription lookups to avoid redundant Lago API calls
+  // when multiple transactions share the same customer
+  const subscriptionCache = new Map<string, string | null>();
 
   for (const [txId, tx] of transactions) {
     const syncState = syncStates.get(txId) || null;
     const mapping = mappings.get(tx.ocppIdTag);
 
-    const result = await processTransaction(tx, syncState, mapping, syncRunId);
+    const result = await processTransaction(tx, syncState, mapping, subscriptionCache);
 
     if (result) {
       processed.push(result);

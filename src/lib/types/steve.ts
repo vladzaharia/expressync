@@ -44,19 +44,6 @@ export const StEvETransactionSchema = z.object({
 export type StEvETransaction = z.infer<typeof StEvETransactionSchema>;
 
 /**
- * Extended transaction type with latest meter value
- * Used for active transactions during incremental sync
- */
-export const StEvETransactionWithMeterSchema = StEvETransactionSchema.extend({
-  /** Latest meter value for active transactions (Wh as string) */
-  latestMeterValue: z.string(),
-});
-
-export type StEvETransactionWithMeter = z.infer<
-  typeof StEvETransactionWithMeterSchema
->;
-
-/**
  * Zod schema for StEvE OCPP Tag
  */
 export const StEvEOcppTagSchema = z.object({
@@ -77,6 +64,18 @@ export const StEvEOcppTagSchema = z.object({
 
   /** Maximum number of active transactions allowed (-1 = unlimited, 0 = blocked) */
   maxActiveTransactionCount: z.number().nullable().optional(),
+
+  /** Whether this tag is blocked */
+  blocked: z.boolean().optional(),
+
+  /** Whether this tag is currently in a transaction */
+  inTransaction: z.boolean().optional(),
+
+  /** Number of currently active transactions */
+  activeTransactionCount: z.number().optional(),
+
+  /** Parent OCPP tag primary key */
+  parentOcppTagPk: z.number().nullable().optional(),
 });
 
 export type StEvEOcppTag = z.infer<typeof StEvEOcppTagSchema>;

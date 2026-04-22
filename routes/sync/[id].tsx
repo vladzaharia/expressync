@@ -22,6 +22,7 @@ import {
 } from "lucide-preact";
 import SyncDetailAccordion from "../../islands/SyncDetailAccordion.tsx";
 import { CHROME_SIZE } from "../../components/AppSidebar.tsx";
+import { formatDate, formatDuration } from "../../src/lib/utils/format.ts";
 
 export const handler = define.handlers({
   async GET(ctx) {
@@ -38,19 +39,6 @@ export const handler = define.handlers({
     return { data: result };
   },
 });
-
-function formatDate(date: Date | null): string {
-  if (!date) return "-";
-  return new Date(date).toLocaleString();
-}
-
-function formatDuration(start: Date, end: Date | null): string {
-  if (!end) return "Running...";
-  const ms = new Date(end).getTime() - new Date(start).getTime();
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`;
-}
 
 function BackAction() {
   return (

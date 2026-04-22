@@ -6,8 +6,6 @@ import {
   StEvEOcppTagSchema,
   type StEvETransaction,
   StEvETransactionSchema,
-  type StEvETransactionWithMeter,
-  StEvETransactionWithMeterSchema,
   type TransactionFilters,
 } from "./types/steve.ts";
 import { z } from "zod";
@@ -50,52 +48,59 @@ class StEvEClient {
         }
       }
 
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          "Content-Type": "application/json",
-          "X-API-KEY": this.apiKey,
-          ...options.headers,
-        },
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      try {
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-KEY": this.apiKey,
+            ...options.headers,
+          },
+        });
 
-      logger.debug("StEvE", "Response received", {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        logger.error("StEvE", "API request failed", {
-          method,
-          path,
+        logger.debug("StEvE", "Response received", {
           status: response.status,
           statusText: response.statusText,
-          errorBody: errorText,
+          headers: Object.fromEntries(response.headers.entries()),
         });
-        throw new Error(
-          `StEvE API error: ${response.status} ${response.statusText} - ${errorText}`,
-        );
-      }
 
-      const data = await response.json();
-      logger.debug("StEvE", "Response data received", {
-        dataType: Array.isArray(data) ? "array" : typeof data,
-        dataSize: Array.isArray(data) ? data.length : Object.keys(data).length,
-      });
+        if (!response.ok) {
+          const errorText = await response.text();
+          logger.error("StEvE", "API request failed", {
+            method,
+            path,
+            status: response.status,
+            statusText: response.statusText,
+            errorBody: errorText,
+          });
+          throw new Error(
+            `StEvE API error: ${response.status} ${response.statusText} - ${errorText}`,
+          );
+        }
 
-      // Validate response with Zod schema
-      try {
-        const validated = schema.parse(data);
-        logger.debug("StEvE", "Response validation successful");
-        return validated;
-      } catch (error) {
-        logger.error("StEvE", "Response validation failed", {
-          error: error instanceof Error ? error.message : String(error),
-          receivedDataSample: Array.isArray(data) ? data.slice(0, 2) : data,
+        const data = await response.json();
+        logger.debug("StEvE", "Response data received", {
+          dataType: Array.isArray(data) ? "array" : typeof data,
+          dataSize: Array.isArray(data) ? data.length : Object.keys(data).length,
         });
-        throw new Error(`StEvE API response validation failed: ${error}`);
+
+        // Validate response with Zod schema
+        try {
+          const validated = schema.parse(data);
+          logger.debug("StEvE", "Response validation successful");
+          return validated;
+        } catch (error) {
+          logger.error("StEvE", "Response validation failed", {
+            error: error instanceof Error ? error.message : String(error),
+            receivedDataSample: Array.isArray(data) ? data.slice(0, 2) : data,
+          });
+          throw new Error(`StEvE API response validation failed: ${error}`);
+        }
+      } finally {
+        clearTimeout(timeoutId);
       }
     }, {
       maxAttempts: 3,
@@ -145,13 +150,6 @@ class StEvEClient {
    */
   async getOcppTags(): Promise<StEvEOcppTag[]> {
     return this.request("/v1/ocppTags", z.array(StEvEOcppTagSchema));
-  }
-
-  /**
-   * Alias for getOcppTags (consistent naming)
-   */
-  async getOcppIdTags(): Promise<StEvEOcppTag[]> {
-    return this.getOcppTags();
   }
 
   /**
@@ -257,38 +255,6 @@ class StEvEClient {
    */
   async getChargeBoxes(): Promise<StEvEChargeBox[]> {
     return this.request("/v1/chargeBoxes", z.array(StEvEChargeBoxSchema));
-  }
-
-  /**
-   * Get all currently active (in-progress) transactions
-   *
-   * Used for incremental billing during charging sessions.
-   * Returns transactions that have started but not yet stopped.
-   */
-  async getActiveTransactions(): Promise<StEvETransactionWithMeter[]> {
-    logger.info("StEvE", "Fetching active transactions");
-
-    const transactions = await this.getTransactions({ type: "ACTIVE" });
-
-    logger.debug("StEvE", "Active transactions retrieved", {
-      count: transactions.length,
-      transactionIds: transactions.map((tx) => tx.id),
-    });
-
-    // For active transactions, we need to get the latest meter value
-    // StEvE may include this in the response, or we may need to fetch separately
-    const withMeter = transactions.map((tx) => ({
-      ...tx,
-      // latestMeterValue comes from StEvE's meter values endpoint or
-      // is included in the transaction response
-      latestMeterValue: (tx as any).latestMeterValue || tx.startValue,
-    }));
-
-    logger.debug("StEvE", "Meter values assigned", {
-      count: withMeter.length,
-    });
-
-    return withMeter;
   }
 
   /**

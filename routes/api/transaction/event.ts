@@ -2,6 +2,7 @@ import { define } from "../../../utils.ts";
 import { db } from "../../../src/db/index.ts";
 import * as schema from "../../../src/db/schema.ts";
 import { and, desc, gte, lte } from "drizzle-orm";
+import { logger } from "../../../src/lib/utils/logger.ts";
 
 export const handler = define.handlers({
   async GET(ctx) {
@@ -39,6 +40,7 @@ export const handler = define.handlers({
         headers: { "Content-Type": "application/json" },
       });
     } catch (error) {
+      logger.error("API", "Failed to fetch transaction events", error as Error);
       return new Response(
         JSON.stringify({ error: "Failed to fetch transaction events" }),
         { status: 500, headers: { "Content-Type": "application/json" } },

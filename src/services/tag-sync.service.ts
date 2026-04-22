@@ -212,15 +212,31 @@ export async function syncTagStatus(
         : null;
       const entityInfo = entityKey ? entityInfoMap.get(entityKey) : undefined;
 
-      // Generate note based on mapping status - ALWAYS update this
+      // Generate note based on mapping status
       const desiredNote = hasMapping && mapping
         ? generateLinkedNote(mapping, entityInfo, syncTimestamp)
         : generateUnlinkedNote(syncTimestamp);
 
-      // Always update the tag to keep the sync timestamp current
+      // Compare current state vs desired state - only update if something changed
+      // Strip timestamp line from comparison so that "Last synced on ..." alone
+      // doesn't force an update every cycle.
+      const stripTimestamp = (note: string) => note.replace(/Last synced on .+$/, '').trim();
+      const noteChanged = stripTimestamp(tag.note ?? "") !== stripTimestamp(desiredNote);
+
+      if (!statusChanged && !noteChanged) {
+        // Nothing changed, skip the API call
+        logger.debug("TagSync", "Tag unchanged, skipping update", {
+          tagId: tag.idTag,
+          hasMapping,
+        });
+        result.unchangedTags++;
+        continue;
+      }
+
       logger.info("TagSync", "Updating tag", {
         tagId: tag.idTag,
         statusChanged,
+        noteChanged,
         from: currentLimit,
         to: desiredLimit,
         hasMapping,
@@ -242,6 +258,7 @@ export async function syncTagStatus(
           result.deactivatedTags++;
         }
       } else {
+        // Note changed but status didn't
         result.unchangedTags++;
       }
     } catch (error) {

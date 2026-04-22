@@ -12,6 +12,7 @@ import {
   MinusCircle,
 } from "lucide-preact";
 import type { SyncRun } from "@/src/db/schema.ts";
+import { formatDate, formatDuration } from "@/src/lib/utils/format.ts";
 
 interface Props {
   syncRuns: SyncRun[];
@@ -20,19 +21,6 @@ interface Props {
   showLoadMore?: boolean;
   hideHeader?: boolean;
   hideFooterText?: boolean;
-}
-
-function formatDate(date: Date | null): string {
-  if (!date) return "-";
-  return new Date(date).toLocaleString();
-}
-
-function formatDuration(start: Date, end: Date | null): string {
-  if (!end) return "Running...";
-  const ms = new Date(end).getTime() - new Date(start).getTime();
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`;
 }
 
 function SegmentStatusBadge({

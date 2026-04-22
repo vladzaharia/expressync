@@ -1,4 +1,5 @@
 import { useSignal } from "@preact/signals";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
@@ -85,7 +86,7 @@ export default function TagLinkingGrid({
       if (res.ok) {
         const data = await res.json();
         if (data.deletedCount && data.deletedCount > 1) {
-          alert(
+          toast.success(
             `Deleted ${data.deletedCount} mappings (1 parent + ${
               data.deletedCount - 1
             } children)`,
@@ -93,10 +94,10 @@ export default function TagLinkingGrid({
         }
         window.location.reload();
       } else {
-        alert("Failed to delete mapping");
+        toast.error("Failed to delete mapping");
       }
     } catch (_e) {
-      alert("An error occurred");
+      toast.error("An error occurred");
     } finally {
       deleting.value = null;
     }
@@ -113,10 +114,10 @@ export default function TagLinkingGrid({
       if (res.ok) {
         window.location.reload();
       } else {
-        alert("Failed to update mapping");
+        toast.error("Failed to update mapping");
       }
     } catch (_e) {
-      alert("An error occurred");
+      toast.error("An error occurred");
     }
   };
 
