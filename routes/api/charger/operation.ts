@@ -1,7 +1,7 @@
 import { define } from "../../../utils.ts";
 import { db } from "../../../src/db/index.ts";
 import * as schema from "../../../src/db/schema.ts";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { steveClient } from "../../../src/lib/steve-client.ts";
 import {
   ALLOWED_OPERATIONS,
@@ -66,6 +66,72 @@ const OPERATION_DISPATCHERS: Record<
  * and will be rejected here — use the StEvE admin UI instead.
  */
 export const handler = define.handlers({
+  /**
+   * GET /api/charger/operation?chargeBoxId=...&limit=5
+   *
+   * Returns a compact list of recent operation log rows for the given
+   * chargeBoxId, newest first. Used by the RecentOperationsStrip island.
+   * Requires `chargeBoxId` — a site-wide listing would bypass admin audit
+   * intent (use /admin/operation-log instead).
+   */
+  async GET(ctx) {
+    const url = new URL(ctx.req.url);
+    const chargeBoxId = url.searchParams.get("chargeBoxId");
+    const limitRaw = url.searchParams.get("limit");
+    const limit = Math.max(
+      1,
+      Math.min(50, Number.parseInt(limitRaw ?? "10", 10) || 10),
+    );
+
+    if (!chargeBoxId) {
+      return jsonResponse(400, { error: "chargeBoxId is required" });
+    }
+
+    try {
+      const rows = await db
+        .select({
+          id: schema.chargerOperationLog.id,
+          operation: schema.chargerOperationLog.operation,
+          status: schema.chargerOperationLog.status,
+          taskId: schema.chargerOperationLog.taskId,
+          createdAt: schema.chargerOperationLog.createdAt,
+          completedAt: schema.chargerOperationLog.completedAt,
+          result: schema.chargerOperationLog.result,
+          requestedByEmail: schema.users.email,
+        })
+        .from(schema.chargerOperationLog)
+        .leftJoin(
+          schema.users,
+          eq(schema.chargerOperationLog.requestedByUserId, schema.users.id),
+        )
+        .where(eq(schema.chargerOperationLog.chargeBoxId, chargeBoxId))
+        .orderBy(desc(schema.chargerOperationLog.createdAt))
+        .limit(limit);
+
+      return jsonResponse(200, {
+        rows: rows.map((r) => ({
+          id: r.id,
+          operation: r.operation,
+          status: r.status,
+          taskId: r.taskId,
+          createdAt: r.createdAt ? r.createdAt.toISOString() : null,
+          completedAt: r.completedAt ? r.completedAt.toISOString() : null,
+          result: r.result ?? null,
+          requestedByEmail: r.requestedByEmail ?? null,
+        })),
+      });
+    } catch (error) {
+      logger.error(
+        "API",
+        "Failed to list charger operation log rows",
+        error as Error,
+      );
+      return jsonResponse(500, {
+        error: "Failed to list operation log rows",
+      });
+    }
+  },
+
   async POST(ctx) {
     let body: {
       chargeBoxId?: unknown;
