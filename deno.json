@@ -22,12 +22,15 @@
   },
   "exclude": [
     "**/_fresh/*",
-    ".claude/**"
+    ".claude/**",
+    "cloudflare/**"
   ],
   "imports": {
     "@/": "./",
     "fresh": "jsr:@fresh/core@^2.2.0",
     "preact": "npm:preact@^10.28.1",
+    "preact-render-to-string": "npm:preact-render-to-string@^6.5.0",
+    "juice": "npm:juice@^11.0.0",
     "@preact/signals": "npm:@preact/signals@^2.5.1",
     "@fresh/plugin-vite": "jsr:@fresh/plugin-vite@^1.0.8",
     "vite": "npm:vite@^7.1.3",
