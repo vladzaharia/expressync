@@ -19,6 +19,7 @@ import { db } from "../db/index.ts";
 import * as schema from "../db/schema.ts";
 import type { Reservation, ReservationStatus } from "../db/schema.ts";
 import { logger } from "../lib/utils/logger.ts";
+import { steveClient } from "../lib/steve-client.ts";
 
 export interface ConflictRow {
   id: number;
@@ -217,6 +218,40 @@ export async function createReservation(
     reservation = updated ?? inserted;
   }
 
+  // Dispatch ReserveNow to StEvE. Non-blocking — a StEvE outage must not
+  // break local reservation creation, so we log+swallow failures and leave
+  // `steve_reservation_id = null`. The row stays at `status='pending'`;
+  // transition to `confirmed` is the responsibility of a future task-
+  // resolver that polls `steveClient.operations.getTask(taskId)` and
+  // interprets the async ReserveNow response. TODO: build that resolver
+  // (likely a cron + webhook-on-StatusNotification combo).
+  try {
+    const taskResult = await steveClient.operations.reserveNow({
+      chargeBoxId: reservation.chargeBoxId,
+      connectorId: reservation.connectorId,
+      expiry: (reservation.endAt ?? input.endAt).toISOString(),
+      idTag: reservation.steveOcppIdTag,
+    });
+    if (taskResult && typeof taskResult.taskId === "number") {
+      const [updated] = await db
+        .update(schema.reservations)
+        .set({
+          steveReservationId: taskResult.taskId,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.reservations.id, reservation.id))
+        .returning();
+      reservation = updated ?? reservation;
+    }
+  } catch (err) {
+    logger.warn("Reservations", "StEvE ReserveNow dispatch failed", {
+      reservationId: reservation.id,
+      chargeBoxId: reservation.chargeBoxId,
+      connectorId: reservation.connectorId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   return { reservation, conflicts: [] };
 }
 
@@ -235,6 +270,28 @@ export async function cancelReservation(
 
   if (!existing) return null;
   if (existing.status === "cancelled") return existing;
+
+  // Best-effort StEvE CancelReservation dispatch BEFORE we flip the row so
+  // the StEvE side gets a chance to tear down the reservation even if our
+  // status update races with a concurrent cancellation. Non-blocking: a
+  // StEvE outage must not prevent local cancellation.
+  if (
+    existing.steveReservationId !== null &&
+    (existing.status === "pending" || existing.status === "confirmed")
+  ) {
+    try {
+      await steveClient.operations.cancelReservation({
+        chargeBoxId: existing.chargeBoxId,
+        reservationId: existing.steveReservationId,
+      });
+    } catch (err) {
+      logger.warn("Reservations", "StEvE CancelReservation dispatch failed", {
+        reservationId: existing.id,
+        steveReservationId: existing.steveReservationId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
 
   const [updated] = await db
     .update(schema.reservations)
