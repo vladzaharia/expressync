@@ -19,6 +19,8 @@ import {
   BatteryCharging,
   Check,
   Loader2,
+  Pencil,
+  Plug,
   Tag as TagIcon,
 } from "lucide-preact";
 import { Button } from "@/components/ui/button.tsx";
@@ -401,29 +403,31 @@ export default function ReservationWizard(
       )}
 
       {step === 3 && selectedCharger && (
-        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-          <StepWindow
-            startAtDate={startAtDate}
-            endAtDate={endAtDate}
-            onRangeChange={(startAt, endAt) => {
-              setStartLocal(isoAt(startAt));
-              const newDuration = Math.max(
-                15,
-                Math.round((endAt.getTime() - startAt.getTime()) / 60_000),
-              );
-              setDuration(newDuration);
-            }}
-            checking={checkingConflicts}
-            conflicts={conflicts}
-            onPickSuggestion={onPickSuggestion}
-            tz={displayTz ?? null}
-          />
+        <div class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)] lg:divide-x lg:divide-border">
           <WizardContextAside
             charger={selectedCharger}
             connectorId={connectorId}
             tag={selectedTag ?? null}
             onEditStep={setStep}
           />
+          <div class="lg:pl-6">
+            <StepWindow
+              startAtDate={startAtDate}
+              endAtDate={endAtDate}
+              onRangeChange={(startAt, endAt) => {
+                setStartLocal(isoAt(startAt));
+                const newDuration = Math.max(
+                  15,
+                  Math.round((endAt.getTime() - startAt.getTime()) / 60_000),
+                );
+                setDuration(newDuration);
+              }}
+              checking={checkingConflicts}
+              conflicts={conflicts}
+              onPickSuggestion={onPickSuggestion}
+              tz={displayTz ?? null}
+            />
+          </div>
         </div>
       )}
 
@@ -692,9 +696,10 @@ function StepWindow(
 }
 
 /**
- * Compact summary aside shown alongside the Window step on desktop, so the
- * operator doesn't lose sight of the charger / connector / tag they already
- * chose (and the picker itself stays narrower).
+ * Summary aside shown on the left of the Window step — three small cards
+ * (charger, connector, tag) with icons and inline "Edit" jumps so operators
+ * don't lose sight of the choices they already made while picking a time.
+ * The outer grid provides the vertical divider between aside and picker.
  */
 function WizardContextAside(
   { charger, connectorId, tag, onEditStep }: {
@@ -704,61 +709,87 @@ function WizardContextAside(
     onEditStep: (step: number) => void;
   },
 ) {
-  const rows: Array<{
+  return (
+    <aside class="flex flex-col gap-3 h-fit lg:sticky lg:top-4 lg:pr-6">
+      <ContextCard
+        icon={BatteryCharging}
+        iconTone="bg-orange-500/10 text-orange-600 dark:text-orange-400"
+        label="Charger"
+        value={charger.friendlyName ?? charger.chargeBoxId}
+        subValue={charger.friendlyName ? charger.chargeBoxId : undefined}
+        onEdit={() => onEditStep(0)}
+      />
+      <ContextCard
+        icon={Plug}
+        iconTone="bg-blue-500/10 text-blue-600 dark:text-blue-400"
+        label="Connector"
+        value={connectorId == null
+          ? <span class="italic text-muted-foreground">Not chosen</span>
+          : connectorId === 0
+          ? "All connectors"
+          : `Connector #${connectorId}`}
+        onEdit={() => onEditStep(1)}
+      />
+      <ContextCard
+        icon={TagIcon}
+        iconTone="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
+        label="Tag"
+        value={tag
+          ? (tag.displayName ?? tag.idTag)
+          : <span class="italic text-muted-foreground">Not chosen</span>}
+        subValue={tag && tag.displayName ? tag.idTag : undefined}
+        onEdit={() => onEditStep(2)}
+      />
+    </aside>
+  );
+}
+
+function ContextCard(
+  { icon: Icon, iconTone, label, value, subValue, onEdit }: {
+    icon: typeof BatteryCharging;
+    iconTone: string;
     label: string;
     value: preact.ComponentChildren;
-    editStep: number;
-  }> = [
-    {
-      label: "Charger",
-      value: charger.friendlyName ?? charger.chargeBoxId,
-      editStep: 0,
-    },
-    {
-      label: "Connector",
-      value: connectorId == null
-        ? <span class="italic text-muted-foreground">Not chosen</span>
-        : connectorId === 0
-        ? "All (charger-wide)"
-        : `#${connectorId}`,
-      editStep: 1,
-    },
-    {
-      label: "Tag",
-      value: tag
-        ? (
-          <span class="truncate">
-            {tag.displayName ?? tag.idTag}
-          </span>
-        )
-        : <span class="italic text-muted-foreground">Not chosen</span>,
-      editStep: 2,
-    },
-  ];
-
+    subValue?: string;
+    onEdit: () => void;
+  },
+) {
   return (
-    <aside class="flex flex-col gap-3 rounded-lg border bg-muted/20 p-4 h-fit lg:sticky lg:top-4">
-      <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Reservation context
-      </h3>
-      <dl class="grid gap-2 text-sm">
-        {rows.map((r) => (
-          <div key={r.label} class="flex flex-col gap-0.5">
-            <dt class="flex items-center justify-between gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
-              <span>{r.label}</span>
-              <button
-                type="button"
-                onClick={() => onEditStep(r.editStep)}
-                class="text-[11px] font-medium text-indigo-600 hover:underline dark:text-indigo-400"
-              >
-                Edit
-              </button>
-            </dt>
-            <dd class="truncate text-sm text-foreground">{r.value}</dd>
-          </div>
-        ))}
-      </dl>
-    </aside>
+    <div class="flex items-start gap-3 rounded-lg border bg-card p-3 shadow-sm">
+      <span
+        class={cn(
+          "flex size-9 shrink-0 items-center justify-center rounded-md",
+          iconTone,
+        )}
+        aria-hidden="true"
+      >
+        <Icon class="size-4" />
+      </span>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {label}
+          </p>
+          <button
+            type="button"
+            onClick={onEdit}
+            class="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+            aria-label={`Edit ${label.toLowerCase()}`}
+          >
+            <Pencil class="size-3" aria-hidden="true" />
+            Edit
+          </button>
+        </div>
+        <p class="mt-0.5 truncate text-sm font-medium text-foreground">
+          {value}
+        </p>
+        {subValue && (
+          <p class="truncate font-mono text-[11px] text-muted-foreground">
+            {subValue}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
