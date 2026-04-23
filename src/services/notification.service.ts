@@ -261,23 +261,26 @@ async function fireCustomerEmail(
     return;
   }
 
-  try {
-    if (input.emailPayload.kind === "session.complete") {
-      await sendSessionSummary(email, input.emailPayload.session);
-    } else if (input.emailPayload.kind === "reservation.cancelled") {
-      await sendReservationCancelled(
-        email,
-        input.emailPayload.reservation,
-        input.emailPayload.reason,
-      );
-    }
-  } catch (err) {
-    // Email failure is non-fatal — the notification row is already
-    // persisted and the bell will surface it.
-    log.warn("Customer email send failed (non-fatal)", {
+  // Both helpers NEVER throw — they return a SendEmailResult capturing
+  // worker outages / misconfiguration / no-email recipients. Notification
+  // row is persisted regardless; the bell will surface it. The result is
+  // logged at warn-level so ops can spot a worker outage.
+  let result;
+  if (input.emailPayload.kind === "session.complete") {
+    result = await sendSessionSummary(email, input.emailPayload.session);
+  } else if (input.emailPayload.kind === "reservation.cancelled") {
+    result = await sendReservationCancelled(
+      email,
+      input.emailPayload.reservation,
+      input.emailPayload.reason,
+    );
+  }
+  if (result && !result.ok) {
+    log.warn("Customer email send degraded (non-fatal)", {
       kind: input.kind,
       userId: input.userId,
-      error: err instanceof Error ? err.message : String(err),
+      status: result.status,
+      reason: result.reason,
     });
   }
 }
