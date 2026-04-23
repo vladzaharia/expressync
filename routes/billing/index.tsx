@@ -57,7 +57,6 @@ import {
   type InvoiceListDTO,
   toInvoiceListDTO,
 } from "../../src/lib/invoice-ui.ts";
-import { CUSTOMER_NAV_SECTIONS } from "../../src/lib/customer-navigation.ts";
 import { logger } from "../../src/lib/utils/logger.ts";
 import { db } from "../../src/db/index.ts";
 import * as schema from "../../src/db/schema.ts";
@@ -411,7 +410,6 @@ export default define.page<typeof handler>(function BillingIndexPage(
       currentPath={url.pathname}
       user={state.user}
       role="customer"
-      navSections={CUSTOMER_NAV_SECTIONS}
       accentColor="teal"
     >
       <PageCard

@@ -11,10 +11,8 @@ import NotificationBell from "@/islands/NotificationBell.tsx";
 import UserMenu from "@/islands/UserMenu.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { type AccentColor, accentTailwindClasses } from "@/src/lib/colors.ts";
-import {
-  ADMIN_NAV_SECTIONS,
-  type NavSection,
-} from "@/src/lib/admin-navigation.ts";
+import { ADMIN_NAV_SECTIONS } from "@/src/lib/admin-navigation.ts";
+import { CUSTOMER_NAV_SECTIONS } from "@/src/lib/customer-navigation.ts";
 
 interface User {
   id: string;
@@ -32,9 +30,12 @@ interface SidebarWrapperProps {
   actions?: ComponentChildren;
   accentColor?: AccentColor;
   user?: User;
-  /** Polaris Track A: nav module forwarded to AppSidebar. */
-  navSections?: NavSection[];
-  /** Polaris Track A: surface role forwarded to AppSidebar. */
+  /**
+   * Polaris Track A: surface role. The matching nav module is looked up
+   * inside this island — passing the nav array as a prop would force
+   * Fresh's hydration serializer to encode the icon component
+   * references, which throws "Serializing functions is not supported".
+   */
   role?: "admin" | "customer";
 }
 
@@ -100,9 +101,11 @@ export default function SidebarWrapper({
   actions,
   accentColor,
   user,
-  navSections = ADMIN_NAV_SECTIONS,
   role = "admin",
 }: SidebarWrapperProps) {
+  const navSections = role === "customer"
+    ? CUSTOMER_NAV_SECTIONS
+    : ADMIN_NAV_SECTIONS;
   return (
     <SidebarProvider defaultOpen={false}>
       <AppSidebar
