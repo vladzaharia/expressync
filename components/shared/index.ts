@@ -14,6 +14,8 @@ export type { SyncStatus } from "./SyncStatusBadge.tsx";
 
 export { InvoiceStatusBadge } from "./InvoiceStatusBadge.tsx";
 
+export { CardStatusBadge } from "./CardStatusBadge.tsx";
+
 export { MetricTile } from "./MetricTile.tsx";
 export { StatStrip } from "./StatStrip.tsx";
 export type { StatStripItem, StatStripProps } from "./StatStrip.tsx";
