@@ -142,7 +142,7 @@ export const handler = define.handlers({
     }
 
     // 3. User must be admin.
-    let user: { id: string; role: string; email: string } | undefined;
+    let user: { id: string; role: string; email: string | null } | undefined;
     try {
       const [u] = await db
         .select({ id: users.id, role: users.role, email: users.email })
