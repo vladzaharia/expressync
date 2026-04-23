@@ -18,8 +18,9 @@ docker-compose.override.yml
 docker-compose.env
 docker-compose.postgres.env
 
-# Claude Code agent worktrees (scratch)
+# Claude Code agent worktrees + scratch
 .claude/worktrees/
+.claude/scheduled_tasks.lock
 
 # Email preview output (scripts/preview-email.ts)
 _email-preview.html
