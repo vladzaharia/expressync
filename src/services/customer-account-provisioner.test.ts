@@ -386,7 +386,7 @@ Deno.test(
 );
 
 Deno.test(
-  "Lago email missing → 422 LAGO_EMAIL_MISSING",
+  "Lago email missing → graceful no-email account creation",
   withMockedLago(
     {
       external_id: "cust_no_email",
@@ -397,13 +397,18 @@ Deno.test(
     },
     async () => {
       const store = newStore({ lookupLagoId: "cust_no_email" });
-      const { tx } = createSmartTx(store);
-      const err = await assertRejects(
-        () => resolveOrCreateCustomerAccount(tx, "cust_no_email"),
-        ProvisionerError,
-      );
-      assertEquals(err.code, "LAGO_EMAIL_MISSING");
-      assertEquals(err.status, 422);
+      const { tx, inserted } = createSmartTx(store);
+      const result = await resolveOrCreateCustomerAccount(tx, "cust_no_email");
+      // Customer account is created with email=null; scan-to-login still
+      // works, magic-link / outbound-email flows skip silently.
+      assertEquals(result.created, true);
+      assertEquals(result.reused, false);
+      // Mock store coerces null inserts to "" — production schema stores
+      // NULL via the now-nullable email column. Either represents "no
+      // usable email" for downstream `hasUsableEmail()` checks.
+      assert(!result.email);
+      assertEquals(inserted.length, 1);
+      assert(!inserted[0].email);
     },
   ),
 );
@@ -633,7 +638,7 @@ Deno.test(
       assertEquals(result.reused, true);
       assertEquals(result.userId, userId);
       assertEquals(inserted.length, 0);
-      assert(result.email.toLowerCase() === "frank@example.com");
+      assert(result.email?.toLowerCase() === "frank@example.com");
     },
   ),
 );
