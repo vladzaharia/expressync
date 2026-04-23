@@ -18,7 +18,6 @@ import { count, desc, eq, max, sum } from "drizzle-orm";
 import { db } from "../../src/db/index.ts";
 import * as schema from "../../src/db/schema.ts";
 import { resolveCustomerScope } from "../../src/lib/scoping.ts";
-import { CUSTOMER_NAV_SECTIONS } from "../../src/lib/customer-navigation.ts";
 import { config } from "../../src/lib/config.ts";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
@@ -155,7 +154,6 @@ export default define.page<typeof handler>(
         user={state.user}
         accentColor="cyan"
         role="customer"
-        navSections={CUSTOMER_NAV_SECTIONS}
       >
         <PageCard
           title="Your cards"

@@ -39,7 +39,6 @@ import {
   OwnershipError,
   resolveCustomerScope,
 } from "../../src/lib/scoping.ts";
-import { CUSTOMER_NAV_SECTIONS } from "../../src/lib/customer-navigation.ts";
 import { logger } from "../../src/lib/utils/logger.ts";
 import type { ReservationStatus } from "../../src/db/schema.ts";
 
@@ -207,7 +206,6 @@ export default define.page<typeof handler>(
         currentPath={url.pathname}
         user={state.user}
         role="customer"
-        navSections={CUSTOMER_NAV_SECTIONS}
         accentColor="indigo"
         actions={<BackAction href="/reservations" />}
       >

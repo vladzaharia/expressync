@@ -21,7 +21,6 @@ import type { State } from "../utils.ts";
 import { db } from "../src/db/index.ts";
 import * as schema from "../src/db/schema.ts";
 import { resolveCustomerScope } from "../src/lib/scoping.ts";
-import { CUSTOMER_NAV_SECTIONS } from "../src/lib/customer-navigation.ts";
 import { SidebarLayout } from "../components/SidebarLayout.tsx";
 import { PageCard } from "../components/PageCard.tsx";
 import CustomerDashboard, {
@@ -370,7 +369,6 @@ export default define.page<typeof handler>(
         user={state.user}
         role="customer"
         accentColor="blue"
-        navSections={CUSTOMER_NAV_SECTIONS}
         defaultTheme="light"
       >
         {data.impersonation && (

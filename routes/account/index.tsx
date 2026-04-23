@@ -26,7 +26,6 @@ import { PageCard } from "../../components/PageCard.tsx";
 import { SectionCard } from "../../components/shared/SectionCard.tsx";
 import { MetricTile } from "../../components/shared/MetricTile.tsx";
 import { Button } from "../../components/ui/button.tsx";
-import { CUSTOMER_NAV_SECTIONS } from "../../src/lib/customer-navigation.ts";
 import { resolveCustomerScope } from "../../src/lib/scoping.ts";
 import { config } from "../../src/lib/config.ts";
 import { logger } from "../../src/lib/utils/logger.ts";
@@ -163,7 +162,6 @@ export default define.page<typeof handler>(
         currentPath={url.pathname}
         user={state.user}
         role="customer"
-        navSections={CUSTOMER_NAV_SECTIONS}
         accentColor="slate"
       >
         <PageCard

@@ -2,7 +2,7 @@
  * Polaris Track G2 — customer Sessions list (`/sessions`).
  *
  * Listing-page anatomy from the plan:
- *   SidebarLayout(role=customer, accentColor=green, navSections=CUSTOMER_NAV_SECTIONS)
+ *   SidebarLayout(role=customer, accentColor=green)
  *     PageCard(title="Charging Sessions", colorScheme=green)
  *       StatStrip(accent=green) — Sessions (24h), kWh (7d), Active Now (clickable),
  *                                  Avg kWh (7d)
@@ -39,7 +39,6 @@ import {
   StatStrip,
   type StatStripItem,
 } from "../../components/shared/index.ts";
-import { CUSTOMER_NAV_SECTIONS } from "../../src/lib/customer-navigation.ts";
 import CustomerSessionsTable, {
   type CustomerSessionRow,
 } from "../../islands/customer/CustomerSessionsTable.tsx";
@@ -278,7 +277,6 @@ export default define.page<typeof handler>(
         user={state.user}
         accentColor="green"
         role="customer"
-        navSections={CUSTOMER_NAV_SECTIONS}
       >
         <PageCard
           title="Charging Sessions"

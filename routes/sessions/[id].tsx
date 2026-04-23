@@ -26,7 +26,6 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { assertOwnership, OwnershipError } from "../../src/lib/scoping.ts";
 import { steveClient } from "../../src/lib/steve-client.ts";
 import { logger } from "../../src/lib/utils/logger.ts";
-import { CUSTOMER_NAV_SECTIONS } from "../../src/lib/customer-navigation.ts";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
 import {
@@ -256,7 +255,6 @@ export default define.page<typeof handler>(
         user={state.user}
         accentColor="green"
         role="customer"
-        navSections={CUSTOMER_NAV_SECTIONS}
         actions={<BackAction href="/sessions" />}
       >
         <div class="space-y-6">
