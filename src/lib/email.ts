@@ -100,16 +100,36 @@ function isDevModeFallback(): boolean {
   return false;
 }
 
+/** Outcome of an outbound email attempt. Helpers NEVER throw. */
+export type SendEmailResult =
+  | { ok: true; status: "sent" | "logged_dev" }
+  | {
+    ok: false;
+    status: "skipped_no_email" | "misconfigured" | "worker_error";
+    reason: string;
+  };
+
 /**
  * POST a signed email payload to the Cloudflare Email Worker.
  *
- * In dev (no worker URL or no secret in dev mode), falls back to logging
- * the rendered email instead.
+ * Graceful-degradation contract: this function NEVER throws. Worker
+ * outages, missing-config, network errors, 5xx responses — all are
+ * captured into a `SendEmailResult` and returned. Callers that need to
+ * react (e.g. surface "we're having trouble emailing you" UX) inspect
+ * `result.ok`; callers that just want to fire-and-forget can ignore
+ * the result.
  *
- * In production, throws on missing secret — silently failing on auth
- * flows like magic-link is worse than a loud error.
+ * In dev (no worker URL configured, or DENO_ENV=development without
+ * a secret), the rendered email is logged to console instead.
+ *
+ * In production with the URL set but the secret missing, this is
+ * misconfiguration — we log loudly and return `worker_error` rather
+ * than crashing. Operations should alert on `[Email] worker_error`
+ * counts spiking.
  */
-export async function sendEmail(payload: SendEmailPayload): Promise<void> {
+export async function sendEmail(
+  payload: SendEmailPayload,
+): Promise<SendEmailResult> {
   if (isDevModeFallback()) {
     const ctaUrl = extractFirstUrl(payload.text);
     log.info("DEV MODE — email not sent (no Worker URL configured)", {
@@ -126,14 +146,30 @@ export async function sendEmail(payload: SendEmailPayload): Promise<void> {
     console.log("---- TEXT PREVIEW ----");
     console.log(payload.text);
     console.log("---- END EMAIL PREVIEW ----");
-    return;
+    return { ok: true, status: "logged_dev" };
   }
 
   if (!config.CF_EMAIL_WORKER_URL) {
-    throw new Error("CF_EMAIL_WORKER_URL not configured");
+    log.error(
+      "Email worker URL missing in production — skipping send",
+      { category: payload.category },
+    );
+    return {
+      ok: false,
+      status: "misconfigured",
+      reason: "CF_EMAIL_WORKER_URL not configured",
+    };
   }
   if (!config.CF_EMAIL_WORKER_SECRET) {
-    throw new Error("CF_EMAIL_WORKER_SECRET not configured");
+    log.error(
+      "Email worker secret missing in production — skipping send",
+      { category: payload.category },
+    );
+    return {
+      ok: false,
+      status: "misconfigured",
+      reason: "CF_EMAIL_WORKER_SECRET not configured",
+    };
   }
 
   const signed: SignedBody = {
@@ -155,17 +191,17 @@ export async function sendEmail(payload: SendEmailPayload): Promise<void> {
         "x-polaris-sig": sig,
       },
       body,
+      // Defend against a hung Worker — give up after 10s rather than
+      // tying up the auth/notification flow indefinitely.
+      signal: AbortSignal.timeout(10_000),
     });
   } catch (err) {
-    log.error("Email worker request failed", {
+    const reason = err instanceof Error ? err.message : String(err);
+    log.error("Email worker request failed — skipping send", {
       category: payload.category,
-      error: err instanceof Error ? err.message : String(err),
+      error: reason,
     });
-    throw new Error(
-      `Email worker request failed: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
-    );
+    return { ok: false, status: "worker_error", reason };
   }
 
   if (!res.ok) {
@@ -175,20 +211,23 @@ export async function sendEmail(payload: SendEmailPayload): Promise<void> {
     } catch {
       // ignore
     }
-    log.error("Email worker rejected send", {
+    log.error("Email worker rejected send — skipping", {
       category: payload.category,
       status: res.status,
       detail: detail.slice(0, 200),
     });
-    throw new Error(
-      `Email worker returned ${res.status}: ${detail.slice(0, 200)}`,
-    );
+    return {
+      ok: false,
+      status: "worker_error",
+      reason: `Worker returned ${res.status}: ${detail.slice(0, 200)}`,
+    };
   }
 
   log.info("email sent", {
     category: payload.category,
     // Don't log the recipient — keep parity with the Worker's PII rules.
   });
+  return { ok: true, status: "sent" };
 }
 
 /** Pull the first http(s) URL out of a plain-text body. Used for dev logging. */
@@ -225,37 +264,63 @@ export function hasUsableEmail(email: string | null | undefined): boolean {
   return typeof email === "string" && email.trim().length > 0;
 }
 
-/** Magic-link sign-in email — triggered when a customer enters their email
- *  at `polaris.express/login`. */
+/**
+ * Skip-result for missing-email short-circuits — keeps the caller's
+ * inspect-result code path uniform with worker-side outcomes.
+ */
+function skippedNoEmail(reason: string): SendEmailResult {
+  return { ok: false, status: "skipped_no_email", reason };
+}
+
+/**
+ * Magic-link sign-in email — triggered when a customer enters their email
+ * at `polaris.express/login`. NEVER throws — returns a result object.
+ */
 export async function sendCustomerMagicLink(
   email: string | null | undefined,
   url: string,
-): Promise<void> {
+): Promise<SendEmailResult> {
   if (!hasUsableEmail(email)) {
     log.info("Skipping sendCustomerMagicLink — no usable email", { url });
-    return;
+    return skippedNoEmail("recipient has no email on file");
   }
-  const inputs: MagicLinkInputs = { to: email as string, url };
-  const rendered = await renderTemplate(buildMagicLinkEmail(inputs));
-  await sendEmail(payloadFromRendered(rendered, email as string));
+  try {
+    const inputs: MagicLinkInputs = { to: email as string, url };
+    const rendered = await renderTemplate(buildMagicLinkEmail(inputs));
+    return await sendEmail(payloadFromRendered(rendered, email as string));
+  } catch (err) {
+    // Render failures are bugs (template producing invalid HTML) — log
+    // but don't crash the auth flow.
+    const reason = err instanceof Error ? err.message : String(err);
+    log.error("sendCustomerMagicLink: render failed", { reason });
+    return { ok: false, status: "worker_error", reason };
+  }
 }
 
-/** Charging-session summary — fired by Track H from
- *  `notification.service.ts` on `session.complete`. */
+/**
+ * Charging-session summary — fired by Track H from
+ * `notification.service.ts` on `session.complete`. NEVER throws.
+ */
 export async function sendSessionSummary(
   email: string | null | undefined,
   session: SessionSummaryData,
-): Promise<void> {
+): Promise<SendEmailResult> {
   if (!hasUsableEmail(email)) {
     log.info("Skipping sendSessionSummary — no usable email", {
       session_id: session?.id,
     });
-    return;
+    return skippedNoEmail("recipient has no email on file");
   }
-  const rendered = await renderTemplate(
-    buildSessionSummaryEmail({ to: email as string, session }),
-  );
-  await sendEmail(payloadFromRendered(rendered, email as string));
+  try {
+    const rendered = await renderTemplate(
+      buildSessionSummaryEmail({ to: email as string, session }),
+    );
+    return await sendEmail(payloadFromRendered(rendered, email as string));
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    log.error("sendSessionSummary: render failed", { reason });
+    return { ok: false, status: "worker_error", reason };
+  }
 }
 
 /** Reservation cancellation notification — fired from the cancel flow. */
@@ -263,38 +328,50 @@ export async function sendReservationCancelled(
   email: string | null | undefined,
   reservation: ReservationData,
   reason?: string,
-): Promise<void> {
+): Promise<SendEmailResult> {
   if (!hasUsableEmail(email)) {
     log.info("Skipping sendReservationCancelled — no usable email", {
       charger: reservation?.chargerName,
     });
-    return;
+    return skippedNoEmail("recipient has no email on file");
   }
-  const rendered = await renderTemplate(
-    buildReservationCancelledEmail({
-      to: email as string,
-      reservation,
-      reason,
-    }),
-  );
-  await sendEmail(payloadFromRendered(rendered, email as string));
+  try {
+    const rendered = await renderTemplate(
+      buildReservationCancelledEmail({
+        to: email as string,
+        reservation,
+        reason,
+      }),
+    );
+    return await sendEmail(payloadFromRendered(rendered, email as string));
+  } catch (err) {
+    const renderErr = err instanceof Error ? err.message : String(err);
+    log.error("sendReservationCancelled: render failed", { reason: renderErr });
+    return { ok: false, status: "worker_error", reason: renderErr };
+  }
 }
 
 /** Admin password-reset email — admin-only flow from `manage.polaris.express`. */
 export async function sendAdminPasswordReset(
   email: string | null | undefined,
   url: string,
-): Promise<void> {
+): Promise<SendEmailResult> {
   // Admin accounts always have an email by construction (no path creates an
   // emailless admin), but guard anyway so a stale code path can't 500.
   if (!hasUsableEmail(email)) {
     log.warn("Skipping sendAdminPasswordReset — no usable email", { url });
-    return;
+    return skippedNoEmail("recipient has no email on file");
   }
-  const rendered = await renderTemplate(
-    buildAdminPasswordResetEmail({ to: email as string, url }),
-  );
-  await sendEmail(payloadFromRendered(rendered, email as string));
+  try {
+    const rendered = await renderTemplate(
+      buildAdminPasswordResetEmail({ to: email as string, url }),
+    );
+    return await sendEmail(payloadFromRendered(rendered, email as string));
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    log.error("sendAdminPasswordReset: render failed", { reason });
+    return { ok: false, status: "worker_error", reason };
+  }
 }
 
 // Intentionally NOT exported (per the silent-lifecycle directive in the plan):

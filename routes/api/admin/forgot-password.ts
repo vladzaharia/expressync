@@ -191,15 +191,16 @@ export const handler = define.handlers({
     const resetUrl = `${config.ADMIN_BASE_URL}/reset-password?token=${
       encodeURIComponent(token)
     }`;
-    try {
-      await sendAdminPasswordReset(email, resetUrl);
-    } catch (err) {
+    // sendAdminPasswordReset NEVER throws — it returns a SendEmailResult.
+    // Worker outages / misconfig surface as `result.ok=false`; we log but
+    // continue to return uniformOk() so a transport hiccup never tells the
+    // caller "your email is valid but outbound failed" (anti-enumeration).
+    const result = await sendAdminPasswordReset(email, resetUrl);
+    if (!result.ok) {
       log.error("sendAdminPasswordReset failed", {
-        error: err instanceof Error ? err.message : String(err),
+        status: result.status,
+        reason: result.reason,
       });
-      // Note: Better-Auth-style behavior — we still return ok so an
-      // email-transport hiccup never tells the caller "your email is
-      // valid but our outbound failed".
     }
 
     return uniformOk();
