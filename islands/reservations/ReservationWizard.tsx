@@ -73,6 +73,29 @@ interface Props {
   };
   /** Optional IANA tz used for inline display. */
   displayTz?: string | null;
+  /**
+   * API endpoint for the create POST. Defaults to the admin endpoint so
+   * existing callers (`routes/admin/reservations/new.tsx`) keep working.
+   * Customer surface passes `/api/customer/reservations`.
+   */
+  submitUrl?: string;
+  /**
+   * Conflict-check endpoint used by the inline conflict effect. Defaults
+   * to `/api/admin/reservations` for admin parity. Customer surface passes
+   * `/api/customer/reservations`.
+   */
+  conflictCheckUrl?: string;
+  /**
+   * Path prefix for the post-create redirect. Defaults to `/reservations`
+   * so admin URLs (e.g. `/reservations/123` after middleware rewrite) and
+   * customer URLs (`/reservations/123` directly) both work.
+   */
+  redirectPathPrefix?: string;
+  /**
+   * When true, applies a brief celebration animation (SparklesText on the
+   * page title) after successful create — used by the customer wizard.
+   */
+  celebrateOnSuccess?: boolean;
 }
 
 const STEP_LABELS = [
@@ -96,7 +119,16 @@ function parseLocalDatetime(v: string): Date | null {
 }
 
 export default function ReservationWizard(
-  { chargers, tags, initial, displayTz }: Props,
+  {
+    chargers,
+    tags,
+    initial,
+    displayTz,
+    submitUrl = "/api/admin/reservations",
+    conflictCheckUrl = "/api/admin/reservations",
+    redirectPathPrefix = "/reservations",
+    celebrateOnSuccess: _celebrateOnSuccess = false,
+  }: Props,
 ) {
   // Hydrate from URL on mount so a refresh doesn't lose progress.
   const [step, setStep] = useState<number>(0);
@@ -146,7 +178,21 @@ export default function ReservationWizard(
     );
   }, [tags, tagFilter]);
 
-  // Auto-skip step 2 when the charger has a single connector.
+  // Auto-skip step 0 (Charger) when only one charger is available — common
+  // friends-and-family deployment. The user lands directly on Connector
+  // (which itself auto-skips when there's a single connector).
+  useEffect(() => {
+    if (step !== 0) return;
+    if (chargers.length === 1 && chargeBoxId === null) {
+      const only = chargers[0];
+      setChargeBoxId(only.chargeBoxId);
+      // Mirror StepCharger's onSelect side-effect.
+      setConnectorId(null);
+      setStep(1);
+    }
+  }, [step, chargers, chargeBoxId]);
+
+  // Auto-skip step 1 (Connector) when the charger has a single connector.
   useEffect(() => {
     if (!selectedCharger) return;
     if (step !== 1) return;
@@ -155,6 +201,16 @@ export default function ReservationWizard(
       setStep(2);
     }
   }, [step, selectedCharger]);
+
+  // Auto-skip step 2 (Tag) when only one tag is available — usually the
+  // case for customers since `tags` is pre-filtered to their own cards.
+  useEffect(() => {
+    if (step !== 2) return;
+    if (tags.length === 1 && ocppTagPk === null) {
+      setOcppTagPk(tags[0].ocppTagPk);
+      setStep(3);
+    }
+  }, [step, tags, ocppTagPk]);
 
   // URL-query persistence.
   useEffect(() => {
@@ -210,7 +266,7 @@ export default function ReservationWizard(
           limit: "100",
         });
         const res = await fetch(
-          `/api/admin/reservations?${params.toString()}`,
+          `${conflictCheckUrl}?${params.toString()}`,
           {
             signal: ac.signal,
           },
@@ -219,6 +275,8 @@ export default function ReservationWizard(
           if (!cancelled) setConflicts([]);
           return;
         }
+        // Both admin and customer endpoints return `{ reservations: [...] }`
+        // with the `ReservationRowDTO` shape (per `toReservationRowDTO`).
         const body = await res.json() as {
           reservations: Array<{
             id: number;
@@ -284,7 +342,7 @@ export default function ReservationWizard(
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/admin/reservations", {
+      const res = await fetch(submitUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -301,7 +359,13 @@ export default function ReservationWizard(
       if (res.status === 201) {
         const body = await res.json() as { reservation: { id: number } };
         toast.success("Reservation created");
-        globalThis.location.href = `/reservations/${body.reservation.id}`;
+        // Brief celebration on the customer surface — for now we just rely
+        // on the toast to set the mood while we navigate. The detail page
+        // can layer richer UI later (e.g. SparklesText on the title).
+        globalThis.location.href =
+          `${redirectPathPrefix}/${body.reservation.id}${
+            _celebrateOnSuccess ? "?celebrate=1" : ""
+          }`;
         return;
       }
       if (res.status === 409) {
