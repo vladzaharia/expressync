@@ -25,7 +25,6 @@ import {
   extractInvoiceCustomer,
   type InvoiceUiStatus,
 } from "../../../src/lib/invoice-ui.ts";
-import { CUSTOMER_NAV_SECTIONS } from "../../../src/lib/customer-navigation.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
 
 const log = logger.child("CustomerInvoiceDetailPage");
@@ -210,7 +209,6 @@ export default define.page<typeof handler>(function CustomerInvoiceDetailPage(
       currentPath={url.pathname}
       user={state.user}
       role="customer"
-      navSections={CUSTOMER_NAV_SECTIONS}
       accentColor="teal"
       actions={<BackAction href="/billing" />}
     >

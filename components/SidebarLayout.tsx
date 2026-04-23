@@ -1,10 +1,6 @@
 import type { ComponentChildren } from "preact";
 import SidebarWrapper from "@/islands/SidebarWrapper.tsx";
 import { ThemeProvider } from "@/hooks/use-theme.tsx";
-import {
-  ADMIN_NAV_SECTIONS,
-  type NavSection,
-} from "@/src/lib/admin-navigation.ts";
 
 interface User {
   id: string;
@@ -33,16 +29,12 @@ interface SidebarLayoutProps {
   accentColor?: import("@/src/lib/colors.ts").AccentColor;
   user?: User;
   /**
-   * Polaris Track A: nav module to render in the sidebar. Defaults to
-   * `ADMIN_NAV_SECTIONS` so existing admin callers keep working.
-   * Customer pages pass `CUSTOMER_NAV_SECTIONS` from
-   * `src/lib/customer-navigation.ts`.
-   */
-  navSections?: NavSection[];
-  /**
    * Polaris Track A: which UI surface this layout serves. Drives brand
-   * selection (ExpresSync vs Polaris Express), mobile shell pattern, and
-   * the localStorage key used by the theme provider. Defaults to "admin".
+   * selection (ExpresSync vs Polaris Express), mobile shell pattern,
+   * the localStorage key used by the theme provider, AND which nav
+   * module the sidebar renders. The nav data is looked up inside the
+   * SidebarWrapper island so its function-typed icons never have to be
+   * crossed through Fresh's prop serializer. Defaults to "admin".
    */
   role?: SurfaceRole;
   /**
@@ -59,7 +51,6 @@ export function SidebarLayout({
   actions,
   accentColor,
   user,
-  navSections = ADMIN_NAV_SECTIONS,
   role = "admin",
   defaultTheme,
 }: SidebarLayoutProps) {
@@ -77,7 +68,6 @@ export function SidebarLayout({
         actions={actions}
         accentColor={accentColor}
         user={user}
-        navSections={navSections}
         role={role}
       >
         {children}
