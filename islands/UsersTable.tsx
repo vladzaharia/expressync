@@ -26,7 +26,7 @@ import { Plus, Shield, ShieldCheck, Trash2, User } from "lucide-preact";
 interface UserData {
   id: string;
   name: string | null;
-  email: string;
+  email: string | null;
   role: string;
   createdAt: Date | string | null;
 }
@@ -212,7 +212,7 @@ export default function UsersTable({
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground truncate">
-                        {user.email}
+                        {user.email ?? "—"}
                       </p>
                     </div>
                   </div>
@@ -383,7 +383,8 @@ export default function UsersTable({
             <>
               Delete{" "}
               <span className="font-medium">
-                {deleteTarget.value.name ?? deleteTarget.value.email}
+                {deleteTarget.value.name ?? deleteTarget.value.email ??
+                  deleteTarget.value.id}
               </span>? This cannot be undone.
             </>
           )

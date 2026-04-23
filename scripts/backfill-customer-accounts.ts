@@ -188,7 +188,9 @@ async function main(): Promise<void> {
       // admin route uses, so behavior is identical.
       let outcome: CsvRow["outcome"] = "linked_existing";
       let userId = "";
-      let email = "";
+      // Null when the resolved account has no email (Lago customer without
+      // one); rendered as empty string in the CSV output below.
+      let email: string | null = "";
       let note = "";
       try {
         await db.transaction(async (tx) => {
@@ -234,7 +236,7 @@ async function main(): Promise<void> {
         emit({
           mappingId,
           lagoCustomerId,
-          lagoEmail: email,
+          lagoEmail: email ?? "",
           outcome,
           userId,
           note,

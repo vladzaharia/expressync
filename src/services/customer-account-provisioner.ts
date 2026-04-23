@@ -65,7 +65,12 @@ export interface ResolveCustomerAccountResult {
   userId: string;
   created: boolean;
   reused: boolean;
-  email: string;
+  /**
+   * Account email. Null when the Lago customer had no email at provisioning
+   * time — that's allowed; magic-link / outbound-email flows skip these
+   * accounts silently and the customer signs in via scan-to-login.
+   */
+  email: string | null;
 }
 
 /**
@@ -125,18 +130,23 @@ function buildDisplayName(input: {
   name: string | null;
   firstname: string | null;
   lastname: string | null;
-  email: string;
-}): string {
+  /** Null when the Lago customer has no email — see resolveOrCreate. */
+  email: string | null;
+}): string | null {
   if (input.name && input.name.trim()) return input.name.trim();
   const composed = [input.firstname, input.lastname]
     .filter((p): p is string => !!p && !!p.trim())
     .map((p) => p.trim())
     .join(" ");
   if (composed) return composed;
-  // Last resort — strip the local-part of the email so the name slot is
-  // never empty (the schema marks it nullable but UI surfaces prefer a value).
-  const local = input.email.split("@")[0] ?? "";
-  return local || input.email;
+  if (input.email) {
+    // Strip the local-part so the name slot is non-empty.
+    const local = input.email.split("@")[0] ?? "";
+    return local || input.email;
+  }
+  // No name + no email — leave the column null. UI fallbacks already
+  // handle null name (e.g. UserAvatarMenu's "Guest" / initials helper).
+  return null;
 }
 
 /**
@@ -334,28 +344,81 @@ export async function resolveOrCreateCustomerAccount(
     throw classifyLagoFetchError(err);
   }
 
-  // 3. Validate the email.
-  if (!customer.email || !customer.email.trim()) {
-    throw new ProvisionerError(
-      "LAGO_EMAIL_MISSING",
-      "Lago customer has no email; add one in Lago, then retry.",
-    );
-  }
-  const emailRaw = customer.email.trim();
-  if (isMalformedEmail(emailRaw)) {
-    throw new ProvisionerError(
-      "LAGO_EMAIL_MALFORMED",
-      `Lago customer email is malformed: ${emailRaw}`,
-    );
+  // 3. Validate the email — but tolerate absence.
+  // Lago customers MAY have no email (manual onboarding, partial records,
+  // legacy data). Those still get a `users` row with `email = NULL` so
+  // scan-to-login still works; magic-link / outbound-email flows just
+  // skip them silently (`hasUsableEmail` in `src/lib/email.ts`).
+  // Malformed-but-present emails are still a hard rejection — the data is
+  // wrong, admin should fix it in Lago.
+  let emailRaw: string | null = null;
+  if (customer.email && customer.email.trim()) {
+    emailRaw = customer.email.trim();
+    if (isMalformedEmail(emailRaw)) {
+      throw new ProvisionerError(
+        "LAGO_EMAIL_MALFORMED",
+        `Lago customer email is malformed: ${emailRaw}`,
+      );
+    }
   }
 
-  // 4. Email-based lookup (case-insensitive).
+  // 4. Email-based lookup (case-insensitive). When email is null we skip
+  //    the lookup branch entirely and create with email=NULL — there's
+  //    no possibility of an admin-collision or Lago-cross-link in that
+  //    case because uniqueness/lookup are both keyed on email.
+  if (emailRaw === null) {
+    return await createNoEmailUser(tx, lagoCustomerExternalId, customer);
+  }
   return await resolveOrCreateForEmail(
     tx,
     lagoCustomerExternalId,
     emailRaw,
     customer,
   );
+}
+
+/**
+ * Direct insert path for the no-email branch. No lookup needed — there
+ * are no email-keyed identities to collide with. The functional unique
+ * index `users_email_lower_unique` (migration 0027) already permits
+ * multiple NULL values (Postgres treats NULLs as distinct in indexes).
+ */
+async function createNoEmailUser(
+  tx: DrizzleTx,
+  lagoCustomerExternalId: string,
+  customer: {
+    name: string | null;
+    firstname: string | null;
+    lastname: string | null;
+  },
+): Promise<ResolveCustomerAccountResult> {
+  const userId = generateUserId();
+  const displayName = buildDisplayName({ ...customer, email: null });
+  const [inserted] = await tx
+    .insert(users)
+    .values({
+      id: userId,
+      email: null,
+      name: displayName,
+      role: "customer",
+      emailVerified: false,
+    })
+    .returning({ id: users.id, email: users.email });
+  await logCustomerAccountAutoProvisioned({
+    userId: inserted.id,
+    email: null,
+    metadata: { lagoCustomerExternalId, noEmail: true },
+  });
+  log.info("Auto-provisioned customer account (no email)", {
+    userId: inserted.id,
+    lagoCustomerExternalId,
+  });
+  return {
+    userId: inserted.id,
+    created: true,
+    reused: false,
+    email: inserted.email,
+  };
 }
 
 /**

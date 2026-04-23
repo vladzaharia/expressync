@@ -214,50 +214,87 @@ function payloadFromRendered(
 
 // ---- Per-template helpers --------------------------------------------------
 
+/**
+ * True when an email is usable for outbound sends. Customer accounts may
+ * have null/empty email (auto-provisioned from Lago customers without
+ * one — see `customer-account-provisioner.ts`). Every customer-bound
+ * helper checks this first and silently skips so callers never have to
+ * special-case null-email accounts at every site.
+ */
+export function hasUsableEmail(email: string | null | undefined): boolean {
+  return typeof email === "string" && email.trim().length > 0;
+}
+
 /** Magic-link sign-in email — triggered when a customer enters their email
  *  at `polaris.express/login`. */
 export async function sendCustomerMagicLink(
-  email: string,
+  email: string | null | undefined,
   url: string,
 ): Promise<void> {
-  const inputs: MagicLinkInputs = { to: email, url };
+  if (!hasUsableEmail(email)) {
+    log.info("Skipping sendCustomerMagicLink — no usable email", { url });
+    return;
+  }
+  const inputs: MagicLinkInputs = { to: email as string, url };
   const rendered = await renderTemplate(buildMagicLinkEmail(inputs));
-  await sendEmail(payloadFromRendered(rendered, email));
+  await sendEmail(payloadFromRendered(rendered, email as string));
 }
 
 /** Charging-session summary — fired by Track H from
  *  `notification.service.ts` on `session.complete`. */
 export async function sendSessionSummary(
-  email: string,
+  email: string | null | undefined,
   session: SessionSummaryData,
 ): Promise<void> {
+  if (!hasUsableEmail(email)) {
+    log.info("Skipping sendSessionSummary — no usable email", {
+      session_id: session?.id,
+    });
+    return;
+  }
   const rendered = await renderTemplate(
-    buildSessionSummaryEmail({ to: email, session }),
+    buildSessionSummaryEmail({ to: email as string, session }),
   );
-  await sendEmail(payloadFromRendered(rendered, email));
+  await sendEmail(payloadFromRendered(rendered, email as string));
 }
 
 /** Reservation cancellation notification — fired from the cancel flow. */
 export async function sendReservationCancelled(
-  email: string,
+  email: string | null | undefined,
   reservation: ReservationData,
   reason?: string,
 ): Promise<void> {
+  if (!hasUsableEmail(email)) {
+    log.info("Skipping sendReservationCancelled — no usable email", {
+      charger: reservation?.chargerName,
+    });
+    return;
+  }
   const rendered = await renderTemplate(
-    buildReservationCancelledEmail({ to: email, reservation, reason }),
+    buildReservationCancelledEmail({
+      to: email as string,
+      reservation,
+      reason,
+    }),
   );
-  await sendEmail(payloadFromRendered(rendered, email));
+  await sendEmail(payloadFromRendered(rendered, email as string));
 }
 
 /** Admin password-reset email — admin-only flow from `manage.polaris.express`. */
 export async function sendAdminPasswordReset(
-  email: string,
+  email: string | null | undefined,
   url: string,
 ): Promise<void> {
+  // Admin accounts always have an email by construction (no path creates an
+  // emailless admin), but guard anyway so a stale code path can't 500.
+  if (!hasUsableEmail(email)) {
+    log.warn("Skipping sendAdminPasswordReset — no usable email", { url });
+    return;
+  }
   const rendered = await renderTemplate(
-    buildAdminPasswordResetEmail({ to: email, url }),
+    buildAdminPasswordResetEmail({ to: email as string, url }),
   );
-  await sendEmail(payloadFromRendered(rendered, email));
+  await sendEmail(payloadFromRendered(rendered, email as string));
 }
 
 // Intentionally NOT exported (per the silent-lifecycle directive in the plan):

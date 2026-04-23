@@ -49,7 +49,8 @@ interface AccountPageData {
   profile: {
     id: string;
     name: string | null;
-    email: string;
+    /** Null for customers auto-provisioned from emailless Lago records. */
+    email: string | null;
     createdAtIso: string | null;
     onboardedAtIso: string | null;
   } | null;
@@ -186,8 +187,10 @@ export default define.page<typeof handler>(
                     <MetricTile
                       icon={Mail}
                       label="Email"
-                      value={profile.email}
-                      sublabel="Contact your operator to change"
+                      value={profile.email ?? "—"}
+                      sublabel={profile.email
+                        ? "Contact your operator to change"
+                        : "No email on file — contact your operator to add one"}
                       accent="slate"
                     />
                     <MetricTile

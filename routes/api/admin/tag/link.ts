@@ -136,7 +136,8 @@ export const handler = define.handlers({
       const childMappings: schema.UserMapping[] = [];
       let resolvedAccount: {
         userId: string;
-        email: string;
+        /** Null when Lago customer had no email — see provisioner. */
+        email: string | null;
         autoCreated: boolean;
         reused: boolean;
       } | null = null;

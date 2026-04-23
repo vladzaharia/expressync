@@ -33,7 +33,8 @@ interface UserAvatarMenuProps {
   user?: {
     id?: string;
     name?: string | null;
-    email: string;
+    /** Null for customers auto-provisioned from emailless Lago records. */
+    email?: string | null;
     role?: string | null;
   };
 }
@@ -85,7 +86,9 @@ export default function UserAvatarMenu({ user }: UserAvatarMenuProps) {
   };
 
   const displayName = user?.name || user?.email || "Guest";
-  const initialsText = user ? initials(user.name || user.email) : "?";
+  const initialsText = user
+    ? initials(user.name || user.email || "Guest")
+    : "?";
 
   return (
     <DropdownMenu>
@@ -114,9 +117,17 @@ export default function UserAvatarMenu({ user }: UserAvatarMenuProps) {
             <DropdownMenuLabel>
               <div class="flex flex-col min-w-0">
                 <span class="text-sm font-medium truncate">{displayName}</span>
-                <span class="text-xs text-muted-foreground truncate">
-                  {user.email}
-                </span>
+                {user.email
+                  ? (
+                    <span class="text-xs text-muted-foreground truncate">
+                      {user.email}
+                    </span>
+                  )
+                  : (
+                    <span class="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      no email on file
+                    </span>
+                  )}
                 {user.role && (
                   <span class="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">
                     {user.role}

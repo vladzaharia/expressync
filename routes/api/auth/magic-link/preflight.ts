@@ -134,7 +134,7 @@ export const handler = define.handlers({
     }
 
     // Look up user by LOWER(email) — invariant 0027 enforces uniqueness.
-    let row: { id: string; role: string; email: string } | undefined;
+    let row: { id: string; role: string; email: string | null } | undefined;
     try {
       const [found] = await db
         .select({
