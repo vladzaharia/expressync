@@ -54,8 +54,10 @@ export function SidebarLayout({
   role = "admin",
   defaultTheme,
 }: SidebarLayoutProps) {
-  const resolvedDefaultTheme = defaultTheme ??
-    (role === "customer" ? "light" : "dark");
+  // Both surfaces default to dark; users can opt into light from the
+  // theme toggle. Per-host localStorage key (resolvedDefaultTheme below)
+  // keeps the customer and admin preferences independent.
+  const resolvedDefaultTheme = defaultTheme ?? "dark";
   const storageKey = role === "customer" ? "polaris-theme" : "ev-billing-theme";
 
   return (

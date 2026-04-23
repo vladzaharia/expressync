@@ -133,9 +133,8 @@ export default function CustomerLoginForm(
         : null}
       <Button
         type="submit"
-        variant="outline"
         size="lg"
-        class="w-full h-11"
+        className="w-full h-12 text-base font-semibold"
         disabled={loading.value}
       >
         {loading.value

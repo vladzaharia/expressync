@@ -20,8 +20,10 @@ import {
   FEATURE_SCAN_LOGIN,
 } from "../src/lib/feature-flags.ts";
 import { isEmailEnabled } from "../src/lib/email.ts";
-import { PolarisExpressBrand } from "../components/brand/PolarisExpressBrand.tsx";
+import { ExpresSyncBrand } from "../components/brand/ExpresSyncBrand.tsx";
 import { Particles } from "../components/magicui/particles.tsx";
+import { GridPattern } from "../components/magicui/grid-pattern.tsx";
+import { ShineBorder } from "../components/magicui/shine-border.tsx";
 import { BlurFade } from "../components/magicui/blur-fade.tsx";
 import CustomerLoginForm from "../islands/customer/CustomerLoginForm.tsx";
 import CustomerScanLoginIsland from "../islands/customer/CustomerScanLoginIsland.tsx";
@@ -62,71 +64,73 @@ export default define.page<typeof handler>(function CustomerLoginPage(
   { data },
 ) {
   return (
-    <div class="min-h-screen flex items-center justify-center relative overflow-hidden bg-background px-4 py-10">
-      {/* Subtle particles background — gentle warm touch on the customer surface. */}
+    <div class="min-h-screen flex items-center justify-center relative overflow-hidden bg-background">
+      {/* Match the admin login chrome 1:1 — particles + grid + gradient. */}
       <Particles
-        className="absolute inset-0 -z-10"
-        quantity={50}
-        staticity={40}
-        color="#0E7C66"
+        className="absolute inset-0 -z-5"
+        quantity={80}
+        staticity={30}
+        color="#0ea5e9"
         size={0.6}
       />
 
-      {/* Soft radial gradient overlay so the brand glow lifts off the page. */}
-      <div class="absolute inset-0 -z-10 bg-gradient-to-b from-background via-background/95 to-primary/5" />
+      <GridPattern
+        width={40}
+        height={40}
+        className="absolute inset-0 -z-10 opacity-10"
+        squares={[[1, 1], [3, 3], [5, 2], [2, 5], [7, 4], [4, 7], [6, 1], [
+          8,
+          6,
+        ]]}
+      />
 
-      <div class="relative z-10 w-full max-w-md">
-        <BlurFade delay={0} duration={0.4} direction="down">
-          <div class="flex justify-center mb-6">
-            <PolarisExpressBrand variant="login" showParticles />
+      <div class="absolute inset-0 -z-10 bg-gradient-to-br from-background via-background/95 to-primary/5" />
+
+      <div class="relative z-10 w-full max-w-md px-4">
+        <BlurFade delay={0} duration={0.5} direction="down">
+          <div class="flex justify-center mb-8">
+            <div class="relative">
+              <ExpresSyncBrand variant="login" showParticles />
+            </div>
           </div>
         </BlurFade>
 
-        <BlurFade delay={0.1} duration={0.4} direction="up">
-          <div class="text-center mb-6 space-y-1">
-            <h1 class="text-2xl font-semibold text-foreground">
-              Welcome to Polaris Express
-            </h1>
-            <p class="text-sm text-muted-foreground">
-              Sign in to manage your charging
-            </p>
-          </div>
+        <BlurFade delay={0.2} duration={0.5} direction="up">
+          <ShineBorder borderRadius={12} borderWidth={1} duration={10}>
+            <div class="space-y-5 p-5 sm:p-6">
+              {data.scanLoginEnabled
+                ? (
+                  <CustomerScanLoginIsland
+                    autoOpen={data.autoOpenScan}
+                    initialChargeBoxId={data.initialChargeBoxId}
+                  />
+                )
+                : null}
+
+              {data.scanLoginEnabled && data.magicLinkEnabled
+                ? (
+                  <div
+                    class="relative flex items-center"
+                    role="separator"
+                    aria-orientation="horizontal"
+                  >
+                    <span class="flex-1 h-px bg-border" />
+                    <span class="px-3 text-xs uppercase tracking-wide text-muted-foreground">
+                      or
+                    </span>
+                    <span class="flex-1 h-px bg-border" />
+                  </div>
+                )
+                : null}
+
+              {data.magicLinkEnabled
+                ? <CustomerLoginForm defaultEmail={data.defaultEmail} />
+                : null}
+            </div>
+          </ShineBorder>
         </BlurFade>
 
-        <BlurFade delay={0.2} duration={0.4} direction="up">
-          <div class="rounded-2xl border border-border bg-card/80 backdrop-blur-sm shadow-lg p-5 sm:p-6 space-y-5">
-            {data.scanLoginEnabled
-              ? (
-                <CustomerScanLoginIsland
-                  autoOpen={data.autoOpenScan}
-                  initialChargeBoxId={data.initialChargeBoxId}
-                />
-              )
-              : null}
-
-            {data.scanLoginEnabled && data.magicLinkEnabled
-              ? (
-                <div
-                  class="relative flex items-center"
-                  role="separator"
-                  aria-orientation="horizontal"
-                >
-                  <span class="flex-1 h-px bg-border" />
-                  <span class="px-3 text-xs uppercase tracking-wide text-muted-foreground">
-                    or
-                  </span>
-                  <span class="flex-1 h-px bg-border" />
-                </div>
-              )
-              : null}
-
-            {data.magicLinkEnabled
-              ? <CustomerLoginForm defaultEmail={data.defaultEmail} />
-              : null}
-          </div>
-        </BlurFade>
-
-        <BlurFade delay={0.3} duration={0.4} direction="up">
+        <BlurFade delay={0.35} duration={0.5} direction="up">
           <p class="text-xs text-center text-muted-foreground mt-6">
             Need help?{" "}
             <a
