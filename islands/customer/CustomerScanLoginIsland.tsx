@@ -39,7 +39,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { ShimmerButton } from "@/components/magicui/shimmer-button.tsx";
 import {
   type ChargerPickerCharger,
   ChargerPickerInline,
@@ -469,16 +468,15 @@ export default function CustomerScanLoginIsland({
   // Render — the trigger button always renders; the modal only when open.
   return (
     <>
-      <ShimmerButton
+      <Button
         type="button"
-        class={`w-full min-h-12 text-base font-semibold ${className ?? ""}`}
-        background="hsl(var(--primary, 192 95% 39%))"
-        shimmerColor="rgba(255,255,255,0.85)"
+        size="lg"
+        className={`w-full h-12 text-base font-semibold ${className ?? ""}`}
         onClick={handleOpen}
       >
         <ScanLine class="mr-2 size-5" />
         Tap to scan your card
-      </ShimmerButton>
+      </Button>
 
       <Dialog
         open={open.value}

@@ -369,7 +369,6 @@ export default define.page<typeof handler>(
         user={state.user}
         role="customer"
         accentColor="blue"
-        defaultTheme="light"
       >
         {data.impersonation && (
           <ImpersonationBanner
