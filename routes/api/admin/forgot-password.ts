@@ -34,7 +34,10 @@ import { users, verifications } from "../../../src/db/schema.ts";
 import { config } from "../../../src/lib/config.ts";
 import { checkRateLimit } from "../../../src/lib/utils/rate-limit.ts";
 import { hashEmail, logAuthEvent } from "../../../src/lib/audit.ts";
-import { sendAdminPasswordReset } from "../../../src/lib/email.ts";
+import {
+  isEmailEnabled,
+  sendAdminPasswordReset,
+} from "../../../src/lib/email.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
 
 const log = logger.child("AdminForgotPassword");
@@ -76,6 +79,17 @@ function rateLimited(): Response {
   );
 }
 
+function featureDisabled(): Response {
+  return new Response(
+    JSON.stringify({
+      error: "feature_disabled",
+      reason:
+        "Password reset is unavailable because outbound email isn't configured.",
+    }),
+    { status: 503, headers: { "Content-Type": "application/json" } },
+  );
+}
+
 function base64UrlEncode(bytes: Uint8Array): string {
   let bin = "";
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
@@ -94,6 +108,13 @@ function isLikelyEmail(s: string): boolean {
 
 export const handler = define.handlers({
   async POST(ctx) {
+    // Defense in depth: the admin login UI hides the forgot-password
+    // form when the worker isn't configured. Direct API callers get a
+    // 503 here so they don't burn rate-limit budget for nothing.
+    if (!isEmailEnabled()) {
+      return featureDisabled();
+    }
+
     let body: unknown;
     try {
       body = await ctx.req.json();

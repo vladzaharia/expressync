@@ -19,6 +19,7 @@ import {
   FEATURE_MAGIC_LINK,
   FEATURE_SCAN_LOGIN,
 } from "../src/lib/feature-flags.ts";
+import { isEmailEnabled } from "../src/lib/email.ts";
 import { PolarisExpressBrand } from "../components/brand/PolarisExpressBrand.tsx";
 import { Particles } from "../components/magicui/particles.tsx";
 import { BlurFade } from "../components/magicui/blur-fade.tsx";
@@ -44,7 +45,11 @@ export const handler = define.handlers({
       data: {
         operatorEmail: config.OPERATOR_CONTACT_EMAIL,
         scanLoginEnabled: FEATURE_SCAN_LOGIN,
-        magicLinkEnabled: FEATURE_MAGIC_LINK,
+        // Hide the magic-link UI when (a) the feature flag is off OR
+        // (b) the email worker isn't configured. Without (b), customers
+        // would submit "email me a link" → see "check your email" → wait
+        // forever for an email that can never be sent.
+        magicLinkEnabled: FEATURE_MAGIC_LINK && isEmailEnabled(),
         autoOpenScan: scanParam === "1",
         initialChargeBoxId: chargerParam,
         defaultEmail: emailParam,
