@@ -9,8 +9,7 @@ import { BackAction } from "../../../components/shared/BackAction.tsx";
 import { config } from "../../../src/lib/config.ts";
 import { steveClient } from "../../../src/lib/steve-client.ts";
 import { lagoClient } from "../../../src/lib/lago-client.ts";
-import { getAllChildTags, isMetaTag } from "../../../src/lib/tag-hierarchy.ts";
-import { MetaInheritancePreview } from "../../../components/links/MetaInheritancePreview.tsx";
+import { isMetaTag } from "../../../src/lib/tag-hierarchy.ts";
 
 /**
  * Loader shape (LinksNewLoaderData):
@@ -20,7 +19,10 @@ import { MetaInheritancePreview } from "../../../components/links/MetaInheritanc
  *   lagoDashboardUrl      — config
  *   hasAnyCustomers       — Lago (for zero-state hint)
  *   hasAnyTags            — StEvE (for zero-state hint)
- *   metaChildren          — idTags that inherit, when tag is a meta-tag
+ *
+ * Inheritance preview lives on the meta-tag's detail page (TagLinkCard's
+ * family zone) — the linking form is now single-responsibility: pick +
+ * submit.
  */
 export const handler = define.handlers({
   async GET(ctx) {
@@ -30,7 +32,6 @@ export const handler = define.handlers({
 
     let preselectedTagId: string | null = null;
     let preselectedTagPk: number | null = null;
-    let metaChildren: string[] | null = null;
 
     // Resolve tagPk → idTag via StEvE; if the tag is already linked, redirect
     // to its edit page instead of duplicating a mapping.
@@ -51,11 +52,6 @@ export const handler = define.handlers({
             }
             preselectedTagId = hit.idTag;
             preselectedTagPk = hit.ocppTagPk;
-            if (isMetaTag(hit.idTag)) {
-              metaChildren = getAllChildTags(hit.idTag, allTags).map(
-                (c) => c.idTag,
-              );
-            }
           }
         } catch (err) {
           console.error("Failed to resolve tagPk:", err);
@@ -87,7 +83,6 @@ export const handler = define.handlers({
         lagoDashboardUrl: config.LAGO_DASHBOARD_URL || null,
         hasAnyCustomers,
         hasAnyTags,
-        metaChildren,
       },
     };
   },
@@ -121,14 +116,6 @@ export default define.page<typeof handler>(
             preselectedTagPk={data.preselectedTagPk}
             preselectedCustomerId={data.preselectedCustomerId}
             lagoDashboardUrl={data.lagoDashboardUrl}
-            inheritanceSlot={meta && data.preselectedTagId
-              ? (
-                <MetaInheritancePreview
-                  parentIdTag={data.preselectedTagId}
-                  childIdTags={data.metaChildren ?? []}
-                />
-              )
-              : null}
           />
         </PageCard>
       </SidebarLayout>
