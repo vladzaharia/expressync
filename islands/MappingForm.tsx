@@ -46,12 +46,8 @@ interface Props {
   /** Preselected Lago customer external id (create mode, from query). */
   preselectedCustomerId?: string | null;
   /** When truthy, the form emits `/links/[id]` on successful create instead
-   *  of navigating to `/links`. Pairs with the inheritance preview logic in
-   *  `/links/new`. */
+   *  of navigating to `/links`. */
   lagoDashboardUrl?: string | null;
-  /** Optional render slot between the subscription picker and submit row.
-   *  `/links/new` uses this for `MetaInheritancePreview`. */
-  inheritanceSlot?: preact.ComponentChildren;
   /** Title override for the step rail's screen-reader label. */
   ariaLabel?: string;
 }
@@ -63,7 +59,6 @@ export default function MappingForm(props: Props) {
     preselectedTagPk,
     preselectedCustomerId,
     lagoDashboardUrl,
-    inheritanceSlot,
     ariaLabel,
   } = props;
 
@@ -259,8 +254,6 @@ export default function MappingForm(props: Props) {
         }}
         lagoDashboardUrl={lagoDashboardUrl}
       />
-
-      {inheritanceSlot}
 
       {
         /* Active toggle — hidden for create flow (defaults true). The edit

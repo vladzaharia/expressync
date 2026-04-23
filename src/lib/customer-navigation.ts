@@ -142,3 +142,16 @@ export function isPathActive(itemPath: string, currentPath: string): boolean {
   if (itemPath === "/") return currentPath === "/";
   return currentPath === itemPath || currentPath.startsWith(itemPath + "/");
 }
+
+// ---- Aliases for G1 dashboard imports ------------------------------------
+// G1 (the dashboard track) imports under different names; keep both APIs.
+
+export type CustomerNavItem = NavItem;
+
+/** Bottom-tab list — same data as CUSTOMER_NAV_SECTIONS but flattened. */
+export function getCustomerBottomTabs(): NavItem[] {
+  return CUSTOMER_NAV_SECTIONS.flatMap((s) => s.items);
+}
+
+/** Active-path check — alias of isPathActive. */
+export const isCustomerPathActive = isPathActive;
