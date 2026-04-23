@@ -105,9 +105,25 @@ export default define.page(function App({ Component, state }) {
         />
       </head>
       <body class="min-h-screen bg-background text-foreground antialiased">
+        {
+          /*
+          Polaris Track H — Skip-link. Hidden visually until focused, then
+          jumps the user past the navigation chrome to the page's main
+          content. Pages must tag their `<main>` with `id="main-content"`
+          (SidebarLayout / SidebarWrapper handle this for the standard
+          shell). Easy a11y win — keyboard users press Tab on page load
+          and immediately see the link.
+        */
+        }
+        <a
+          href="#main-content"
+          class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-primary focus:text-primary-foreground focus:px-4 focus:py-2 focus:rounded"
+        >
+          Skip to main content
+        </a>
         <Component />
         <Toaster richColors position="bottom-right" />
-        <CommandPalette />
+        <CommandPalette surface={surface} />
         <SseProvider />
       </body>
     </html>

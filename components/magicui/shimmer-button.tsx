@@ -36,17 +36,25 @@ export function ShimmerButton({
       )}
       {...props}
     >
-      {/* spark container */}
+      {
+        /* spark container — Polaris Track H: aria-hidden so the decorative
+          shimmer doesn't clutter the AT label of the host button. */
+      }
       <div
+        aria-hidden="true"
         className={cn(
           "-z-30 blur-[2px]",
           "[container-type:size] absolute inset-0 overflow-visible",
         )}
       >
-        {/* spark */}
-        <div className="animate-shimmer-slide absolute inset-0 [aspect-ratio:1] h-[100cqh] [border-radius:0] [mask:none]">
+        {
+          /* spark — Polaris Track H: gate the slide animation on
+            prefers-reduced-motion. With motion disabled the conic
+            gradient remains painted but doesn't slide/spin. */
+        }
+        <div className="motion-safe:animate-shimmer-slide absolute inset-0 [aspect-ratio:1] h-[100cqh] [border-radius:0] [mask:none]">
           {/* spark before */}
-          <div className="animate-spin-around absolute -inset-full w-auto [translate:0_0] rotate-0 [background:conic-gradient(from_calc(270deg-(var(--spread)*0.5)),transparent_0,var(--shimmer-color)_var(--spread),transparent_var(--spread))]" />
+          <div className="motion-safe:animate-spin-around absolute -inset-full w-auto [translate:0_0] rotate-0 [background:conic-gradient(from_calc(270deg-(var(--spread)*0.5)),transparent_0,var(--shimmer-color)_var(--spread),transparent_var(--spread))]" />
         </div>
       </div>
       {children}

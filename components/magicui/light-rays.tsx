@@ -41,6 +41,8 @@ export function LightRays({
 
   return (
     <div
+      // Polaris Track H: decorative-only background — flag for AT users.
+      aria-hidden="true"
       className={cn(
         "pointer-events-none absolute inset-0 overflow-hidden",
         className,
@@ -62,9 +64,12 @@ export function LightRays({
       {rays.map((ray, i) => (
         <div
           key={i}
+          // Polaris Track H: gate ray pulse on prefers-reduced-motion. The
+          // rays still paint statically, so the visual atmosphere remains
+          // even with motion disabled.
           className={cn(
             "absolute top-0 left-1/2 origin-top",
-            animated && "animate-pulse",
+            animated && "motion-safe:animate-pulse",
           )}
           style={{
             width: `${ray.width}px`,

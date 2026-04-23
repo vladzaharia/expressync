@@ -23,6 +23,11 @@ const buttonVariants = cva(
         default: "h-9 px-4 py-2 has-[>svg]:px-3",
         sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
         lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
+        // Polaris Track H — customer-touchable variant. 44px (`h-11`) hits
+        // the iOS HIG minimum tap target. Used by all customer-facing
+        // buttons (Stop charging, login submit, scan trigger, quick
+        // actions, bottom-tab buttons). Admin defaults stay on `h-9`/`h-10`.
+        mobile: "h-11 rounded-md px-5 has-[>svg]:px-4",
         icon: "size-9",
       },
     },

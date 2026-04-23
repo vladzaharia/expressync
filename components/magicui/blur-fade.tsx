@@ -47,7 +47,10 @@ export function BlurFade({
 
   return (
     <div
-      className={cn("animate-blur-fade", className)}
+      // Polaris Track H: gate the entrance fade on prefers-reduced-motion.
+      // For reduce-motion users the children render in their final state
+      // immediately (no blur, no offset) — content is fully accessible.
+      className={cn("motion-safe:animate-blur-fade", className)}
       style={{
         "--blur-fade-duration": `${duration}s`,
         "--blur-fade-delay": `${delay}s`,
