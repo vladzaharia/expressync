@@ -100,6 +100,33 @@ function isDevModeFallback(): boolean {
   return false;
 }
 
+/**
+ * Whether outbound email is *advertisable* to end users.
+ *
+ * Returns true when either:
+ *   - dev mode is active (sends are logged to console — devs see them)
+ *   - prod has BOTH `CF_EMAIL_WORKER_URL` and `CF_EMAIL_WORKER_SECRET` set
+ *
+ * Server-side loaders pass this flag to islands so the UI can hide
+ * email-dependent options (magic-link sign-in, admin forgot-password)
+ * when the worker isn't configured. Without this, customers see
+ * "Email me a sign-in link" → submit → "Check your email" → wait
+ * forever for a link that never arrives.
+ *
+ * Note: this is a STATIC config check, not a runtime liveness probe.
+ * If the worker URL/secret are set but the worker happens to be down,
+ * this still reports `true` and the UI shows email options. Users
+ * will see the standard "check your email" message; the email won't
+ * arrive but they can request another or use the scan flow. Add a
+ * background liveness ping later if outages become frequent.
+ */
+export function isEmailEnabled(): boolean {
+  if (isDevModeFallback()) return true;
+  return Boolean(
+    config.CF_EMAIL_WORKER_URL && config.CF_EMAIL_WORKER_SECRET,
+  );
+}
+
 /** Outcome of an outbound email attempt. Helpers NEVER throw. */
 export type SendEmailResult =
   | { ok: true; status: "sent" | "logged_dev" }

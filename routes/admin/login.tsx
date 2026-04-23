@@ -6,8 +6,25 @@ import { Particles } from "../../components/magicui/particles.tsx";
 import { ShineBorder } from "../../components/magicui/shine-border.tsx";
 import { ExpresSyncBrand } from "../../components/brand/ExpresSyncBrand.tsx";
 import { BlurFade } from "../../components/magicui/blur-fade.tsx";
+import { isEmailEnabled } from "../../src/lib/email.ts";
 
-export default define.page(function LoginPage() {
+interface LoginPageData {
+  /** Hide the forgot-password trigger when the email worker isn't
+   *  configured — admins can't receive a reset link otherwise. */
+  forgotPasswordEnabled: boolean;
+}
+
+export const handler = define.handlers({
+  GET() {
+    return {
+      data: {
+        forgotPasswordEnabled: isEmailEnabled(),
+      } satisfies LoginPageData,
+    };
+  },
+});
+
+export default define.page<typeof handler>(function LoginPage({ data }) {
   return (
     <div class="min-h-screen flex items-center justify-center relative overflow-hidden bg-background">
       {/* Animated particles background */}
@@ -53,12 +70,18 @@ export default define.page(function LoginPage() {
           </ShineBorder>
         </BlurFade>
 
-        {/* Forgot-password trigger — collapsed by default; expands inline. */}
-        <BlurFade delay={0.35} duration={0.5} direction="up">
-          <div class="mt-3 px-1">
-            <ForgotPasswordForm />
-          </div>
-        </BlurFade>
+        {
+          /* Forgot-password trigger — collapsed by default; expands inline.
+            Hidden entirely when the email worker isn't configured (no
+            reset link can be sent). Admin recovers via direct DB access. */
+        }
+        {data.forgotPasswordEnabled && (
+          <BlurFade delay={0.35} duration={0.5} direction="up">
+            <div class="mt-3 px-1">
+              <ForgotPasswordForm />
+            </div>
+          </BlurFade>
+        )}
       </div>
     </div>
   );
