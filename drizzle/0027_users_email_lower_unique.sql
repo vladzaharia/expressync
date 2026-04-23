@@ -14,5 +14,10 @@
 -- Auto-provisioning code MUST use `LOWER(email) = LOWER($1)` for lookups
 -- after this lands.
 
+-- The original uniqueness lives as a constraint (not a bare index), so we
+-- have to drop the constraint first. `IF EXISTS` keeps the migration
+-- idempotent across envs where the constraint was renamed or already
+-- dropped.
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_email_unique;
 DROP INDEX IF EXISTS users_email_unique;
 CREATE UNIQUE INDEX users_email_lower_unique ON users (LOWER(email));
