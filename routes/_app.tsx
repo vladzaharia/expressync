@@ -25,10 +25,9 @@ export default define.page(function App({ Component, state }) {
   const manifestHref = isAdmin ? "/manifest.admin.json" : "/manifest.json";
   const themeColor = isAdmin ? "#0ea5e9" : "#0E7C66";
   const title = isAdmin ? "ExpresSync" : "Polaris Express";
-  // Admin keeps the previously-default `dark` class so SSR markup matches
-  // the bootstrap script for admin sessions; customer renders without an
-  // initial class and the bootstrap script applies `light` on the client.
-  const htmlClass = isAdmin ? "dark" : "";
+  // Both surfaces default to dark; the bootstrap script reads the
+  // per-host localStorage key and overrides if the user picked light.
+  const htmlClass = "dark";
 
   // Favicon set per surface — matches the manifest icon entries so the
   // browser's <link rel=icon> picker finds the right asset before the
@@ -43,9 +42,11 @@ export default define.page(function App({ Component, state }) {
                 const isAdmin = location.hostname.startsWith('manage.') || location.hostname === 'localhost';
                 const key = isAdmin ? 'ev-billing-theme' : 'polaris-theme';
                 const stored = localStorage.getItem(key);
-                const theme = stored || (isAdmin ? 'dark' : 'light');
+                // Both surfaces default to dark; light is opt-in.
+                const theme = stored || 'dark';
                 if (theme === 'system') {
                   const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                  document.documentElement.classList.remove('light', 'dark');
                   document.documentElement.classList.add(systemTheme);
                 } else {
                   document.documentElement.classList.remove('light', 'dark');
