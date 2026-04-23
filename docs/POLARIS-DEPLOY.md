@@ -5,13 +5,13 @@
 The Polaris Express customer portal ships as the same Fresh container that
 serves the existing admin tool. Two Traefik routers split traffic by host:
 
-- `manage.polaris.express` → admin surface (rename from `expressync.polaris.gdn`)
+- `manage.polaris.express` → admin surface (rename from
+  `expressync.polaris.gdn`)
 - `polaris.express` → customer surface
 - `expressync.polaris.gdn` → 301 → `manage.polaris.express` (90-day grace)
 
-A separate Cloudflare Email Worker handles outbound transactional email
-(magic links, session summaries, reservation cancellations, admin
-password resets).
+A separate Cloudflare Email Worker handles outbound transactional email (magic
+links, session summaries, reservation cancellations, admin password resets).
 
 ## Prerequisites
 
@@ -52,8 +52,8 @@ _dmarc.polaris.express.   3600  IN  TXT
   "v=DMARC1; p=none; rua=mailto:dmarc-reports@polaris.express; fo=1; aspf=r; adkim=r; pct=100"
 ```
 
-After 30 days of clean reports → escalate to `p=quarantine`. After 60 days
-clean → `p=reject`.
+After 30 days of clean reports → escalate to `p=quarantine`. After 60 days clean
+→ `p=reject`.
 
 ### 3. Hosted brand assets (PNGs)
 
@@ -64,9 +64,9 @@ Upload to `https://assets.polaris.express/email/`:
 - `expressync-logo-160.png`
 - `expressync-logo-320.png`
 
-For now, the in-repo `static/polaris-favicon-*.png` files are 1×1
-transparent placeholders. To generate real ones from
-`static/polaris-logo.svg` (already shipped):
+For now, the in-repo `static/polaris-favicon-*.png` files are 1×1 transparent
+placeholders. To generate real ones from `static/polaris-logo.svg` (already
+shipped):
 
 ```bash
 deno run --allow-read --allow-write --allow-run scripts/generate-polaris-favicons.ts
@@ -126,8 +126,8 @@ OPERATOR_CONTACT_EMAIL=support@polaris.express
 deno task db:migrate
 ```
 
-This applies migrations 0017–0027 (user_mappings.userId, role triggers,
-audit tables, case-insensitive email index).
+This applies migrations 0017–0027 (user_mappings.userId, role triggers, audit
+tables, case-insensitive email index).
 
 ### 7. Backfill existing customer accounts
 
@@ -142,9 +142,9 @@ deno task backfill:customer-accounts
 ```
 
 The script auto-creates customer user rows for every existing
-`user_mappings.lago_customer_external_id` (using the Lago customer's
-email). Skipped rows (no Lago email, admin-email collision) are reported in
-the CSV — fix in Lago and re-run.
+`user_mappings.lago_customer_external_id` (using the Lago customer's email).
+Skipped rows (no Lago email, admin-email collision) are reported in the CSV —
+fix in Lago and re-run.
 
 ### 8. Deploy Fresh container + flip Traefik
 
@@ -199,38 +199,38 @@ curl https://polaris.express/api/health
 
 ## Pen-test checklist (run BEFORE marking the launch complete)
 
-These are the 20 items from the security audit, captured here as the
-launch-gate checklist. Run each manually or with the noted test commands.
-The codebase already enforces most of these — this checklist confirms
-production behavior matches.
+These are the 20 items from the security audit, captured here as the launch-gate
+checklist. Run each manually or with the noted test commands. The codebase
+already enforces most of these — this checklist confirms production behavior
+matches.
 
 ### Auth & sessions
 
-1. **Magic-link enumeration**: POST `/api/auth/magic-link/preflight` with
-   100 random emails. Expected: uniform 200, no DB rows for non-existent
-   users (verify via `psql`), per-IP rate-limit triggers around the 25th
-   request. (Track A-Core enforces composite rate limits.)
+1. **Magic-link enumeration**: POST `/api/auth/magic-link/preflight` with 100
+   random emails. Expected: uniform 200, no DB rows for non-existent users
+   (verify via `psql`), per-IP rate-limit triggers around the 25th request.
+   (Track A-Core enforces composite rate limits.)
 
-2. **Magic-link single-use replay**: click an emailed magic link. Open the
-   same URL again. Expected: second click → "Link expired" page. (Track C
-   verify endpoint deletes the verification row on use.)
+2. **Magic-link single-use replay**: click an emailed magic link. Open the same
+   URL again. Expected: second click → "Link expired" page. (Track C verify
+   endpoint deletes the verification row on use.)
 
-3. **Magic-link expired**: wait 16 minutes after issuance. Click. Expected:
-   410 / "Link expired". (TTL = `MAGIC_LINK_TTL_SECONDS=900`.)
+3. **Magic-link expired**: wait 16 minutes after issuance. Click. Expected: 410
+   / "Link expired". (TTL = `MAGIC_LINK_TTL_SECONDS=900`.)
 
 4. **Cross-charger SSE pickup attempt**: open SSE
-   `/api/auth/scan-detect?pairingCode=A&chargeBoxId=EVSE-1`; have someone
-   scan at EVSE-2. Expected: no event delivered. (Track C scan-detect filters
-   by chargeBoxId.)
+   `/api/auth/scan-detect?pairingCode=A&chargeBoxId=EVSE-1`; have someone scan
+   at EVSE-2. Expected: no event delivered. (Track C scan-detect filters by
+   chargeBoxId.)
 
 5. **Concurrent armed pairing per charger**: open two browsers, both POST
-   `/api/auth/scan-pair` with `chargeBoxId=EVSE-1`. Expected: second returns
-   409 Conflict. (One armed pairing per charger; Track C enforces.)
+   `/api/auth/scan-pair` with `chargeBoxId=EVSE-1`. Expected: second returns 409
+   Conflict. (One armed pairing per charger; Track C enforces.)
 
-6. **Captured-nonce replay**: capture `(idTag, pairingCode_A, nonce_A)` from
-   one client's SSE; POST `/api/auth/scan-login` from another browser with
-   different `pairingCode_B + nonce_A`. Expected: 403 HMAC mismatch. (HMAC
-   binds chargeBoxId+pairingCode+idTag+timestamp.)
+6. **Captured-nonce replay**: capture `(idTag, pairingCode_A, nonce_A)` from one
+   client's SSE; POST `/api/auth/scan-login` from another browser with different
+   `pairingCode_B + nonce_A`. Expected: 403 HMAC mismatch. (HMAC binds
+   chargeBoxId+pairingCode+idTag+timestamp.)
 
 7. **Atomic single-use scan-login**: POST `/api/auth/scan-login` twice in
    parallel with same payload. Expected: first 200, second 410. (Atomic
@@ -243,20 +243,21 @@ production behavior matches.
 9. **Customer ownership IDOR — reservations**: as customer A, PATCH
    `/api/customer/reservations/{B's id}`. Expected: 404.
 
-10. **Customer ownership — scan-start with foreign tag**: as customer A,
-    POST `/api/customer/scan-start` with `{ ocppTagPk: <B's tag> }`.
-    Expected: 404. (assertOwnership on the tag.)
+10. **Customer ownership — scan-start with foreign tag**: as customer A, POST
+    `/api/customer/scan-start` with `{ ocppTagPk: <B's tag> }`. Expected: 404.
+    (assertOwnership on the tag.)
 
 11. **Customer ownership — session-stop on foreign session**: as customer A,
     POST `/api/customer/session-stop` with `{ transactionId: <B's tx> }`.
     Expected: 404.
 
 12. **Operation allowlist**: as customer, POST `/api/admin/charger/operation`
-    with `operation: "Reset"`. Expected: 403 (and the path itself is
-    admin-only via middleware, so an even earlier 404 from the customer
-    surface is acceptable).
+    with `operation: "Reset"`. Expected: 403 (and the path itself is admin-only
+    via middleware, so an even earlier 404 from the customer surface is
+    acceptable).
 
-13. **DB trigger — admin-as-mapping-user**: directly run `INSERT INTO
+13. **DB trigger — admin-as-mapping-user**: directly run
+    `INSERT INTO
     user_mappings (steve_ocpp_tag_pk, user_id) VALUES (1, '<an admin id>')`.
     Expected: trigger raises exception with role='admin' message. (Migration
     0018.)
@@ -265,31 +266,31 @@ production behavior matches.
     request. Expected: 302 to /login + session row deleted from `sessions`.
 
 15. **Email Worker replay-protection**: capture a real `POST /send` body and
-    signature, replay 6 minutes later. Expected: 403 (timestamp expired or
-    nonce already in KV).
+    signature, replay 6 minutes later. Expected: 403 (timestamp expired or nonce
+    already in KV).
 
 16. **SSE concurrency cap**: open 5 concurrent
-    `EventSource('/api/auth/scan-detect?...')` from the same IP. Expected:
-    4th onwards → 429. (Track C per-IP cap of 3 concurrent.)
+    `EventSource('/api/auth/scan-detect?...')` from the same IP. Expected: 4th
+    onwards → 429. (Track C per-IP cap of 3 concurrent.)
 
 17. **Cross-site CSRF**: from `evil.com`, submit
     `<form method="POST" action="https://polaris.express/api/customer/session-stop">`.
-    Expected: 403 (Origin mismatch from `assertSameOrigin`) + cookie not
-    sent (SameSite=Lax).
+    Expected: 403 (Origin mismatch from `assertSameOrigin`) + cookie not sent
+    (SameSite=Lax).
 
 18. **Email previewer (Outlook SafeLinks) simulation**: GET
     `https://polaris.express/auth/verify?token=<valid>` with
-    `User-Agent: Outlook-Safe-Links/1.0`. Expected: renders confirmation
-    form (POST), does NOT consume the token. (Track C two-step consume.)
+    `User-Agent: Outlook-Safe-Links/1.0`. Expected: renders confirmation form
+    (POST), does NOT consume the token. (Track C two-step consume.)
 
 19. **Admin impersonation audit**: as admin, navigate to
     `polaris.express/?as=<customer-uuid>`. Expected: ImpersonationBanner
-    visible, `impersonation_audit` row written, state-changing POST
-    rejected with 403 "Read-only while impersonating".
+    visible, `impersonation_audit` row written, state-changing POST rejected
+    with 403 "Read-only while impersonating".
 
-20. **Brute-force admin password**: POST `/api/auth/sign-in/email` with
-    wrong password 100 times in 1 minute from one IP. Expected: rate-limit
-    429 well before 100 attempts. (Existing `/api/auth` 10/min IP limit.)
+20. **Brute-force admin password**: POST `/api/auth/sign-in/email` with wrong
+    password 100 times in 1 minute from one IP. Expected: rate-limit 429 well
+    before 100 attempts. (Existing `/api/auth` 10/min IP limit.)
 
 After all 20 checks pass, the launch gate is green.
 
@@ -298,36 +299,33 @@ After all 20 checks pass, the launch gate is green.
 If production is unhappy:
 
 1. Revert the docker-compose.override.yml Traefik label change to point
-   `polaris-admin` back at `expressync.polaris.gdn` and remove the
-   customer router. The single Fresh app keeps serving admin from the
-   legacy host.
-2. Customer-facing endpoints (`/api/customer/*`, `/login`, `/auth/*`)
-   become inaccessible (no router pointing at them) — admin tool is
-   unaffected.
-3. To roll back schema: migrations 0017–0027 are non-destructive (they
-   only ADD columns + tables + triggers). The new triggers can be dropped
-   manually if they cause friction. Existing admin data is unchanged.
+   `polaris-admin` back at `expressync.polaris.gdn` and remove the customer
+   router. The single Fresh app keeps serving admin from the legacy host.
+2. Customer-facing endpoints (`/api/customer/*`, `/login`, `/auth/*`) become
+   inaccessible (no router pointing at them) — admin tool is unaffected.
+3. To roll back schema: migrations 0017–0027 are non-destructive (they only ADD
+   columns + tables + triggers). The new triggers can be dropped manually if
+   they cause friction. Existing admin data is unchanged.
 
 ## Open follow-ups
 
 - **`users.deleted_at`** — schema doesn't yet support GDPR soft-delete.
-  `/api/customer/delete-account` returns 501. Plan to add a follow-up
-  migration when the operator needs the path.
-- **Real Polaris favicon artwork** — `static/polaris-favicon-*.png` are
-  1×1 placeholders. Generate from `static/polaris-logo.svg` via the
+  `/api/customer/delete-account` returns 501. Plan to add a follow-up migration
+  when the operator needs the path.
+- **Real Polaris favicon artwork** — `static/polaris-favicon-*.png` are 1×1
+  placeholders. Generate from `static/polaris-logo.svg` via the
   scripts/generate-polaris-favicons.ts script.
-- **`/api/customer/sessions?cardId=` filter** — Track G2's card-detail
-  page wants to filter recent sessions by card; the Track F endpoint
-  doesn't accept this param yet. Cosmetic — currently shows the user's
-  full session history embedded.
-- **Lago invoice cross-link from session detail** — the session detail's
-  Cost MetricTile is wired as a cross-link target but the loader
-  currently returns null `costCents` / `invoiceId`. Resolve in a follow-up
-  by enriching the loader with the Lago invoice lookup.
+- **`/api/customer/sessions?cardId=` filter** — Track G2's card-detail page
+  wants to filter recent sessions by card; the Track F endpoint doesn't accept
+  this param yet. Cosmetic — currently shows the user's full session history
+  embedded.
+- **Lago invoice cross-link from session detail** — the session detail's Cost
+  MetricTile is wired as a cross-link target but the loader currently returns
+  null `costCents` / `invoiceId`. Resolve in a follow-up by enriching the loader
+  with the Lago invoice lookup.
 - **DMARC escalation timeline** — start at `p=none` for 30 days, then
   `p=quarantine`, then `p=reject`. Track DMARC reports via the
   `dmarc-reports@polaris.express` mailbox.
-- **Worker secret rotation** — the Worker accepts both
-  `POLARIS_SECRET_A` and `POLARIS_SECRET_B` for rolling rotation. To
-  rotate: (a) add SECRET_B, (b) update Fresh app to use SECRET_B,
-  (c) remove SECRET_A.
+- **Worker secret rotation** — the Worker accepts both `POLARIS_SECRET_A` and
+  `POLARIS_SECRET_B` for rolling rotation. To rotate: (a) add SECRET_B, (b)
+  update Fresh app to use SECRET_B, (c) remove SECRET_A.
