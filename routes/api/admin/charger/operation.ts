@@ -133,6 +133,16 @@ export const handler = define.handlers({
   },
 
   async POST(ctx) {
+    // Defense-in-depth: this endpoint is mounted under /api/admin/* and the
+    // middleware enforces admin-host-only delivery. We re-check the role here
+    // so even if a future middleware refactor regresses, a customer-role
+    // session can never dispatch arbitrary OCPP operations.
+    if (ctx.state.user?.role !== "admin") {
+      return jsonResponse(403, {
+        error: "Forbidden — admin role required",
+      });
+    }
+
     let body: {
       chargeBoxId?: unknown;
       operation?: unknown;

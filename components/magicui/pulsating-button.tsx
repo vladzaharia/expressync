@@ -29,7 +29,14 @@ export function PulsatingButton({
       {...props}
     >
       <div className="relative z-10">{children}</div>
-      <div className="absolute left-1/2 top-1/2 size-full -translate-x-1/2 -translate-y-1/2 animate-pulse rounded-lg bg-inherit" />
+      {
+        /* Polaris Track H: decorative pulse — aria-hidden + gated on
+          prefers-reduced-motion. Button itself stays fully usable. */
+      }
+      <div
+        aria-hidden="true"
+        className="absolute left-1/2 top-1/2 size-full -translate-x-1/2 -translate-y-1/2 motion-safe:animate-pulse rounded-lg bg-inherit"
+      />
     </button>
   );
 }

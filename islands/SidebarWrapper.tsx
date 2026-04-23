@@ -118,7 +118,12 @@ export default function SidebarWrapper({
           accentColor={accentColor}
           user={user}
         />
-        <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
+        <main
+          id="main-content"
+          className="flex-1 overflow-auto p-4 md:p-6"
+        >
+          {children}
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );

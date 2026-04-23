@@ -1,4 +1,5 @@
 import { useComputed, useSignal } from "@preact/signals";
+import { useEffect, useState } from "preact/hooks";
 import { Button } from "./button.tsx";
 import {
   Table,
@@ -11,6 +12,26 @@ import {
 import { ChevronDown, Loader2 } from "lucide-preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 import type { ComponentChildren } from "preact";
+
+/**
+ * Match the `<md` breakpoint Tailwind uses (768px). Tracks resize so the
+ * mobile-card render flips back to the table on rotate / window-resize
+ * without a full reload. Initial render returns `false` (assume desktop)
+ * so SSR markup matches the post-hydration desktop view; the mobile flip
+ * happens on the first effect tick.
+ */
+function useIsMobileViewport(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof globalThis.matchMedia !== "function") return;
+    const mql = globalThis.matchMedia("(max-width: 767px)");
+    const update = () => setIsMobile(mql.matches);
+    update();
+    mql.addEventListener("change", update);
+    return () => mql.removeEventListener("change", update);
+  }, []);
+  return isMobile;
+}
 
 export interface PaginatedTableColumn<T> {
   key: string;
@@ -50,6 +71,16 @@ export interface PaginatedTableProps<T> {
   hideHeader?: boolean;
   /** Hide the "Showing X items" footer text */
   hideFooterText?: boolean;
+  /**
+   * Polaris Track H — when provided AND the viewport is `<md`, render each
+   * item as a stacked card via this callback instead of as a table row. The
+   * desktop table is unchanged; column hiding via `hideOnMobile` continues
+   * to apply for callers that don't opt into card mode.
+   *
+   * Whole-card tap routing comes from `onRowClick` (same as the table) — the
+   * wrapping `<div>` proxies the click so the same handler fires.
+   */
+  renderMobileCard?: (item: T, index: number) => ComponentChildren;
 }
 
 export function PaginatedTable<T>({
@@ -67,9 +98,11 @@ export function PaginatedTable<T>({
   rowClassName,
   hideHeader = false,
   hideFooterText = false,
+  renderMobileCard,
 }: PaginatedTableProps<T>) {
   const items = useSignal<T[]>(initialItems);
   const loading = useSignal(false);
+  const isMobile = useIsMobileViewport();
   const hasMore = useComputed(() => {
     if (totalCount === undefined) return items.value.length >= pageSize;
     return items.value.length < totalCount;
@@ -110,51 +143,72 @@ export function PaginatedTable<T>({
     );
   }
 
+  // Polaris Track H — mobile-card render mode. When the caller opts in via
+  // `renderMobileCard` AND the viewport is `<md`, render the items as a
+  // stacked card list. Otherwise the existing table path runs unchanged.
+  const useCardMode = renderMobileCard !== undefined && isMobile;
+
   return (
     <div className={cn("space-y-4", className)}>
-      <Table>
-        {!hideHeader && (
-          <TableHeader>
-            <TableRow>
-              {columns.map((col) => (
-                <TableHead
-                  key={col.key}
+      {useCardMode
+        ? (
+          <div className="space-y-2">
+            {items.value.map((item, index) => (
+              <div
+                key={getItemKey(item)}
+                onClick={() => onRowClick?.(item, index)}
+                className={rowClassName?.(item, index)}
+              >
+                {renderMobileCard!(item, index)}
+              </div>
+            ))}
+          </div>
+        )
+        : (
+          <Table>
+            {!hideHeader && (
+              <TableHeader>
+                <TableRow>
+                  {columns.map((col) => (
+                    <TableHead
+                      key={col.key}
+                      className={cn(
+                        col.className,
+                        col.hideOnMobile && "hidden md:table-cell",
+                      )}
+                    >
+                      {col.header}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+            )}
+            <TableBody>
+              {items.value.map((item, index) => (
+                <TableRow
+                  key={getItemKey(item)}
                   className={cn(
-                    col.className,
-                    col.hideOnMobile && "hidden md:table-cell",
+                    onRowClick && "cursor-pointer hover:bg-muted/50",
+                    rowClassName?.(item, index),
                   )}
+                  onClick={() => onRowClick?.(item, index)}
                 >
-                  {col.header}
-                </TableHead>
+                  {columns.map((col) => (
+                    <TableCell
+                      key={col.key}
+                      className={cn(
+                        col.className,
+                        col.hideOnMobile && "hidden md:table-cell",
+                      )}
+                    >
+                      {col.render(item, index)}
+                    </TableCell>
+                  ))}
+                </TableRow>
               ))}
-            </TableRow>
-          </TableHeader>
+            </TableBody>
+          </Table>
         )}
-        <TableBody>
-          {items.value.map((item, index) => (
-            <TableRow
-              key={getItemKey(item)}
-              className={cn(
-                onRowClick && "cursor-pointer hover:bg-muted/50",
-                rowClassName?.(item, index),
-              )}
-              onClick={() => onRowClick?.(item, index)}
-            >
-              {columns.map((col) => (
-                <TableCell
-                  key={col.key}
-                  className={cn(
-                    col.className,
-                    col.hideOnMobile && "hidden md:table-cell",
-                  )}
-                >
-                  {col.render(item, index)}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
 
       {/* Footer with count and Load More */}
       <div className="flex items-center justify-between px-4">

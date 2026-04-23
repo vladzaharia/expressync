@@ -54,6 +54,17 @@ export function NumberTicker({
   useEffect(() => {
     if (hasAnimated) return;
 
+    // Polaris Track H: respect prefers-reduced-motion. Skip the count-up
+    // animation entirely and snap to the final value — keeps the number
+    // legible without a moving target for AT users.
+    const reduceMotion = typeof globalThis.matchMedia === "function" &&
+      globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) {
+      setHasAnimated(true);
+      setDisplayValue(value);
+      return;
+    }
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && !hasAnimated) {

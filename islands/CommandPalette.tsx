@@ -43,9 +43,30 @@ import {
   buildNavigateCommands,
   type PaletteCommand,
 } from "@/src/lib/command-palette/commands.ts";
+import {
+  buildCustomerActionCommands,
+  buildCustomerNavigateCommands,
+  type CustomerActionEnv,
+} from "@/src/lib/command-palette/customer-commands.ts";
 import { CommandGroup } from "@/components/command-palette/CommandGroup.tsx";
 import { CommandItem } from "@/components/command-palette/CommandItem.tsx";
 import type { CommandSearchResponse } from "@/routes/api/admin/command-palette/search.ts";
+
+/**
+ * Polaris Track H — surface the palette is mounted in. Customer surface
+ * uses the customer command registry + scoped search endpoint; admin
+ * surface keeps the existing behavior.
+ */
+export type CommandPaletteSurface = "admin" | "customer";
+
+interface CommandPaletteProps {
+  /**
+   * Which surface this palette belongs to. Defaults to "admin" so the
+   * existing single-call site in `_app.tsx` keeps working unchanged
+   * until the parent threads through `state.surface`.
+   */
+  surface?: CommandPaletteSurface;
+}
 
 const RECENT_KEY = "cmdk.recent";
 const RECENT_MIGRATED_KEY = "cmdk.recent.migrated_v1";
@@ -139,7 +160,9 @@ function pushRecent(entry: RecentEntry) {
   }
 }
 
-export default function CommandPalette() {
+export default function CommandPalette(
+  { surface = "admin" }: CommandPaletteProps = {},
+) {
   const open = useSignal(false);
   const query = useSignal("");
   const searchResults = useSignal<CommandSearchResponse | null>(null);
@@ -147,8 +170,19 @@ export default function CommandPalette() {
   const recent = useSignal<RecentEntry[]>([]);
   const triggeringElement = useRef<Element | null>(null);
 
-  const navigateCommands = useMemo<PaletteCommand[]>(buildNavigateCommands, []);
-  const actionEnv: ActionEnv = useMemo(() => ({
+  const isCustomer = surface === "customer";
+
+  // Polaris Track H: pick the right command registries per surface. The
+  // admin path stays untouched; the customer path swaps in the
+  // customer-safe nav + actions (Start charging, Stop, New reservation,
+  // …).
+  const navigateCommands = useMemo<PaletteCommand[]>(
+    () =>
+      isCustomer ? buildCustomerNavigateCommands() : buildNavigateCommands(),
+    [isCustomer],
+  );
+
+  const adminActionEnv: ActionEnv = useMemo(() => ({
     toast: {
       promise: (p, opts) => toast.promise(p, opts),
       success: (m) => toast.success(m),
@@ -156,10 +190,35 @@ export default function CommandPalette() {
     },
     navigate,
   }), []);
+
+  const customerActionEnv: CustomerActionEnv = useMemo(() => ({
+    toast: {
+      promise: (p, opts) => toast.promise(p, opts),
+      success: (m) => toast.success(m),
+      error: (m) => toast.error(m),
+    },
+    navigate,
+    // Scan-modal trigger is owned by the dashboard island once it lands;
+    // for MVP we leave this undefined so the action falls back to a
+    // dashboard hop.
+    openScanModal: undefined,
+  }), []);
+
   const actionCommands = useMemo<PaletteCommand[]>(
-    () => buildActionCommands(actionEnv),
-    [actionEnv],
+    () =>
+      isCustomer
+        ? buildCustomerActionCommands(customerActionEnv)
+        : buildActionCommands(adminActionEnv),
+    [isCustomer, adminActionEnv, customerActionEnv],
   );
+
+  // Polaris Track H: surface-aware search endpoint. Customer routes are
+  // scoped to the authenticated user via `resolveCustomerScope`; admin
+  // route is the existing one. Falling back to admin keeps existing
+  // tests + behavior untouched.
+  const searchEndpoint = isCustomer
+    ? "/api/customer/command-palette/search"
+    : "/api/admin/command-palette/search";
 
   // -- Hotkeys -----------------------------------------------------------
   useEffect(() => {
@@ -225,7 +284,7 @@ export default function CommandPalette() {
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch("/api/admin/command-palette/search", {
+        const res = await fetch(searchEndpoint, {
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
@@ -253,7 +312,7 @@ export default function CommandPalette() {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [open.value, query.value]);
+  }, [open.value, query.value, searchEndpoint]);
 
   // -- Close helper ------------------------------------------------------
   const close = () => {

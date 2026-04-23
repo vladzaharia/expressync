@@ -57,8 +57,30 @@ export const handler = define.handlers({
     const id = parseId(ctx.params.id);
     if (id === null) return jsonResponse(400, { error: "Invalid id" });
 
+    // Polaris Track H: admin-supplied cancellation reason. Threaded into
+    // both the in-app customer notification and the reservation-cancelled
+    // email's highlight block. Read from query string so a simple DELETE
+    // call with `?reason=...` works without a body, but also fall back to
+    // a JSON body if present (admin tooling sends bodies for richer flows).
+    const url = new URL(ctx.req.url);
+    let reason: string | undefined = url.searchParams.get("reason") ??
+      undefined;
+    if (!reason) {
+      try {
+        const text = await ctx.req.text();
+        if (text) {
+          const parsed = JSON.parse(text) as { reason?: unknown };
+          if (typeof parsed.reason === "string" && parsed.reason.trim()) {
+            reason = parsed.reason.trim();
+          }
+        }
+      } catch {
+        // Non-JSON or empty body — fine, reason stays undefined.
+      }
+    }
+
     try {
-      const row = await cancelReservation(id);
+      const row = await cancelReservation(id, reason);
       if (!row) return jsonResponse(404, { error: "Reservation not found" });
       return jsonResponse(200, { reservation: toReservationRowDTO(row) });
     } catch (error) {

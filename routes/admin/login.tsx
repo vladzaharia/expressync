@@ -1,5 +1,6 @@
 import { define } from "../../utils.ts";
 import LoginForm from "../../islands/LoginForm.tsx";
+import ForgotPasswordForm from "../../islands/admin/ForgotPasswordForm.tsx";
 import { GridPattern } from "../../components/magicui/grid-pattern.tsx";
 import { Particles } from "../../components/magicui/particles.tsx";
 import { ShineBorder } from "../../components/magicui/shine-border.tsx";
@@ -50,6 +51,13 @@ export default define.page(function LoginPage() {
           <ShineBorder borderRadius={12} borderWidth={1} duration={10}>
             <LoginForm />
           </ShineBorder>
+        </BlurFade>
+
+        {/* Forgot-password trigger — collapsed by default; expands inline. */}
+        <BlurFade delay={0.35} duration={0.5} direction="up">
+          <div class="mt-3 px-1">
+            <ForgotPasswordForm />
+          </div>
         </BlurFade>
       </div>
     </div>

@@ -49,8 +49,17 @@ export function MagicCard({
       )}
       {...props}
     >
+      {
+        /*
+        Polaris Track H: hover-driven gradient is decorative (purely visual
+        affordance for pointer users; no information conveyed). Marked
+        aria-hidden and the transition is dropped under reduce-motion so
+        the gradient just snaps in/out without an opacity ramp.
+      */
+      }
       <div
-        className="pointer-events-none absolute -inset-px opacity-0 transition duration-300"
+        aria-hidden="true"
+        className="pointer-events-none absolute -inset-px opacity-0 motion-safe:transition motion-safe:duration-300"
         style={{
           opacity,
           background:

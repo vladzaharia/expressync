@@ -53,7 +53,14 @@ export function Particles({
       context.current = canvasRef.current.getContext("2d");
     }
     initCanvas();
-    animate();
+    // Polaris Track H: respect prefers-reduced-motion. When set, render a
+    // single static frame of particles instead of running the rAF loop.
+    // The aria-hidden on the wrapper already excludes this from AT.
+    const reduceMotion = typeof globalThis.matchMedia === "function" &&
+      globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!reduceMotion) {
+      animate();
+    }
     globalThis.addEventListener("resize", initCanvas);
     return () => {
       globalThis.removeEventListener("resize", initCanvas);

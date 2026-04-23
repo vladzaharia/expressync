@@ -69,6 +69,16 @@ export function SparklesText({
   const [sparkles, setSparkles] = useState<Sparkle[]>([]);
 
   useEffect(() => {
+    // Polaris Track H: respect prefers-reduced-motion — skip the sparkle
+    // generation + interval entirely. The host text remains fully
+    // legible; no decorative motion is rendered.
+    const reduceMotion = typeof globalThis.matchMedia === "function" &&
+      globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) {
+      setSparkles([]);
+      return;
+    }
+
     const generatedSparkles = Array.from(
       { length: sparklesCount },
       () => generateSparkle(colors),
@@ -93,7 +103,10 @@ export function SparklesText({
       {sparkles.map((sparkle) => (
         <span
           key={sparkle.id}
-          className="pointer-events-none absolute z-20 animate-sparkle"
+          // Polaris Track H: sparkles are decorative — flag aria-hidden so
+          // they don't pollute the text content for AT consumers.
+          aria-hidden="true"
+          className="pointer-events-none absolute z-20 motion-safe:animate-sparkle"
           style={{
             left: sparkle.x,
             top: sparkle.y,
