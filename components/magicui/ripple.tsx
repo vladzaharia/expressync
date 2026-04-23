@@ -17,6 +17,8 @@ export function Ripple({
 }: RippleProps) {
   return (
     <div
+      // Polaris Track H: decorative-only background — flag for AT users.
+      aria-hidden="true"
       className={cn(
         "pointer-events-none absolute inset-0 select-none [mask-image:linear-gradient(white,transparent)]",
         className,
@@ -31,7 +33,10 @@ export function Ripple({
         return (
           <div
             key={i}
-            className="absolute animate-ripple rounded-full border bg-foreground/25 shadow-xl"
+            // Polaris Track H: gate the ripple animation on
+            // prefers-reduced-motion — without it, the static circles
+            // remain visible as a calm background pattern.
+            className="absolute motion-safe:animate-ripple rounded-full border bg-foreground/25 shadow-xl"
             style={{
               width: `${size}px`,
               height: `${size}px`,

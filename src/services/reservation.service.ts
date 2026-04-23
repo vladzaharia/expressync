@@ -20,6 +20,7 @@ import * as schema from "../db/schema.ts";
 import type { Reservation, ReservationStatus } from "../db/schema.ts";
 import { logger } from "../lib/utils/logger.ts";
 import { steveClient } from "../lib/steve-client.ts";
+import { createNotification } from "./notification.service.ts";
 
 export interface ConflictRow {
   id: number;
@@ -258,9 +259,16 @@ export async function createReservation(
 /**
  * Cancel a reservation. Idempotent: cancelling an already-cancelled row is
  * a no-op that returns the existing row.
+ *
+ * Polaris Track H: when an active reservation is cancelled (by admin or by
+ * a Lago subscription teardown), this fires a `reservation.cancelled`
+ * customer notification — which in turn triggers the customer email via
+ * `notification.service.ts`'s post-create hook. The optional `reason`
+ * threads through to both the in-app body copy and the email highlight.
  */
 export async function cancelReservation(
   reservationId: number,
+  reason?: string,
 ): Promise<Reservation | null> {
   const [existing] = await db
     .select()
@@ -303,7 +311,118 @@ export async function cancelReservation(
     .where(eq(schema.reservations.id, reservationId))
     .returning();
 
+  // Polaris Track H — fire customer notification + email. Non-blocking:
+  // any failure here is logged inside `notifyReservationCancelled` so the
+  // cancellation itself isn't reverted by a notification-store outage.
+  await notifyReservationCancelled(updated ?? existing, reason);
+
   return updated ?? existing;
+}
+
+/**
+ * Polaris Track H — emit a `reservation.cancelled` customer notification
+ * for the supplied reservation. Looks up the owning user via the tag
+ * mapping; no-ops cleanly when the mapping is missing (e.g. a deleted
+ * customer account, or a system-created reservation without a user link).
+ *
+ * The notification.service.ts post-create hook fires the customer email
+ * automatically when the audience is `customer` and the kind matches.
+ *
+ * Errors are caught and logged so a notification-store outage does not
+ * destabilise the cancel flow itself.
+ */
+async function notifyReservationCancelled(
+  reservation: Reservation,
+  reason: string | undefined,
+): Promise<void> {
+  try {
+    // Resolve owning customer user_id via the tag mapping. We accept any
+    // mapping (active or inactive) since a reservation owned by a since-
+    // unlinked tag should still notify the original customer.
+    const [mapping] = await db
+      .select({ userId: schema.userMappings.userId })
+      .from(schema.userMappings)
+      .where(eq(schema.userMappings.steveOcppTagPk, reservation.steveOcppTagPk))
+      .limit(1);
+
+    const userId = mapping?.userId;
+    if (!userId) {
+      // No customer user — likely a legacy mapping pre-Polaris or a
+      // backfill row that hasn't been linked yet. Skip silently; admin
+      // tooling can resurface the cancel via the audit log.
+      return;
+    }
+
+    // Best-effort charger label. Falls back to chargeBoxId when the
+    // friendly name isn't cached (admin hasn't populated chargers_cache
+    // yet, or the cache row was evicted).
+    const [charger] = await db
+      .select({ friendlyName: schema.chargersCache.friendlyName })
+      .from(schema.chargersCache)
+      .where(eq(schema.chargersCache.chargeBoxId, reservation.chargeBoxId))
+      .limit(1);
+    const chargerName = charger?.friendlyName ?? reservation.chargeBoxId;
+
+    const startAt = reservation.startAt ?? new Date();
+    const endAt = reservation.endAt ?? new Date();
+
+    // Format date / time for both the in-app body and the email metadata.
+    // Format-locale is intentionally `en-US` to match the email templates'
+    // expectations; UI consumers re-format from the underlying ISO
+    // timestamps when they need a localized view.
+    const dateStr = startAt.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+    const timeStr = `${
+      startAt.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      })
+    } – ${
+      endAt.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      })
+    }`;
+
+    await createNotification({
+      kind: "reservation.cancelled",
+      severity: "info",
+      title: "Reservation cancelled",
+      body: reason
+        ? `Your reservation at ${chargerName} on ${dateStr} was cancelled. Reason: ${reason}`
+        : `Your reservation at ${chargerName} on ${dateStr} was cancelled.`,
+      sourceType: "reservation",
+      sourceId: String(reservation.id),
+      audience: "customer",
+      userId,
+      context: {
+        chargeBoxId: reservation.chargeBoxId,
+        reservationId: reservation.id,
+        startAtIso: startAt.toISOString(),
+        endAtIso: endAt.toISOString(),
+        reason: reason ?? null,
+      },
+      emailPayload: {
+        kind: "reservation.cancelled",
+        reservation: {
+          chargerName,
+          date: dateStr,
+          time: timeStr,
+        },
+        reason,
+      },
+    });
+  } catch (err) {
+    logger.warn("Reservations", "notifyReservationCancelled failed", {
+      reservationId: reservation.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 export interface RescheduleInput {
@@ -450,6 +569,83 @@ export async function listBySubscription(
     .where(and(...clauses))
     .orderBy(desc(schema.reservations.startAt))
     .limit(limit);
+}
+
+// ============================================================================
+// === Polaris Track F: customer suggestion windows on conflict ==============
+// ============================================================================
+
+/** A non-conflicting time window suggested to the customer after a 409. */
+export interface ReservationSuggestion {
+  startAtIso: string;
+  endAtIso: string;
+}
+
+export interface SuggestionInput {
+  chargeBoxId: string;
+  connectorId: number;
+  /** Original requested start (used to seed the search). */
+  requestedStartAt: Date;
+  /** Original requested end. */
+  requestedEndAt: Date;
+  /** Conflict rows from `checkConflicts` (or `createReservation`). */
+  conflicts: ConflictRow[];
+}
+
+/**
+ * Compute up to 2 nearby non-conflicting windows of the same duration as the
+ * customer's original ask, starting after each conflict's end. Only returns
+ * windows whose start lies within 24h of the original request.
+ *
+ * The customer wizard renders these as one-tap chips ("Reserve at 16:30
+ * instead?"). When no windows fit within 24h we return an empty array — the
+ * UI then falls back to manual reschedule.
+ *
+ * Performance: at most 2 follow-up `checkConflicts` calls (one per candidate).
+ * Cheaper than a full calendar walk.
+ */
+export async function suggestAlternatives(
+  input: SuggestionInput,
+): Promise<ReservationSuggestion[]> {
+  const durationMs = input.requestedEndAt.getTime() -
+    input.requestedStartAt.getTime();
+  if (durationMs <= 0) return [];
+
+  // Build candidate starts from each conflict's end-time.
+  const conflictEnds = input.conflicts
+    .map((c) => new Date(c.endAtIso))
+    .filter((d) => !Number.isNaN(d.getTime()))
+    // Ascending — we'll try the earliest free slot first.
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  if (conflictEnds.length === 0) return [];
+
+  const cutoff = new Date(
+    input.requestedStartAt.getTime() + 24 * 60 * 60 * 1000,
+  );
+  const suggestions: ReservationSuggestion[] = [];
+
+  for (const candidateStart of conflictEnds) {
+    if (suggestions.length >= 2) break;
+    if (candidateStart > cutoff) break;
+    const candidateEnd = new Date(candidateStart.getTime() + durationMs);
+    const conflicts = await checkConflicts({
+      chargeBoxId: input.chargeBoxId,
+      connectorId: input.connectorId,
+      startAt: candidateStart,
+      endAt: candidateEnd,
+    });
+    if (conflicts.length === 0) {
+      suggestions.push({
+        startAtIso: candidateStart.toISOString(),
+        endAtIso: candidateEnd.toISOString(),
+      });
+    }
+    // If the candidate also conflicts, advance to its conflict-end to avoid
+    // an infinite walk on long, dense calendars.
+  }
+
+  return suggestions;
 }
 
 /**

@@ -35,8 +35,11 @@ export function ShineBorder({
           `linear-gradient(var(--background), var(--background)) padding-box, linear-gradient(90deg, ${colorString}, ${colorString}) border-box`,
         backgroundSize: "200% 200%",
       }}
+      // Polaris Track H: gate the shine animation on prefers-reduced-motion.
+      // The painted border-image gradient stays visible; only the slow
+      // hue-shift is dropped under reduce-motion.
       className={cn(
-        "relative rounded-[var(--border-radius)] border-[length:var(--border-width)] border-transparent animate-shine",
+        "relative rounded-[var(--border-radius)] border-[length:var(--border-width)] border-transparent motion-safe:animate-shine",
         className,
       )}
     >

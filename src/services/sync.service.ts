@@ -1,7 +1,10 @@
 import { steveClient } from "../lib/steve-client.ts";
 import { lagoClient } from "../lib/lago-client.ts";
 import type { TransactionWithCompletion } from "./transaction-processor.ts";
-import { processTransactions } from "./transaction-processor.ts";
+import {
+  notifyFinalizedTransactions,
+  processTransactions,
+} from "./transaction-processor.ts";
 import {
   BATCH_SIZE,
   batchEvents,
@@ -345,6 +348,27 @@ export async function runSync(): Promise<SyncResult> {
         await batchUpsertSyncStates(syncStateUpdates);
         syncLogger.info("Sync states saved");
       }
+
+      // Polaris Track H — even when there's nothing to send to Lago we
+      // still finalize transactions locally; fire `session.complete`
+      // notifications for any that flipped final on this run.
+      try {
+        await notifyFinalizedTransactions(
+          transactionsSkipped,
+          syncStateByTxId,
+          allTransactions,
+        );
+      } catch (notifyErr) {
+        syncLogger.warn(
+          "session.complete notification batch failed (non-blocking)",
+          {
+            error: notifyErr instanceof Error
+              ? notifyErr.message
+              : String(notifyErr),
+          },
+        );
+      }
+
       await syncLogger.endSegment();
 
       await markSyncComplete(
@@ -471,6 +495,29 @@ export async function runSync(): Promise<SyncResult> {
       syncedEventRecords,
     );
     syncLogger.info("Sync states and event records persisted successfully");
+
+    // Polaris Track H — fire `session.complete` customer notifications
+    // for any transactions that flipped to `is_finalized=true` on this run.
+    // Non-blocking: per-transaction errors are logged inside the helper.
+    try {
+      await notifyFinalizedTransactions(
+        // Both code paths fire on transactions that have a sync state to
+        // upsert. The notification helper filters by `isFinal` + prior
+        // finalization state itself, so passing the union here is safe.
+        [...successfullySentTransactions, ...transactionsSkipped],
+        syncStateByTxId,
+        allTransactions,
+      );
+    } catch (notifyErr) {
+      syncLogger.warn(
+        "session.complete notification batch failed (non-blocking)",
+        {
+          error: notifyErr instanceof Error
+            ? notifyErr.message
+            : String(notifyErr),
+        },
+      );
+    }
 
     // Update eventsCreated to reflect only successfully-sent transactions
     eventsCreated = successfullySentTransactions.length;

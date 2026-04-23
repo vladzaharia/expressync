@@ -43,7 +43,12 @@ export type AuthAuditEvent =
   | "capability.denied"
   | "privilege_violation"
   | "customer.account.auto_provisioned"
-  | "customer.account.auto_create_blocked_admin_email";
+  | "customer.account.auto_create_blocked_admin_email"
+  /**
+   * Customer-initiated mutations (start charge, stop session, create
+   * reservation, etc.). Concrete action stored in `metadata.action`.
+   */
+  | "customer.action";
 
 export interface AuthEventPayload {
   /** Optional user reference (set on success; omit on failed-pre-resolve flows). */
@@ -115,6 +120,10 @@ export const logPasswordLoginFailed = (p: AuthEventPayload) =>
   logAuthEvent("password.login_failed", p);
 export const logImpersonationStart = (p: AuthEventPayload) =>
   logAuthEvent("impersonation.start", p);
+export const logImpersonationEnd = (p: AuthEventPayload) =>
+  logAuthEvent("impersonation.end", p);
+export const logImpersonationWriteBlocked = (p: AuthEventPayload) =>
+  logAuthEvent("impersonation.write_blocked", p);
 export const logCustomerAccountAutoProvisioned = (p: AuthEventPayload) =>
   logAuthEvent("customer.account.auto_provisioned", p);
 export const logCapabilityDenied = (p: AuthEventPayload) =>
@@ -122,3 +131,31 @@ export const logCapabilityDenied = (p: AuthEventPayload) =>
 export const logCustomerAccountAutoCreateBlockedAdminEmail = (
   p: AuthEventPayload,
 ) => logAuthEvent("customer.account.auto_create_blocked_admin_email", p);
+
+/**
+ * Log a customer-initiated mutation (scan-start, session-stop, reserve, etc.).
+ *
+ * Stored as `event='customer.action'` with the concrete verb in
+ * `metadata.action` — single audit-event identifier keeps log scrapers
+ * straightforward; the action label gives forensic granularity.
+ *
+ * Common actions: `scan-start`, `session-stop`, `reservation-create`,
+ * `reservation-cancel`, `reservation-reschedule`, `onboarded`,
+ * `profile-update`.
+ */
+export interface CustomerActionPayload extends AuthEventPayload {
+  /** Free-form action label; e.g. "scan-start", "session-stop". */
+  action: string;
+}
+
+export async function logCustomerAction(
+  payload: CustomerActionPayload,
+): Promise<void> {
+  await logAuthEvent("customer.action", {
+    ...payload,
+    metadata: {
+      ...(payload.metadata ?? {}),
+      action: payload.action,
+    },
+  });
+}

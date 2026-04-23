@@ -24,7 +24,9 @@ export function AuroraText({
   return (
     <span
       className={cn(
-        "bg-clip-text text-transparent animate-aurora",
+        // Polaris Track H: gate animation on prefers-reduced-motion. The
+        // gradient stays painted; only the slow color shimmer is dropped.
+        "bg-clip-text text-transparent motion-safe:animate-aurora",
         className,
       )}
       style={{

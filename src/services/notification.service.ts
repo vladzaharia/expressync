@@ -21,12 +21,26 @@ import {
   type Notification,
   notifications,
   type NotificationSeverityValue,
+  users,
 } from "../db/schema.ts";
 import { config } from "../lib/config.ts";
 import { logger } from "../lib/utils/logger.ts";
 import { eventBus } from "./event-bus.service.ts";
+import { sendReservationCancelled, sendSessionSummary } from "../lib/email.ts";
+import type { SessionSummaryData } from "../lib/email/session-summary.tsx";
+import type { ReservationData } from "../lib/email/reservation-cancelled.tsx";
 
 const log = logger.child("NotificationService");
+
+/**
+ * Polaris Track H — notification audience values. Mirrors the CHECK
+ * constraint on `notifications.audience` (migration 0021).
+ *
+ * - `admin`     — the existing admin alert feed (default for backwards compat)
+ * - `customer`  — single customer feed; `userId` MUST be set
+ * - `all`       — broadcast across both surfaces (rare; cross-surface system msg)
+ */
+export type NotificationAudience = "admin" | "customer" | "all";
 
 // ----------------------------------------------------------------------------
 // Public types
@@ -57,6 +71,32 @@ export interface CreateNotificationInput {
   context?: Record<string, unknown> | null;
   /** If set, target this admin only; null = broadcast to all admins. */
   adminUserId?: string | null;
+  /**
+   * Polaris Track H — routing axis. Defaults to `admin` for backwards
+   * compatibility with existing webhook/sync callers. Customer-facing
+   * notifications MUST pass `audience: "customer"` AND `userId`.
+   */
+  audience?: NotificationAudience;
+  /**
+   * Polaris Track H — target customer's user_id. Required when
+   * `audience === "customer"`; otherwise ignored. Stored in the
+   * `admin_user_id` column (which is misleadingly named — see schema
+   * comment) so a single FK and index serve both audiences.
+   */
+  userId?: string | null;
+  /**
+   * Polaris Track H — pre-built email payload for this notification. Used
+   * by the post-create email-fire hook to send `session.complete` and
+   * `reservation.cancelled` customer emails. Other kinds leave this
+   * undefined; the dispatch map below decides whether to honour it.
+   */
+  emailPayload?:
+    | { kind: "session.complete"; session: SessionSummaryData }
+    | {
+      kind: "reservation.cancelled";
+      reservation: ReservationData;
+      reason?: string;
+    };
 }
 
 export interface NotificationDTO {
@@ -161,15 +201,110 @@ function toDTO(row: Notification): NotificationDTO {
 // ----------------------------------------------------------------------------
 
 /**
+ * Polaris Track H — kinds that fire a customer email after the row is
+ * inserted. Confined to the silent-lifecycle directive's two cost-
+ * transparency emails (session summary + reservation cancellation).
+ *
+ * Lifecycle events (`subscription.terminated`, `subscription.started`,
+ * `account.auto_create`) are intentionally excluded — see the
+ * silent-lifecycle directive in the plan.
+ */
+const EMAIL_FIRING_KINDS = new Set<string>([
+  "session.complete",
+  "reservation.cancelled",
+]);
+
+/**
+ * Resolve the target customer's email address. Caller is responsible for
+ * supplying a `userId` that points at a `users.role = 'customer'` row;
+ * this helper just looks the email up and returns null on a miss so the
+ * post-create email dispatch can no-op without throwing.
+ */
+async function resolveCustomerEmail(userId: string): Promise<string | null> {
+  try {
+    const [row] = await db
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    return row?.email ?? null;
+  } catch (err) {
+    log.warn("resolveCustomerEmail failed", {
+      userId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
+/**
+ * Polaris Track H — fire the customer email tied to this notification.
+ *
+ * Wrapped in try/catch so a Worker outage NEVER blocks notification
+ * insertion. The notification row is the source of truth for the in-app
+ * bell; the email is best-effort.
+ */
+async function fireCustomerEmail(
+  input: CreateNotificationInput,
+): Promise<void> {
+  if (!input.emailPayload) return;
+  if (input.audience !== "customer") return;
+  if (!input.userId) return;
+  if (!EMAIL_FIRING_KINDS.has(input.kind)) return;
+
+  const email = await resolveCustomerEmail(input.userId);
+  if (!email) {
+    log.warn("Customer email lookup failed; skipping email dispatch", {
+      kind: input.kind,
+      userId: input.userId,
+    });
+    return;
+  }
+
+  try {
+    if (input.emailPayload.kind === "session.complete") {
+      await sendSessionSummary(email, input.emailPayload.session);
+    } else if (input.emailPayload.kind === "reservation.cancelled") {
+      await sendReservationCancelled(
+        email,
+        input.emailPayload.reservation,
+        input.emailPayload.reason,
+      );
+    }
+  } catch (err) {
+    // Email failure is non-fatal — the notification row is already
+    // persisted and the bell will surface it.
+    log.warn("Customer email send failed (non-fatal)", {
+      kind: input.kind,
+      userId: input.userId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+/**
  * Insert a notification row. Returns the created DTO.
  *
  * Never throws into caller — logs and returns null on insert failure so the
  * webhook/sync pipelines that call this are not destabilized by notification
  * persistence problems.
+ *
+ * Polaris Track H: when `audience='customer'` AND `kind` is in
+ * `EMAIL_FIRING_KINDS` AND `emailPayload` is supplied, also fires the
+ * matching customer email via the Cloudflare Email Worker. Email failures
+ * are logged and swallowed so they don't block the notification insert.
  */
 export async function createNotification(
   input: CreateNotificationInput,
 ): Promise<NotificationDTO | null> {
+  // The schema column is named `admin_user_id` for backwards compatibility
+  // (see comment on `notifications.adminUserId`). For customer audience the
+  // caller supplies `userId`; we route either through the same column.
+  const audience: NotificationAudience = input.audience ?? "admin";
+  const targetUserId = audience === "customer"
+    ? (input.userId ?? null)
+    : (input.adminUserId ?? null);
+
   try {
     const [inserted] = await db
       .insert(notifications)
@@ -181,7 +316,8 @@ export async function createNotification(
         sourceType: input.sourceType ?? null,
         sourceId: input.sourceId ?? null,
         context: (input.context ?? null) as Record<string, unknown> | null,
-        adminUserId: input.adminUserId ?? null,
+        adminUserId: targetUserId,
+        audience,
       })
       .returning();
 
@@ -209,6 +345,13 @@ export async function createNotification(
         error: pubErr instanceof Error ? pubErr.message : String(pubErr),
       });
     }
+
+    // Polaris Track H — fire the customer email AFTER the notification row
+    // is persisted. Awaited so a single createNotification call can be
+    // sequenced behind a Promise.all by the caller, but failures are
+    // swallowed inside fireCustomerEmail.
+    await fireCustomerEmail(input);
+
     return dto;
   } catch (err) {
     log.error("Failed to insert notification", {
@@ -294,7 +437,10 @@ export async function dismiss(id: number, userId: string): Promise<boolean> {
 }
 
 /**
- * Count unread, non-dismissed notifications for the user (including broadcast).
+ * Count unread, non-dismissed notifications for an admin user (including
+ * broadcast rows). Filters out customer-targeted notifications via the
+ * `audience` column so the admin bell never accidentally shows a row meant
+ * for a customer surface.
  */
 export async function getUnreadCount(userId: string): Promise<number> {
   const [row] = await db
@@ -308,13 +454,18 @@ export async function getUnreadCount(userId: string): Promise<number> {
           eq(notifications.adminUserId, userId),
           isNull(notifications.adminUserId),
         ),
+        // Admin feed: only show admin or broadcast rows.
+        or(
+          eq(notifications.audience, "admin"),
+          eq(notifications.audience, "all"),
+        ),
       ),
     );
   return Number(row?.n ?? 0);
 }
 
 /**
- * Fetch the newest unread notifications for the bell dropdown.
+ * Fetch the newest unread notifications for the admin bell dropdown.
  */
 export async function getUnread(
   userId: string,
@@ -331,12 +482,150 @@ export async function getUnread(
           eq(notifications.adminUserId, userId),
           isNull(notifications.adminUserId),
         ),
+        or(
+          eq(notifications.audience, "admin"),
+          eq(notifications.audience, "all"),
+        ),
       ),
     )
     .orderBy(desc(notifications.createdAt))
     .limit(limit);
 
   return rows.map(toDTO);
+}
+
+// ----------------------------------------------------------------------------
+// Customer-scoped feed (Polaris Track F)
+// ----------------------------------------------------------------------------
+
+/**
+ * Count unread, non-dismissed notifications for a customer user.
+ *
+ * The notifications schema stores the target user_id in `admin_user_id`
+ * (the column was repurposed when audience routing was added — see the
+ * column docstring on `notifications.adminUserId`). For customers we filter
+ * `audience IN ('customer','all')` so admin-only rows never bleed in even
+ * if a row is mis-targeted.
+ */
+export async function getCustomerUnreadCount(userId: string): Promise<number> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(notifications)
+    .where(
+      and(
+        isNull(notifications.readAt),
+        isNull(notifications.dismissedAt),
+        or(
+          eq(notifications.adminUserId, userId),
+          // Broadcast rows ('all') with no specific target.
+          and(
+            eq(notifications.audience, "all"),
+            isNull(notifications.adminUserId),
+          ),
+        ),
+        or(
+          eq(notifications.audience, "customer"),
+          eq(notifications.audience, "all"),
+        ),
+      ),
+    );
+  return Number(row?.n ?? 0);
+}
+
+/**
+ * Fetch the newest unread notifications for the customer bell dropdown.
+ */
+export async function getCustomerUnread(
+  userId: string,
+  limit = 5,
+): Promise<NotificationDTO[]> {
+  const rows = await db
+    .select()
+    .from(notifications)
+    .where(
+      and(
+        isNull(notifications.readAt),
+        isNull(notifications.dismissedAt),
+        or(
+          eq(notifications.adminUserId, userId),
+          and(
+            eq(notifications.audience, "all"),
+            isNull(notifications.adminUserId),
+          ),
+        ),
+        or(
+          eq(notifications.audience, "customer"),
+          eq(notifications.audience, "all"),
+        ),
+      ),
+    )
+    .orderBy(desc(notifications.createdAt))
+    .limit(limit);
+
+  return rows.map(toDTO);
+}
+
+/**
+ * Paginated archive listing for a customer user. Same filter logic as the
+ * admin variant but adds the customer audience gate.
+ */
+export async function listCustomerArchive(
+  userId: string,
+  params: ListArchiveParams = {},
+): Promise<ListArchiveResult> {
+  const limit = Math.min(Math.max(params.limit ?? 25, 1), 100);
+  const offset = Math.max(params.offset ?? 0, 0);
+
+  const conditions = [
+    or(
+      eq(notifications.adminUserId, userId),
+      and(
+        eq(notifications.audience, "all"),
+        isNull(notifications.adminUserId),
+      ),
+    )!,
+    or(
+      eq(notifications.audience, "customer"),
+      eq(notifications.audience, "all"),
+    )!,
+  ];
+
+  if (params.severity) {
+    conditions.push(eq(notifications.severity, params.severity));
+  }
+  if (params.kind) {
+    conditions.push(eq(notifications.kind, params.kind));
+  }
+  if (params.sourceType) {
+    conditions.push(eq(notifications.sourceType, params.sourceType));
+  }
+  if (params.readState === true) {
+    conditions.push(sql`${notifications.readAt} IS NOT NULL`);
+  } else if (params.readState === false) {
+    conditions.push(isNull(notifications.readAt));
+  }
+
+  const whereClause = and(...conditions);
+
+  const rowsPromise = db
+    .select()
+    .from(notifications)
+    .where(whereClause)
+    .orderBy(desc(notifications.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  const totalPromise = db
+    .select({ n: count() })
+    .from(notifications)
+    .where(whereClause);
+
+  const [rows, totalRows] = await Promise.all([rowsPromise, totalPromise]);
+
+  return {
+    items: rows.map(toDTO),
+    total: Number(totalRows[0]?.n ?? 0),
+  };
 }
 
 /**

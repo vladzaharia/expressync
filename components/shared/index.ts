@@ -20,3 +20,6 @@ export type { StatStripItem, StatStripProps } from "./StatStrip.tsx";
 export { EmptyState } from "./EmptyState.tsx";
 export type { EmptyStateAction, EmptyStateProps } from "./EmptyState.tsx";
 export { SectionCard } from "./SectionCard.tsx";
+
+export { MobileCardRow } from "./MobileCardRow.tsx";
+export type { MobileCardRowProps } from "./MobileCardRow.tsx";
