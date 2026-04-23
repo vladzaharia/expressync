@@ -5,7 +5,7 @@
     "test": "deno test --allow-read --allow-env",
     "dev": "vite",
     "build": "vite build",
-    "start": "deno serve -A _fresh/server.js",
+    "start": "deno serve -A prod-server.ts",
     "update": "deno run -A -r jsr:@fresh/update .",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "deno run -A src/db/migrate.ts",
