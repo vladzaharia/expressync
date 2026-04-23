@@ -149,17 +149,19 @@ export const auth = betterAuth({
           email,
           metadata: { tokenHash, urlHost: safeUrlHost(url) },
         });
-        try {
-          await sendCustomerMagicLink(email, url);
-        } catch (err) {
-          // Magic-link issuance must never fail visibly because of email
-          // transport problems — Better-Auth has already created the
-          // verification row. Log loudly + audit; the customer can request
-          // another link if the first never arrives.
-          console.error("[auth] sendCustomerMagicLink threw", err);
+        // sendCustomerMagicLink NEVER throws — it returns a SendEmailResult
+        // capturing worker outages, missing config, render bugs, etc. We
+        // audit the failure mode but don't propagate so Better-Auth still
+        // returns a uniform success to the caller (anti-enumeration).
+        const result = await sendCustomerMagicLink(email, url);
+        if (!result.ok) {
           await logAuthEvent("magic_link.failed", {
             email,
-            metadata: { reason: "email_transport_failure" },
+            metadata: {
+              reason: "email_transport_failure",
+              status: result.status,
+              detail: result.reason,
+            },
           });
         }
       },
