@@ -19,6 +19,7 @@ import {
   type ReserveNowParams,
   type SetChargingProfileParams,
   type StEvEChargeBox,
+  StEvEChargeBoxSchema,
   type StEvEOcppTag,
   StEvEOcppTagSchema,
   type StEvETransaction,
@@ -307,33 +308,55 @@ class StEvEClient {
   /**
    * Fetch all charge boxes.
    *
-   * SteVe 3.12.0 has no REST endpoint for listing charge boxes — only
-   * /v1/ocppTags, /v1/transactions, and /v1/operations/* exist. Derive the
-   * list from the transactions endpoint instead (distinct chargeBoxId/Pk),
-   * so charge boxes that have never been involved in a transaction will not
-   * appear. This is a known limitation until upstream adds a listing endpoint.
+   * The ExpresSync fork adds `GET /v1/chargeBoxes` to SteVe (see
+   * `web/api/ChargeBoxesRestController.java`) which returns the full
+   * roster including the operator-provided `description` (used as the
+   * friendly charger name in the UI).
+   *
+   * Falls back to deriving the list from the transactions endpoint if
+   * the new endpoint isn't available — that path drops `description`
+   * but keeps the legacy contract working when running against vanilla
+   * upstream SteVe.
    *
    * Phase B: callers that need a stable charger roster should read from
-   * `chargers_cache` via `src/services/charger-cache.service.ts` instead of
-   * calling this on every request. The cache is refreshed at the end of
-   * every sync run and records `first_seen_at` / `last_seen_at` so stale
-   * chargers stay visible with an "Offline" badge rather than disappearing.
+   * `chargers_cache` via `src/services/charger-cache.service.ts` instead
+   * of calling this on every request. The cache is refreshed at the end
+   * of every sync run and records `first_seen_at` / `last_seen_at` so
+   * stale chargers stay visible with an "Offline" badge.
    */
   async getChargeBoxes(): Promise<StEvEChargeBox[]> {
-    const transactions = await this.request(
-      "/v1/transactions?type=ALL&periodType=ALL",
-      z.array(StEvETransactionSchema),
-    );
-    const seen = new Map<number, StEvEChargeBox>();
-    for (const tx of transactions) {
-      if (!seen.has(tx.chargeBoxPk)) {
-        seen.set(tx.chargeBoxPk, {
-          chargeBoxId: tx.chargeBoxId,
-          chargeBoxPk: tx.chargeBoxPk,
+    try {
+      return await this.request(
+        "/v1/chargeBoxes",
+        z.array(StEvEChargeBoxSchema),
+      );
+    } catch (err) {
+      // Vanilla SteVe doesn't expose `/v1/chargeBoxes`. Treat any 404 /
+      // ZodError as "endpoint missing" and fall back to the legacy
+      // transaction-derived path. Anything else (network, auth) is
+      // logged and rethrown so callers can react.
+      const msg = err instanceof Error ? err.message : String(err);
+      const isMissing = msg.includes("404") || msg.includes("Not Found");
+      if (!isMissing) {
+        logger.warn("StEvE", "getChargeBoxes via /v1/chargeBoxes failed", {
+          error: msg,
         });
       }
+      const transactions = await this.request(
+        "/v1/transactions?type=ALL&periodType=ALL",
+        z.array(StEvETransactionSchema),
+      );
+      const seen = new Map<number, StEvEChargeBox>();
+      for (const tx of transactions) {
+        if (!seen.has(tx.chargeBoxPk)) {
+          seen.set(tx.chargeBoxPk, {
+            chargeBoxId: tx.chargeBoxId,
+            chargeBoxPk: tx.chargeBoxPk,
+          });
+        }
+      }
+      return Array.from(seen.values());
     }
-    return Array.from(seen.values());
   }
 
   /**
