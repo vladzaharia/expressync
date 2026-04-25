@@ -11,7 +11,14 @@
  * `/api/command-palette/search` keyed by the user's query.
  */
 
-import { LayoutDashboard, Plus, RefreshCw, Shield, Zap } from "lucide-preact";
+import {
+  LayoutDashboard,
+  Plus,
+  Radio,
+  RefreshCw,
+  Shield,
+  Zap,
+} from "lucide-preact";
 import type { AccentColor } from "@/src/lib/colors.ts";
 import { getAllNavItems, type NavItem } from "@/src/lib/admin-navigation.ts";
 
@@ -88,6 +95,27 @@ export function buildNavigateCommands(isAdmin = false): PaletteCommand[] {
 
 export function buildActionCommands(env: ActionEnv): PaletteCommand[] {
   return [
+    {
+      id: "action:scan-ev-card",
+      kind: "action",
+      group: "actions",
+      title: "Scan EV Card",
+      subtitle: "Pick a charger, then tap a card",
+      icon: Radio,
+      accent: "cyan",
+      keywords: ["nfc", "rfid", "tag", "tap", "card", "add"],
+      // Keep the palette open: the palette itself listens for this event,
+      // fetches the charger roster, and either auto-arms (single online
+      // charger) or switches to its inline charger-picker subview. The
+      // actual scan UX lives in the TapToAddModal mounted by
+      // `ScanTagPaletteHost` once a charger is chosen.
+      keepOpenAfterRun: true,
+      run: () => {
+        if (typeof globalThis.dispatchEvent === "function") {
+          globalThis.dispatchEvent(new CustomEvent("cmdk:scan-picker:open"));
+        }
+      },
+    },
     {
       id: "action:sync-now",
       kind: "action",

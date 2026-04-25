@@ -30,8 +30,10 @@ import { db } from "@/src/db/index.ts";
 import {
   chargersCache,
   reservations,
+  syncedTransactionEvents,
   syncRuns,
   userMappings,
+  users,
 } from "@/src/db/schema.ts";
 import { desc, eq, ilike, or, sql } from "drizzle-orm";
 import { lagoClient } from "@/src/lib/lago-client.ts";
@@ -54,6 +56,13 @@ export interface CommandSearchResponse {
   invoices: CommandSearchHit[];
   reservations: CommandSearchHit[];
   syncRuns: CommandSearchHit[];
+  /** Both admin + customer rows from the `users` table. Customer hits link
+   *  to a stub `/users/[id]` detail page; admin rows are anchored into the
+   *  existing list view (no per-admin detail page yet). */
+  users: CommandSearchHit[];
+  /** Synced transaction events — search by Steve transaction id (numeric)
+   *  or by chargeBoxId. */
+  transactions: CommandSearchHit[];
 }
 
 const EMPTY: CommandSearchResponse = {
@@ -63,6 +72,8 @@ const EMPTY: CommandSearchResponse = {
   invoices: [],
   reservations: [],
   syncRuns: [],
+  users: [],
+  transactions: [],
 };
 
 export const handler = define.handlers({
@@ -93,29 +104,44 @@ export const handler = define.handlers({
 
     // Fire all local DB queries in parallel; swallow per-source errors so a
     // single bad query doesn't blank the whole palette.
-    const [chargers, tags, customers, reservationsRows, syncRunsRows] =
-      await Promise.all([
-        searchChargers(like).catch((err) => {
-          logger.warn("CommandPalette", "chargers search failed", { err });
-          return [] as CommandSearchHit[];
-        }),
-        searchTags(like).catch((err) => {
-          logger.warn("CommandPalette", "tags search failed", { err });
-          return [] as CommandSearchHit[];
-        }),
-        searchCustomers(like).catch((err) => {
-          logger.warn("CommandPalette", "customers search failed", { err });
-          return [] as CommandSearchHit[];
-        }),
-        searchReservations(like).catch((err) => {
-          logger.warn("CommandPalette", "reservations search failed", { err });
-          return [] as CommandSearchHit[];
-        }),
-        searchSyncRuns(query).catch((err) => {
-          logger.warn("CommandPalette", "sync runs search failed", { err });
-          return [] as CommandSearchHit[];
-        }),
-      ]);
+    const [
+      chargers,
+      tags,
+      customers,
+      reservationsRows,
+      syncRunsRows,
+      usersRows,
+      transactionsRows,
+    ] = await Promise.all([
+      searchChargers(like).catch((err) => {
+        logger.warn("CommandPalette", "chargers search failed", { err });
+        return [] as CommandSearchHit[];
+      }),
+      searchTags(like).catch((err) => {
+        logger.warn("CommandPalette", "tags search failed", { err });
+        return [] as CommandSearchHit[];
+      }),
+      searchCustomers(like).catch((err) => {
+        logger.warn("CommandPalette", "customers search failed", { err });
+        return [] as CommandSearchHit[];
+      }),
+      searchReservations(like).catch((err) => {
+        logger.warn("CommandPalette", "reservations search failed", { err });
+        return [] as CommandSearchHit[];
+      }),
+      searchSyncRuns(query).catch((err) => {
+        logger.warn("CommandPalette", "sync runs search failed", { err });
+        return [] as CommandSearchHit[];
+      }),
+      searchUsers(like).catch((err) => {
+        logger.warn("CommandPalette", "users search failed", { err });
+        return [] as CommandSearchHit[];
+      }),
+      searchTransactions(query, like).catch((err) => {
+        logger.warn("CommandPalette", "transactions search failed", { err });
+        return [] as CommandSearchHit[];
+      }),
+    ]);
 
     // Invoices via Lago — only on ≥3 chars and best-effort.
     let invoices: CommandSearchHit[] = [];
@@ -144,6 +170,8 @@ export const handler = define.handlers({
       invoices,
       reservations: reservationsRows,
       syncRuns: syncRunsRows,
+      users: usersRows,
+      transactions: transactionsRows,
     });
   },
 });
@@ -270,6 +298,78 @@ async function searchReservations(like: string): Promise<CommandSearchHit[]> {
     label: `${r.chargeBoxId} · conn ${r.connectorId}`,
     subtitle: `${r.status} · ${r.idTag}`,
     href: `/reservations/${r.id}`,
+  }));
+}
+
+async function searchUsers(like: string): Promise<CommandSearchHit[]> {
+  // Search across both admin + customer rows. Admin hits anchor into the
+  // existing /admin/users list (no per-admin detail page); customer hits
+  // route to /admin/users/[id] which is the new detail page added alongside
+  // this search expansion.
+  const rows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+    })
+    .from(users)
+    .where(
+      or(
+        ilike(users.email, like),
+        ilike(users.name, like),
+      ),
+    )
+    .orderBy(desc(users.updatedAt))
+    .limit(LIMIT);
+
+  return rows.map((r) => {
+    const label = (r.name && r.name.trim()) || r.email || `User ${r.id}`;
+    const subtitle = r.name && r.email
+      ? `${r.email} · ${r.role}`
+      : (r.email ?? r.role);
+    return {
+      id: r.id,
+      label,
+      subtitle,
+      href: r.role === "admin"
+        ? `/users#${encodeURIComponent(r.id)}`
+        : `/users/${encodeURIComponent(r.id)}`,
+    };
+  });
+}
+
+async function searchTransactions(
+  query: string,
+  _like: string,
+): Promise<CommandSearchHit[]> {
+  // Only the numeric Steve transaction id is in the local cache. A
+  // chargeBoxId-keyed transaction search would require joining StEvE,
+  // which is too expensive on the keystroke path; chargers themselves
+  // are already searchable separately.
+  const idNum = Number.parseInt(query, 10);
+  if (Number.isNaN(idNum)) return [];
+  const rows = await db
+    .selectDistinctOn([syncedTransactionEvents.steveTransactionId], {
+      id: syncedTransactionEvents.steveTransactionId,
+      isFinal: syncedTransactionEvents.isFinal,
+      kwhDelta: syncedTransactionEvents.kwhDelta,
+    })
+    .from(syncedTransactionEvents)
+    .where(eq(syncedTransactionEvents.steveTransactionId, idNum))
+    .orderBy(
+      syncedTransactionEvents.steveTransactionId,
+      desc(syncedTransactionEvents.syncedAt),
+    )
+    .limit(LIMIT);
+
+  return rows.map((r) => ({
+    id: String(r.id),
+    label: `Transaction #${r.id}`,
+    subtitle: `${r.kwhDelta ?? "0"} kWh${
+      r.isFinal ? " · finalized" : " · in progress"
+    }`,
+    href: `/transactions/${r.id}`,
   }));
 }
 
