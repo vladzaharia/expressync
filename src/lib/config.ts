@@ -146,6 +146,21 @@ export const config = {
   FEATURE_MAGIC_LINK: Deno.env.get("FEATURE_MAGIC_LINK") !== "false",
   /** Feature flag — when false, scan-to-login endpoints respond 503. */
   FEATURE_SCAN_LOGIN: Deno.env.get("FEATURE_SCAN_LOGIN") !== "false",
+  /**
+   * Feature flag — when true, the POST /api/ocpp/pre-authorize hook is
+   * live and the pair-intent watchdog subscribes to tx.started events.
+   * Default OFF until the SteVe fork is deployed and verified on one
+   * charger. When off, the endpoint returns 503 so a misconfigured SteVe
+   * fails open rather than silently calling a noop.
+   */
+  FEATURE_PAIR_INTENT_INTERCEPT:
+    Deno.env.get("FEATURE_PAIR_INTENT_INTERCEPT") === "true",
+  /**
+   * Shared secret used to verify the `X-Signature` HMAC-SHA256 header on
+   * requests from the SteVe pre-authorize hook. Required when
+   * FEATURE_PAIR_INTENT_INTERCEPT is on; empty string otherwise.
+   */
+  STEVE_PREAUTH_HMAC_KEY: Deno.env.get("STEVE_PREAUTH_HMAC_KEY") || "",
   /** Canonical admin host URL (used in admin redirects + reset-link composition). */
   ADMIN_BASE_URL: stripTrailingSlash(
     Deno.env.get("ADMIN_BASE_URL") || "https://manage.polaris.express",

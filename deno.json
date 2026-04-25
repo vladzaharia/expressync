@@ -11,7 +11,8 @@
     "db:migrate": "deno run -A src/db/migrate.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "backfill:customer-accounts": "deno run -A scripts/backfill-customer-accounts.ts"
+    "backfill:customer-accounts": "deno run -A scripts/backfill-customer-accounts.ts",
+    "test:integration:scan-login": "deno run -A tests/integration/scan-login/runner.ts"
   },
   "lint": {
     "rules": {

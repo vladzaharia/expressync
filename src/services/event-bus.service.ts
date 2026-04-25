@@ -40,6 +40,8 @@ export type EventBusEventType =
   | "charger.state"
   | "transaction.meter"
   | "tag.seen"
+  | "scan.intercepted"
+  | "tx.started"
   | "sync.completed"
   | "heartbeat";
 
@@ -92,6 +94,50 @@ export interface TagSeenPayload {
   seenAt: string;
 }
 
+/**
+ * Emitted by POST /api/ocpp/pre-authorize when an armed scan-pair row
+ * matches an incoming tag scan. The scan-detect SSE consumer filters by
+ * chargeBoxId and forwards to the waiting client.
+ *
+ * Fires uniformly for known AND unknown tags — the hook's job is to
+ * stop the charger from auto-starting and hand off the idTag to the
+ * waiting flow. Downstream consumers decide what to do with the idTag
+ * based on `purpose`:
+ *
+ *   - `login`       — customer is mid-login. scan-login.ts mints a
+ *                     session if the idTag resolves to a linked
+ *                     customer, else 401.
+ *   - `admin-link`  — admin is linking a (possibly unknown) tag to a
+ *                     customer from the admin UI.
+ *   - `customer-link` — authenticated customer is adding another tag
+ *                     to their own account.
+ *
+ * Unknown `purpose` strings are forwarded as-is for forward-compat.
+ */
+export interface ScanInterceptedPayload {
+  idTag: string;
+  chargeBoxId: string;
+  pairingCode: string;
+  /** Intent purpose — defaults to "login" when the intent was armed without one. */
+  purpose: string;
+  /** ms since epoch at the time of match. */
+  t: number;
+}
+
+/**
+ * Emitted by docker-log-subscriber when a StartTransaction line is parsed.
+ * Consumed by the pair-intent watchdog as the fallback RemoteStop trigger
+ * in case the pre-auth hook didn't prevent the transaction (e.g. hook
+ * timed out, charger had cached auth).
+ */
+export interface TxStartedPayload {
+  chargeBoxId: string;
+  idTag: string | null;
+  transactionId: number | null;
+  /** ms since epoch. */
+  t: number;
+}
+
 export interface SyncCompletedPayload {
   syncRunId: number;
   transactionsProcessed: number;
@@ -106,6 +152,8 @@ export type EventBusEvent =
   | { type: "charger.state"; payload: ChargerStatePayload }
   | { type: "transaction.meter"; payload: TransactionMeterPayload }
   | { type: "tag.seen"; payload: TagSeenPayload }
+  | { type: "scan.intercepted"; payload: ScanInterceptedPayload }
+  | { type: "tx.started"; payload: TxStartedPayload }
   | { type: "sync.completed"; payload: SyncCompletedPayload }
   | { type: "heartbeat"; payload: { ts: number } };
 

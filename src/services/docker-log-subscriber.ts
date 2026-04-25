@@ -32,14 +32,33 @@
 
 import { dockerClient } from "../lib/docker-client.ts";
 import { logger } from "../lib/utils/logger.ts";
-import { extractRejectedTag } from "../lib/utils/tag-patterns.ts";
+import {
+  extractRejectedTag,
+  extractStartTransaction,
+} from "../lib/utils/tag-patterns.ts";
+import { eventBus } from "./event-bus.service.ts";
 
 const log = logger.child("DockerLogSubscriber");
 
-/** Parsed scan event emitted to each subscriber. */
+/**
+ * Parsed scan event emitted to each subscriber.
+ *
+ * Two event shapes share this interface via the `type` discriminator:
+ *   - `reject`: StEvE refused to authorize a tag. Used by the existing
+ *     admin tag-detect flow and the unknown-tag scan-login pairing flow.
+ *   - `start-tx`: StEvE accepted the tag and the charger opened a
+ *     transaction. Used by the pair-intent watchdog as the fallback
+ *     RemoteStop trigger when the pre-auth hook didn't prevent the
+ *     transaction (hook timed out, charger had cached auth, etc.).
+ */
 export interface ScanLogEvent {
-  /** OCPP id-tag string parsed from the rejected/unknown-tag line. */
-  idTag: string;
+  /**
+   * Discriminator. Pre-existing consumers that predate the watchdog
+   * treat missing/omitted as "reject" for backwards compatibility.
+   */
+  type: "reject" | "start-tx";
+  /** OCPP id-tag string. Nullable on start-tx if the line omits it. */
+  idTag: string | null;
   /**
    * chargeBoxId parsed from the same log line if present. May be `null`
    * when the line doesn't contain a chargeBoxId (older StEvE format /
@@ -47,6 +66,8 @@ export interface ScanLogEvent {
    * admin tag-detect tolerates null.
    */
   chargeBoxId: string | null;
+  /** OCPP transactionId — populated for `start-tx` events, null otherwise. */
+  transactionId: number | null;
   /** Server-side wall-clock at parse time (Date.now()). */
   t: number;
   /** Raw log line, truncated to 500 chars for safety. */
@@ -155,16 +176,54 @@ async function runStream(): Promise<void> {
     });
     for await (const line of logStream) {
       if (stopRequested || subscribers.size === 0) break;
-      const idTag = extractRejectedTag(line);
-      if (!idTag) continue;
       const chargeBoxId = extractChargeBoxId(line);
-      const event: ScanLogEvent = {
-        idTag,
-        chargeBoxId,
-        t: Date.now(),
-        rawLine: line.length > 500 ? line.slice(0, 500) : line,
-      };
-      dispatch(event);
+      const truncated = line.length > 500 ? line.slice(0, 500) : line;
+      const now = Date.now();
+
+      // Try reject pattern first; a single line never matches both.
+      const rejectedTag = extractRejectedTag(line);
+      if (rejectedTag) {
+        dispatch({
+          type: "reject",
+          idTag: rejectedTag,
+          chargeBoxId,
+          transactionId: null,
+          t: now,
+          rawLine: truncated,
+        });
+        continue;
+      }
+
+      const startTx = extractStartTransaction(line);
+      if (startTx && chargeBoxId) {
+        // Publish tx.started on the event bus for cross-worker
+        // watchdog fan-out. We also dispatch locally so same-worker
+        // subscribers (e.g. tests) get the event without the transport
+        // round-trip.
+        try {
+          eventBus.publish({
+            type: "tx.started",
+            payload: {
+              chargeBoxId,
+              idTag: startTx.idTag,
+              transactionId: startTx.transactionId,
+              t: now,
+            },
+          });
+        } catch (err) {
+          log.warn("Failed to publish tx.started", {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        dispatch({
+          type: "start-tx",
+          idTag: startTx.idTag,
+          chargeBoxId,
+          transactionId: startTx.transactionId,
+          t: now,
+          rawLine: truncated,
+        });
+      }
     }
   } catch (err) {
     log.error("Docker log stream error", {

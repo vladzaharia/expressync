@@ -1,6 +1,7 @@
 import { App, staticFiles } from "fresh";
 import type { State } from "./utils.ts";
 import { ensureLagoMetricSafety } from "./src/services/lago-safety.service.ts";
+import { startPairIntentWatchdog } from "./src/services/pair-intent-watchdog.ts";
 import {
   classifyAdminHostname,
   classifyCustomerHostname,
@@ -38,6 +39,11 @@ app.fsRoutes();
 // Phase D: verify Lago billable metric aggregation type on web-app startup.
 // Fire-and-forget — never blocks serving.
 ensureLagoMetricSafety().catch(() => {/* already logged */});
+
+// Scan-to-login intercept: start the fallback watchdog that RemoteStops
+// transactions which slipped past the pre-auth hook. No-op when the
+// feature flag is off.
+startPairIntentWatchdog();
 
 /**
  * Wraps the Fresh App handler with a hostname-driven URL rewrite. When the
