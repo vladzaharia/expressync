@@ -44,6 +44,7 @@ import {
   ChargerPickerInline,
 } from "@/components/customer/ChargerPickerInline.tsx";
 import { ScanCountdownRing } from "@/components/scan/ScanCountdownRing.tsx";
+import { ScanPanel, type ScanPanelState } from "@/components/scan/ScanPanel.tsx";
 import {
   AlertCircle,
   Loader2,
@@ -586,13 +587,14 @@ export default function CustomerScanLoginIsland({
 }
 
 // Inline flow body — the wizard version with side-by-side countdown ring +
-// instructions. Same state machine as the modal FlowBody; different layout.
+// instructions. Renders through `ScanPanel` (the canonical chrome shared
+// with admin scan flows) so the look stays identical across surfaces.
 function InlineFlow({
   flow,
   prefersReducedMotion,
   onPickCharger,
   onRetry,
-  onExit,
+  onExit: _onExit,
 }: {
   flow: FlowState;
   prefersReducedMotion: boolean;
@@ -600,40 +602,27 @@ function InlineFlow({
   onRetry: () => void;
   onExit: () => void;
 }) {
-  if (flow.kind === "idle" || flow.kind === "loadingChargers") {
-    return (
-      <div class="flex flex-col items-center gap-2 py-8 text-center">
-        <Loader2 class="size-6 animate-spin text-muted-foreground" />
-        <p class="text-sm text-muted-foreground">Looking for your chargers…</p>
-      </div>
-    );
-  }
-
+  // The "no chargers" terminal state reuses the panel's error chrome with a
+  // disambiguating icon. We let ScanPanel's error case render the framing.
   if (flow.kind === "noChargers") {
     return (
-      <div class="space-y-3 text-center py-4">
-        <WifiOff class="size-8 mx-auto text-muted-foreground" />
-        <p class="text-sm font-medium text-foreground">No chargers online</p>
-        <p class="text-xs text-muted-foreground">
-          We couldn't reach a reader right now. Use email instead or try again in
-          a minute.
-        </p>
-        <div class="flex gap-2 justify-center">
-          <Button variant="outline" size="sm" onClick={onRetry}>
-            <RotateCcw class="mr-1 size-3.5" />
-            Try again
-          </Button>
-        </div>
-      </div>
+      <ScanPanel
+        accent="cyan"
+        prefersReducedMotion={prefersReducedMotion}
+        state={{
+          kind: "error",
+          message:
+            "We couldn't reach a reader right now. Use email instead or try again in a minute.",
+          onRetry,
+        }}
+      />
     );
   }
 
   if (flow.kind === "picker") {
     return (
       <div class="space-y-3">
-        <p class="text-xs text-muted-foreground">
-          Which reader are you at?
-        </p>
+        <p class="text-xs text-muted-foreground">Which reader are you at?</p>
         <ChargerPickerInline
           chargers={flow.chargers}
           onSelect={onPickCharger}
@@ -642,97 +631,55 @@ function InlineFlow({
     );
   }
 
-  // Pairing / waiting share the [ring | instructions] layout so the UI
-  // doesn't jump when the API call resolves.
-  const chargerName = flow.kind === "pairing" || flow.kind === "waiting"
-    ? (flow.chargerName ?? null)
-    : null;
-  const displayName = chargerName && chargerName.trim()
-    ? chargerName
-    : "the reader";
-
-  if (flow.kind === "pairing" || flow.kind === "waiting") {
-    const isArmed = flow.kind === "waiting";
-    const remaining = flow.kind === "waiting" ? flow.secondsRemaining : 0;
-    const total = PAIRING_DEFAULT_TTL_SEC;
-    const tone = isArmed && remaining <= 15 ? "amber" : "cyan";
-
-    const steps: string[] = [
-      "Wake your card",
-      `Tap it on ${displayName}`,
-      "Login, just like that!",
-    ];
-
-    return (
-      <div class="flex items-stretch gap-4">
-        {/* Countdown lives in its own card; instructions sit alongside as
-            plain content so the eye parses the ring as the active element
-            and the steps as guidance. */}
-        <div class="shrink-0 rounded-xl border bg-card/60 p-4 sm:p-5 flex items-center justify-center">
-          {isArmed
-            ? (
-              <ScanCountdownRing
-                remaining={remaining}
-                total={total}
-                tone={tone}
-                reducedMotion={prefersReducedMotion}
-              />
-            )
-            : (
-              <div
-                class="inline-flex size-32 items-center justify-center rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
-                aria-label="Arming reader"
-              >
-                <Loader2 class="size-8 animate-spin" />
-              </div>
-            )}
-        </div>
-        {/* Instructions are centered vertically next to the countdown card,
-            stacked tightly so the eye reads them as a single block. Numbers
-            are dimmed so the verbs carry the visual weight. */}
-        <ol class="min-w-0 flex-1 flex flex-col justify-center gap-2 py-1">
-          {steps.map((step, i) => (
-            <li key={i} class="flex items-baseline gap-2">
-              <span
-                class="text-xs font-mono tabular-nums text-muted-foreground/60 shrink-0"
-                aria-hidden="true"
-              >
-                {i + 1}.
-              </span>
-              <span class="text-sm leading-snug">{step}</span>
-            </li>
-          ))}
-        </ol>
-      </div>
-    );
-  }
-
-  if (flow.kind === "loggingIn" || flow.kind === "success") {
-    return (
-      <div class="flex flex-col items-center gap-2 py-8 text-center">
-        <Loader2 class="size-6 animate-spin text-primary" />
-        <p class="text-sm font-medium text-foreground">
-          {flow.kind === "success" ? "Signed in. Redirecting…" : "Signing you in…"}
-        </p>
-      </div>
-    );
-  }
-
-  // error
+  const panelState = mapCustomerFlowToPanelState(flow);
   return (
-    <div class="space-y-3 text-center py-4">
-      <AlertCircle class="size-8 mx-auto text-destructive" />
-      <p class="text-sm text-foreground">{flow.message}</p>
-      {flow.canRetry && (
-        <div class="flex justify-center">
-          <Button variant="outline" size="sm" onClick={onRetry}>
-            <RotateCcw class="mr-1 size-3.5" />
-            Try again
-          </Button>
-        </div>
-      )}
-    </div>
+    <ScanPanel
+      accent="cyan"
+      prefersReducedMotion={prefersReducedMotion}
+      state={panelState.kind === "error"
+        ? {
+          ...panelState,
+          onRetry: flow.kind === "error" && flow.canRetry ? onRetry : undefined,
+        }
+        : panelState}
+    />
   );
+}
+
+/**
+ * Map the customer's internal `FlowState` to the normalised `ScanPanelState`.
+ * Kept inline so the customer-specific copy ("Signing you in…", etc.) stays
+ * with the customer flow.
+ */
+function mapCustomerFlowToPanelState(flow: FlowState): ScanPanelState {
+  switch (flow.kind) {
+    case "idle":
+    case "loadingChargers":
+      return { kind: "idle", message: "Looking for your chargers…" };
+    case "pairing":
+      return { kind: "idle", message: "Arming the reader…" };
+    case "waiting":
+      return {
+        kind: "armed",
+        remaining: flow.secondsRemaining,
+        total: PAIRING_DEFAULT_TTL_SEC,
+        readerName: flow.chargerName,
+        steps: [
+          "Wake your card",
+          `Tap it on ${flow.chargerName?.trim() ? flow.chargerName : "the reader"}`,
+          "Login, just like that!",
+        ],
+      };
+    case "loggingIn":
+      return { kind: "resolving", message: "Signing you in…" };
+    case "success":
+      return { kind: "success", message: "Signed in. Redirecting…" };
+    case "error":
+      return { kind: "error", message: flow.message };
+    // picker / noChargers handled by callers above.
+    default:
+      return { kind: "idle" };
+  }
 }
 
 function FlowBody({
