@@ -88,6 +88,14 @@ interface BillingPageData {
   currency: string;
   operatorEmail?: string;
   /**
+   * Lago hosted customer-portal URL. Resolved server-side (best-effort)
+   * from `lagoClient.getCustomerPortalUrl`. Customers click "Manage in
+   * billing portal" to update payment methods, change plan, etc. — flows
+   * we don't implement natively. Null when Lago is unreachable or the
+   * customer has no Lago link.
+   */
+  billingPortalUrl: string | null;
+  /**
    * In-progress charging session for this customer, if any. When present
    * the page renders a "Currently charging" SectionCard with a live
    * `LiveSessionCard` near the top.
@@ -488,6 +496,24 @@ export const handler = define.handlers({
       }
     }
 
+    // Resolve Lago hosted-portal URL (best-effort). Lago expires these
+    // signed URLs after a short window so we MUST resolve per request,
+    // not cache. A failure here just hides the "Manage in billing portal"
+    // button.
+    let billingPortalUrl: string | null = null;
+    if (hasLagoLink && scope.lagoCustomerExternalId) {
+      try {
+        const resp = await lagoClient.getCustomerPortalUrl(
+          scope.lagoCustomerExternalId,
+        );
+        billingPortalUrl = resp.customer.portal_url ?? null;
+      } catch (err) {
+        log.warn("Failed to resolve Lago portal URL; hiding link", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     return {
       data: {
         overview,
@@ -505,6 +531,7 @@ export const handler = define.handlers({
         currency,
         operatorEmail: config.OPERATOR_CONTACT_EMAIL || undefined,
         activeSession: activeSessionData,
+        billingPortalUrl,
       } satisfies BillingPageData,
     };
   },
@@ -655,6 +682,20 @@ export default define.page<typeof handler>(function BillingIndexPage(
             title="Overview"
             icon={CircleDollarSign}
             accent="blue"
+            actions={data.billingPortalUrl
+              ? (
+                <a
+                  href={data.billingPortalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors"
+                  aria-label="Open Lago billing portal in a new tab to update payment methods or change plan"
+                >
+                  Manage in billing portal
+                  <span aria-hidden="true">↗</span>
+                </a>
+              )
+              : undefined}
           >
             <BillingOverviewCard {...data.overview} accent="blue" />
           </SectionCard>
