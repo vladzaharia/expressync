@@ -42,6 +42,8 @@ const EMPTY: CommandSearchResponse = {
   invoices: [],
   reservations: [],
   syncRuns: [],
+  users: [],
+  transactions: [],
 };
 
 export const handler = define.handlers({
@@ -79,14 +81,10 @@ export const handler = define.handlers({
 
     // Local DB queries in parallel; per-source errors swallowed so one
     // bad query doesn't blank the whole palette (mirrors the admin path).
-    //
-    // Sessions search is collected but not surfaced in the response yet —
-    // the admin response shape doesn't carry a `sessions` slot, and
-    // wedging owned sessions into another bucket muddles the chrome. The
-    // dedicated "My sessions" group lands in Track G1 alongside the
-    // dashboard. For MVP the static action commands ("My sessions" /
-    // "My reservations" / "My invoices") cover the search-less nav case.
-    const [tags, _sessionsHits, reservationsHits] = await Promise.all([
+    // Sessions are surfaced via the shared `transactions` slot on the
+    // CommandSearchResponse — the customer wording in CommandPalette.tsx
+    // labels them "Sessions" but the wire-format is unified.
+    const [tags, sessionsHits, reservationsHits] = await Promise.all([
       searchOwnedTags(like, scope.mappingIds).catch((err) => {
         logger.warn("CustomerCommandPalette", "tags search failed", { err });
         return [] as CommandSearchHit[];
@@ -140,6 +138,13 @@ export const handler = define.handlers({
       invoices,
       reservations: reservationsHits,
       syncRuns: [], // admin-only operational concept
+      users: [], // admin-only
+      // Surface owned charging sessions in the shared `transactions` slot.
+      // The palette UI labels this group "Transactions" — fine for the
+      // admin surface; for customers we treat each row as a session and
+      // link into `/sessions/{id}` so the wording matches the destination
+      // page title.
+      transactions: sessionsHits,
     });
   },
 });

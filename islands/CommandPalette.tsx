@@ -31,10 +31,13 @@ import {
   CalendarClock,
   Clock,
   FileText,
+  Radio,
   Receipt,
   RefreshCw,
   Tag,
+  User as UserIcon,
   Users,
+  Zap,
 } from "lucide-preact";
 import { attachPaletteHotkeys } from "@/src/lib/command-palette/hotkeys.ts";
 import {
@@ -161,6 +164,12 @@ function pushRecent(entry: RecentEntry) {
   }
 }
 
+interface ScanPickerCharger {
+  chargeBoxId: string;
+  friendlyName: string | null;
+  status: string | null;
+}
+
 export default function CommandPalette(
   { surface = "admin" }: CommandPaletteProps = {},
 ) {
@@ -170,6 +179,15 @@ export default function CommandPalette(
   const searchLoading = useSignal(false);
   const recent = useSignal<RecentEntry[]>([]);
   const triggeringElement = useRef<Element | null>(null);
+  // Sub-page state for the "Scan EV Card" two-step flow. When non-null,
+  // the palette body switches from search results to a charger picker.
+  // `loading=true` while the GET /api/auth/scan-charger-list call is in
+  // flight; `chargers` is the filtered (online-only) list when present.
+  const scanPicker = useSignal<
+    | { loading: true; chargers: null }
+    | { loading: false; chargers: ScanPickerCharger[] }
+    | null
+  >(null);
 
   const isCustomer = surface === "customer";
 
@@ -272,6 +290,85 @@ export default function CommandPalette(
     return () => globalThis.removeEventListener("beforeunload", onBeforeUnload);
   }, []);
 
+  // -- Scan EV Card flow: action dispatches `cmdk:scan-picker:open`; we
+  //    fetch the online charger roster and either auto-arm (1 online) or
+  //    switch to the inline picker subview (>1 online).
+  useEffect(() => {
+    const onScanPickerOpen = async () => {
+      // Skip on customer surface — admin scan inventory only.
+      if (isCustomer) return;
+      scanPicker.value = { loading: true, chargers: null };
+      try {
+        const res = await fetch("/api/auth/scan-charger-list", {
+          method: "GET",
+          credentials: "same-origin",
+        });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const data = await res.json() as {
+          chargers: Array<
+            ScanPickerCharger & { online: boolean }
+          >;
+        };
+        const online = (data.chargers ?? []).filter((c) => c.online);
+        if (online.length === 0) {
+          scanPicker.value = null;
+          toast.error("No chargers online", {
+            description: "Wait for a charger to come back online and try again.",
+          });
+          return;
+        }
+        if (online.length === 1) {
+          // Single charger — skip the picker and go straight to scan UX.
+          const c = online[0];
+          scanPicker.value = null;
+          close();
+          globalThis.dispatchEvent(
+            new CustomEvent("evcard:scan-open", {
+              detail: { chargeBoxId: c.chargeBoxId },
+            }),
+          );
+          return;
+        }
+        // Multiple chargers — switch the palette body to the picker subview.
+        scanPicker.value = {
+          loading: false,
+          chargers: online.map((c) => ({
+            chargeBoxId: c.chargeBoxId,
+            friendlyName: c.friendlyName,
+            status: c.status,
+          })),
+        };
+        // Reset query so the picker isn't pre-filtered by whatever the
+        // user typed before invoking the action.
+        query.value = "";
+      } catch (err) {
+        scanPicker.value = null;
+        console.warn("[cmdk] scan-picker fetch failed", err);
+        toast.error("Couldn't load charger list");
+      }
+    };
+    globalThis.addEventListener(
+      "cmdk:scan-picker:open",
+      onScanPickerOpen as EventListener,
+    );
+    return () =>
+      globalThis.removeEventListener(
+        "cmdk:scan-picker:open",
+        onScanPickerOpen as EventListener,
+      );
+  }, [isCustomer]);
+
+  /** Close + dispatch scan-open with a chosen charger. */
+  const armScanAt = (chargeBoxId: string) => {
+    scanPicker.value = null;
+    close();
+    globalThis.dispatchEvent(
+      new CustomEvent("evcard:scan-open", { detail: { chargeBoxId } }),
+    );
+  };
+
   // -- Debounced search --------------------------------------------------
   useEffect(() => {
     if (!open.value) return;
@@ -320,12 +417,18 @@ export default function CommandPalette(
     open.value = false;
     query.value = "";
     searchResults.value = null;
+    scanPicker.value = null;
     const el = triggeringElement.current;
     if (
       el && "focus" in el && typeof (el as HTMLElement).focus === "function"
     ) {
       (el as HTMLElement).focus();
     }
+  };
+
+  /** Drop the scan-picker subview without closing the palette. */
+  const dismissScanPicker = () => {
+    scanPicker.value = null;
   };
 
   // -- Execute a command (navigate or action) ---------------------------
@@ -390,7 +493,8 @@ export default function CommandPalette(
     const r = searchResults.value;
     if (!r) return 0;
     return r.chargers.length + r.tags.length + r.customers.length +
-      r.invoices.length + r.reservations.length + r.syncRuns.length;
+      r.invoices.length + r.reservations.length + r.syncRuns.length +
+      (r.users?.length ?? 0) + (r.transactions?.length ?? 0);
   });
 
   if (!open.value) return null;
@@ -418,25 +522,38 @@ export default function CommandPalette(
           className="flex flex-col flex-1 min-h-0"
         >
           <div class="flex items-center gap-2 px-3 py-2 border-b border-border">
+            {scanPicker.value && (
+              <span class="inline-flex items-center gap-1.5 rounded-md border border-cyan-500/40 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-medium text-cyan-700 dark:text-cyan-300 shrink-0">
+                <Radio class="size-3" aria-hidden="true" />
+                Scan
+              </span>
+            )}
             <Command.Input
               autoFocus
               value={query.value}
               onValueChange={(v: string) => (query.value = v)}
-              placeholder="Type exact tag names, charger IDs, or action names..."
+              placeholder={scanPicker.value
+                ? "Search chargers..."
+                : "Type exact tag names, charger IDs, or action names..."}
               className="flex-1 bg-transparent outline-none text-sm py-2 placeholder:text-muted-foreground"
               role="combobox"
               aria-expanded
               aria-controls="cmdk-list"
               onKeyDown={(e: KeyboardEvent) => {
-                // Safety: if focus somehow leaves the input into another
-                // input before the palette, bail (shouldn't happen).
                 if (e.key === "Escape") {
                   e.preventDefault();
-                  close();
+                  // Esc backs out of the scan-picker subview before closing
+                  // the whole palette — gives the user a way to bail without
+                  // losing context.
+                  if (scanPicker.value) {
+                    dismissScanPicker();
+                  } else {
+                    close();
+                  }
                 }
               }}
             />
-            {searchLoading.value && (
+            {(searchLoading.value || scanPicker.value?.loading) && (
               <span class="text-xs text-muted-foreground shrink-0">...</span>
             )}
             <kbd class="hidden sm:inline-flex items-center text-[10px] px-1.5 py-0.5 border border-border rounded text-muted-foreground shrink-0">
@@ -454,11 +571,33 @@ export default function CommandPalette(
             className="flex-1 overflow-y-auto py-1"
           >
             <Command.Empty className="px-4 py-6 text-sm text-muted-foreground text-center">
-              No matches. Try a charger ID, tag name, or "sync".
+              {scanPicker.value
+                ? "No matching chargers online."
+                : `No matches. Try a charger ID, tag name, or "sync".`}
             </Command.Empty>
 
+            {/* Scan EV Card subview — when active, replaces the normal
+                results stack with a charger picker. Selecting a charger
+                closes the palette and arms the TapToAddModal at it. */}
+            {scanPicker.value && !scanPicker.value.loading &&
+              scanPicker.value.chargers && (
+              <CommandGroup heading="Pick a charger to scan at">
+                {scanPicker.value.chargers.map((c) => (
+                  <CommandItem
+                    key={`scan-pick:${c.chargeBoxId}`}
+                    value={`scan-pick:${c.chargeBoxId}:${c.friendlyName ?? ""}`}
+                    icon={Radio}
+                    accent="cyan"
+                    title={c.friendlyName?.trim() || c.chargeBoxId}
+                    subtitle={c.friendlyName ? c.chargeBoxId : (c.status ?? "")}
+                    onSelect={() => armScanAt(c.chargeBoxId)}
+                  />
+                ))}
+              </CommandGroup>
+            )}
+
             {/* Recent — only on empty query */}
-            {!hasQuery && recent.value.length > 0 && (
+            {!scanPicker.value && !hasQuery && recent.value.length > 0 && (
               <CommandGroup heading="Recent">
                 {recent.value.map((r) => (
                   <CommandItem
@@ -474,40 +613,45 @@ export default function CommandPalette(
               </CommandGroup>
             )}
 
-            {/* Navigate */}
-            <CommandGroup heading="Navigate">
-              {navigateCommands.map((c) => (
-                <CommandItem
-                  key={c.id}
-                  value={c.id}
-                  keywords={[c.title, ...(c.keywords ?? [])]}
-                  icon={c.icon}
-                  accent={c.accent}
-                  title={c.title}
-                  subtitle={c.subtitle}
-                  onSelect={() => execute(c)}
-                />
-              ))}
-            </CommandGroup>
+            {/* Navigate + Actions + dynamic results — hidden while the
+                Scan EV Card subview is open so the operator only sees
+                charger options during that flow. */}
+            {!scanPicker.value && (
+              <>
+                <CommandGroup heading="Navigate">
+                  {navigateCommands.map((c) => (
+                    <CommandItem
+                      key={c.id}
+                      value={c.id}
+                      keywords={[c.title, ...(c.keywords ?? [])]}
+                      icon={c.icon}
+                      accent={c.accent}
+                      title={c.title}
+                      subtitle={c.subtitle}
+                      onSelect={() => execute(c)}
+                    />
+                  ))}
+                </CommandGroup>
 
-            {/* Actions */}
-            <CommandGroup heading="Actions">
-              {actionCommands.map((c) => (
-                <CommandItem
-                  key={c.id}
-                  value={c.id}
-                  keywords={[c.title, ...(c.keywords ?? [])]}
-                  icon={c.icon}
-                  accent={c.accent}
-                  title={c.title}
-                  subtitle={c.subtitle}
-                  onSelect={() => execute(c)}
-                />
-              ))}
-            </CommandGroup>
+                <CommandGroup heading="Actions">
+                  {actionCommands.map((c) => (
+                    <CommandItem
+                      key={c.id}
+                      value={c.id}
+                      keywords={[c.title, ...(c.keywords ?? [])]}
+                      icon={c.icon}
+                      accent={c.accent}
+                      title={c.title}
+                      subtitle={c.subtitle}
+                      onSelect={() => execute(c)}
+                    />
+                  ))}
+                </CommandGroup>
+              </>
+            )}
 
             {/* Dynamic entities — only when there's a query */}
-            {hasQuery && results && (
+            {!scanPicker.value && hasQuery && results && (
               <>
                 {results.chargers.length > 0 && (
                   <CommandGroup heading="Chargers">
@@ -595,6 +739,36 @@ export default function CommandPalette(
                         title={h.label}
                         subtitle={h.subtitle}
                         onSelect={() => executeHit(h, "syncrun")}
+                      />
+                    ))}
+                  </CommandGroup>
+                )}
+                {results.users && results.users.length > 0 && (
+                  <CommandGroup heading="Users">
+                    {results.users.map((h) => (
+                      <CommandItem
+                        key={`user:${h.id}`}
+                        value={`user:${h.id}:${h.label}`}
+                        icon={UserIcon}
+                        accent="violet"
+                        title={h.label}
+                        subtitle={h.subtitle}
+                        onSelect={() => executeHit(h, "user")}
+                      />
+                    ))}
+                  </CommandGroup>
+                )}
+                {results.transactions && results.transactions.length > 0 && (
+                  <CommandGroup heading="Transactions">
+                    {results.transactions.map((h) => (
+                      <CommandItem
+                        key={`txn:${h.id}`}
+                        value={`txn:${h.id}:${h.label}`}
+                        icon={Zap}
+                        accent="emerald"
+                        title={h.label}
+                        subtitle={h.subtitle}
+                        onSelect={() => executeHit(h, "transaction")}
                       />
                     ))}
                   </CommandGroup>
