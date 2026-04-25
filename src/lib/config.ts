@@ -79,12 +79,6 @@ export const config = {
   AUTH_SECRET: Deno.env.get("AUTH_SECRET")!,
   AUTH_URL: Deno.env.get("AUTH_URL") || "http://localhost:8000",
 
-  // Phase P7: SSE backbone. Defaults to enabled; set to "false" to force all
-  // SSE endpoints to return 503 so client islands fall back to polling. Useful
-  // behind proxies or on constrained networks where long-lived connections
-  // aren't viable.
-  ENABLE_SSE: Deno.env.get("ENABLE_SSE") !== "false",
-
   // Wave A8: pluggable SSE transport. "memory" keeps the default in-process
   // fan-out (single worker); "postgres" activates LISTEN/NOTIFY on the
   // `sse_events` channel so multiple worker processes can cooperate.
@@ -142,28 +136,26 @@ export const config = {
     );
     return isNaN(val) || val <= 0 ? 28800 : val;
   })(),
-  /** Feature flag — when false, magic-link endpoints respond 503. */
-  FEATURE_MAGIC_LINK: Deno.env.get("FEATURE_MAGIC_LINK") !== "false",
-  /** Feature flag — when false, scan-to-login endpoints respond 503. */
-  FEATURE_SCAN_LOGIN: Deno.env.get("FEATURE_SCAN_LOGIN") !== "false",
-  /**
-   * Feature flag — when true, the POST /api/ocpp/pre-authorize hook is
-   * live and the pair-intent watchdog subscribes to tx.started events.
-   * Default OFF until the SteVe fork is deployed and verified on one
-   * charger. When off, the endpoint returns 503 so a misconfigured SteVe
-   * fails open rather than silently calling a noop.
-   */
-  FEATURE_PAIR_INTENT_INTERCEPT:
-    Deno.env.get("FEATURE_PAIR_INTENT_INTERCEPT") === "true",
   /**
    * Shared secret used to verify the `X-Signature` HMAC-SHA256 header on
-   * requests from the SteVe pre-authorize hook. Required when
-   * FEATURE_PAIR_INTENT_INTERCEPT is on; empty string otherwise.
+   * requests from the SteVe pre-authorize hook. The route returns 401
+   * when this is empty so a misconfigured deploy is loudly broken.
    */
   STEVE_PREAUTH_HMAC_KEY: Deno.env.get("STEVE_PREAUTH_HMAC_KEY") || "",
+  /**
+   * Shared secret for the SteVe meter-values webhook (mirrors the
+   * pre-authorize HMAC pattern). Falls back to STEVE_PREAUTH_HMAC_KEY so
+   * operators can run both hooks under one secret in early deployments.
+   */
+  STEVE_METERVALUE_HMAC_KEY: Deno.env.get("STEVE_METERVALUE_HMAC_KEY") ||
+    Deno.env.get("STEVE_PREAUTH_HMAC_KEY") || "",
   /** Canonical admin host URL (used in admin redirects + reset-link composition). */
   ADMIN_BASE_URL: stripTrailingSlash(
     Deno.env.get("ADMIN_BASE_URL") || "https://manage.polaris.express",
+  ),
+  /** Canonical customer host URL (used for cross-host links from admin → customer surface). */
+  CUSTOMER_BASE_URL: stripTrailingSlash(
+    Deno.env.get("CUSTOMER_BASE_URL") || "https://polaris.express",
   ),
   /** Cookie Domain attribute used by Better-Auth so admin + customer share. */
   COOKIE_DOMAIN: Deno.env.get("COOKIE_DOMAIN") || ".polaris.express",

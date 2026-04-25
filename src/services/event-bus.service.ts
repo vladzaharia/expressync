@@ -39,6 +39,7 @@ export type EventBusEventType =
   | "invoice.updated"
   | "charger.state"
   | "transaction.meter"
+  | "transaction.billing"
   | "tag.seen"
   | "scan.intercepted"
   | "tx.started"
@@ -84,8 +85,47 @@ export interface ChargerStatePayload {
 export interface TransactionMeterPayload {
   transactionId: number | string;
   chargeBoxId: string;
+  /** Cumulative energy delivered this session, in kWh. */
   kwh?: number;
+  /** Instantaneous power draw in kW (rolling 60s average if not reported by the charger). */
+  powerKw?: number;
+  /** OCPP MeterValue timestamp from the charger (ISO-8601). */
+  meterTimestamp?: string;
+  /** Connector id reported by the charger; useful for chargers with multiple ports. */
+  connectorId?: number;
+  /**
+   * `user_mappings.id` for the customer that owns this transaction. Required
+   * for the customer SSE stream to fan out without leaking other customers'
+   * meter ticks. Publishers MUST set this when known; absent → customer
+   * stream drops the event (fail-closed).
+   */
+  userMappingId?: number;
+  /** Set when the session ends (final MeterValues with stop context). */
   endedAt?: string;
+}
+
+/**
+ * Emitted by the incremental billing emitter every time it successfully
+ * pushes one or more events to Lago for an active transaction. Lets the
+ * customer LiveSessionCard show a "billed" running total separate from
+ * the locally-estimated cost (kWh × tariff). Convergence between billed
+ * and estimated proves Lago accepted the events.
+ */
+export interface TransactionBillingPayload {
+  transactionId: number | string;
+  /** Cumulative kWh confirmed by Lago for this session (sum of all sent deltas). */
+  billedKwh: number;
+  /** Currency-minor-unit cost confirmed by Lago, when known. Optional —
+   * Lago resolves the tariff at event ingest, not at our emit time. */
+  billedCostCents?: number;
+  /** ISO-8601 of the most recent successful flush. */
+  flushedAt: string;
+  /** Per-event idempotency key of the latest flush — useful for audit log linking. */
+  lagoEventTransactionId: string;
+  /** True when this is the post-tx reconciliation true-up (final event for the session). */
+  isReconciliation: boolean;
+  /** When non-null, must match the customer SSE filter — same semantics as TransactionMeterPayload. */
+  userMappingId?: number;
 }
 
 export interface TagSeenPayload {
@@ -151,6 +191,7 @@ export type EventBusEvent =
   | { type: "invoice.updated"; payload: InvoiceUpdatedPayload }
   | { type: "charger.state"; payload: ChargerStatePayload }
   | { type: "transaction.meter"; payload: TransactionMeterPayload }
+  | { type: "transaction.billing"; payload: TransactionBillingPayload }
   | { type: "tag.seen"; payload: TagSeenPayload }
   | { type: "scan.intercepted"; payload: ScanInterceptedPayload }
   | { type: "tx.started"; payload: TxStartedPayload }
