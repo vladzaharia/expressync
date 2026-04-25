@@ -30,7 +30,11 @@ import { Button } from "@/components/ui/button.tsx";
 import ConfirmDialog from "@/components/shared/ConfirmDialog.tsx";
 import { NumberTicker } from "@/components/magicui/number-ticker.tsx";
 import { BorderBeam } from "@/components/magicui/border-beam.tsx";
-import { sseConnected, subscribeSse } from "@/islands/shared/SseProvider.tsx";
+import {
+  sseConnected,
+  type SseEventType,
+  subscribeSse,
+} from "@/islands/shared/SseProvider.tsx";
 import { formatSessionDuration } from "@/islands/shared/charger-visuals.ts";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { toast } from "sonner";
@@ -65,6 +69,15 @@ interface MeterPayload {
   endedAt?: string;
 }
 
+interface BillingPayload {
+  transactionId: number | string;
+  billedKwh?: number;
+  billedCostCents?: number;
+  currencySymbol?: string;
+  lagoEventTransactionId?: string;
+  t?: string;
+}
+
 const nowTick = signal<number>(Date.now());
 let tickHandle: number | null = null;
 let tickCount = 0;
@@ -87,6 +100,11 @@ function subscribeTick(): () => void {
 
 export default function ActiveSessionBanner({ initial }: Props) {
   const session = useSignal<ActiveSession | null>(initial);
+  // Authoritative billed cost from the Lago billing pipeline (cents). Null
+  // until a `transaction.billing` SSE event lands; until then we render the
+  // estimate alone.
+  const billedCostCents = useSignal<number | null>(null);
+  const billedCurrency = useSignal<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [stopping, setStopping] = useState(false);
 
@@ -100,11 +118,13 @@ export default function ActiveSessionBanner({ initial }: Props) {
         ? parseInt(p.transactionId, 10)
         : p.transactionId;
       if (txId !== cur.steveTransactionId) return;
+      // Monotonic kWh clamp — replays must never snap totals backward.
+      const nextKwh = typeof p.kwh === "number" && Number.isFinite(p.kwh)
+        ? Math.max(cur.kwh, p.kwh)
+        : cur.kwh;
       session.value = {
         ...cur,
-        kwh: typeof p.kwh === "number" && Number.isFinite(p.kwh)
-          ? p.kwh
-          : cur.kwh,
+        kwh: nextKwh,
         powerKw: typeof p.powerKw === "number" && Number.isFinite(p.powerKw)
           ? p.powerKw
           : cur.powerKw,
@@ -113,9 +133,36 @@ export default function ActiveSessionBanner({ initial }: Props) {
         session.value = null;
       }
     });
+    // Optimistic subscription to `transaction.billing`; degrades silently
+    // when the server doesn't emit it.
+    const unsubBilling = subscribeSse(
+      "transaction.billing" as SseEventType,
+      (raw) => {
+        const p = raw as BillingPayload;
+        const cur = session.value;
+        if (!cur) return;
+        const txId = typeof p.transactionId === "string"
+          ? parseInt(p.transactionId, 10)
+          : p.transactionId;
+        if (txId !== cur.steveTransactionId) return;
+        if (
+          typeof p.billedCostCents === "number" &&
+          Number.isFinite(p.billedCostCents)
+        ) {
+          billedCostCents.value = Math.max(
+            billedCostCents.value ?? 0,
+            p.billedCostCents,
+          );
+        }
+        if (typeof p.currencySymbol === "string") {
+          billedCurrency.value = p.currencySymbol;
+        }
+      },
+    );
     const unsubTick = subscribeTick();
     return () => {
       unsubMeter();
+      unsubBilling();
       unsubTick();
     };
   }, []);
@@ -298,10 +345,16 @@ export default function ActiveSessionBanner({ initial }: Props) {
 
           <span class="text-muted-foreground" aria-hidden="true">│</span>
 
-          {/* Cost */}
+          {/* Cost — estimate, plus billed total when available */}
           <span class="tabular-nums">
             {currency}
             {cost.toFixed(2)}
+            {billedCostCents.value !== null && (
+              <span class="ml-1 text-xs text-muted-foreground">
+                · billed {billedCurrency.value ?? currency}
+                {(billedCostCents.value / 100).toFixed(2)}
+              </span>
+            )}
           </span>
 
           {showOffline && (
