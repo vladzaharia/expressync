@@ -11,23 +11,35 @@
  *   7. Tear down the stack on success, failure, or signal.
  */
 
-import { generateTestEnv, registerCleanup, runCleanups } from "./harness/env.ts";
+import { generateTestEnv, runCleanups } from "./harness/env.ts";
 import { composeUp, getHostPort } from "./harness/compose.ts";
 import { seedExpressync, seedSteve } from "./harness/seed.ts";
+import { sweepOrphans } from "./harness/sweep.ts";
+
+const CLEANUP_DEADLINE_MS = 120_000;
 
 let cleaningUp = false;
 async function cleanupAndExit(code: number) {
   if (cleaningUp) return;
   cleaningUp = true;
   console.log("[runner] cleaning up...");
-  await runCleanups();
+  // Bound the cleanup window so a hung compose-down can't keep the
+  // runner alive forever — at the deadline we fall through and exit,
+  // and any leftover stack will be reaped by the next run's sweep.
+  const deadline = new Promise<void>((resolve) =>
+    setTimeout(() => {
+      console.error(`[runner] cleanup deadline (${CLEANUP_DEADLINE_MS}ms) hit — exiting; leftover stacks (if any) will be reaped on next run`);
+      resolve();
+    }, CLEANUP_DEADLINE_MS)
+  );
+  await Promise.race([runCleanups(), deadline]);
   Deno.exit(code);
 }
 
 const onSignal = () => { cleanupAndExit(130); };
 Deno.addSignalListener("SIGINT", onSignal);
 Deno.addSignalListener("SIGTERM", onSignal);
-addEventListener("unload", () => { /* best-effort sync */ });
+Deno.addSignalListener("SIGHUP", onSignal);
 
 async function buildCpsim(outDir: string): Promise<string> {
   const out = `${outDir}/cpsim`;
@@ -45,6 +57,12 @@ async function buildCpsim(outDir: string): Promise<string> {
 }
 
 async function main() {
+  console.log("[runner] sweeping orphan stacks from prior runs...");
+  const swept = await sweepOrphans({ excludePid: Deno.pid, verbose: true });
+  if (swept.orphans.length) {
+    console.log(`[runner] reaped ${swept.orphans.length} orphan stack(s): ${swept.orphans.join(", ")}`);
+  }
+
   console.log("[runner] generating env...");
   const env = await generateTestEnv();
   const project = env.values.COMPOSE_PROJECT_NAME;
@@ -111,6 +129,3 @@ main().catch(async (err) => {
   console.error("[runner] FATAL:", err);
   await cleanupAndExit(1);
 });
-
-// Safety: ensure cleanup runs even on unhandled rejection.
-registerCleanup(async () => { /* placeholder so list is non-empty even pre-up */ });
