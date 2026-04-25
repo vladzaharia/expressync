@@ -5,7 +5,10 @@
  * stay in lock-step.
  */
 
-import type { PlanInfo, PlanTier } from "@/components/customer/PlanInfoCard.tsx";
+import type {
+  PlanInfo,
+  PlanTier,
+} from "@/components/customer/PlanInfoCard.tsx";
 
 export type BillingPeriod = "current" | "previous" | "year";
 

@@ -10,7 +10,12 @@
  */
 
 import type { ComponentChildren } from "preact";
-import { CheckCircle2, CircleAlert, CircleDollarSign, Mail } from "lucide-preact";
+import {
+  CheckCircle2,
+  CircleAlert,
+  CircleDollarSign,
+  Mail,
+} from "lucide-preact";
 import { Button } from "@/components/ui/button.tsx";
 import { MoneyBadge } from "@/components/billing/MoneyBadge.tsx";
 import { type AccentColor, stripToneClasses } from "@/src/lib/colors.ts";
@@ -90,7 +95,7 @@ export function BillingOverviewCard({
             <p class="text-xs text-muted-foreground">
               Next invoice {formatDate(nextInvoiceDateIso)}
               {nextInvoiceEstimateCents != null &&
-                  nextInvoiceEstimateCents > 0 && (
+                nextInvoiceEstimateCents > 0 && (
                 <>
                   {" · estimate "}
                   <MoneyBadge
@@ -148,7 +153,9 @@ export function BillingOverviewCard({
       encodeURIComponent("Payment issue on my account")
     }`
     : "/billing?status=open#invoices";
-  const actionLabel = failedCount > 0 ? "Contact operator" : "View open invoices";
+  const actionLabel = failedCount > 0
+    ? "Contact operator"
+    : "View open invoices";
   const actionIcon: ComponentChildren = failedCount > 0
     ? <Mail class="size-4" aria-hidden="true" />
     : null;
@@ -189,7 +196,9 @@ export function BillingOverviewCard({
           )}
           {failedCount > 0 && (
             <span class="rounded-full border border-rose-500/40 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-300">
-              {failedCount === 1 ? "1 payment failed" : `${failedCount} payments failed`}
+              {failedCount === 1
+                ? "1 payment failed"
+                : `${failedCount} payments failed`}
             </span>
           )}
         </p>

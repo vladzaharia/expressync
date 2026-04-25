@@ -254,10 +254,13 @@ export async function reconcileTransaction(args: {
     (args.planCode != null && NON_USAGE_PLAN_CODES.has(args.planCode));
 
   if (skipBilling) {
-    log.info("Reconciliation: skipping Lago event (no subscription / non-usage)", {
-      transactionId: args.steveTransactionId,
-      gapKwh,
-    });
+    log.info(
+      "Reconciliation: skipping Lago event (no subscription / non-usage)",
+      {
+        transactionId: args.steveTransactionId,
+        gapKwh,
+      },
+    );
     state.delete(args.steveTransactionId);
     return { emittedDeltaKwh: 0, alreadyBilledKwh };
   }
@@ -274,11 +277,14 @@ export async function reconcileTransaction(args: {
   try {
     await lagoClient.createBatchEvents([event]);
   } catch (err) {
-    log.error("Reconciliation Lago push failed; sync run will retry next cycle", {
-      transactionId: args.steveTransactionId,
-      gapKwh,
-      error: err instanceof Error ? err.message : String(err),
-    });
+    log.error(
+      "Reconciliation Lago push failed; sync run will retry next cycle",
+      {
+        transactionId: args.steveTransactionId,
+        gapKwh,
+        error: err instanceof Error ? err.message : String(err),
+      },
+    );
     return { emittedDeltaKwh: 0, alreadyBilledKwh };
   }
 

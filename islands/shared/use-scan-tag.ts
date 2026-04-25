@@ -385,9 +385,7 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
       }
       if (!idTag) return;
       const cur = state.value;
-      const remaining = cur.kind === "waiting"
-        ? cur.remaining
-        : timeoutSeconds;
+      const remaining = cur.kind === "waiting" ? cur.remaining : timeoutSeconds;
       // Tear down the SSE + arm row — the intent has been consumed
       // server-side on match; the DELETE is best-effort cleanup.
       closeEventSource();

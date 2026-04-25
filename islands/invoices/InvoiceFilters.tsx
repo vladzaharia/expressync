@@ -60,9 +60,11 @@ export default function InvoiceFilters({ initial }: Props) {
     if (customerId.value) params.set("customerId", customerId.value);
     const qs = params.toString();
     // CSV export: bypass client-nav so the browser handles the file download.
-    globalThis.location.assign(qs
-      ? `/api/admin/invoice/export.csv?${qs}`
-      : "/api/admin/invoice/export.csv");
+    globalThis.location.assign(
+      qs
+        ? `/api/admin/invoice/export.csv?${qs}`
+        : "/api/admin/invoice/export.csv",
+    );
   };
 
   return (

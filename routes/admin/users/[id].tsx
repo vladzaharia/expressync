@@ -106,147 +106,149 @@ export const handler = define.handlers({
   },
 });
 
-export default define.page<typeof handler>(function UserDetail({ data, url, state }) {
-  const u = (data as { user: UserData }).user;
-  const isCustomer = u.role === "customer";
-  return (
-    <SidebarLayout
-      currentPath={url.pathname}
-      user={state.user}
-      accentColor="amber"
-    >
-      <PageCard
-        title={u.name?.trim() || u.email || u.id}
-        description={u.email
-          ? `${u.role} · ${u.email}`
-          : `${u.role} · no email`}
-        colorScheme="amber"
-        headerActions={isCustomer
-          ? (
-            <Button variant="outline" size="sm" asChild>
-              {/* Cross-host link: impersonation only takes effect on the
-                  customer surface (the middleware reads ?as= there). */}
-              <a
-                href={`${config.CUSTOMER_BASE_URL}/?as=${
-                  encodeURIComponent(u.id)
-                }`}
-              >
-                <UserCog class="mr-2 h-4 w-4" /> View as customer
-              </a>
-            </Button>
-          )
-          : undefined}
+export default define.page<typeof handler>(
+  function UserDetail({ data, url, state }) {
+    const u = (data as { user: UserData }).user;
+    const isCustomer = u.role === "customer";
+    return (
+      <SidebarLayout
+        currentPath={url.pathname}
+        user={state.user}
+        accentColor="amber"
       >
-        <div class="grid gap-4 md:grid-cols-2">
-          <SectionCard title="Identity" icon={Mail} accent="amber">
-            <dl class="grid grid-cols-3 gap-y-2 text-sm">
-              <dt class="text-muted-foreground">User id</dt>
-              <dd class="col-span-2 font-mono text-xs break-all">{u.id}</dd>
-              <dt class="text-muted-foreground">Name</dt>
-              <dd class="col-span-2">{u.name ?? "—"}</dd>
-              <dt class="text-muted-foreground">Email</dt>
-              <dd class="col-span-2">{u.email ?? "—"}</dd>
-              <dt class="text-muted-foreground">Verified</dt>
-              <dd class="col-span-2">{u.emailVerified ? "Yes" : "No"}</dd>
-              <dt class="text-muted-foreground">Created</dt>
-              <dd class="col-span-2">
-                {u.createdAt
-                  ? new Date(u.createdAt).toLocaleString()
-                  : "—"}
-              </dd>
-              {isCustomer && (
-                <>
-                  <dt class="text-muted-foreground">Onboarded</dt>
-                  <dd class="col-span-2">
-                    {u.onboardedAt
-                      ? new Date(u.onboardedAt).toLocaleString()
-                      : "Not yet"}
-                  </dd>
-                  <dt class="text-muted-foreground">Lago id</dt>
-                  <dd class="col-span-2 font-mono text-xs break-all">
-                    {u.lagoCustomerExternalId ?? "—"}
-                  </dd>
-                </>
-              )}
-            </dl>
-          </SectionCard>
-          <SectionCard title="Access" icon={Shield} accent="amber">
-            <dl class="grid grid-cols-3 gap-y-2 text-sm">
-              <dt class="text-muted-foreground">Role</dt>
-              <dd class="col-span-2">{u.role}</dd>
-              <dt class="text-muted-foreground">Sessions</dt>
-              <dd class="col-span-2">{u.sessionCount}</dd>
-            </dl>
-          </SectionCard>
-        </div>
-        {isCustomer && (
-          <div class="mt-4">
-            <SectionCard
-              title="Linked EV cards"
-              description={`${u.mappings.length} mapping${
-                u.mappings.length !== 1 ? "s" : ""
-              }`}
-              icon={Tag}
-              accent="amber"
-              actions={u.lagoCustomerExternalId
-                ? (
-                  <Button variant="outline" size="sm" asChild>
-                    <a
-                      href={`/links?customerId=${
-                        encodeURIComponent(u.lagoCustomerExternalId)
-                      }`}
-                    >
-                      Manage links
-                    </a>
-                  </Button>
-                )
-                : undefined}
-            >
-              {u.mappings.length === 0
-                ? (
-                  <p class="text-sm text-muted-foreground">
-                    No EV cards linked to this account yet.
-                  </p>
-                )
-                : (
-                  <ul class="divide-y divide-border text-sm">
-                    {u.mappings.map((m: MappingRow) => (
-                      <li
-                        key={m.id}
-                        class="flex items-center justify-between py-2"
-                      >
-                        <div>
-                          <a
-                            href={`/tags?idTag=${
-                              encodeURIComponent(m.steveOcppIdTag)
-                            }`}
-                            class="font-medium hover:underline"
-                          >
-                            {m.displayName?.trim() || m.steveOcppIdTag}
-                          </a>
-                          {m.displayName && (
-                            <span class="ml-2 font-mono text-xs text-muted-foreground">
-                              {m.steveOcppIdTag}
-                            </span>
-                          )}
-                        </div>
-                        <span
-                          class={`rounded-full px-2 py-0.5 text-xs ${
-                            m.isActive
-                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          {m.isActive ? "Active" : "Inactive"}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+        <PageCard
+          title={u.name?.trim() || u.email || u.id}
+          description={u.email
+            ? `${u.role} · ${u.email}`
+            : `${u.role} · no email`}
+          colorScheme="amber"
+          headerActions={isCustomer
+            ? (
+              <Button variant="outline" size="sm" asChild>
+                {
+                  /* Cross-host link: impersonation only takes effect on the
+                  customer surface (the middleware reads ?as= there). */
+                }
+                <a
+                  href={`${config.CUSTOMER_BASE_URL}/?as=${
+                    encodeURIComponent(u.id)
+                  }`}
+                >
+                  <UserCog class="mr-2 h-4 w-4" /> View as customer
+                </a>
+              </Button>
+            )
+            : undefined}
+        >
+          <div class="grid gap-4 md:grid-cols-2">
+            <SectionCard title="Identity" icon={Mail} accent="amber">
+              <dl class="grid grid-cols-3 gap-y-2 text-sm">
+                <dt class="text-muted-foreground">User id</dt>
+                <dd class="col-span-2 font-mono text-xs break-all">{u.id}</dd>
+                <dt class="text-muted-foreground">Name</dt>
+                <dd class="col-span-2">{u.name ?? "—"}</dd>
+                <dt class="text-muted-foreground">Email</dt>
+                <dd class="col-span-2">{u.email ?? "—"}</dd>
+                <dt class="text-muted-foreground">Verified</dt>
+                <dd class="col-span-2">{u.emailVerified ? "Yes" : "No"}</dd>
+                <dt class="text-muted-foreground">Created</dt>
+                <dd class="col-span-2">
+                  {u.createdAt ? new Date(u.createdAt).toLocaleString() : "—"}
+                </dd>
+                {isCustomer && (
+                  <>
+                    <dt class="text-muted-foreground">Onboarded</dt>
+                    <dd class="col-span-2">
+                      {u.onboardedAt
+                        ? new Date(u.onboardedAt).toLocaleString()
+                        : "Not yet"}
+                    </dd>
+                    <dt class="text-muted-foreground">Lago id</dt>
+                    <dd class="col-span-2 font-mono text-xs break-all">
+                      {u.lagoCustomerExternalId ?? "—"}
+                    </dd>
+                  </>
                 )}
+              </dl>
+            </SectionCard>
+            <SectionCard title="Access" icon={Shield} accent="amber">
+              <dl class="grid grid-cols-3 gap-y-2 text-sm">
+                <dt class="text-muted-foreground">Role</dt>
+                <dd class="col-span-2">{u.role}</dd>
+                <dt class="text-muted-foreground">Sessions</dt>
+                <dd class="col-span-2">{u.sessionCount}</dd>
+              </dl>
             </SectionCard>
           </div>
-        )}
-      </PageCard>
-    </SidebarLayout>
-  );
-});
+          {isCustomer && (
+            <div class="mt-4">
+              <SectionCard
+                title="Linked EV cards"
+                description={`${u.mappings.length} mapping${
+                  u.mappings.length !== 1 ? "s" : ""
+                }`}
+                icon={Tag}
+                accent="amber"
+                actions={u.lagoCustomerExternalId
+                  ? (
+                    <Button variant="outline" size="sm" asChild>
+                      <a
+                        href={`/links?customerId=${
+                          encodeURIComponent(u.lagoCustomerExternalId)
+                        }`}
+                      >
+                        Manage links
+                      </a>
+                    </Button>
+                  )
+                  : undefined}
+              >
+                {u.mappings.length === 0
+                  ? (
+                    <p class="text-sm text-muted-foreground">
+                      No EV cards linked to this account yet.
+                    </p>
+                  )
+                  : (
+                    <ul class="divide-y divide-border text-sm">
+                      {u.mappings.map((m: MappingRow) => (
+                        <li
+                          key={m.id}
+                          class="flex items-center justify-between py-2"
+                        >
+                          <div>
+                            <a
+                              href={`/tags?idTag=${
+                                encodeURIComponent(m.steveOcppIdTag)
+                              }`}
+                              class="font-medium hover:underline"
+                            >
+                              {m.displayName?.trim() || m.steveOcppIdTag}
+                            </a>
+                            {m.displayName && (
+                              <span class="ml-2 font-mono text-xs text-muted-foreground">
+                                {m.steveOcppIdTag}
+                              </span>
+                            )}
+                          </div>
+                          <span
+                            class={`rounded-full px-2 py-0.5 text-xs ${
+                              m.isActive
+                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {m.isActive ? "Active" : "Inactive"}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+              </SectionCard>
+            </div>
+          )}
+        </PageCard>
+      </SidebarLayout>
+    );
+  },
+);

@@ -9,13 +9,7 @@
 
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
-import {
-  CalendarClock,
-  Gauge,
-  Plug,
-  Receipt,
-  Zap,
-} from "lucide-preact";
+import { CalendarClock, Gauge, Plug, Receipt, Zap } from "lucide-preact";
 import { SectionCard } from "@/components/shared/SectionCard.tsx";
 import { EmptyState } from "@/components/shared/EmptyState.tsx";
 import { BillingPeriodSwitcher } from "@/components/shared/BillingPeriodSwitcher.tsx";
@@ -25,10 +19,13 @@ import NextReservationCard from "@/islands/customer/NextReservationCard.tsx";
 import PeriodUsageChart, {
   type UsageDayPoint,
 } from "@/islands/customer/PeriodUsageChart.tsx";
-import { PlanInfoCard, type PlanInfo } from "@/components/customer/PlanInfoCard.tsx";
 import {
-  RecentActivityList,
+  type PlanInfo,
+  PlanInfoCard,
+} from "@/components/customer/PlanInfoCard.tsx";
+import {
   type RecentActivityItem,
+  RecentActivityList,
 } from "@/components/customer/RecentActivityList.tsx";
 import InactiveAccountHero from "@/islands/customer/InactiveAccountHero.tsx";
 import OnboardingTour from "@/islands/customer/OnboardingTour.tsx";

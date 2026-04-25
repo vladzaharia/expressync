@@ -101,11 +101,11 @@ export default function PeriodUsageChart(
   const px = (i: number) => padL + (n > 1 ? i * dx : innerW / 2);
   const py = (v: number) => padT + innerH - (v / yMax) * innerH;
 
-  const linePath = n === 0
-    ? ""
-    : points
-      .map((p, i) => `${i === 0 ? "M" : "L"} ${px(i).toFixed(2)} ${py(p.kwh).toFixed(2)}`)
-      .join(" ");
+  const linePath = n === 0 ? "" : points
+    .map((p, i) =>
+      `${i === 0 ? "M" : "L"} ${px(i).toFixed(2)} ${py(p.kwh).toFixed(2)}`
+    )
+    .join(" ");
 
   const areaPath = n === 0
     ? ""

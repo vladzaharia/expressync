@@ -44,7 +44,9 @@ export default define.page<typeof handler>(
       l.segment === "transaction_sync"
     );
     const schedulingLogs = logs.filter((l) => l.segment === "scheduling");
-    const lagoCustomersLogs = logs.filter((l) => l.segment === "lago_customers");
+    const lagoCustomersLogs = logs.filter((l) =>
+      l.segment === "lago_customers"
+    );
     const lagoSubscriptionsLogs = logs.filter((l) =>
       l.segment === "lago_subscriptions"
     );

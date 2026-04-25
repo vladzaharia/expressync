@@ -81,9 +81,9 @@ export default function WebhookEventFilters({ initial }: Props) {
       qs.set("notification_fired", "0");
     }
     const suffix = qs.toString();
-    clientNavigate(suffix
-      ? `/admin/webhook-events?${suffix}`
-      : `/admin/webhook-events`);
+    clientNavigate(
+      suffix ? `/admin/webhook-events?${suffix}` : `/admin/webhook-events`,
+    );
   }, [type, status, customer, subscription, start, end, notificationFired]);
 
   const reset = useCallback(() => {

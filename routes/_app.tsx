@@ -127,7 +127,8 @@ export default define.page(function App({ Component, state }) {
         >
           Skip to main content
         </a>
-        {/*
+        {
+          /*
           Fresh 2 client-side navigation requires every route response to
           contain at least one named <Partial>. The runtime fetches the new
           page, looks for `<!--frsh:partial:NAME...-->` markers, and replaces
@@ -138,15 +139,18 @@ export default define.page(function App({ Component, state }) {
           symptom). Keep the global chrome (Toaster, CommandPalette,
           SseProvider) OUTSIDE the partial so they survive route swaps and
           retain their state.
-        */}
+        */
+        }
         <Partial name="body">
           <Component />
         </Partial>
         <Toaster richColors position="bottom-right" />
         <CommandPalette surface={surface} />
-        {/* Admin-only: hidden modal host that the palette's "Scan EV Card"
+        {
+          /* Admin-only: hidden modal host that the palette's "Scan EV Card"
             action opens. Mounting it once at the root means the action
-            works from any page, not only /admin/tags. */}
+            works from any page, not only /admin/tags. */
+        }
         {isAdmin && <ScanTagPaletteHost />}
         <SseProvider />
       </body>

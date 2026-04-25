@@ -31,7 +31,11 @@ interface ProjectInfo {
 }
 
 async function dockerOut(args: string[]): Promise<string> {
-  const cmd = new Deno.Command("docker", { args, stdout: "piped", stderr: "null" });
+  const cmd = new Deno.Command("docker", {
+    args,
+    stdout: "piped",
+    stderr: "null",
+  });
   const out = await cmd.output();
   return new TextDecoder().decode(out.stdout);
 }
@@ -40,13 +44,16 @@ async function listProjects(): Promise<ProjectInfo[]> {
   // `docker ps -a --filter label=...` returns one row per container; we
   // group by compose project and pick labels off any one container in
   // the group (they're identical within a project).
-  const fmt = "{{.Label \"com.docker.compose.project\"}}\t" +
-    "{{.Label \"com.expressync.scanlogin.runner-pid\"}}\t" +
-    "{{.Label \"com.expressync.scanlogin.started-at\"}}";
+  const fmt = '{{.Label "com.docker.compose.project"}}\t' +
+    '{{.Label "com.expressync.scanlogin.runner-pid"}}\t' +
+    '{{.Label "com.expressync.scanlogin.started-at"}}';
   const out = await dockerOut([
-    "ps", "-a",
-    "--filter", "label=com.expressync.scanlogin.harness=true",
-    "--format", fmt,
+    "ps",
+    "-a",
+    "--filter",
+    "label=com.expressync.scanlogin.harness=true",
+    "--format",
+    fmt,
   ]);
   const groups = new Map<string, ProjectInfo>();
   for (const line of out.split("\n").map((l) => l.trim()).filter(Boolean)) {
@@ -60,7 +67,9 @@ async function listProjects(): Promise<ProjectInfo[]> {
     groups.set(project, {
       project,
       runnerPid: pidStr && /^\d+$/.test(pidStr) ? parseInt(pidStr, 10) : null,
-      startedAt: startedStr && /^\d+$/.test(startedStr) ? parseInt(startedStr, 10) : null,
+      startedAt: startedStr && /^\d+$/.test(startedStr)
+        ? parseInt(startedStr, 10)
+        : null,
       containerCount: 1,
     });
   }
@@ -68,14 +77,24 @@ async function listProjects(): Promise<ProjectInfo[]> {
   // gone — their compose project may have no running containers but
   // still have a network we need to reap.
   const netOut = await dockerOut([
-    "network", "ls",
-    "--filter", "label=com.expressync.scanlogin.harness=true",
-    "--format", "{{.Label \"com.docker.compose.project\"}}",
+    "network",
+    "ls",
+    "--filter",
+    "label=com.expressync.scanlogin.harness=true",
+    "--format",
+    '{{.Label "com.docker.compose.project"}}',
   ]);
-  for (const project of netOut.split("\n").map((l) => l.trim()).filter(Boolean)) {
+  for (
+    const project of netOut.split("\n").map((l) => l.trim()).filter(Boolean)
+  ) {
     if (!project.startsWith(PROJECT_PREFIX)) continue;
     if (!groups.has(project)) {
-      groups.set(project, { project, runnerPid: null, startedAt: null, containerCount: 0 });
+      groups.set(project, {
+        project,
+        runnerPid: null,
+        startedAt: null,
+        containerCount: 0,
+      });
     }
   }
   return [...groups.values()];
@@ -108,7 +127,10 @@ function classify(p: ProjectInfo, excludePid: number | null): Verdict {
   }
   if (p.startedAt !== null && Date.now() - p.startedAt > MAX_AGE_MS) {
     const ageMin = Math.round((Date.now() - p.startedAt) / 60000);
-    return { orphan: true, reason: `age ${ageMin}m exceeds cutoff (pid ${p.runnerPid} likely hung)` };
+    return {
+      orphan: true,
+      reason: `age ${ageMin}m exceeds cutoff (pid ${p.runnerPid} likely hung)`,
+    };
   }
   return { orphan: false, reason: `pid ${p.runnerPid} alive` };
 }
@@ -126,14 +148,20 @@ export interface SweepResult {
   preserved: string[];
 }
 
-export async function sweepOrphans(opts: SweepOptions = {}): Promise<SweepResult> {
+export async function sweepOrphans(
+  opts: SweepOptions = {},
+): Promise<SweepResult> {
   const projects = await listProjects();
   const orphans: string[] = [];
   const preserved: string[] = [];
   for (const p of projects) {
     const verdict = classify(p, opts.excludePid ?? null);
     if (opts.verbose) {
-      console.error(`[sweep] ${p.project}: ${verdict.orphan ? "orphan" : "keep"} (${verdict.reason})`);
+      console.error(
+        `[sweep] ${p.project}: ${
+          verdict.orphan ? "orphan" : "keep"
+        } (${verdict.reason})`,
+      );
     }
     if (verdict.orphan) orphans.push(p.project);
     else preserved.push(p.project);

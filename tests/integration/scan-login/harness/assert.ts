@@ -21,7 +21,11 @@ export async function assertEventually<T>(
     await new Promise((r) => setTimeout(r, intervalMs));
   }
   throw new Error(
-    `assertEventually timed out after ${timeoutMs}ms: ${opts.message ?? ""}\nlast error: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
+    `assertEventually timed out after ${timeoutMs}ms: ${
+      opts.message ?? ""
+    }\nlast error: ${
+      lastErr instanceof Error ? lastErr.message : String(lastErr)
+    }`,
   );
 }
 
@@ -34,7 +38,9 @@ export async function assertWithinMs<T>(
   const v = await fn();
   const elapsed = performance.now() - start;
   if (elapsed > budgetMs) {
-    throw new Error(`${label} exceeded budget: ${elapsed.toFixed(1)}ms > ${budgetMs}ms`);
+    throw new Error(
+      `${label} exceeded budget: ${elapsed.toFixed(1)}ms > ${budgetMs}ms`,
+    );
   }
   return v;
 }

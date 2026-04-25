@@ -22,7 +22,10 @@ services:
       MYSQL_USER: steve
       MYSQL_PASSWORD: ${STEVE_DB_PASSWORD}
     healthcheck:
-      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -usteve -p${STEVE_DB_PASSWORD} || mysqladmin ping -h 127.0.0.1 -usteve -p${STEVE_DB_PASSWORD}"]
+      test: [
+        "CMD-SHELL",
+        "mariadb-admin ping -h 127.0.0.1 -usteve -p${STEVE_DB_PASSWORD} || mysqladmin ping -h 127.0.0.1 -usteve -p${STEVE_DB_PASSWORD}",
+      ]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -64,7 +67,10 @@ services:
     ports:
       - "0:8180"
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS -o /dev/null http://127.0.0.1:8180/steve/manager/home || exit 1"]
+      test: [
+        "CMD-SHELL",
+        "curl -fsS -o /dev/null http://127.0.0.1:8180/steve/manager/home || exit 1",
+      ]
       interval: 10s
       timeout: 5s
       retries: 60
@@ -147,7 +153,12 @@ services:
     healthcheck:
       # The deno image has no curl/wget/nc — but it has deno. Hit /api/health
       # directly via fetch and exit non-zero on any error.
-      test: ["CMD", "deno", "eval", "const r = await fetch('http://127.0.0.1:8000/api/health'); Deno.exit(r.ok ? 0 : 1);"]
+      test: [
+        "CMD",
+        "deno",
+        "eval",
+        "const r = await fetch('http://127.0.0.1:8000/api/health'); Deno.exit(r.ok ? 0 : 1);",
+      ]
       interval: 5s
       timeout: 10s
       retries: 40
@@ -173,7 +184,14 @@ services:
       LAGO_API_KEY: dummy
       LAGO_DASHBOARD_URL: http://localhost:1
       FEATURE_PAIR_INTENT_INTERCEPT: "true"
-    command: ["deno", "run", "--allow-net", "--allow-env", "--allow-read", "sync-worker.ts"]
+    command: [
+      "deno",
+      "run",
+      "--allow-net",
+      "--allow-env",
+      "--allow-read",
+      "sync-worker.ts",
+    ]
     restart: "no"
     profiles: ["with-sync"]
 

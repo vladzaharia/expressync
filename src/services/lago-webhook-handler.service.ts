@@ -852,7 +852,9 @@ async function upsertWebhookIntoCache(
       result = await handlePlanWebhook(raw, wt);
     } else if (wt.startsWith("invoice.")) {
       result = await handleInvoiceWebhook(raw, wt);
-    } else if (wt.startsWith("wallet.") || wt === "wallet_transaction.created") {
+    } else if (
+      wt.startsWith("wallet.") || wt === "wallet_transaction.created"
+    ) {
       result = await handleWalletWebhook(raw, wt);
     }
   } catch (err) {

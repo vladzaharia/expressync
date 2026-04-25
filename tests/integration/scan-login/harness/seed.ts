@@ -60,7 +60,9 @@ export async function seedSteve(
         await mysqlQuery(
           ctx,
           v.STEVE_DB_PASSWORD,
-          `INSERT IGNORE INTO charge_box (charge_box_id, registration_status) VALUES ('${m[1]}', 'Accepted');`,
+          `INSERT IGNORE INTO charge_box (charge_box_id, registration_status) VALUES ('${
+            m[1]
+          }', 'Accepted');`,
         );
       } else {
         throw err;

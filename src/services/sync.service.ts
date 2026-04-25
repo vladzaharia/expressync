@@ -460,7 +460,9 @@ export async function runSync(): Promise<SyncResult> {
           successfulBatchIndices.add(i);
           if (attempt > 0) {
             syncLogger.info(
-              `Batch ${i + 1}/${eventBatches.length} sent successfully on retry`,
+              `Batch ${
+                i + 1
+              }/${eventBatches.length} sent successfully on retry`,
               { attempts: attempt + 1 },
             );
           } else {

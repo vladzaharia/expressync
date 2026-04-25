@@ -7,11 +7,7 @@
  * guard, and shutdown without touching the network or DB.
  */
 
-import {
-  assertEquals,
-  assertExists,
-  assertStrictEquals,
-} from "@std/assert";
+import { assertEquals, assertExists, assertStrictEquals } from "@std/assert";
 import {
   _internal,
   enqueueMeterSample,

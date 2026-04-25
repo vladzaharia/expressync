@@ -241,7 +241,9 @@ export const handler = define.handlers({
       ? body.pairingCode.trim()
       : "";
     if (!chargeBoxId || !pairingCode) {
-      return jsonResponse(400, { error: "chargeBoxId and pairingCode required" });
+      return jsonResponse(400, {
+        error: "chargeBoxId and pairingCode required",
+      });
     }
 
     const identifier = `scan-pair:${chargeBoxId}:${pairingCode}`;

@@ -99,9 +99,9 @@ export default function InvoicesTable({
                       key={row.id}
                       className="cursor-pointer hover:bg-muted/40"
                       onClick={() => {
-                        clientNavigate(`/invoices/${
-                          encodeURIComponent(row.id)
-                        }`);
+                        clientNavigate(
+                          `/invoices/${encodeURIComponent(row.id)}`,
+                        );
                       }}
                     >
                       <TableCell>

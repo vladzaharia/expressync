@@ -389,8 +389,7 @@ export default function ActiveSessionBanner({ initial }: Props) {
             You're about to stop charging on{" "}
             <span class="font-medium">
               {s.friendlyName?.trim() || s.chargeBoxId || "the charger"}
-            </span>.
-            Current usage:{" "}
+            </span>. Current usage:{" "}
             <span class="font-semibold tabular-nums">
               {s.kwh.toFixed(2)} kWh
             </span>{" "}

@@ -22,9 +22,7 @@ export const handler = define.handlers({
       const skipRaw = parseInt(url.searchParams.get("skip") || "0", 10);
       const skip = isNaN(skipRaw) || skipRaw < 0 ? 0 : skipRaw;
       const limitRaw = parseInt(url.searchParams.get("limit") || "25", 10);
-      const limit = isNaN(limitRaw)
-        ? 25
-        : Math.max(1, Math.min(100, limitRaw));
+      const limit = isNaN(limitRaw) ? 25 : Math.max(1, Math.min(100, limitRaw));
 
       const all = await steveClient.getChargeBoxes();
       const total = all.length;

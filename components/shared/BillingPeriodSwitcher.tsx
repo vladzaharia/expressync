@@ -64,9 +64,7 @@ function buildHref(basePath: string, period: BillingPeriod): string {
 export function BillingPeriodSwitcher(
   { value, basePath = "/billing", className, supportedPeriods }: Props,
 ) {
-  const supported = supportedPeriods
-    ? new Set(supportedPeriods)
-    : null;
+  const supported = supportedPeriods ? new Set(supportedPeriods) : null;
   return (
     <ToggleGroup
       type="single"

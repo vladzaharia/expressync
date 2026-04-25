@@ -6,11 +6,20 @@
  * fast guards on the math.
  */
 
-import { assertAlmostEquals, assertEquals, assertStrictEquals } from "@std/assert";
+import {
+  assertAlmostEquals,
+  assertEquals,
+  assertStrictEquals,
+} from "@std/assert";
 import { _internal } from "./meter-values.ts";
 
-const { extractEnergyKwh, extractPowerKw, isFinalSample, mappingCache, rememberMapping } =
-  _internal;
+const {
+  extractEnergyKwh,
+  extractPowerKw,
+  isFinalSample,
+  mappingCache,
+  rememberMapping,
+} = _internal;
 
 Deno.test("extractEnergyKwh — Wh default unit converts to kWh", () => {
   const kwh = extractEnergyKwh([

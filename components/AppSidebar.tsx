@@ -150,12 +150,10 @@ function AdminNavSheet(
                     onClick={() => setOpen(false)}
                     className={cn(
                       "flex items-center gap-3 px-4 border-b transition-colors shrink-0",
-                      active
-                        ? cn(accent.bg, accent.text)
-                        : cn(
-                          "text-muted-foreground hover:text-foreground",
-                          accent.bgHover,
-                        ),
+                      active ? cn(accent.bg, accent.text) : cn(
+                        "text-muted-foreground hover:text-foreground",
+                        accent.bgHover,
+                      ),
                     )}
                     style={{ height: CHROME_SIZE, minHeight: CHROME_SIZE }}
                   >
@@ -283,7 +281,9 @@ export function AppSidebar({
               <ThemeToggle />
             </button>
           </TooltipTrigger>
-          <TooltipContent side="bottom" sideOffset={8}>Toggle Theme</TooltipContent>
+          <TooltipContent side="bottom" sideOffset={8}>
+            Toggle Theme
+          </TooltipContent>
         </Tooltip>
 
         <NotificationBell variant="mobile" />
@@ -302,7 +302,9 @@ export function AppSidebar({
                 <span aria-hidden="true">⌘K</span>
               </button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={8}>Command Palette</TooltipContent>
+            <TooltipContent side="bottom" sideOffset={8}>
+              Command Palette
+            </TooltipContent>
           </Tooltip>
         )}
 

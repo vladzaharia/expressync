@@ -20,7 +20,11 @@ import {
   upsertSubscription,
   upsertWallet,
 } from "./index.ts";
-import { LagoInvoiceExtendedSchema, LagoPlanSchema, LagoSubscriptionSchema } from "../../lib/types/lago.ts";
+import {
+  LagoInvoiceExtendedSchema,
+  LagoPlanSchema,
+  LagoSubscriptionSchema,
+} from "../../lib/types/lago.ts";
 
 type AnyRecord = Record<string, unknown>;
 
@@ -54,7 +58,10 @@ export async function handleCustomerWebhook(
       await softDeleteCustomer(lagoId);
       return { ok: true };
     } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 
@@ -64,7 +71,10 @@ export async function handleCustomerWebhook(
     await upsertCustomer(parsed);
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 
@@ -75,19 +85,27 @@ export async function handleSubscriptionWebhook(
   const raw = pickObject(payload, "subscription");
   if (!raw) return { ok: false, error: "no subscription in payload" };
 
-  if (webhookType === "subscription.terminated" || webhookType === "subscription.terminated_and_downgraded") {
+  if (
+    webhookType === "subscription.terminated" ||
+    webhookType === "subscription.terminated_and_downgraded"
+  ) {
     // Terminated is not deleted — we keep the row with terminated_at set,
     // so fall through to upsert. Lago typically includes the full object on
     // terminate webhooks.
   }
 
   const parsed = safeParse(LagoSubscriptionSchema, raw);
-  if (!parsed) return { ok: false, error: "subscription payload failed schema" };
+  if (!parsed) {
+    return { ok: false, error: "subscription payload failed schema" };
+  }
   try {
     await upsertSubscription(parsed);
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 
@@ -114,7 +132,10 @@ export async function handlePlanWebhook(
     await upsertPlan(parsed);
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 
@@ -138,7 +159,10 @@ export async function handleInvoiceWebhook(
       await softDeleteInvoice(lagoId);
       return { ok: true };
     } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 
@@ -148,7 +172,10 @@ export async function handleInvoiceWebhook(
     await upsertInvoice(parsed);
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 
@@ -169,7 +196,10 @@ export async function handleWalletWebhook(
     await upsertWallet(parsed);
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 

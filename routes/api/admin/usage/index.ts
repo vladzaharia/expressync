@@ -149,7 +149,8 @@ export const handler = define.handlers({
               customerId: pair.customerId,
               subscriptionId: pair.subscriptionId,
               displayName: pair.displayName,
-              error: `Lago getCurrentUsage timed out after ${PER_CALL_TIMEOUT_MS}ms`,
+              error:
+                `Lago getCurrentUsage timed out after ${PER_CALL_TIMEOUT_MS}ms`,
               stale: true,
             };
           }

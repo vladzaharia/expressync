@@ -266,7 +266,9 @@ export const handler = define.handlers({
       ? body.transactionPk
       : NaN;
     const samples = Array.isArray(body.samples) ? body.samples : [];
-    if (!chargeBoxId || !Number.isFinite(transactionPk) || samples.length === 0) {
+    if (
+      !chargeBoxId || !Number.isFinite(transactionPk) || samples.length === 0
+    ) {
       // Bad payload — ack quickly so SteVe doesn't retry uselessly.
       return jsonResponse(400, { error: "invalid_body" });
     }

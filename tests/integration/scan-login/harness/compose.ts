@@ -60,7 +60,9 @@ export async function composeUp(
   // that need cleaning. Registering after `up` returns would leak them.
   registerCleanup(() => composeDown(ctx));
   const args = ["up", "-d", "--build"];
-  if (opts.wait) args.push("--wait", "--wait-timeout", String(opts.timeoutSec ?? 600));
+  if (opts.wait) {
+    args.push("--wait", "--wait-timeout", String(opts.timeoutSec ?? 600));
+  }
   const r = await run(composeArgs(ctx, args));
   if (r.code !== 0) {
     throw new Error(`compose up failed (code=${r.code})`);
@@ -73,19 +75,36 @@ export async function composeUp(
  * removal so a stuck container can never block teardown.
  */
 export async function composeDown(ctx: ComposeContext): Promise<void> {
-  const downArgs = composeArgs(ctx, ["down", "-v", "--remove-orphans", "--timeout", "30"]);
+  const downArgs = composeArgs(ctx, [
+    "down",
+    "-v",
+    "--remove-orphans",
+    "--timeout",
+    "30",
+  ]);
   const ok = await runWithDeadline(downArgs, 90_000);
   if (!ok) {
-    console.warn(`[harness] compose down for ${ctx.project} did not finish cleanly — forcing`);
+    console.warn(
+      `[harness] compose down for ${ctx.project} did not finish cleanly — forcing`,
+    );
     await forceTeardown(ctx.project);
   }
 }
 
-async function runWithDeadline(args: string[], deadlineMs: number): Promise<boolean> {
-  const cmd = new Deno.Command("docker", { args, stdout: "null", stderr: "null" });
+async function runWithDeadline(
+  args: string[],
+  deadlineMs: number,
+): Promise<boolean> {
+  const cmd = new Deno.Command("docker", {
+    args,
+    stdout: "null",
+    stderr: "null",
+  });
   const child = cmd.spawn();
   const timer = setTimeout(() => {
-    try { child.kill("SIGKILL"); } catch { /* */ }
+    try {
+      child.kill("SIGKILL");
+    } catch { /* */ }
   }, deadlineMs);
   try {
     const { code } = await child.output();
@@ -105,8 +124,18 @@ async function runWithDeadline(args: string[], deadlineMs: number): Promise<bool
 export async function forceTeardown(project: string): Promise<void> {
   const projectFilter = `label=com.docker.compose.project=${project}`;
   const ids = async (kind: "container" | "network" | "volume") => {
-    const subcmd = kind === "container" ? ["ps", "-a"] : kind === "network" ? ["network", "ls"] : ["volume", "ls"];
-    const r = await run([...subcmd, "--filter", projectFilter, "--format", "{{.ID}}"], { capture: true });
+    const subcmd = kind === "container"
+      ? ["ps", "-a"]
+      : kind === "network"
+      ? ["network", "ls"]
+      : ["volume", "ls"];
+    const r = await run([
+      ...subcmd,
+      "--filter",
+      projectFilter,
+      "--format",
+      "{{.ID}}",
+    ], { capture: true });
     return r.stdout.split("\n").map((s) => s.trim()).filter(Boolean);
   };
   const cids = await ids("container");
@@ -134,13 +163,18 @@ export async function getHostPort(
     { capture: true },
   );
   if (r.code !== 0) {
-    throw new Error(`compose port failed for ${service}:${containerPort}: ${r.stderr}`);
+    throw new Error(
+      `compose port failed for ${service}:${containerPort}: ${r.stderr}`,
+    );
   }
   const line = r.stdout.trim().split("\n").find((l) => l.includes(":")) ?? "";
   const [host, port] = line.split(":");
   if (!port) throw new Error(`could not parse host:port from "${line}"`);
   // Map 0.0.0.0 → 127.0.0.1 for client connections.
-  return { host: host === "0.0.0.0" || host === "::" ? "127.0.0.1" : host, port: parseInt(port, 10) };
+  return {
+    host: host === "0.0.0.0" || host === "::" ? "127.0.0.1" : host,
+    port: parseInt(port, 10),
+  };
 }
 
 export async function execInService(
@@ -166,14 +200,19 @@ export async function recreateService(
   ctx: ComposeContext,
   service: string,
 ): Promise<void> {
-  await run(composeArgs(ctx, ["up", "-d", "--force-recreate", "--no-deps", service]));
+  await run(
+    composeArgs(ctx, ["up", "-d", "--force-recreate", "--no-deps", service]),
+  );
 }
 
 export interface LogStream {
   /** ring of recent lines */
   buffer: string[];
   /** waits until matcher returns true on any line (or timeout) */
-  waitFor(matcher: RegExp | ((line: string) => boolean), timeoutMs?: number): Promise<string>;
+  waitFor(
+    matcher: RegExp | ((line: string) => boolean),
+    timeoutMs?: number,
+  ): Promise<string>;
   /** asserts current ring has a match */
   has(matcher: RegExp): boolean;
   stop(): void;
@@ -232,9 +271,13 @@ export function streamLogs(
   function stop() {
     if (stopped) return;
     stopped = true;
-    try { child.kill("SIGTERM"); } catch { /* */ }
+    try {
+      child.kill("SIGTERM");
+    } catch { /* */ }
   }
-  registerCleanup(async () => { stop(); });
+  registerCleanup(async () => {
+    stop();
+  });
 
   return {
     buffer,
@@ -252,7 +295,11 @@ export function streamLogs(
         const timer = setTimeout(() => {
           const idx = waiters.findIndex((w) => w.test === test);
           if (idx >= 0) waiters.splice(idx, 1);
-          reject(new Error(`streamLogs.waitFor timed out after ${timeoutMs}ms (matcher=${matcher})`));
+          reject(
+            new Error(
+              `streamLogs.waitFor timed out after ${timeoutMs}ms (matcher=${matcher})`,
+            ),
+          );
         }, timeoutMs);
         waiters.push({
           test,

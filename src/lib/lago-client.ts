@@ -872,7 +872,9 @@ class LagoClient {
     let page = 1;
     while (true) {
       if (page > MAX_PAGES) {
-        logger.warn("Lago", "listAllInvoices: max page limit reached", { page });
+        logger.warn("Lago", "listAllInvoices: max page limit reached", {
+          page,
+        });
         break;
       }
       const { invoices, meta } = await this.listInvoices({

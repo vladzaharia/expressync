@@ -130,13 +130,21 @@ export async function openSse(
           reject(new Error(`SSE next() timed out after ${timeoutMs}ms`));
         }, timeoutMs);
         waiters.push({
-          resolve: (m) => { clearTimeout(timer); resolve(m); },
-          reject: (e) => { clearTimeout(timer); reject(e); },
+          resolve: (m) => {
+            clearTimeout(timer);
+            resolve(m);
+          },
+          reject: (e) => {
+            clearTimeout(timer);
+            reject(e);
+          },
         });
       });
     },
     close() {
-      try { ctrl.abort(); } catch { /* */ }
+      try {
+        ctrl.abort();
+      } catch { /* */ }
     },
   };
 }
