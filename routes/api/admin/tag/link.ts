@@ -159,6 +159,13 @@ export const handler = define.handlers({
           };
 
           // Create mapping for the parent tag with the resolved userId.
+          // Mirror SteVe's parent_id_tag + expiry_date locally so the
+          // inline sync's full-PUT preserves them. The parent tag itself
+          // (effectiveTagPk) is the one being linked, so we look up its
+          // SteVe state.
+          const ourSteveRow = allTags.find(
+            (t) => t.ocppTagPk === effectiveTagPk,
+          );
           const [parent] = await tx
             .insert(schema.userMappings)
             .values({
@@ -169,6 +176,10 @@ export const handler = define.handlers({
               isActive: isActive ?? true,
               tagType,
               userId: account.userId,
+              steveParentIdTag: ourSteveRow?.parentIdTag ?? null,
+              steveExpiryDate: ourSteveRow?.expiryDate
+                ? new Date(ourSteveRow.expiryDate)
+                : null,
             })
             .returning();
           parentMapping = parent;
@@ -187,6 +198,13 @@ export const handler = define.handlers({
                   // Children inherit the parent's type by default.
                   tagType,
                   userId: account.userId,
+                  // Child's SteVe parent_id_tag IS the linked parent. This
+                  // is the canonical place where parent_id_tag gets
+                  // populated for the local mirror.
+                  steveParentIdTag: ocppTagId,
+                  steveExpiryDate: childTag.expiryDate
+                    ? new Date(childTag.expiryDate)
+                    : null,
                 })
                 .returning();
               childMappings.push(childMapping);

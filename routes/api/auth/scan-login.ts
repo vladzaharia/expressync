@@ -207,6 +207,15 @@ export const handler = define.handlers({
     }
 
     // Step 3: atomic single-use consume.
+    //
+    // Two valid starting states:
+    //   - status='armed': the legacy log-scrape path (unknown tag scanned,
+    //     SSE delivered the idTag from docker-log).
+    //   - status='matched' AND matchedIdTag === idTag: the pre-authorize
+    //     hook path. /api/ocpp/pre-authorize already transitioned the row
+    //     to matched and stamped the idTag — scan-login only finalizes
+    //     it. Without accepting this state, the new hook pipeline can't
+    //     complete login (the row has already moved past 'armed').
     const identifier = `scan-pair:${chargeBoxId}:${pairingCode}`;
     let consumedRows: { id: string }[];
     try {
@@ -215,8 +224,14 @@ export const handler = define.handlers({
         SET value = jsonb_set(value::jsonb, '{status}', '"consumed"')::text,
             updated_at = now()
         WHERE identifier = ${identifier}
-          AND value::jsonb->>'status' = 'armed'
           AND expires_at > now()
+          AND (
+            value::jsonb->>'status' = 'armed'
+            OR (
+              value::jsonb->>'status' = 'matched'
+              AND value::jsonb->>'matchedIdTag' = ${idTag}
+            )
+          )
         RETURNING id
       `);
       consumedRows = (Array.isArray(result)

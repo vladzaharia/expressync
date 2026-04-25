@@ -407,13 +407,19 @@ export async function syncSingleTagToSteve(
   // Construct the payload StEvE expects. `maxActiveTransactionCount`:
   //   -1 → unlimited (active)
   //    0 → blocked (deactivated)
-  // We omit `expiryDate` so StEvE retains whatever was previously set; the
-  // background pass owns the long-form expiry strategy.
+  //
+  // SteVe's update endpoint is a full PUT — every field on the row gets
+  // replaced. So we MUST pass through `parentIdTag` and `expiryDate`
+  // from our local mirror columns; otherwise every inline sync clobbers
+  // them to NULL. (See migration 0031 for the column rationale.)
   const updatedTag: StEvEOcppTag = {
     idTag: mapping.steveOcppIdTag,
     ocppTagPk: mapping.steveOcppTagPk,
     note,
-    parentIdTag: null,
+    parentIdTag: mapping.steveParentIdTag ?? null,
+    expiryDate: mapping.steveExpiryDate
+      ? new Date(mapping.steveExpiryDate).toISOString()
+      : null,
     maxActiveTransactionCount: mapping.isActive ? -1 : 0,
   };
 
