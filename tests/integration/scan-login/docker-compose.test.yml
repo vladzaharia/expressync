@@ -1,0 +1,153 @@
+###
+# Self-contained docker compose stack for the scan-to-login OCPP intercept
+# regression test harness. Spun up per run by harness/compose.ts with a
+# unique project name (-p scanlogin-<short-uuid>) so multiple invocations
+# don't collide. All credentials are injected from a generated env file
+# (see harness/env.ts) — nothing is hardcoded.
+###
+services:
+  mariadb:
+    image: mariadb:10.4.30
+    tmpfs:
+      - /var/lib/mysql
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+      MYSQL_DATABASE: stevedb
+      MYSQL_USER: steve
+      MYSQL_PASSWORD: ${STEVE_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -usteve -p${STEVE_DB_PASSWORD} || mysqladmin ping -h 127.0.0.1 -usteve -p${STEVE_DB_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  steve:
+    build:
+      context: /docker/services/ocpp
+      dockerfile: Dockerfile
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      # Fed into application-docker.properties via Maven filtering at build
+      # time — but the SteVe codebase reads these at runtime through Spring
+      # placeholders, so propagating them here is sufficient.
+      DB_HOST: mariadb
+      DB_PORT: "3306"
+      DB_DATABASE: stevedb
+      DB_USER: steve
+      DB_PASSWORD: ${STEVE_DB_PASSWORD}
+      AUTH_USER: ${STEVE_API_USERNAME}
+      AUTH_PASSWORD: ${STEVE_API_KEY}
+      WEBAPI_VALUE: ${WEBAPI_VALUE}
+      # Pre-authorize hook config for the scan-login feature.
+      PREAUTH_ENABLED: "true"
+      PREAUTH_URL: ${PREAUTH_URL_OVERRIDE:-http://expressync-app:8000/api/ocpp/pre-authorize}
+      PREAUTH_HMAC_KEY: ${STEVE_PREAUTH_HMAC_KEY}
+      PREAUTH_TIMEOUT_MS: ${PREAUTH_TIMEOUT_MS_OVERRIDE:-200}
+    ports:
+      - "0:8180"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null http://127.0.0.1:8180/steve/manager/home || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 240s
+
+  postgres:
+    image: postgres:17-alpine
+    tmpfs:
+      - /var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ocpp_user
+      POSTGRES_PASSWORD: ${EXPRESSYNC_DB_PASSWORD}
+      POSTGRES_DB: ocpp_billing
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ocpp_user -d ocpp_billing"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  migrate:
+    build:
+      context: /docker/services/expressync
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://ocpp_user:${EXPRESSYNC_DB_PASSWORD}@postgres:5432/ocpp_billing
+      AUTH_SECRET: ${AUTH_SECRET}
+      STEVE_BASE_URL: http://steve:8180/steve
+      STEVE_API_USERNAME: ${STEVE_API_USERNAME}
+      STEVE_API_KEY: ${STEVE_API_KEY}
+      LAGO_API_URL: http://localhost:1
+      LAGO_API_KEY: dummy
+      LAGO_DASHBOARD_URL: http://localhost:1
+    command: ["deno", "task", "db:migrate"]
+    restart: "no"
+
+  expressync-app:
+    build:
+      context: /docker/services/expressync
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      steve:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgres://ocpp_user:${EXPRESSYNC_DB_PASSWORD}@postgres:5432/ocpp_billing
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_URL: http://expressync-app:8000
+      STEVE_BASE_URL: http://steve:8180/steve
+      STEVE_API_USERNAME: ${STEVE_API_USERNAME}
+      STEVE_API_KEY: ${STEVE_API_KEY}
+      STEVE_CONTAINER_NAME: ${COMPOSE_PROJECT_NAME}-steve-1
+      LAGO_API_URL: http://localhost:1
+      LAGO_API_KEY: dummy
+      LAGO_DASHBOARD_URL: http://localhost:1
+      FEATURE_PAIR_INTENT_INTERCEPT: "true"
+      FEATURE_SCAN_LOGIN: "true"
+      STEVE_PREAUTH_HMAC_KEY: ${EXPRESSYNC_PREAUTH_HMAC_KEY:-${STEVE_PREAUTH_HMAC_KEY}}
+      DEBUG_LEVEL: DEBUG
+      DENO_ENV: test
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "0:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/api/health || curl -fsS http://127.0.0.1:8000/ || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 60s
+
+  expressync-sync:
+    build:
+      context: /docker/services/expressync
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://ocpp_user:${EXPRESSYNC_DB_PASSWORD}@postgres:5432/ocpp_billing
+      AUTH_SECRET: ${AUTH_SECRET}
+      STEVE_BASE_URL: http://steve:8180/steve
+      STEVE_API_USERNAME: ${STEVE_API_USERNAME}
+      STEVE_API_KEY: ${STEVE_API_KEY}
+      LAGO_API_URL: http://localhost:1
+      LAGO_API_KEY: dummy
+      LAGO_DASHBOARD_URL: http://localhost:1
+      FEATURE_PAIR_INTENT_INTERCEPT: "true"
+    command: ["deno", "run", "--allow-net", "--allow-env", "--allow-read", "sync-worker.ts"]
+    restart: "no"
+    profiles: ["with-sync"]
+
+networks:
+  default:
+    driver: bridge

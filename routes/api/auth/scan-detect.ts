@@ -33,6 +33,7 @@ import {
   featureDisabledResponse,
 } from "../../../src/lib/feature-flags.ts";
 import { subscribe } from "../../../src/services/docker-log-subscriber.ts";
+import { eventBus } from "../../../src/services/event-bus.service.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
 
 const log = logger.child("ScanDetect");
@@ -150,6 +151,7 @@ export const handler = define.handlers({
     concurrentByIp.set(ip, cur + 1);
 
     let unsubscribe: (() => void) | null = null;
+    let unsubBus: (() => void) | null = null;
     let keepaliveInterval: ReturnType<typeof setInterval> | null = null;
     let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
     let closed = false;
@@ -170,6 +172,7 @@ export const handler = define.handlers({
       if (keepaliveInterval) clearInterval(keepaliveInterval);
       if (timeoutTimer) clearTimeout(timeoutTimer);
       if (unsubscribe) unsubscribe();
+      if (unsubBus) unsubBus();
       const remaining = (concurrentByIp.get(ip) ?? 1) - 1;
       if (remaining <= 0) {
         concurrentByIp.delete(ip);
@@ -193,6 +196,33 @@ export const handler = define.handlers({
           ),
         );
 
+        // Emit an HMAC-signed scan event to the client. Called by both
+        // the docker-log `reject` path (unknown tag intercepted by log
+        // scraping) and the event-bus `scan.intercepted` path (pre-auth
+        // hook intercepted a known-or-unknown tag during an armed
+        // window).
+        const emit = (idTag: string, t: number): void => {
+          (async () => {
+            try {
+              const nonce = await signNonce(
+                idTag,
+                pairingCode,
+                chargeBoxId,
+                t,
+              );
+              safeEnqueue(
+                _enc.encode(
+                  `data: ${JSON.stringify({ idTag, nonce, t })}\n\n`,
+                ),
+              );
+            } catch (err) {
+              log.error("Failed to sign nonce", {
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+          })();
+        };
+
         const sub = await subscribe(
           (event) => {
             if (closed) return;
@@ -203,30 +233,10 @@ export const handler = define.handlers({
             // scan against a charger whose chargeBoxId we couldn't
             // extract from logs.
             if (event.chargeBoxId !== chargeBoxId) return;
-
-            // Fire-and-forget the HMAC signing — keep the handler
-            // synchronous-ish so subscriber dispatch doesn't pile up.
-            (async () => {
-              try {
-                const nonce = await signNonce(
-                  event.idTag,
-                  pairingCode,
-                  chargeBoxId,
-                  event.t,
-                );
-                safeEnqueue(
-                  _enc.encode(
-                    `data: ${
-                      JSON.stringify({ idTag: event.idTag, nonce, t: event.t })
-                    }\n\n`,
-                  ),
-                );
-              } catch (err) {
-                log.error("Failed to sign nonce", {
-                  error: err instanceof Error ? err.message : String(err),
-                });
-              }
-            })();
+            // Only the reject path is relevant here; start-tx events
+            // are handled by the watchdog, not customer login.
+            if (event.type !== "reject" || !event.idTag) return;
+            emit(event.idTag, event.t);
           },
           (err) => {
             if (closed) return;
@@ -241,6 +251,25 @@ export const handler = define.handlers({
             cleanup();
           },
         );
+
+        // Parallel subscription to the event bus for pre-auth hook
+        // intercepts (known tags + any tag while an intent is armed).
+        // Filtered by both chargeBoxId AND pairingCode so only THIS
+        // listener's matching scan is delivered, even if multiple
+        // pairings are armed against different chargers in parallel.
+        unsubBus = eventBus.subscribe(["scan.intercepted"], (delivered) => {
+          if (closed) return;
+          const p = delivered.payload as {
+            idTag: string;
+            chargeBoxId: string;
+            pairingCode: string;
+            purpose?: string;
+            t: number;
+          };
+          if (p.chargeBoxId !== chargeBoxId) return;
+          if (p.pairingCode !== pairingCode) return;
+          emit(p.idTag, p.t);
+        });
         if (!sub.available) {
           safeEnqueue(
             _enc.encode(

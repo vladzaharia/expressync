@@ -45,3 +45,52 @@ export function extractRejectedTag(logLine: string): string | null {
   }
   return null;
 }
+
+/**
+ * Patterns matching StEvE log lines for successful StartTransaction
+ * events. The fallback watchdog uses these to detect transactions that
+ * slipped past the pre-authorize hook (e.g. hook timed out, charger had
+ * cached authorization). Capture groups: (transactionId, idTag) — order
+ * may vary, so the extractor below tries each pattern in turn.
+ */
+export const START_TRANSACTION_PATTERNS: ReadonlyArray<RegExp> = [
+  /StartTransaction\.(?:conf|req)[^\n]*transactionId[=:\s]+(\d+)[^\n]*idTag[=:\s]+["']?([^\s"']+)/i,
+  /StartTransaction[^\n]*idTag[=:\s]+["']?([^\s"']+)["']?[^\n]*transactionId[=:\s]+(\d+)/i,
+  // Fallback: transactionId only (idTag may not appear in every variant)
+  /StartTransaction[^\n]*transactionId[=:\s]+(\d+)/i,
+];
+
+export interface StartTransactionExtract {
+  transactionId: number;
+  idTag: string | null;
+}
+
+export function extractStartTransaction(
+  logLine: string,
+): StartTransactionExtract | null {
+  // First pattern: txId-then-idTag
+  let m = logLine.match(START_TRANSACTION_PATTERNS[0]);
+  if (m) {
+    const txId = parseInt(m[1], 10);
+    if (Number.isFinite(txId)) {
+      return { transactionId: txId, idTag: m[2] ?? null };
+    }
+  }
+  // Second: idTag-then-txId
+  m = logLine.match(START_TRANSACTION_PATTERNS[1]);
+  if (m) {
+    const txId = parseInt(m[2], 10);
+    if (Number.isFinite(txId)) {
+      return { transactionId: txId, idTag: m[1] ?? null };
+    }
+  }
+  // Third: txId only
+  m = logLine.match(START_TRANSACTION_PATTERNS[2]);
+  if (m) {
+    const txId = parseInt(m[1], 10);
+    if (Number.isFinite(txId)) {
+      return { transactionId: txId, idTag: null };
+    }
+  }
+  return null;
+}
