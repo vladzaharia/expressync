@@ -9,6 +9,7 @@ import {
 } from "./ui/sidebar.tsx";
 import ThemeToggle, { useThemeToggle } from "../islands/ThemeToggle.tsx";
 import NotificationBell from "../islands/NotificationBell.tsx";
+import FleetLivePill from "../islands/admin/FleetLivePill.tsx";
 import {
   LayoutDashboard,
   LogOut,
@@ -504,6 +505,11 @@ export function AppSidebar({
           sidebar still shows who's signed in, then the sign-out button. */
       }
       <SidebarFooter className="p-0 mt-auto gap-0">
+        {isAdmin && !isCollapsed && (
+          <div class="flex items-center justify-center border-t px-3 py-2 shrink-0">
+            <FleetLivePill />
+          </div>
+        )}
         {user && !isCollapsed && (
           <div className="flex items-center gap-3 px-4 py-2 border-t text-muted-foreground shrink-0">
             <User className="size-4 text-primary shrink-0" aria-hidden="true" />

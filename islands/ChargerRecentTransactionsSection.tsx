@@ -150,9 +150,13 @@ export default function ChargerRecentTransactionsSection(
                       <td class="py-2">
                         {isActive
                           ? (
-                            <Badge variant="warning" class="text-[10px]">
-                              Active
-                            </Badge>
+                            <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
+                              <span class="relative flex size-1.5">
+                                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                                <span class="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+                              </span>
+                              Live
+                            </span>
                           )
                           : (
                             <Badge variant="outline" class="text-[10px]">

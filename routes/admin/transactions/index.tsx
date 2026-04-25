@@ -14,6 +14,7 @@ import {
   sql,
 } from "drizzle-orm";
 import TransactionsTable from "../../../islands/TransactionsTable.tsx";
+import TransactionsLiveBanner from "../../../islands/admin/TransactionsLiveBanner.tsx";
 import ChargingSessionsFilters, {
   type ChargingSessionStatus,
 } from "../../../islands/ChargingSessionsFilters.tsx";
@@ -275,6 +276,8 @@ export default define.page<typeof handler>(
           }${hasActiveFilter ? " match current filters" : " recorded"}`}
           colorScheme="green"
         >
+          <TransactionsLiveBanner />
+
           <div class="mb-6">
             <StatStrip
               accent="green"
