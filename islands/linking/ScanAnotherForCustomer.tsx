@@ -10,6 +10,10 @@
  *   - Scanned tag exists in StEvE but is unlinked    → `/links/new?tagPk=…&customerId=…`.
  *   - Scanned tag is unknown to StEvE                → `/tags/new?idTag=…` (they
  *     need to register it in StEvE + metadata first; linking picks up after).
+ *
+ * Uses the arm-intent pipeline (`/api/admin/tag/scan-arm`) — inherited from
+ * `TapToAddModal`'s default — so this works for known AND unknown tags via
+ * the SteVe pre-Authorize hook, not just the legacy log-scrape path.
  */
 
 import ScanTagAction from "@/islands/ScanTagAction.tsx";

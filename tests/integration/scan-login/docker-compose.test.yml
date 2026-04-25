@@ -42,7 +42,16 @@ services:
       WEBAPI_VALUE: ${WEBAPI_VALUE}
       # Pre-authorize hook config for the scan-login feature.
       PREAUTH_ENABLED: "true"
-      PREAUTH_URL: ${PREAUTH_URL_OVERRIDE:-http://expressync-app:8000/api/ocpp/pre-authorize}
+      # ExpresSync's root middleware (routes/_middleware.ts) only accepts
+      # requests whose Host header is in ADMIN_HOSTS / CUSTOMER_HOSTS — any
+      # other host gets a 404, so calling it from another container as
+      # `expressync-app` fails. Address the service via the
+      # `polaris.localhost` network alias (added on expressync-app below)
+      # so the Host header is recognized as a customer-surface host.
+      # NOTE: cannot use *.localhost — glibc special-cases that name per
+      # RFC 6761 and resolves it to 127.0.0.1 regardless of /etc/hosts /
+      # docker DNS. Use polaris.express which is also in CUSTOMER_HOSTS.
+      PREAUTH_URL: ${PREAUTH_URL_OVERRIDE:-http://polaris.express:8000/api/ocpp/pre-authorize}
       PREAUTH_HMAC_KEY: ${STEVE_PREAUTH_HMAC_KEY}
       PREAUTH_TIMEOUT_MS: ${PREAUTH_TIMEOUT_MS_OVERRIDE:-200}
     ports:
@@ -116,12 +125,21 @@ services:
       DENO_ENV: test
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      default:
+        aliases:
+          # Customer-surface host alias so SteVe's pre-authorize hook (and
+          # any other in-network caller) can reach this service with a
+          # `Host:` header the root middleware accepts.
+          - polaris.express
     ports:
       - "0:8000"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/api/health || curl -fsS http://127.0.0.1:8000/ || exit 1"]
+      # The deno image has no curl/wget/nc — but it has deno. Hit /api/health
+      # directly via fetch and exit non-zero on any error.
+      test: ["CMD", "deno", "eval", "const r = await fetch('http://127.0.0.1:8000/api/health'); Deno.exit(r.ok ? 0 : 1);"]
       interval: 5s
-      timeout: 5s
+      timeout: 10s
       retries: 40
       start_period: 60s
 

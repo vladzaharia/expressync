@@ -9,6 +9,18 @@
  * proof — `close()` or unmount aborts every outstanding side effect, so
  * there's no lingering `EventSource`, interval, or auto-confirm timeout.
  *
+ * The hook supports two pipelines via `armEndpoint`:
+ *   - **legacy log-scrape** (`armEndpoint` omitted): opens an EventSource to
+ *     `/api/admin/tag/detect`. Works for unknown tags only — known tags get
+ *     `ACCEPTED` from SteVe and never surface a `reject` log line. Retained
+ *     only for backwards-compat callers; new admin call sites pass
+ *     `armEndpoint`.
+ *   - **arm-intent** (`armEndpoint` set, e.g. `/api/admin/tag/scan-arm`):
+ *     POSTs the arm endpoint to register a pairing intent at a specific
+ *     `chargeBoxId`, then opens `/api/auth/scan-detect?pairingCode=…&
+ *     chargeBoxId=…`. Works for known AND unknown tags via the SteVe
+ *     pre-Authorize hook. The arm endpoint is DELETEd on close/unmount.
+ *
  * The hook exposes signals so islands can reactively render without extra
  * prop plumbing. Every transition dispatches a `scan-tag:state` CustomEvent
  * for diagnostics; `scan-tag:detected`, `scan-tag:route`, and
@@ -50,6 +62,24 @@ export interface UseScanTagOptions {
   confirmMode?: "auto" | "manual";
   /** Fired after a successful `scan-lookup` POST and before routing. */
   onDetected?: (r: ScanResult) => void | Promise<void>;
+  /**
+   * Arm-intent endpoint. When set, the hook POSTs `{chargeBoxId}` to this
+   * URL, then subscribes to `/api/auth/scan-detect` with the returned
+   * pairingCode. DELETE is fired on close/unmount. Admin callers pass
+   * `/api/admin/tag/scan-arm`. Customer login uses
+   * `/api/auth/scan-pair` (handled by `CustomerScanLoginIsland` directly,
+   * not this hook).
+   *
+   * When omitted, the hook falls back to the legacy log-scrape stream at
+   * `/api/admin/tag/detect` (unknown tags only).
+   */
+  armEndpoint?: string;
+  /**
+   * Charger to arm the intent at. Only used when `armEndpoint` is set.
+   * If omitted, the hook auto-discovers the first online charger via
+   * `/api/auth/scan-charger-list`.
+   */
+  chargeBoxId?: string;
 }
 
 export interface UseScanTagApi {
@@ -73,6 +103,19 @@ type Transition = {
   to: ScanTagState["kind"];
   idTag?: string;
 };
+
+interface ChargerListEntry {
+  chargeBoxId: string;
+  friendlyName: string | null;
+  status: string | null;
+  online: boolean;
+}
+
+interface ArmResponse {
+  pairingCode?: string;
+  chargeBoxId?: string;
+  expiresInSec?: number;
+}
 
 function dispatch(name: string, detail: Record<string, unknown>): void {
   if (typeof globalThis.dispatchEvent !== "function") return;
@@ -103,6 +146,8 @@ function readPrefersReducedMotion(): boolean {
 export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
   const timeoutSeconds = Math.max(1, opts?.timeoutSeconds ?? 20);
   const confirmMode = opts?.confirmMode ?? "manual";
+  const armEndpoint = opts?.armEndpoint;
+  const fixedChargeBoxId = opts?.chargeBoxId;
 
   // One signal per island instance — created lazily inside `useMemo` so
   // multiple mounts don't share state.
@@ -120,6 +165,8 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
     // Simple dismissed-guard so late async resolves can't clobber state
     // after the user closed the modal.
     sessionId: 0,
+    // Active arm-intent binding (only set when `armEndpoint` is in use).
+    arm: null as { pairingCode: string; chargeBoxId: string } | null,
   }), []);
 
   const prefersReducedMotion = useMemo(readPrefersReducedMotion, []);
@@ -157,6 +204,26 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
     }
   };
 
+  // Best-effort release of an armed pairing. Fired when we tear down the
+  // SSE so the charger doesn't stay "listening" for a tap for the
+  // remainder of the 90s TTL (and so the next attempt isn't blocked by
+  // the "already_armed_for_charger" guard).
+  const releaseArmIfActive = (): void => {
+    if (!armEndpoint || !refs.arm) return;
+    const { pairingCode, chargeBoxId } = refs.arm;
+    refs.arm = null;
+    try {
+      void fetch(armEndpoint, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chargeBoxId, pairingCode }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch {
+      /* noop */
+    }
+  };
+
   // Unconditional cleanup — called on close(), retry(), and unmount. Never
   // gated on `open` because that race caused the old modal to leak SSE
   // connections when the dialog was toggled rapidly.
@@ -164,6 +231,7 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
     closeEventSource();
     clearTick();
     clearAutoConfirm();
+    releaseArmIfActive();
   };
 
   const startTick = (): void => {
@@ -186,14 +254,183 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
     }, 1000);
   };
 
-  const beginConnect = (): void => {
-    cleanup();
-    const mySession = ++refs.sessionId;
-    setState({ kind: "connecting" });
+  /**
+   * Pick a charger to arm against. Honors `opts.chargeBoxId` when set;
+   * otherwise queries the public charger list and picks the first online
+   * entry. Returns `null` and signals an unavailability state if no
+   * charger is reachable.
+   */
+  const resolveChargeBoxId = async (
+    mySession: number,
+  ): Promise<string | null> => {
+    if (fixedChargeBoxId) return fixedChargeBoxId;
+    let resp: Response;
+    try {
+      resp = await fetch("/api/auth/scan-charger-list", {
+        headers: { Accept: "application/json" },
+      });
+    } catch {
+      if (mySession !== refs.sessionId) return null;
+      setState({ kind: "network_error", phase: "connect" });
+      dispatch("scan-tag:error", { reason: "connect" });
+      return null;
+    }
+    if (mySession !== refs.sessionId) return null;
+    if (resp.status === 503) {
+      setState({ kind: "unavailable", reason: "detect_503" });
+      dispatch("scan-tag:error", { reason: "detect_503" });
+      return null;
+    }
+    if (!resp.ok) {
+      setState({ kind: "network_error", phase: "connect" });
+      dispatch("scan-tag:error", { reason: "connect" });
+      return null;
+    }
+    const body = await resp.json().catch(() => ({}));
+    const list: ChargerListEntry[] = Array.isArray(body?.chargers)
+      ? body.chargers
+      : [];
+    const online = list.find((c) => c.online);
+    if (!online) {
+      setState({ kind: "unavailable", reason: "detect_503" });
+      dispatch("scan-tag:error", { reason: "no_chargers" });
+      return null;
+    }
+    return online.chargeBoxId;
+  };
 
-    // HEAD probe first so we can distinguish "Docker unavailable (503)"
-    // from "generic SSE error" — otherwise the operator just sees a vague
-    // "connection lost" for an operational misconfiguration.
+  /**
+   * Arm-intent pipeline: POST armEndpoint → open scan-detect SSE bound by
+   * pairingCode + chargeBoxId. Runs only when `armEndpoint` is set.
+   */
+  const beginConnectArmIntent = async (mySession: number): Promise<void> => {
+    if (!armEndpoint) return;
+    const chargeBoxId = await resolveChargeBoxId(mySession);
+    if (!chargeBoxId) return;
+    if (mySession !== refs.sessionId) return;
+
+    let armResp: Response;
+    try {
+      armResp = await fetch(armEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chargeBoxId }),
+      });
+    } catch {
+      if (mySession !== refs.sessionId) return;
+      setState({ kind: "network_error", phase: "connect" });
+      dispatch("scan-tag:error", { reason: "connect" });
+      return;
+    }
+    if (mySession !== refs.sessionId) return;
+    if (armResp.status === 503) {
+      setState({ kind: "unavailable", reason: "detect_503" });
+      dispatch("scan-tag:error", { reason: "detect_503" });
+      return;
+    }
+    const armBody: ArmResponse = await armResp.json().catch(() => ({}));
+    if (!armResp.ok || !armBody.pairingCode || !armBody.chargeBoxId) {
+      setState({ kind: "network_error", phase: "connect" });
+      dispatch("scan-tag:error", {
+        reason: "arm_failed",
+        status: armResp.status,
+      });
+      return;
+    }
+
+    refs.arm = {
+      pairingCode: armBody.pairingCode,
+      chargeBoxId: armBody.chargeBoxId,
+    };
+
+    let es: EventSource;
+    try {
+      const url = `/api/auth/scan-detect?pairingCode=${
+        encodeURIComponent(armBody.pairingCode)
+      }&chargeBoxId=${encodeURIComponent(armBody.chargeBoxId)}`;
+      es = new EventSource(url);
+    } catch {
+      setState({ kind: "network_error", phase: "connect" });
+      dispatch("scan-tag:error", { reason: "connect" });
+      return;
+    }
+    if (mySession !== refs.sessionId) {
+      try {
+        es.close();
+      } catch { /* noop */ }
+      return;
+    }
+    refs.eventSource = es;
+
+    es.addEventListener("connected", () => {
+      if (mySession !== refs.sessionId) return;
+      setState({
+        kind: "waiting",
+        remaining: timeoutSeconds,
+        extended: false,
+      });
+      startTick();
+    });
+
+    // scan-detect emits anonymous `data:` events (no event-type line) for
+    // detected tags — listen via onmessage rather than `tag-detected`.
+    es.onmessage = (event: MessageEvent) => {
+      if (mySession !== refs.sessionId) return;
+      let idTag = "";
+      try {
+        const data = JSON.parse(event.data);
+        idTag = typeof data.idTag === "string" ? data.idTag : "";
+      } catch {
+        idTag = "";
+      }
+      if (!idTag) return;
+      const cur = state.value;
+      const remaining = cur.kind === "waiting"
+        ? cur.remaining
+        : timeoutSeconds;
+      // Tear down the SSE + arm row — the intent has been consumed
+      // server-side on match; the DELETE is best-effort cleanup.
+      closeEventSource();
+      releaseArmIfActive();
+      setState({ kind: "detected", idTag, remaining });
+      dispatch("scan-tag:detected", { idTag });
+
+      if (confirmMode === "auto") {
+        clearAutoConfirm();
+        refs.autoConfirmTimer = setTimeout(() => {
+          if (mySession !== refs.sessionId) return;
+          if (state.value.kind === "detected") confirm();
+        }, 800);
+      }
+    };
+
+    es.addEventListener("timeout", () => {
+      if (mySession !== refs.sessionId) return;
+      cleanup();
+      setState({ kind: "timeout" });
+      dispatch("scan-tag:error", { reason: "timeout" });
+    });
+
+    es.onerror = () => {
+      if (mySession !== refs.sessionId) return;
+      // EventSource fires `error` on normal reconnect attempts too. Treat
+      // as fatal only when the underlying connection is closed.
+      if (refs.eventSource && refs.eventSource.readyState !== 2) return;
+      const phase: "connect" | "stream" = state.value.kind === "connecting"
+        ? "connect"
+        : "stream";
+      cleanup();
+      setState({ kind: "network_error", phase });
+      dispatch("scan-tag:error", { reason: "network", phase });
+    };
+  };
+
+  /**
+   * Legacy log-scrape pipeline: HEAD-probe `/api/admin/tag/detect`, then
+   * open the SSE. Detects unknown-tag scans only (known tags don't surface
+   * via Authorize-reject log lines).
+   */
+  const beginConnectLegacy = (mySession: number): void => {
     (async () => {
       try {
         const probe = await fetch(`/api/admin/tag/detect?timeout=1`, {
@@ -206,7 +443,6 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
           return;
         }
       } catch {
-        // HEAD failing is not fatal on its own; defer to SSE onerror.
         if (mySession !== refs.sessionId) return;
       }
 
@@ -258,8 +494,6 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
           clearAutoConfirm();
           refs.autoConfirmTimer = setTimeout(() => {
             if (mySession !== refs.sessionId) return;
-            // Only auto-confirm if still in `detected` (user may have hit
-            // `cancel` in the interim).
             if (state.value.kind === "detected") confirm();
           }, 800);
         }
@@ -282,6 +516,18 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
         dispatch("scan-tag:error", { reason: "network", phase });
       };
     })();
+  };
+
+  const beginConnect = (): void => {
+    cleanup();
+    const mySession = ++refs.sessionId;
+    setState({ kind: "connecting" });
+
+    if (armEndpoint) {
+      void beginConnectArmIntent(mySession);
+    } else {
+      beginConnectLegacy(mySession);
+    }
   };
 
   const confirm = (): void => {

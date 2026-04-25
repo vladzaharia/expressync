@@ -270,6 +270,29 @@ export const handler = define.handlers({
           if (p.pairingCode !== pairingCode) return;
           emit(p.idTag, p.t);
         });
+
+        // Replay buffered scan.intercepted events from the last ~5s that
+        // match this binding. Belt-and-braces against the start-callback
+        // race: if the event-bus publish happens between this stream
+        // opening and the subscribe call above, the live subscriber misses
+        // it but the ring buffer caught it.
+        const replayCutoff = Date.now() - 5_000;
+        for (
+          const delivered of eventBus.replay(0, ["scan.intercepted"])
+        ) {
+          if (closed) break;
+          if (delivered.ts <= replayCutoff) continue;
+          const p = delivered.payload as {
+            idTag: string;
+            chargeBoxId: string;
+            pairingCode: string;
+            purpose?: string;
+            t: number;
+          };
+          if (p.chargeBoxId !== chargeBoxId) continue;
+          if (p.pairingCode !== pairingCode) continue;
+          emit(p.idTag, p.t);
+        }
         if (!sub.available) {
           safeEnqueue(
             _enc.encode(

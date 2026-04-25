@@ -75,6 +75,18 @@ interface Props {
    * Linking agent migrates. Do not add new call sites.
    */
   onTagDetected?: (idTag: string) => void;
+  /**
+   * Arm-intent endpoint. Defaults to `/api/admin/tag/scan-arm` so all
+   * admin scan UIs use the pre-Authorize hook pipeline (works for known
+   * AND unknown tags). Pass an explicit value (or `undefined`) only if
+   * you need the legacy log-scrape path for diagnostics.
+   */
+  armEndpoint?: string;
+  /**
+   * Optional fixed chargeBoxId to arm against. When omitted the hook
+   * auto-discovers the first online charger via `/api/auth/scan-charger-list`.
+   */
+  chargeBoxId?: string;
 }
 
 /** Countdown thresholds we announce via the `aria-live` region. */
@@ -91,6 +103,8 @@ export default function TapToAddModal({
   panelSubtitle = "Tap an RFID card on any online charger.",
   onDetected,
   onTagDetected,
+  armEndpoint = "/api/admin/tag/scan-arm",
+  chargeBoxId,
 }: Props) {
   const handleDetected = async (r: ScanResult) => {
     if (onDetected) {
@@ -111,6 +125,8 @@ export default function TapToAddModal({
     timeoutSeconds,
     confirmMode,
     onDetected: handleDetected,
+    armEndpoint,
+    chargeBoxId,
   });
 
   const state = hook.state.value;

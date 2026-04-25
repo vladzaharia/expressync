@@ -15,7 +15,7 @@ export interface SseStream {
 
 export async function openSse(
   url: string,
-  opts: { headers?: Record<string, string> } = {},
+  opts: { headers?: Record<string, string>; connectedTimeoutMs?: number } = {},
 ): Promise<SseStream> {
   const ctrl = new AbortController();
   const resp = await fetch(url, {
@@ -33,6 +33,15 @@ export async function openSse(
     resolve: (m: SseMessage) => void;
     reject: (e: Error) => void;
   }> = [];
+  // deno-lint-ignore no-explicit-any
+  let connectedResolve: (m: SseMessage) => void = () => {};
+  // deno-lint-ignore no-explicit-any
+  let connectedReject: (e: Error) => void = () => {};
+  const connectedPromise = new Promise<SseMessage>((res, rej) => {
+    connectedResolve = res;
+    connectedReject = rej;
+  });
+  let sawConnected = false;
 
   function emit(rawBlock: string) {
     const msg: SseMessage = { data: "" };
@@ -48,6 +57,22 @@ export async function openSse(
       else if (field === "id") msg.id = value;
     }
     msg.data = dataLines.join("\n");
+
+    // Trap the `connected` server-side handshake — resolve the openSse
+    // gate but do NOT enqueue it for `next()` consumers (they only want
+    // payload `data:` frames).
+    if (msg.event === "connected") {
+      if (!sawConnected) {
+        sawConnected = true;
+        connectedResolve(msg);
+      }
+      return;
+    }
+    // Skip any other non-data frames (e.g. `event: timeout`,
+    // `event: error`) and keepalives are already filtered above (lines
+    // starting with `:`).
+    if (!msg.data) return;
+
     if (waiters.length > 0) {
       waiters.shift()!.resolve(msg);
     } else {
@@ -72,8 +97,28 @@ export async function openSse(
     } catch (err) {
       const e = err instanceof Error ? err : new Error(String(err));
       while (waiters.length > 0) waiters.shift()!.reject(e);
+      if (!sawConnected) connectedReject(e);
     }
   })();
+
+  // Block until the server emits `event: connected` so callers can be
+  // sure the event-bus subscription is live before they trigger the
+  // event source. Without this gate, scan.intercepted events that fire
+  // in the ~10–50ms window between fetch() returning and the
+  // ReadableStream `start(controller)` callback running can be lost.
+  const gateTimeoutMs = opts.connectedTimeoutMs ?? 5_000;
+  const gateTimer = setTimeout(() => {
+    connectedReject(
+      new Error(
+        `SSE connected event not received within ${gateTimeoutMs}ms`,
+      ),
+    );
+  }, gateTimeoutMs);
+  try {
+    await connectedPromise;
+  } finally {
+    clearTimeout(gateTimer);
+  }
 
   return {
     next(timeoutMs = 10_000): Promise<SseMessage> {

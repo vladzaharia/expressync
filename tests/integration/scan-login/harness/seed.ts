@@ -33,13 +33,15 @@ export async function seedSteve(
   v: SeedValues,
 ): Promise<void> {
   const stmts = [
-    // SteVe schema: ocpp_tag (id_tag UNIQUE, parent_id_tag, expiry_date,
-    // in_transaction, blocked, max_active_transaction_count, note).
-    // charge_box (charge_box_id UNIQUE, registration_status, ...).
-    `INSERT IGNORE INTO ocpp_tag (id_tag, parent_id_tag, expiry_date, in_transaction, blocked, max_active_transaction_count, note)
-       VALUES ('${sqlEscape(v.TAG_GOOD)}', NULL, NULL, 0, 0, 1, 'cpsim-good');`,
-    `INSERT IGNORE INTO ocpp_tag (id_tag, parent_id_tag, expiry_date, in_transaction, blocked, max_active_transaction_count, note)
-       VALUES ('${sqlEscape(v.TAG_BLOCKED)}', NULL, NULL, 0, 1, 1, 'cpsim-blocked');`,
+    // SteVe 3.x schema: ocpp_tag has only id_tag, parent_id_tag,
+    // expiry_date, max_active_transaction_count, note. The
+    // `in_transaction` and `blocked` flags moved to the
+    // `ocpp_tag_activity` VIEW. Setting max_active_transaction_count = 0
+    // is what the view interprets as BLOCKED.
+    `INSERT IGNORE INTO ocpp_tag (id_tag, parent_id_tag, expiry_date, max_active_transaction_count, note)
+       VALUES ('${sqlEscape(v.TAG_GOOD)}', NULL, NULL, 1, 'cpsim-good');`,
+    `INSERT IGNORE INTO ocpp_tag (id_tag, parent_id_tag, expiry_date, max_active_transaction_count, note)
+       VALUES ('${sqlEscape(v.TAG_BLOCKED)}', NULL, NULL, 0, 'cpsim-blocked');`,
     `INSERT IGNORE INTO charge_box (charge_box_id, registration_status, insert_connector_status_after_transaction_msg)
        VALUES ('${sqlEscape(v.CB_A)}', 'Accepted', 0);`,
     `INSERT IGNORE INTO charge_box (charge_box_id, registration_status, insert_connector_status_after_transaction_msg)
@@ -76,6 +78,25 @@ export async function seedExpressync(
   ctx: ComposeContext,
   v: SeedValues,
 ): Promise<SeededUser> {
+  // Look up the SteVe-assigned ocpp_tag_pk for TAG_GOOD — user_mappings
+  // requires steve_ocpp_tag_pk NOT NULL. seedSteve() runs first so the
+  // row exists.
+  const tagPkRows = await mysqlQuery(
+    ctx,
+    v.STEVE_DB_PASSWORD,
+    `SELECT ocpp_tag_pk FROM ocpp_tag WHERE id_tag = '${
+      v.TAG_GOOD.replace(/'/g, "''")
+    }';`,
+  );
+  // mysqlQuery returns string[][] directly (not wrapped in {rows}).
+  const tagPk = parseInt(tagPkRows[0]?.[0] ?? "0", 10);
+  if (!tagPk) {
+    throw new Error(
+      `Could not resolve ocpp_tag_pk for TAG_GOOD=${v.TAG_GOOD}; ` +
+        `seedSteve() must run first.`,
+    );
+  }
+
   const userId = crypto.randomUUID();
   const email = `cpsim-${userId.slice(0, 8)}@test.local`;
   await pgQuery(
@@ -87,8 +108,8 @@ export async function seedExpressync(
   const r = await pgQuery(
     ctx,
     null,
-    `INSERT INTO user_mappings (user_id, steve_ocpp_id_tag, is_active, created_at, updated_at)
-       VALUES ('${userId}', '${v.TAG_GOOD}', true, now(), now())
+    `INSERT INTO user_mappings (user_id, steve_ocpp_id_tag, steve_ocpp_tag_pk, is_active, created_at, updated_at)
+       VALUES ('${userId}', '${v.TAG_GOOD}', ${tagPk}, true, now(), now())
      RETURNING id;`,
   );
   const mappingId = parseInt(r.rows[0]?.[0] ?? "0", 10);

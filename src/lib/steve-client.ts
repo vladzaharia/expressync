@@ -2,6 +2,7 @@ import { config } from "./config.ts";
 import {
   type CancelReservationParams,
   type ChangeAvailabilityParams,
+  type ChangeConfigurationParams,
   type DataTransferParams,
   type GetCompositeScheduleParams,
   type GetConfigurationParams,
@@ -532,6 +533,21 @@ class StEvEClient {
     ): Promise<OcppTaskResult> =>
       this.postOperation(
         "ChangeAvailability",
+        params as unknown as Record<string, unknown>,
+        OcppTaskResultSchema,
+      ),
+
+    /**
+     * Set a single OCPP ConfigurationKey via SteVe's REST operations
+     * endpoint. Used by `scripts/push-charger-preauth-config.ts` to
+     * disable local-auth caches as a prerequisite for the pre-auth
+     * hook.
+     */
+    changeConfiguration: (
+      params: ChangeConfigurationParams,
+    ): Promise<OcppTaskResult> =>
+      this.postOperation(
+        "ChangeConfiguration",
         params as unknown as Record<string, unknown>,
         OcppTaskResultSchema,
       ),

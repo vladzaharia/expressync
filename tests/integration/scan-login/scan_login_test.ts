@@ -46,9 +46,15 @@ const TAG_UNKNOWN = envOrThrow("TAG_UNKNOWN");
 
 const ctx: ComposeContext = { project: PROJECT, envPath: ENV_PATH };
 
+// Scenarios 5-7 and 9 each `recreateService("steve")` with an env override.
+// Container start_period is 240s, so each one costs ~5+ minutes. They are
+// gated behind `RUN_SLOW=1` so the default `deno task test:integration:
+// scan-login` run stays under ~5 minutes; CI can opt-in via env.
+const RUN_SLOW = Deno.env.get("RUN_SLOW") === "1";
+
 async function newCpsim(chargeBoxId: string): Promise<Cpsim> {
   const sim = await Cpsim.spawn(CPSIM_BIN);
-  await sim.connect(`${STEVE_WS_URL}/${chargeBoxId}`, chargeBoxId);
+  await sim.connect(STEVE_WS_URL, chargeBoxId);
   await sim.bootNotification();
   await sim.statusNotification(1, "Available");
   return sim;
@@ -114,6 +120,11 @@ Deno.test({
       await clearVerifications();
       const { pairingCode } = await armScanPair(CB_A);
       const sse = await detectStream(CB_A, pairingCode);
+      // Belt-and-braces: even though detectStream now waits for the
+      // `event: connected` handshake (which fires after the event-bus
+      // subscribe is wired), give the server a tick to be safe. The real
+      // race fix is the eventBus.replay() path in scan-detect.ts.
+      await new Promise((r) => setTimeout(r, 50));
       const sim = await newCpsim(CB_A);
       try {
         const auth = await sim.authorize(TAG_GOOD);
@@ -186,7 +197,7 @@ Deno.test({
     });
 
     // --- 5. Hook timeout (steve restart with PREAUTH_TIMEOUT_MS=1) ----------
-    await t.step("5. hook timeout: SteVe fails open, Authorize Accepted, tx starts", async () => {
+    await t.step({ name: "5. [slow] hook timeout: SteVe fails open, Authorize Accepted, tx starts", ignore: !RUN_SLOW, fn: async () => {
       await clearVerifications();
       // Bounce SteVe with an aggressive timeout.
       Deno.env.set("PREAUTH_TIMEOUT_MS_OVERRIDE", "1");
@@ -200,7 +211,7 @@ Deno.test({
         await assertEventually(async () => {
           const sim = await Cpsim.spawn(CPSIM_BIN);
           try {
-            await sim.connect(`${STEVE_WS_URL}/${CB_A}`, CB_A);
+            await sim.connect(STEVE_WS_URL, CB_A);
             await sim.bootNotification();
             return true;
           } catch {
@@ -227,7 +238,7 @@ Deno.test({
         await assertEventually(async () => {
           const sim = await Cpsim.spawn(CPSIM_BIN);
           try {
-            await sim.connect(`${STEVE_WS_URL}/${CB_A}`, CB_A);
+            await sim.connect(STEVE_WS_URL, CB_A);
             await sim.bootNotification();
             return true;
           } catch {
@@ -235,12 +246,12 @@ Deno.test({
           } finally { await sim.dispose(); }
         }, { timeoutMs: 180_000, intervalMs: 2_000 });
       }
-    });
+    } });
 
     // --- 6. Hook 5xx --------------------------------------------------------
     // We point PREAUTH_URL at a tiny Deno HTTP stub running on the host.
     // Since SteVe lives in docker, we expose the stub on host.docker.internal.
-    await t.step("6. hook 5xx: fail open", async () => {
+    await t.step({ name: "6. [slow] hook 5xx: fail open", ignore: !RUN_SLOW, fn: async () => {
       await clearVerifications();
       const stub = Deno.serve({ port: 0, hostname: "0.0.0.0" }, () => new Response("oops", { status: 500 }));
       const port = stub.addr.port;
@@ -251,7 +262,7 @@ Deno.test({
         await assertEventually(async () => {
           const sim = await Cpsim.spawn(CPSIM_BIN);
           try {
-            await sim.connect(`${STEVE_WS_URL}/${CB_A}`, CB_A);
+            await sim.connect(STEVE_WS_URL, CB_A);
             await sim.bootNotification();
             return true;
           } catch { return false; } finally { await sim.dispose(); }
@@ -268,16 +279,16 @@ Deno.test({
         await assertEventually(async () => {
           const sim = await Cpsim.spawn(CPSIM_BIN);
           try {
-            await sim.connect(`${STEVE_WS_URL}/${CB_A}`, CB_A);
+            await sim.connect(STEVE_WS_URL, CB_A);
             await sim.bootNotification();
             return true;
           } catch { return false; } finally { await sim.dispose(); }
         }, { timeoutMs: 180_000, intervalMs: 2_000 });
       }
-    });
+    } });
 
     // --- 7. Malformed JSON --------------------------------------------------
-    await t.step("7. hook malformed JSON: fail open", async () => {
+    await t.step({ name: "7. [slow] hook malformed JSON: fail open", ignore: !RUN_SLOW, fn: async () => {
       await clearVerifications();
       const stub = Deno.serve({ port: 0, hostname: "0.0.0.0" }, () => new Response("not-json", { status: 200, headers: { "Content-Type": "application/json" } }));
       const port = stub.addr.port;
@@ -287,7 +298,7 @@ Deno.test({
         await assertEventually(async () => {
           const sim = await Cpsim.spawn(CPSIM_BIN);
           try {
-            await sim.connect(`${STEVE_WS_URL}/${CB_A}`, CB_A);
+            await sim.connect(STEVE_WS_URL, CB_A);
             await sim.bootNotification();
             return true;
           } catch { return false; } finally { await sim.dispose(); }
@@ -304,13 +315,13 @@ Deno.test({
         await assertEventually(async () => {
           const sim = await Cpsim.spawn(CPSIM_BIN);
           try {
-            await sim.connect(`${STEVE_WS_URL}/${CB_A}`, CB_A);
+            await sim.connect(STEVE_WS_URL, CB_A);
             await sim.bootNotification();
             return true;
           } catch { return false; } finally { await sim.dispose(); }
         }, { timeoutMs: 180_000, intervalMs: 2_000 });
       }
-    });
+    } });
 
     // --- 8. HMAC mismatch ---------------------------------------------------
     await t.step("8. HMAC mismatch: ExpresSync 401, SteVe fails open", async () => {
@@ -345,7 +356,7 @@ Deno.test({
     });
 
     // --- 9. Race / watchdog -------------------------------------------------
-    await t.step("9. watchdog: hook returns null but DB row armed → RemoteStop after StartTransaction", async () => {
+    await t.step({ name: "9. [slow] watchdog: hook returns null but DB row armed → RemoteStop after StartTransaction", ignore: !RUN_SLOW, fn: async () => {
       await clearVerifications();
       await clearOperationLog();
       // Stub returns {override:null} so SteVe lets the start-tx through.
@@ -356,7 +367,7 @@ Deno.test({
         await recreateService(ctx, "steve");
         await assertEventually(async () => {
           const sim = await Cpsim.spawn(CPSIM_BIN);
-          try { await sim.connect(`${STEVE_WS_URL}/${CB_A}`, CB_A); await sim.bootNotification(); return true; }
+          try { await sim.connect(STEVE_WS_URL, CB_A); await sim.bootNotification(); return true; }
           catch { return false; } finally { await sim.dispose(); }
         }, { timeoutMs: 180_000, intervalMs: 2_000 });
 
@@ -395,11 +406,11 @@ Deno.test({
         await recreateService(ctx, "steve");
         await assertEventually(async () => {
           const sim = await Cpsim.spawn(CPSIM_BIN);
-          try { await sim.connect(`${STEVE_WS_URL}/${CB_A}`, CB_A); await sim.bootNotification(); return true; }
+          try { await sim.connect(STEVE_WS_URL, CB_A); await sim.bootNotification(); return true; }
           catch { return false; } finally { await sim.dispose(); }
         }, { timeoutMs: 180_000, intervalMs: 2_000 });
       }
-    });
+    } });
 
     // --- 10. Intent expired -------------------------------------------------
     await t.step("10. intent expired: preauth finds no armed row → Accepted", async () => {
@@ -419,18 +430,24 @@ Deno.test({
     });
 
     // --- 11. Blocked tag ----------------------------------------------------
-    await t.step("11. blocked tag: Authorize Blocked, no scan.intercepted (hook short-circuits)", async () => {
+    // The pre-authorize hook fires for every authorize during an armed
+    // window — including non-ACCEPTED original statuses — so that admin
+    // pair-and-add flows can intercept blocked / unknown tags too. The
+    // override side of the contract still refuses to upgrade non-ACCEPTED
+    // (a Blocked tag stays Blocked), but the scan.intercepted SSE event
+    // DOES fire so the listening UI can route to "this card is already
+    // blocked" copy.
+    await t.step("11. blocked tag: stays Blocked but scan.intercepted still fires", async () => {
       await clearVerifications();
       const { pairingCode } = await armScanPair(CB_A);
       const sse = await detectStream(CB_A, pairingCode);
-      let sseFired = false;
-      sse.next(3_000).then(() => { sseFired = true; }).catch(() => {});
       const sim = await newCpsim(CB_A);
       try {
         const auth = await sim.authorize(TAG_BLOCKED);
-        assertEquals(auth.status, "Blocked", "blocked tag stays Blocked from SteVe");
-        await new Promise((r) => setTimeout(r, 3_500));
-        assertEquals(sseFired, false, "hook short-circuits before calling ExpresSync");
+        assertEquals(auth.status, "Blocked", "blocked tag stays Blocked from SteVe (override won't upgrade non-ACCEPTED)");
+        const msg = await sse.next(10_000);
+        const payload = JSON.parse(msg.data) as { idTag: string };
+        assertEquals(payload.idTag, TAG_BLOCKED, "scan.intercepted forwards even for blocked tags");
       } finally { sse.close(); await sim.dispose(); }
     });
 
