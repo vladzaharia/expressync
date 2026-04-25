@@ -30,6 +30,10 @@ interface Props {
   timeoutSeconds?: number;
   /** Themes the modal BorderBeam / countdown ring. Defaults to cyan. */
   accent?: AccentColor;
+  /** Heading rendered inside the shared `ScanPanel`. */
+  panelTitle?: string;
+  /** Helper line under the panel title. */
+  panelSubtitle?: string;
 }
 
 export default function ScanTagAction(
@@ -39,6 +43,8 @@ export default function ScanTagAction(
     confirmMode,
     timeoutSeconds,
     accent,
+    panelTitle,
+    panelSubtitle,
   }: Props,
 ) {
   const open = useSignal(false);
@@ -79,6 +85,8 @@ export default function ScanTagAction(
         confirmMode={confirmMode}
         timeoutSeconds={timeoutSeconds}
         accent={accent}
+        panelTitle={panelTitle}
+        panelSubtitle={panelSubtitle}
       />
     </>
   );

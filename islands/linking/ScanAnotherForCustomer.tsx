@@ -46,6 +46,8 @@ export default function ScanAnotherForCustomer({ customerExternalId }: Props) {
     <ScanTagAction
       buttonLabel="Scan another for this customer"
       onDetected={handleDetected}
+      panelTitle="Link another tag"
+      panelSubtitle="Tap the customer's card on any online charger."
     />
   );
 }
