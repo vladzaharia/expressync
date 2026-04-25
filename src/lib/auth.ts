@@ -142,6 +142,16 @@ export const auth = betterAuth({
       expiresIn: config.MAGIC_LINK_TTL_SECONDS,
       storeToken: "hashed",
       sendMagicLink: async ({ email, url, token }, _ctx) => {
+        // Constant-time-ish jitter floor: a deterministic ~50-150ms wait
+        // smooths out the difference between "user exists, send email" and
+        // "user does not exist, return early". Without this, an attacker
+        // can compare response latencies to enumerate registered emails.
+        // We don't try to be cryptographically constant-time — just to mask
+        // the bulk of the latency variance.
+        const jitter = 50 + Math.floor(Math.random() * 100);
+        const jitterPromise = new Promise<void>((resolve) =>
+          setTimeout(resolve, jitter)
+        );
         // Audit BEFORE sending so we always have the request record even if
         // the email Worker call rolls back.
         const tokenHash = await hashEmail(token); // sha256 helper, name kept for symmetry
@@ -164,6 +174,9 @@ export const auth = betterAuth({
             },
           });
         }
+        // Wait out the jitter floor so the response latency is roughly
+        // independent of the actual send path taken.
+        await jitterPromise;
       },
     }),
 

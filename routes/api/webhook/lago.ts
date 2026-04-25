@@ -12,10 +12,13 @@ const webhookLogger = logger.child("LagoWebhook");
 /**
  * Public-key cache for webhook signature verification.
  *
- * Lago's webhook key can rotate (e.g. organization re-provision); we refetch
- * every hour and on verify failure. The cache survives the handler closure.
+ * Lago's webhook key can rotate (e.g. organization re-provision, security
+ * incident). A 60-minute TTL means a compromised-key rotation can take up to
+ * an hour to propagate to us; for an active incident that's an unacceptably
+ * wide window. 5 minutes keeps incident exposure short while still avoiding
+ * a fetch-per-request hot path. We also refetch on signature-verify failure.
  */
-const PUBLIC_KEY_TTL_MS = 60 * 60 * 1000;
+const PUBLIC_KEY_TTL_MS = 5 * 60 * 1000;
 let cachedPublicKey: { pem: string; fetchedAt: number } | null = null;
 
 async function getPublicKey(forceRefresh = false): Promise<string | null> {

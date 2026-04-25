@@ -12,6 +12,7 @@ import {
 import { logger } from "../../../../src/lib/utils/logger.ts";
 import { recordChargerStatus } from "../../../../src/services/charger-cache.service.ts";
 import { eventBus } from "../../../../src/services/event-bus.service.ts";
+import { withIdempotency } from "../../../../src/lib/idempotency.ts";
 
 /**
  * Map from allowed operation name to the corresponding `steveClient.operations`
@@ -132,7 +133,11 @@ export const handler = define.handlers({
     }
   },
 
-  async POST(ctx) {
+  POST(ctx) {
+    return withIdempotency(
+      ctx,
+      "POST /api/admin/charger/operation",
+      async () => {
     // Defense-in-depth: this endpoint is mounted under /api/admin/* and the
     // middleware enforces admin-host-only delivery. We re-check the role here
     // so even if a future middleware refactor regresses, a customer-role
@@ -328,6 +333,8 @@ export const handler = define.handlers({
         error: message,
       });
     }
+      },
+    );
   },
 });
 
