@@ -80,6 +80,10 @@ export async function generateTestEnv(): Promise<TestEnv> {
     TAG_GOOD: `tag-good-${shortId()}`,
     TAG_BLOCKED: `tag-blocked-${shortId()}`,
     TAG_UNKNOWN: `tag-unknown-${shortId()}`,
+    // Stamped onto every container as labels so the orphan sweeper can
+    // tell whether a leftover stack belongs to a still-running test.
+    RUNNER_PID: String(Deno.pid),
+    RUNNER_STARTED_AT: String(Date.now()),
   };
 
   const envPath = `${dir}/.env.test.${id}`;
