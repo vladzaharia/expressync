@@ -46,6 +46,10 @@ import {
   type NotificationSourceType,
 } from "./notification.service.ts";
 import { eventBus } from "./event-bus.service.ts";
+import {
+  stopActiveTransactionsForCustomer,
+  stopActiveTransactionsForSubscription,
+} from "./auto-stop.service.ts";
 import { syncSingleTagToSteve } from "./tag-sync.service.ts";
 import {
   handleCustomerWebhook,
@@ -686,6 +690,65 @@ async function reactTo(payload: LagoWebhook, rowId: number): Promise<boolean> {
       return true;
     }
 
+    // Wave R: hard cap. When a customer's pre-paid wallet hits zero
+    // mid-charge (typical for guest passes / pay-as-you-go plans) Lago
+    // fires `wallet.depleted_ongoing_balance`. We auto-stop every
+    // active session for that customer so they don't accrue more charge
+    // they can't pay for.
+    case "wallet.depleted_ongoing_balance": {
+      const externalCustomerId = pickExternalCustomerId(payload);
+      if (!externalCustomerId) {
+        log.warn("wallet.depleted_ongoing_balance without customer id", {
+          rowId,
+        });
+        return false;
+      }
+      void stopActiveTransactionsForCustomer(externalCustomerId, {
+        code: "wallet_depleted",
+        detail:
+          `Lago wallet depleted_ongoing_balance for customer ${externalCustomerId}`,
+        webhookEventId: rowId,
+      }).catch((err) => {
+        log.error("stopActiveTransactionsForCustomer threw (caught)", {
+          externalCustomerId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+      return true;
+    }
+
+    // Wave R: soft cap → hard cap when the operator marks the threshold
+    // as enforcing. Lago's `subscription.usage_threshold_reached` carries
+    // the alert metadata; we honour `enforce_stop=true` only.
+    case "subscription.usage_threshold_reached": {
+      const externalSubscriptionId = pickExternalSubscriptionId(payload);
+      if (!externalSubscriptionId) {
+        log.warn("usage_threshold_reached without subscription id", { rowId });
+        return false;
+      }
+      const enforce = pickEnforceStopFlag(payload);
+      if (!enforce) {
+        // Informational threshold — log and let the caller's own
+        // notification path surface it. No auto-stop.
+        log.info("usage_threshold_reached (informational only)", {
+          externalSubscriptionId,
+        });
+        return false;
+      }
+      void stopActiveTransactionsForSubscription(externalSubscriptionId, {
+        code: "usage_cap_exceeded",
+        detail:
+          `Lago usage_threshold_reached (enforce=true) for subscription ${externalSubscriptionId}`,
+        webhookEventId: rowId,
+      }).catch((err) => {
+        log.error("stopActiveTransactionsForSubscription threw (caught)", {
+          externalSubscriptionId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+      return true;
+    }
+
     // ----------------------------------------------------------------------
     // Polaris Track A — capability sync via Lago lifecycle webhooks.
     //
@@ -838,6 +901,56 @@ function pickExternalSubscriptionId(payload: LagoWebhook): string | null {
 }
 
 /**
+ * Probe a Lago payload for the originating customer's external_id. Lago
+ * variously nests it under `wallet.external_customer_id`, `customer`,
+ * `subscription.external_customer_id`, or as a top-level field — we
+ * check each in order.
+ */
+function pickExternalCustomerId(payload: LagoWebhook): string | null {
+  const p = payload as unknown as Record<string, unknown>;
+  const wallet = p.wallet as Record<string, unknown> | undefined;
+  if (wallet && typeof wallet.external_customer_id === "string") {
+    return wallet.external_customer_id;
+  }
+  const wt = p.wallet_transaction as Record<string, unknown> | undefined;
+  if (wt && typeof wt.external_customer_id === "string") {
+    return wt.external_customer_id;
+  }
+  const customer = p.customer as Record<string, unknown> | undefined;
+  if (customer && typeof customer.external_id === "string") {
+    return customer.external_id;
+  }
+  const sub = p.subscription as Record<string, unknown> | undefined;
+  if (sub && typeof sub.external_customer_id === "string") {
+    return sub.external_customer_id;
+  }
+  if (typeof p.external_customer_id === "string") {
+    return p.external_customer_id;
+  }
+  return null;
+}
+
+/**
+ * Lago's `subscription.usage_threshold_reached` webhook carries an
+ * `alert` object with optional `metadata`. Operators set
+ * `metadata.enforce_stop=true` (or the legacy `enforce_stop` boolean
+ * directly on the alert) to convert a soft warning into a hard cap.
+ * Default (false / missing) means "informational only" so we don't
+ * accidentally yank the cord on every threshold breach.
+ */
+function pickEnforceStopFlag(payload: LagoWebhook): boolean {
+  const p = payload as unknown as Record<string, unknown>;
+  const alert = p.alert as Record<string, unknown> | undefined;
+  if (!alert) return false;
+  if (alert.enforce_stop === true) return true;
+  const meta = alert.metadata as Record<string, unknown> | undefined;
+  if (meta && (meta.enforce_stop === true || meta.enforce_stop === "true")) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Pull the customer object out of a customer.* webhook. Lago wraps it under
  * `customer`.
  */
@@ -919,6 +1032,24 @@ async function handleSubscriptionStateChange(args: {
     void syncSingleTagToSteve(m).catch((err) => {
       log.error("syncSingleTagToSteve threw unexpectedly (caught)", {
         mappingId: m.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+  }
+
+  // Wave R: when a subscription terminates we also stop any in-flight
+  // charging session — otherwise the customer would keep drawing kWh
+  // against a deactivated mapping and the post-tx sync would discover
+  // the gap minutes later. Fire-and-forget: failures already notify on
+  // their own; the next sync sweep is the safety net.
+  if (!targetActive) {
+    void stopActiveTransactionsForSubscription(externalSubscriptionId, {
+      code: "subscription_terminated",
+      detail: `Lago ${webhookType} for subscription ${externalSubscriptionId}`,
+      webhookEventId: rowId,
+    }).catch((err) => {
+      log.error("stopActiveTransactionsForSubscription threw (caught)", {
+        externalSubscriptionId,
         error: err instanceof Error ? err.message : String(err),
       });
     });
