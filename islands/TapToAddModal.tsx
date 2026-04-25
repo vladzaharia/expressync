@@ -39,6 +39,7 @@ import { ScanStateIcon } from "@/components/scan/ScanStateIcon.tsx";
 import { ScanCountdownRing } from "@/components/scan/ScanCountdownRing.tsx";
 import { ManualEntryForm } from "@/components/scan/ManualEntryForm.tsx";
 import { TagChip } from "@/components/tags/TagChip.tsx";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 interface Props {
   open: boolean;
@@ -89,7 +90,7 @@ export default function TapToAddModal({
     const dest = r.exists && typeof r.tagPk === "number"
       ? `/tags/${r.tagPk}`
       : `/tags/new?idTag=${encodeURIComponent(r.idTag)}`;
-    globalThis.location.href = dest;
+    clientNavigate(dest);
   };
 
   const hook = useScanTag({

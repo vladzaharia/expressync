@@ -1,28 +1,15 @@
 /**
  * /billing — customer Billing landing.
  *
- * Polaris Track G3 — single page combining Subscription + Usage + Invoices.
- * SidebarLayout with the customer navigation, page accent = teal.
- *
- * Loader fetches three things (each tolerant of failure):
- *   1. Lago subscription via `lagoClient.getSubscriptions(externalCustomerId)`
- *   2. Lago current/previous/year usage via `lagoClient.getCurrentUsage`
- *      (legacy `previous` / `year` periods short-circuit to a placeholder)
- *   3. Customer invoice list via `lagoClient.listInvoices` (with status +
- *      date filters from URL)
- *
- * Layout (top-down):
- *   StatStrip [Open · Paid · This Period kWh · Total Spent]
- *     (Open / Paid cells double as ?status= shortcuts)
- *   Anchor sub-nav: "Subscription · Usage · Invoices"
- *   SectionCard "Subscription" #subscription
- *   SectionCard "Usage" #usage
- *   SectionCard "Invoices" #invoices
- *     [filter bar]
- *     [CustomerInvoicesTable]
- *     [EmptyState if zero]
+ * IA (top-down, inside one PageCard, accent=blue):
+ *   StatStrip [ Amount due · Next due · Paid last 30d · kWh this month ]
+ *   SectionCard "Overview"        → BillingOverviewCard (pay-now pill or paid-up tick)
+ *   SectionCard "Plan & Usage"    → PeriodUsageChart + PlanInfoCard (1fr · 1fr on lg)
+ *   SectionCard "Wallet"          → CustomerWalletSection (conditional)
+ *   SectionCard "Invoices"        → filter bar + CustomerInvoicesTable + EmptyState
  */
 
+import { and, eq, gte, inArray, isNotNull, lt, ne } from "drizzle-orm";
 import { define } from "../../utils.ts";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
@@ -36,64 +23,70 @@ import { BlurFade } from "../../components/magicui/blur-fade.tsx";
 import { MoneyBadge } from "../../components/billing/MoneyBadge.tsx";
 import { BillingPeriodSwitcher } from "../../components/shared/BillingPeriodSwitcher.tsx";
 import type { BillingPeriod } from "../../components/shared/BillingPeriodSwitcher.tsx";
-import SubscriptionHeroCard from "../../islands/customer/SubscriptionHeroCard.tsx";
-import type { SubscriptionHeroData } from "../../islands/customer/SubscriptionHeroCard.tsx";
-import UsageGaugeLive from "../../islands/customer/UsageGaugeLive.tsx";
+import {
+  BillingOverviewCard,
+  type BillingOverviewData,
+} from "../../components/customer/BillingOverviewCard.tsx";
+import { type PlanInfo } from "../../components/customer/PlanInfoCard.tsx";
+import { PeriodBreakdownCard } from "../../components/customer/PeriodBreakdownCard.tsx";
+import PeriodUsageChart, {
+  type UsageDayPoint,
+} from "../../islands/customer/PeriodUsageChart.tsx";
 import CustomerInvoicesTable from "../../islands/customer/CustomerInvoicesTable.tsx";
 import CustomerInvoiceFilterBar from "../../islands/customer/CustomerInvoiceFilterBar.tsx";
 import type { CustomerInvoiceFilter } from "../../islands/customer/CustomerInvoiceFilterBar.tsx";
+import CustomerWalletSection, {
+  type WalletData,
+} from "../../islands/customer/CustomerWalletSection.tsx";
 import {
   Bolt,
-  FileText,
+  CalendarClock,
+  CircleDollarSign,
   Gauge,
   Receipt,
   Wallet,
-  WalletCards,
 } from "lucide-preact";
 import { lagoClient } from "../../src/lib/lago-client.ts";
 import { resolveCustomerScope } from "../../src/lib/scoping.ts";
 import {
-  deriveInvoiceUiStatus,
   type InvoiceListDTO,
   toInvoiceListDTO,
 } from "../../src/lib/invoice-ui.ts";
 import { logger } from "../../src/lib/utils/logger.ts";
 import { db } from "../../src/db/index.ts";
 import * as schema from "../../src/db/schema.ts";
-import { and, eq, isNotNull, ne } from "drizzle-orm";
+import {
+  currencySymbolFor,
+  derivePlanInfo,
+  enumerateDays,
+  localDayKey,
+  periodWindow,
+} from "../../src/lib/billing-derive.ts";
+import { config } from "../../src/lib/config.ts";
 
 const log = logger.child("CustomerBillingPage");
 
 interface BillingPageData {
-  subscription: SubscriptionHeroData | null;
-  usage: {
-    period: BillingPeriod;
-    valueKwh: number;
-    /** Optional cap to drive the gauge ratio (null when no plan cap exposed). */
-    capKwh: number | null;
-    supported: boolean;
-    currency: string;
-    totalSpentCents: number;
-  };
+  overview: BillingOverviewData;
+  plan: PlanInfo | null;
+  dailyUsage: UsageDayPoint[];
+  periodLabel: string;
+  wallet: WalletData | null;
   invoices: {
     rows: InvoiceListDTO[];
     totalCount: number;
-    openCount: number;
-    paidCount: number;
-    totalSpentCents: number;
+    paidLast30dCents: number;
   };
   filters: {
     status: CustomerInvoiceFilter[];
     from: string;
     to: string;
   };
-  scopeIsActive: boolean;
-  scopeMappingIds: number[];
   hasLagoLink: boolean;
   currency: string;
+  operatorEmail?: string;
 }
 
-const ALLOWED_PERIODS: BillingPeriod[] = ["current", "previous", "year"];
 const ALLOWED_STATUS: CustomerInvoiceFilter[] = ["open", "paid", "voided"];
 
 /** Map URL `status` set to Lago `status` + `payment_status` query lists. */
@@ -106,7 +99,6 @@ function customerStatusToLago(filters: CustomerInvoiceFilter[]): {
   for (const f of filters) {
     switch (f) {
       case "open":
-        // "Open" in customer parlance = finalized AND not paid yet.
         lagoStatus.add("finalized");
         lagoPaymentStatus.add("pending");
         lagoPaymentStatus.add("failed");
@@ -129,12 +121,8 @@ function customerStatusToLago(filters: CustomerInvoiceFilter[]): {
 export const handler = define.handlers({
   async GET(ctx) {
     const url = new URL(ctx.req.url);
-    const periodParam = url.searchParams.get("period");
-    const period: BillingPeriod = ALLOWED_PERIODS.includes(
-        periodParam as BillingPeriod,
-      )
-      ? (periodParam as BillingPeriod)
-      : "current";
+    // Current only for now — previous/year not yet wired.
+    const period: BillingPeriod = "current";
 
     const statusParams = url.searchParams.getAll("status").filter(
       (s): s is CustomerInvoiceFilter =>
@@ -146,105 +134,137 @@ export const handler = define.handlers({
     const scope = await resolveCustomerScope(ctx);
     const hasLagoLink = scope.lagoCustomerExternalId !== null;
 
-    let subscription: SubscriptionHeroData | null = null;
     let currency = "EUR";
-    let valueKwh = 0;
-    // No plan cap is exposed in the current Lago payload — kept as a
-    // future hook so the gauge can render a "x of y kWh" ratio later.
-    const capKwh: number | null = null;
-    let usageSupported = true;
+    let planInfo: PlanInfo | null = null;
     let invoicesRows: InvoiceListDTO[] = [];
     let invoicesTotal = 0;
-    let openCount = 0;
-    let paidCount = 0;
-    let totalSpentCents = 0;
-    let usageTotalSpentCents = 0;
 
-    if (hasLagoLink) {
-      // Fetch subscription summary.
+    // Invoice aggregates
+    let openCents = 0;
+    let overdueCents = 0;
+    let failedCount = 0;
+    let paidLast30dCents = 0;
+    let nextDueDateIso: string | null = null;
+    let nextInvoiceDateIso: string | null = null;
+    let nextInvoiceEstimateCents: number | null = null;
+
+    // ── Usage series for the current period (DB-backed) ───────────────
+    const { from: periodFrom, to: periodTo, label: periodLabel } = periodWindow(
+      period,
+    );
+    let usageValueKwh = 0;
+    const dayBuckets = new Map<string, number>();
+    for (const d of enumerateDays(periodFrom, periodTo)) dayBuckets.set(d, 0);
+    if (scope.mappingIds.length > 0) {
       try {
-        const { subscriptions } = await lagoClient.getSubscriptions(
-          scope.lagoCustomerExternalId!,
-        );
-        const active = subscriptions.find((s) =>
-          s.status === "active" || s.status === "pending"
-        ) ?? subscriptions[0] ?? null;
-        if (active) {
-          subscription = {
-            name: active.name,
-            planCode: active.plan_code,
-            billingTime: active.billing_time,
-            // Lago's subscription payload doesn't carry a "next invoice
-            // date" directly — best signal is the current billing period
-            // ending date.
-            nextInvoiceDateIso: active.current_billing_period_ending_at ?? null,
-            // Estimate is not in the basic subscription payload; fetched
-            // separately in a follow-up.
-            nextInvoiceEstimateCents: null,
-            currency,
-            status: active.status,
-          };
+        const rows = await db
+          .select({
+            syncedAt: schema.syncedTransactionEvents.syncedAt,
+            kwhDelta: schema.syncedTransactionEvents.kwhDelta,
+          })
+          .from(schema.syncedTransactionEvents)
+          .where(
+            and(
+              inArray(
+                schema.syncedTransactionEvents.userMappingId,
+                scope.mappingIds,
+              ),
+              gte(schema.syncedTransactionEvents.syncedAt, periodFrom),
+              lt(schema.syncedTransactionEvents.syncedAt, periodTo),
+            ),
+          );
+        for (const r of rows) {
+          const kwh = Number(r.kwhDelta ?? 0);
+          usageValueKwh += kwh;
+          if (r.syncedAt) {
+            const key = localDayKey(new Date(r.syncedAt));
+            dayBuckets.set(key, (dayBuckets.get(key) ?? 0) + kwh);
+          }
         }
       } catch (err) {
-        log.warn(
-          "Failed to fetch subscription for billing page",
-          { error: err instanceof Error ? err.message : String(err) },
-        );
+        log.warn("Failed to fetch daily usage for billing page", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    const dailyUsage: UsageDayPoint[] = [...dayBuckets.entries()].map((
+      [date, kwh],
+    ) => ({ date, kwh: Number(kwh.toFixed(3)) }));
+
+    let wallet: WalletData | null = null;
+
+    if (hasLagoLink) {
+      const extCustomerId = scope.lagoCustomerExternalId!;
+
+      // Resolve subscription id for plan + estimate fetches.
+      let subId: string | null = null;
+      try {
+        const mappingRows = await db
+          .select({
+            subscriptionExternalId:
+              schema.userMappings.lagoSubscriptionExternalId,
+          })
+          .from(schema.userMappings)
+          .where(
+            and(
+              eq(schema.userMappings.lagoCustomerExternalId, extCustomerId),
+              eq(schema.userMappings.isActive, true),
+              isNotNull(schema.userMappings.lagoSubscriptionExternalId),
+              ne(schema.userMappings.lagoSubscriptionExternalId, ""),
+            ),
+          );
+        subId = mappingRows[0]?.subscriptionExternalId ?? null;
+      } catch (err) {
+        log.warn("Failed to resolve subscription for billing page", {
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
 
-      // Fetch current usage when period === "current"; previous/year are
-      // not yet supported by the underlying API.
-      if (period === "current" && subscription) {
+      // Subscription name (for plan label) + current usage estimate.
+      let subscriptionName: string | null = null;
+      if (subId) {
         try {
-          // Resolve the active subscription external id via mapping.
-          const mappingRows = await db
-            .select({
-              subscriptionExternalId:
-                schema.userMappings.lagoSubscriptionExternalId,
-            })
-            .from(schema.userMappings)
-            .where(
-              and(
-                eq(
-                  schema.userMappings.lagoCustomerExternalId,
-                  scope.lagoCustomerExternalId!,
-                ),
-                eq(schema.userMappings.isActive, true),
-                isNotNull(schema.userMappings.lagoSubscriptionExternalId),
-                ne(schema.userMappings.lagoSubscriptionExternalId, ""),
-              ),
-            );
-          const subId = mappingRows[0]?.subscriptionExternalId ?? null;
-          if (subId) {
-            const usage = await lagoClient.getCurrentUsage(
-              scope.lagoCustomerExternalId!,
-              subId,
-            );
+          const [{ subscription }, usage] = await Promise.all([
+            lagoClient.getSubscription(subId).catch(
+              () => ({ subscription: null } as const),
+            ),
+            lagoClient.getCurrentUsage(extCustomerId, subId).catch(() => null),
+          ]);
+          if (subscription) {
+            subscriptionName = subscription.name;
+            nextInvoiceDateIso =
+              subscription.current_billing_period_ending_at ?? null;
+          }
+          if (usage) {
             currency = usage.currency || currency;
-            usageTotalSpentCents = usage.total_amount_cents;
-            // Aggregate the energy units across charges_usage entries.
-            for (const u of usage.charges_usage) {
-              const unitsNum = parseFloat(u.units);
-              if (Number.isFinite(unitsNum)) valueKwh += unitsNum;
+            nextInvoiceEstimateCents = usage.total_amount_cents;
+          }
+          const planCode = subscription?.plan_code ?? null;
+          if (planCode) {
+            const planRaw = await lagoClient.getPlan(planCode).catch(() => null);
+            if (planRaw) {
+              planInfo = derivePlanInfo(
+                planRaw as unknown as Record<string, unknown>,
+                usageValueKwh,
+                currencySymbolFor(currency),
+              );
+              if (planInfo && subscriptionName) planInfo.name = subscriptionName;
             }
           }
         } catch (err) {
-          log.warn(
-            "Failed to fetch usage for billing page",
-            { error: err instanceof Error ? err.message : String(err) },
-          );
+          log.warn("Failed to fetch plan/usage for billing page", {
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
-      } else if (period !== "current") {
-        usageSupported = false;
       }
 
-      // Fetch invoices with active filters applied.
+      // Invoices list (filtered).
       try {
         const { lagoStatus, lagoPaymentStatus } = customerStatusToLago(
           statusParams,
         );
         const list = await lagoClient.listInvoices({
-          externalCustomerId: scope.lagoCustomerExternalId!,
+          externalCustomerId: extCustomerId,
           page: 1,
           perPage: 25,
           status: lagoStatus.length > 0 ? lagoStatus : undefined,
@@ -258,239 +278,310 @@ export const handler = define.handlers({
         invoicesTotal = list.meta.total_count;
         if (list.invoices[0]) currency = list.invoices[0].currency;
       } catch (err) {
-        log.warn(
-          "Failed to fetch invoices for billing page",
-          { error: err instanceof Error ? err.message : String(err) },
-        );
+        log.warn("Failed to fetch invoices for billing page", {
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
 
-      // Compute Open / Paid stat counts from a separate unfiltered fetch
-      // so the StatStrip stays meaningful regardless of UI filters.
+      // Unfiltered aggregate sweep for the overview + stats.
       try {
         const stats = await lagoClient.listInvoices({
-          externalCustomerId: scope.lagoCustomerExternalId!,
+          externalCustomerId: extCustomerId,
           page: 1,
           perPage: 100,
         });
+        const now = Date.now();
+        const thirtyDaysAgoMs = now - 30 * 24 * 60 * 60 * 1000;
         for (const inv of stats.invoices) {
-          const ui = deriveInvoiceUiStatus({
-            status: inv.status,
-            payment_status: inv.payment_status,
-            payment_overdue: inv.payment_overdue,
-          });
-          if (ui === "paid") {
-            paidCount += 1;
-            totalSpentCents += inv.total_amount_cents;
-          } else if (
-            ui === "finalized" || ui === "overdue" || ui === "pending" ||
-            ui === "failed"
-          ) {
-            openCount += 1;
+          const isFinalized = inv.status === "finalized";
+          if (!isFinalized) continue;
+          const paid = inv.payment_status === "succeeded";
+          if (paid) {
+            const issued = inv.issuing_date
+              ? new Date(inv.issuing_date).getTime()
+              : 0;
+            if (issued >= thirtyDaysAgoMs) {
+              paidLast30dCents += inv.total_amount_cents;
+            }
+          } else {
+            openCents += inv.total_amount_cents;
+            if (inv.payment_overdue) {
+              overdueCents += inv.total_amount_cents;
+            }
+            if (inv.payment_status === "failed") failedCount += 1;
+            if (inv.payment_due_date) {
+              if (
+                nextDueDateIso === null ||
+                new Date(inv.payment_due_date) < new Date(nextDueDateIso)
+              ) {
+                nextDueDateIso = inv.payment_due_date;
+              }
+            }
           }
         }
       } catch (err) {
-        log.warn(
-          "Failed to fetch stat counts for billing page",
-          { error: err instanceof Error ? err.message : String(err) },
+        log.warn("Failed to fetch invoice aggregates for billing page", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+
+      // Wallet (optional, tolerant of failure).
+      try {
+        const { wallets } = await lagoClient.listWalletsForCustomer(
+          extCustomerId,
         );
+        const active = wallets.find((w) => w.status === "active") ?? wallets[0];
+        if (active) {
+          const balanceCents = typeof active.balance_cents === "number"
+            ? active.balance_cents
+            : Math.round(parseFloat(active.credits_balance ?? "0") * 100);
+          const consumedCents = Math.round(
+            parseFloat(active.consumed_credits ?? "0") *
+              parseFloat(active.rate_amount ?? "1") * 100,
+          );
+          let txs: WalletData["transactions"] = [];
+          try {
+            const { wallet_transactions } = await lagoClient
+              .listWalletTransactions(active.lago_id, {
+                page: 1,
+                perPage: 5,
+              });
+            txs = wallet_transactions.map((t) => ({
+              id: t.lago_id,
+              dateIso: t.settled_at ?? t.created_at ?? "",
+              cents: Math.round(parseFloat(t.amount ?? "0") * 100),
+              type: t.transaction_type ?? "inbound",
+              status: t.status ?? "",
+            }));
+          } catch (err) {
+            log.warn("Failed to fetch wallet transactions for billing page", {
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+          wallet = {
+            balanceCents: Number.isFinite(balanceCents) ? balanceCents : 0,
+            consumedCents: Number.isFinite(consumedCents) ? consumedCents : 0,
+            lastTopUpIso: active.last_balance_sync_at ?? null,
+            currency: active.currency,
+            transactions: txs,
+          };
+        }
+      } catch (err) {
+        log.warn("Failed to fetch wallet for billing page", {
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 
+    const paidUp = openCents === 0 && failedCount === 0;
+    const overview: BillingOverviewData = {
+      openCents,
+      overdueCents,
+      failedCount,
+      nextInvoiceDateIso,
+      nextInvoiceEstimateCents,
+      currency,
+      paidUp,
+      nextDueDateIso,
+      operatorEmail: config.OPERATOR_CONTACT_EMAIL || undefined,
+    };
+
     return {
       data: {
-        subscription,
-        usage: {
-          period,
-          valueKwh,
-          capKwh,
-          supported: usageSupported,
-          currency,
-          totalSpentCents: usageTotalSpentCents,
-        },
+        overview,
+        plan: planInfo,
+        dailyUsage,
+        periodLabel,
+        wallet,
         invoices: {
           rows: invoicesRows,
           totalCount: invoicesTotal,
-          openCount,
-          paidCount,
-          totalSpentCents,
+          paidLast30dCents,
         },
         filters: { status: statusParams, from, to },
-        scopeIsActive: scope.isActive,
-        scopeMappingIds: scope.mappingIds,
         hasLagoLink,
         currency,
+        operatorEmail: config.OPERATOR_CONTACT_EMAIL || undefined,
       } satisfies BillingPageData,
     };
   },
 });
 
-function SubNav({ activeStatus }: { activeStatus: string[] }) {
-  // The sub-nav doubles as a quick anchor jump. We keep it simple — three
-  // anchors hashed to the SectionCard ids below.
-  return (
-    <nav
-      className="-mx-1 flex flex-wrap gap-1 text-sm"
-      aria-label="Billing sections"
-    >
-      {[
-        { href: "#subscription", label: "Subscription" },
-        { href: "#usage", label: "Usage" },
-        { href: "#invoices", label: "Invoices" },
-      ].map((entry) => (
-        <a
-          key={entry.href}
-          href={entry.href}
-          className="rounded-md px-3 py-1 text-muted-foreground hover:bg-teal-500/10 hover:text-teal-700 dark:hover:text-teal-300"
-        >
-          {entry.label}
-        </a>
-      ))}
-      {activeStatus.length > 0 && (
-        <span className="ml-auto text-xs text-muted-foreground">
-          Filtering by {activeStatus.join(", ")}
-        </span>
-      )}
-    </nav>
-  );
-}
-
 export default define.page<typeof handler>(function BillingIndexPage(
   { data, url, state },
 ) {
-  const periodLabel = data.usage.period === "current"
-    ? "this month"
-    : data.usage.period === "previous"
-    ? "last month"
-    : "this year";
+  // No-Lago-link empty state — dedicated body in place of everything else.
+  if (!data.hasLagoLink) {
+    return (
+      <SidebarLayout
+        currentPath={url.pathname}
+        user={state.user}
+        role="customer"
+        accentColor="blue"
+      >
+        <PageCard
+          title="Billing"
+          description="Your plan, usage, and invoices."
+          colorScheme="blue"
+        >
+          <EmptyState
+            icon={Receipt}
+            accent="blue"
+            title="No billing account on file"
+            description="Contact your operator to provision a plan and unlock billing."
+            primaryAction={data.operatorEmail
+              ? {
+                label: "Contact operator",
+                href: `mailto:${data.operatorEmail}`,
+              }
+              : undefined}
+          />
+        </PageCard>
+      </SidebarLayout>
+    );
+  }
+
+  const overdueCellTone = data.overview.overdueCents > 0
+    ? "amber"
+    : undefined;
 
   const stats: StatStripItem[] = [
     {
-      key: "open",
-      label: `Open · ${data.invoices.openCount}`,
-      value: data.invoices.openCount,
-      icon: WalletCards,
-      href: "/billing?status=open#invoices",
-      active: data.filters.status.includes("open"),
-      disabledWhenZero: true,
-    },
-    {
-      key: "paid",
-      label: `Paid · ${data.invoices.paidCount}`,
-      value: data.invoices.paidCount,
-      icon: FileText,
-      href: "/billing?status=paid#invoices",
-      active: data.filters.status.includes("paid"),
-      tone: "emerald",
-    },
-    {
-      key: "kwh",
-      label: `kWh ${periodLabel}`,
-      value: `${
-        data.usage.valueKwh.toLocaleString(undefined, {
-          maximumFractionDigits: 1,
-        })
-      } kWh`,
-      icon: Bolt,
-    },
-    {
-      key: "spent",
-      label: "Total spent",
+      key: "due",
+      label: "Amount due",
       value: (
         <MoneyBadge
-          cents={data.invoices.totalSpentCents}
+          cents={data.overview.openCents}
           currency={data.currency}
+          muted={data.overview.openCents === 0}
+        />
+      ),
+      icon: CircleDollarSign,
+      tone: overdueCellTone,
+      href: "/billing?status=open#invoices",
+      active: data.filters.status.includes("open"),
+      disabledWhenZero: data.overview.openCents === 0,
+    },
+    {
+      key: "next-due",
+      label: "Next due",
+      value: data.overview.nextDueDateIso
+        ? new Date(data.overview.nextDueDateIso).toLocaleDateString(undefined, {
+          month: "short",
+          day: "numeric",
+        })
+        : "—",
+      icon: CalendarClock,
+    },
+    {
+      key: "paid30",
+      label: "Paid last 30d",
+      value: (
+        <MoneyBadge
+          cents={data.invoices.paidLast30dCents}
+          currency={data.currency}
+          muted={data.invoices.paidLast30dCents === 0}
         />
       ),
       icon: Wallet,
+      tone: "emerald",
+      href: "/billing?status=paid#invoices",
+      active: data.filters.status.includes("paid"),
+    },
+    {
+      key: "kwh",
+      label: `kWh · ${data.periodLabel}`,
+      value: `${
+        data.dailyUsage.reduce((a, p) => a + p.kwh, 0).toLocaleString(
+          undefined,
+          { maximumFractionDigits: 1 },
+        )
+      } kWh`,
+      icon: Bolt,
     },
   ];
+
+  const hasActiveFilters = data.filters.status.length > 0 ||
+    data.filters.from !== "" || data.filters.to !== "";
 
   return (
     <SidebarLayout
       currentPath={url.pathname}
       user={state.user}
       role="customer"
-      accentColor="teal"
+      accentColor="blue"
     >
       <PageCard
         title="Billing"
-        description={data.hasLagoLink
-          ? "Subscription, usage, and invoices."
-          : "No billing account on file. Contact your operator to provision a plan."}
-        colorScheme="teal"
+        description="Your plan, usage, and invoices."
+        colorScheme="blue"
       >
         <div className="flex flex-col gap-6">
           <BlurFade direction="up" duration={0.35}>
-            <StatStrip accent="teal" items={stats} />
+            <StatStrip accent="blue" items={stats} />
           </BlurFade>
 
-          <SubNav activeStatus={data.filters.status} />
+          <SectionCard
+            title="Overview"
+            icon={CircleDollarSign}
+            accent="blue"
+          >
+            <BillingOverviewCard {...data.overview} accent="blue" />
+          </SectionCard>
 
-          <div id="subscription">
-            <SectionCard title="Subscription" icon={Wallet} accent="teal">
-              <SubscriptionHeroCard subscription={data.subscription} />
-            </SectionCard>
-          </div>
-
-          <div id="usage">
-            <SectionCard
-              title="Usage"
-              icon={Gauge}
-              accent="teal"
-              actions={
-                <BillingPeriodSwitcher
-                  value={data.usage.period}
-                  basePath="/billing"
+          <SectionCard
+            title="Plan & Usage"
+            icon={Gauge}
+            accent="blue"
+            actions={
+              <BillingPeriodSwitcher
+                value="current"
+                basePath="/billing"
+                supportedPeriods={["current"]}
+              />
+            }
+          >
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
+              <div className="min-w-0 rounded-lg border bg-card p-4 lg:col-span-2">
+                <PeriodUsageChart
+                  points={data.dailyUsage}
+                  periodLabel={data.periodLabel}
+                  accent="blue"
+                  emphasizeTotal
                 />
-              }
-            >
-              {data.usage.supported
-                ? (
-                  <div className="flex flex-col items-center gap-3 py-2">
-                    <UsageGaugeLive
-                      initialValueKwh={data.usage.valueKwh}
-                      capKwh={data.usage.capKwh}
-                      caption={periodLabel}
-                      accent="teal"
-                      mappingIds={data.scopeMappingIds}
-                    />
-                    {data.usage.totalSpentCents > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        Estimated cost {periodLabel}{" "}
-                        <MoneyBadge
-                          cents={data.usage.totalSpentCents}
-                          currency={data.usage.currency}
-                        />
-                      </p>
-                    )}
-                  </div>
-                )
-                : (
-                  <p className="text-sm text-muted-foreground">
-                    Historical usage isn't available yet. We'll surface it once
-                    finalized invoices land for the selected period.
-                  </p>
-                )}
+              </div>
+              <div className="min-w-0 rounded-lg border bg-card p-4 lg:col-span-1">
+                <PeriodBreakdownCard
+                  points={data.dailyUsage}
+                  accent="blue"
+                />
+              </div>
+            </div>
+          </SectionCard>
+
+          {data.wallet && (
+            <SectionCard title="Wallet" icon={Wallet} accent="blue">
+              <CustomerWalletSection wallet={data.wallet} accent="blue" />
             </SectionCard>
-          </div>
+          )}
 
           <div id="invoices">
-            <SectionCard title="Invoices" icon={Receipt} accent="teal">
+            <SectionCard title="Invoices" icon={Receipt} accent="blue">
               <div className="flex flex-col gap-4">
-                <CustomerInvoiceFilterBar initial={data.filters} />
+                <CustomerInvoiceFilterBar
+                  initial={data.filters}
+                  accent="blue"
+                />
                 {data.invoices.rows.length === 0
                   ? (
                     <EmptyState
                       icon={Receipt}
-                      accent="teal"
+                      accent="blue"
                       title="No invoices to show"
-                      description={data.filters.status.length > 0 ||
-                          data.filters.from ||
-                          data.filters.to
+                      description={hasActiveFilters
                         ? "Try clearing the filters or widening the date range."
                         : "Invoices appear here as your operator finalizes them."}
-                      primaryAction={data.filters.status.length > 0 ||
-                          data.filters.from || data.filters.to
+                      primaryAction={hasActiveFilters
                         ? {
                           label: "Reset filters",
                           href: "/billing#invoices",

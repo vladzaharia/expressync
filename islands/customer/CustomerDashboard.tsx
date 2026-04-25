@@ -1,46 +1,44 @@
 /**
  * CustomerDashboard — orchestrator for the customer surface root (`/`).
  *
- * Pulls together every customer dashboard block. The shape is intentionally
- * SectionCard-driven so we honor the established Wave A-E layout
- * conventions (one PageCard at the route layer, N SectionCards inside).
- *
- * Branches on `scope.isActive`:
- *   • Active   → Charging (Hero | Ready) + Reservation + Usage + Quick
- *                Actions + Recent activity SectionCards
- *   • Inactive → InactiveAccountHero alone (and a calmer surface)
- *
- * Subscribes to `/api/stream/customer` indirectly via the existing
- * SseProvider's shared `subscribeSse` for `notification.created` (badge
- * refresh), `transaction.meter` (HeroSessionCard owns its own subscription)
- * and `charger.state` (ReadyToChargeCard / available pill).
+ * SectionCard-driven layout (one PageCard at the route layer, N
+ * SectionCards inside). Active scope branches between Charging (Hero |
+ * Ready) + Reservation + Usage + Recent activity. Inactive scope
+ * short-circuits to InactiveAccountHero.
  */
 
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import {
-  Activity,
   CalendarClock,
-  CreditCard,
   Gauge,
+  Plug,
   Receipt,
   Zap,
 } from "lucide-preact";
 import { SectionCard } from "@/components/shared/SectionCard.tsx";
 import { EmptyState } from "@/components/shared/EmptyState.tsx";
-import { MobileCardRow } from "@/components/shared/MobileCardRow.tsx";
 import { BillingPeriodSwitcher } from "@/components/shared/BillingPeriodSwitcher.tsx";
-import { TransactionStatusBadge } from "@/components/shared/TransactionStatusBadge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import HeroSessionCard from "@/islands/customer/HeroSessionCard.tsx";
-import ReadyToChargeCard from "@/islands/customer/ReadyToChargeCard.tsx";
 import NextReservationCard from "@/islands/customer/NextReservationCard.tsx";
-import UsageGaugeLive from "@/islands/customer/UsageGaugeLive.tsx";
-import QuickActionsRow from "@/islands/customer/QuickActionsRow.tsx";
+import PeriodUsageChart, {
+  type UsageDayPoint,
+} from "@/islands/customer/PeriodUsageChart.tsx";
+import { PlanInfoCard, type PlanInfo } from "@/components/customer/PlanInfoCard.tsx";
+import {
+  RecentActivityList,
+  type RecentActivityItem,
+} from "@/components/customer/RecentActivityList.tsx";
 import InactiveAccountHero from "@/islands/customer/InactiveAccountHero.tsx";
 import OnboardingTour from "@/islands/customer/OnboardingTour.tsx";
 import { subscribeSse } from "@/islands/shared/SseProvider.tsx";
 import { formatRelative } from "@/islands/shared/charger-visuals.ts";
+import type { FormFactor } from "@/src/lib/types/steve.ts";
+import type { ChargerPickerCharger } from "@/components/customer/ChargerPickerInline.tsx";
+import CustomerChargersSection, {
+  type CustomerChargerCardDto,
+} from "@/islands/customer/CustomerChargersSection.tsx";
 
 interface ActiveSession {
   steveTransactionId: number;
@@ -58,9 +56,15 @@ interface RecentSession {
   id: number;
   steveTransactionId: number;
   syncedAt: string | null;
+  startedAt?: string | null;
+  endedAt?: string | null;
   kwhDelta: number;
   isFinalized: boolean;
   costString?: string | null;
+  durationMinutes?: number | null;
+  chargeBoxId?: string | null;
+  chargerName?: string | null;
+  formFactor?: FormFactor | null;
 }
 
 interface NextReservation {
@@ -83,34 +87,32 @@ export interface CustomerDashboardProps {
   isActive: boolean;
   firstRun: boolean;
   operatorEmail?: string;
-  /** Active session, if any. */
   activeSession: ActiveSession | null;
-  /** Most recent finalized session, used as Ready card's "last session" hint. */
   lastSession: RecentSession | null;
-  /** Last 3 sessions for "Recent activity". */
   recentSessions: RecentSession[];
-  /** Next upcoming reservation, or null. */
   nextReservation: NextReservation | null;
-  /** Initial usage values for the gauge. */
   usage: {
     value: number;
     cap: number | null;
     periodLabel: string;
     period: "current" | "previous" | "year";
   };
-  /** Charge-box ids the customer owns — passed down to UsageGaugeLive. */
+  /** Daily kWh series for the chart. */
+  dailyUsage: UsageDayPoint[];
+  /** Plan breakdown for the right-hand card. */
+  plan: PlanInfo | null;
+  currency: string;
   ownedChargeBoxIds?: string[];
-  /** Initial available-charger snapshot for the Ready card pill. */
   chargerCounts: { available: number; total: number };
+  /** Pre-fetched charger list for the Pick-charger modal. */
+  chargerOptions?: ChargerPickerCharger[];
+  /** Full charger roster with derived customer-facing status. */
+  chargers?: CustomerChargerCardDto[];
 }
 
 export default function CustomerDashboard(props: CustomerDashboardProps) {
   const notificationFlash = useSignal<number>(0);
 
-  // Subscribe to `notification.created` so the dashboard can show a soft
-  // visual flash when the bell badge increments. The actual badge lives
-  // in NotificationBell (separate island); we just keep the dashboard
-  // alive on the SSE bus.
   useEffect(() => {
     const unsub = subscribeSse("notification.created", () => {
       notificationFlash.value = notificationFlash.value + 1;
@@ -118,7 +120,6 @@ export default function CustomerDashboard(props: CustomerDashboardProps) {
     return unsub;
   }, []);
 
-  // Inactive surface — short-circuit everything.
   if (!props.isActive) {
     return (
       <div class="flex flex-col gap-4">
@@ -135,7 +136,8 @@ export default function CustomerDashboard(props: CustomerDashboardProps) {
           <SectionCard
             title="Recent activity"
             icon={Receipt}
-            accent="green"
+            accent="blue"
+            borderBeam
             actions={
               <a
                 href="/sessions"
@@ -145,11 +147,9 @@ export default function CustomerDashboard(props: CustomerDashboardProps) {
               </a>
             }
           >
-            <div class="flex flex-col gap-2">
-              {props.recentSessions.map((s) => (
-                <RecentSessionRow key={s.id} session={s} />
-              ))}
-            </div>
+            <RecentActivityList
+              items={toActivityItems(props.recentSessions)}
+            />
           </SectionCard>
         )}
 
@@ -158,30 +158,57 @@ export default function CustomerDashboard(props: CustomerDashboardProps) {
     );
   }
 
+  const chargers = props.chargers ?? [];
+  const hasChargers = chargers.length > 0;
+  const activeChargerName = props.activeSession
+    ? (() => {
+      const cbx = props.activeSession.chargeBoxId;
+      const match = cbx ? chargers.find((c) => c.chargeBoxId === cbx) : null;
+      return match?.friendlyName?.trim() || cbx || "your charger";
+    })()
+    : null;
+  const chargingDescription = props.activeSession
+    ? `You're charging on ${activeChargerName} — live`
+    : hasChargers
+    ? "Idle — ready when you are"
+    : "No chargers visible to your account yet";
+
   return (
     <div class="flex flex-col gap-4">
-      {/* Charging — hero / ready */}
+      {/* Charging — unified hero + roster */}
       <SectionCard
         title="Charging"
         icon={Zap}
-        accent="cyan"
-        description={props.activeSession
-          ? "You're charging right now."
-          : "Idle — ready when you are."}
+        accent="sky"
+        description={chargingDescription}
+        borderBeam
       >
-        {props.activeSession
-          ? (
-            <HeroSessionCard
-              session={props.activeSession}
-            />
-          )
-          : (
-            <ReadyToChargeCard
-              initialAvailableChargers={props.chargerCounts.available}
-              totalChargers={props.chargerCounts.total}
-              lastSession={props.lastSession}
+        <div data-tour="hero" class="flex flex-col gap-4">
+          {props.activeSession && (
+            <HeroSessionCard session={props.activeSession} />
+          )}
+          {props.activeSession && hasChargers && (
+            <>
+              <div class="border-t border-border/50" />
+              <p class="text-xs uppercase tracking-wide text-muted-foreground">
+                Other chargers
+              </p>
+            </>
+          )}
+          {hasChargers && <CustomerChargersSection chargers={chargers} />}
+          {!props.activeSession && !hasChargers && (
+            <EmptyState
+              icon={Plug}
+              title="No chargers yet"
+              description={props.operatorEmail
+                ? `Contact your operator at ${props.operatorEmail}.`
+                : "Contact your operator."}
+              accent="sky"
+              size="md"
+              showGridPattern={false}
             />
           )}
+        </div>
       </SectionCard>
 
       {/* Next reservation — collapses if none */}
@@ -189,46 +216,46 @@ export default function CustomerDashboard(props: CustomerDashboardProps) {
         <SectionCard
           title="Next reservation"
           icon={CalendarClock}
-          accent="indigo"
+          accent="blue"
+          borderBeam
         >
           <NextReservationCard reservation={props.nextReservation} />
         </SectionCard>
       )}
 
-      {/* Usage */}
+      {/* Usage — chart + plan side-by-side */}
       <SectionCard
         title="Usage"
         icon={Gauge}
-        accent="teal"
+        accent="blue"
         description={props.usage.periodLabel}
+        borderBeam
         actions={
-          <BillingPeriodSwitcher
-            value={props.usage.period}
-            basePath="/"
-          />
+          <BillingPeriodSwitcher value={props.usage.period} basePath="/" />
         }
       >
-        <UsageGaugeLive
-          initialValueKwh={props.usage.value}
-          capKwh={props.usage.cap}
-          caption={props.usage.periodLabel}
-        />
-      </SectionCard>
-
-      {/* Quick actions */}
-      <SectionCard
-        title="Quick actions"
-        icon={Activity}
-        accent="cyan"
-      >
-        <QuickActionsRow isActive={props.isActive} />
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
+          <div class="min-w-0 rounded-lg border bg-card p-4 lg:col-span-2">
+            <PeriodUsageChart
+              points={props.dailyUsage}
+              periodLabel={props.usage.periodLabel}
+              accent="blue"
+            />
+          </div>
+          {props.plan && (
+            <div class="min-w-0 rounded-lg border bg-card p-4 lg:col-span-1">
+              <PlanInfoCard plan={props.plan} accent="blue" />
+            </div>
+          )}
+        </div>
       </SectionCard>
 
       {/* Recent activity */}
       <SectionCard
         title="Recent activity"
         icon={Receipt}
-        accent="green"
+        accent="blue"
+        borderBeam
         actions={
           <a
             href="/sessions"
@@ -244,21 +271,15 @@ export default function CustomerDashboard(props: CustomerDashboardProps) {
               icon={Receipt}
               title="No sessions yet"
               description="Your first charge will appear here once you've started one."
-              accent="green"
+              accent="blue"
               size="md"
               showGridPattern={false}
-              primaryAction={{
-                label: "Scan to start",
-                href: "/login/scan",
-              }}
             />
           )
           : (
-            <div class="flex flex-col gap-2">
-              {props.recentSessions.map((s) => (
-                <RecentSessionRow key={s.id} session={s} />
-              ))}
-            </div>
+            <RecentActivityList
+              items={toActivityItems(props.recentSessions)}
+            />
           )}
       </SectionCard>
 
@@ -267,27 +288,22 @@ export default function CustomerDashboard(props: CustomerDashboardProps) {
   );
 }
 
-function RecentSessionRow({ session }: { session: RecentSession }) {
-  return (
-    <a
-      href={`/sessions/${session.steveTransactionId}`}
-      class="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      <MobileCardRow
-        topLeft={session.syncedAt ? formatRelative(session.syncedAt) : "—"}
-        topRight={session.isFinalized
-          ? <TransactionStatusBadge status="completed" />
-          : <TransactionStatusBadge status="in_progress" />}
-        secondaryLine={`Session #${session.steveTransactionId}`}
-        primaryStat={<span>{session.kwhDelta.toFixed(2)} kWh</span>}
-        secondaryStat={session.costString ?? undefined}
-      />
-    </a>
-  );
+function toActivityItems(sessions: RecentSession[]): RecentActivityItem[] {
+  return sessions.map((s) => ({
+    id: s.id,
+    steveTransactionId: s.steveTransactionId,
+    syncedAt: s.syncedAt,
+    startedAt: s.startedAt ?? null,
+    endedAt: s.endedAt ?? null,
+    kwhDelta: s.kwhDelta,
+    isFinalized: s.isFinalized,
+    costString: s.costString ?? null,
+    chargeBoxId: s.chargeBoxId ?? null,
+    chargerName: s.chargerName ?? null,
+    formFactor: s.formFactor ?? null,
+    durationMinutes: s.durationMinutes ?? null,
+  }));
 }
 
-// Suppress unused "Button" import warning — it's referenced in JSX above
-// (actions slots use anchor tags directly to keep server-rendered hrefs);
-// keeping the import for downstream extension when actions become buttons.
+// Keep imports live for downstream extension.
 void Button;
-void CreditCard;

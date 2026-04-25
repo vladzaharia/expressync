@@ -36,6 +36,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog.tsx";
+import { PlanBadge } from "@/components/shared/PlanBadge.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { tagTypeIcons } from "@/components/brand/tags/index.ts";
 import {
@@ -126,10 +127,10 @@ export default function TagLinkingGrid(
       });
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
-        if (data.deletedCount && data.deletedCount > 1) {
+        if (data.deactivatedCount && data.deactivatedCount > 1) {
           toast.success(
-            `Deleted ${data.deletedCount} mappings (1 parent + ${
-              data.deletedCount - 1
+            `Deleted ${data.deactivatedCount} mappings (1 parent + ${
+              data.deactivatedCount - 1
             } children)`,
           );
         } else {
@@ -336,9 +337,6 @@ function CustomerCard(
   const Icon = hasSubscription ? CreditCard : User;
   const displayName = group.customerName || group.customerEmail ||
     group.customerId;
-  const subtext = hasSubscription
-    ? (group.subscriptionName || group.subscriptionId)
-    : "";
 
   const content = (
     <CardContent
@@ -353,10 +351,14 @@ function CustomerCard(
         </div>
         <div class="min-w-0 flex-1">
           <p class="font-semibold truncate text-sm">{displayName}</p>
-          {subtext && (
-            <p class="text-xs text-muted-foreground truncate">
-              {subtext}
-            </p>
+          {hasSubscription && (
+            <div class="mt-0.5">
+              <PlanBadge
+                name={group.subscriptionName ?? group.subscriptionId ?? null}
+                planCode={group.subscriptionId ?? null}
+                size="sm"
+              />
+            </div>
           )}
         </div>
       </div>

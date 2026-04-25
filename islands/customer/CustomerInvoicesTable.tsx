@@ -25,6 +25,7 @@ import {
   type PaginatedTableColumn,
 } from "@/components/ui/paginated-table.tsx";
 import type { InvoiceListDTO } from "@/src/lib/invoice-ui.ts";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 interface Props {
   invoices: InvoiceListDTO[];
@@ -103,9 +104,9 @@ export default function CustomerInvoicesTable(
       fetchParams={fetchParams}
       getItemKey={(row) => row.id}
       onRowClick={(row) => {
-        globalThis.location.href = `/billing/invoices/${
+        clientNavigate(`/billing/invoices/${
           encodeURIComponent(row.id)
-        }`;
+        }`);
       }}
       emptyMessage="No invoices match the current filters"
       renderMobileCard={renderMobileCard}

@@ -29,6 +29,7 @@ export type AuthAuditEvent =
   | "scan.login_success"
   | "scan.login_failed"
   | "scan.paired"
+  | "scan.released"
   | "scan.detected"
   | "password.login_success"
   | "password.login_failed"

@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 import { X } from "lucide-preact";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 export type CustomerSessionStatus = "all" | "active" | "completed" | "failed";
 
@@ -54,11 +55,11 @@ export default function CustomerSessionsFilterBar({
     if (from.value) params.set("from", from.value);
     if (to.value) params.set("to", to.value);
     const qs = params.toString();
-    globalThis.location.href = qs ? `/sessions?${qs}` : "/sessions";
+    clientNavigate(qs ? `/sessions?${qs}` : "/sessions");
   };
 
   const clear = () => {
-    globalThis.location.href = "/sessions";
+    clientNavigate("/sessions");
   };
 
   const hasFilter = status.value !== "all" || from.value || to.value;

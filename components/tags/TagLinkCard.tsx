@@ -20,6 +20,7 @@ import { ExternalLink, Link2, Link2Off, Pencil, User } from "lucide-preact";
 import { Badge } from "@/components/ui/badge.tsx";
 import { SectionCard } from "@/components/shared/SectionCard.tsx";
 import { TagChip } from "@/components/tags/TagChip.tsx";
+import { PlanBadge } from "@/components/shared/PlanBadge.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 
 export interface TagLinkingInfo {
@@ -250,7 +251,12 @@ function LinkedBody(
             ? (
               <>
                 <dd class="flex flex-wrap items-center gap-2">
-                  <span class="font-medium">{planLabel}</span>
+                  <PlanBadge
+                    name={planLabel}
+                    planCode={linking.subscriptionPlanCode ??
+                      linking.lagoSubscriptionExternalId ?? planLabel}
+                    size="sm"
+                  />
                   {linking.subscriptionStatus
                     ? (
                       <span

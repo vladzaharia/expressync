@@ -781,6 +781,14 @@ export const EventErrorWebhookSchema = simpleWebhook("event.error");
 export const EventsErrorsWebhookSchema = simpleWebhook("events.errors");
 export const CustomerCreatedWebhookSchema = simpleWebhook("customer.created");
 export const CustomerUpdatedWebhookSchema = simpleWebhook("customer.updated");
+export const CustomerDeletedWebhookSchema = simpleWebhook("customer.deleted");
+export const PlanCreatedWebhookSchema = simpleWebhook("plan.created");
+export const PlanUpdatedWebhookSchema = simpleWebhook("plan.updated");
+export const PlanDeletedWebhookSchema = simpleWebhook("plan.deleted");
+export const WalletCreatedWebhookSchema = simpleWebhook("wallet.created");
+export const WalletUpdatedWebhookSchema = simpleWebhook("wallet.updated");
+export const WalletTerminatedWebhookSchema = simpleWebhook("wallet.terminated");
+export const InvoiceDeletedWebhookSchema = simpleWebhook("invoice.deleted");
 
 /**
  * Discriminated union of every webhook we explicitly know how to parse.
@@ -828,6 +836,14 @@ export const LagoWebhookSchema = z.discriminatedUnion("webhook_type", [
   EventsErrorsWebhookSchema,
   CustomerCreatedWebhookSchema,
   CustomerUpdatedWebhookSchema,
+  CustomerDeletedWebhookSchema,
+  PlanCreatedWebhookSchema,
+  PlanUpdatedWebhookSchema,
+  PlanDeletedWebhookSchema,
+  WalletCreatedWebhookSchema,
+  WalletUpdatedWebhookSchema,
+  WalletTerminatedWebhookSchema,
+  InvoiceDeletedWebhookSchema,
 ]);
 
 export type LagoWebhook = z.infer<typeof LagoWebhookSchema>;
@@ -843,3 +859,21 @@ export const LagoWebhookEnvelopeSchema = z.object({
 }).passthrough();
 
 export type LagoWebhookEnvelope = z.infer<typeof LagoWebhookEnvelopeSchema>;
+
+/**
+ * Lago Plan — loose projection used by the reconcile-cache flow. We only need
+ * a few denormalized fields for list/detail surfaces; `passthrough()` preserves
+ * the raw payload so callers can read anything else directly from the row.
+ */
+export const LagoPlanSchema = z.object({
+  lago_id: z.string(),
+  code: z.string(),
+  name: z.string().nullable().optional(),
+  interval: z.string().nullable().optional(),
+  amount_cents: z.number().nullable().optional(),
+  amount_currency: z.string().nullable().optional(),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional(),
+}).passthrough();
+
+export type LagoPlan = z.infer<typeof LagoPlanSchema>;

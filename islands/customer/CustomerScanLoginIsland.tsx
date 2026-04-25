@@ -43,7 +43,7 @@ import {
   type ChargerPickerCharger,
   ChargerPickerInline,
 } from "@/components/customer/ChargerPickerInline.tsx";
-import { PairingCodeDisplay } from "@/components/customer/PairingCodeDisplay.tsx";
+import { ScanCountdownRing } from "@/components/scan/ScanCountdownRing.tsx";
 import {
   AlertCircle,
   Loader2,
@@ -51,6 +51,7 @@ import {
   ScanLine,
   WifiOff,
 } from "lucide-preact";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 type FlowState =
   | { kind: "idle" }
@@ -130,12 +131,23 @@ interface CustomerScanLoginIslandProps {
   initialChargeBoxId?: string | null;
   /** Optional CSS class for the trigger button. */
   className?: string;
+  /**
+   * Inline mode (wizard step 2): render the flow body directly instead of
+   * behind a trigger button + Dialog. Begins loading on mount and surfaces
+   * `onExit` when the user cancels — the wizard shell uses that to return
+   * to the method picker.
+   */
+  inline?: boolean;
+  /** Only used when `inline`; fires when the user chooses to back out. */
+  onExit?: () => void;
 }
 
 export default function CustomerScanLoginIsland({
   autoOpen = false,
   initialChargeBoxId = null,
   className,
+  inline = false,
+  onExit,
 }: CustomerScanLoginIslandProps) {
   const open = useSignal(false);
   const flow = useSignal<FlowState>({ kind: "idle" });
@@ -168,6 +180,31 @@ export default function CustomerScanLoginIsland({
   const cleanup = (): void => {
     closeEventSource();
     clearCountdown();
+  };
+
+  // Best-effort release of an armed pairing. Fired when the user cancels
+  // out of the waiting step so the charger doesn't stay "listening" for a
+  // tap for the remainder of the 90s TTL (and so the next attempt isn't
+  // blocked by the "already_armed_for_charger" guard).
+  const releasePairingIfArmed = (): void => {
+    const cur = flow.value;
+    if (cur.kind !== "waiting") return;
+    // `keepalive` so the beacon completes even if the page is mid-navigation;
+    // fire-and-forget — any failure is silently absorbed (TTL handles the
+    // worst case).
+    try {
+      void fetch("/api/auth/scan-pair", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chargeBoxId: cur.chargeBoxId,
+          pairingCode: cur.pairingCode,
+        }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch {
+      /* noop */
+    }
   };
 
   // Handle the dialog closing (backdrop click, X button, or Escape key).
@@ -444,7 +481,7 @@ export default function CustomerScanLoginIsland({
       globalThis.location.replace(redirectTo);
     } catch {
       // Fallback for environments where replace isn't available.
-      globalThis.location.href = redirectTo;
+      clientNavigate(redirectTo);
     }
   };
 
@@ -453,25 +490,66 @@ export default function CustomerScanLoginIsland({
     void beginLoadChargers();
   };
 
-  // Auto-open from the deep-link path. We only fire once on mount.
+  // Auto-start triggers:
+  //   - `autoOpen` deep-link (?scan=1) opens the modal immediately
+  //   - `inline` mode begins loading the picker immediately so the wizard
+  //     doesn't require a second click to start looking for chargers.
   useEffect(() => {
-    if (autoOpen) {
+    if (inline) {
+      void beginLoadChargers();
+    }
+    // Listen for an external release signal (the wizard's Back pill fires
+    // this synchronously before the scan island unmounts). Relying on the
+    // unmount-cleanup fetch alone was unreliable — `keepalive: true` on
+    // fetch doesn't always survive a SPA-style remount, so a proactive
+    // release via a document-level event is the safer path.
+    const onReleaseSignal = () => releasePairingIfArmed();
+    if (inline && typeof globalThis !== "undefined") {
+      globalThis.addEventListener("scan:release", onReleaseSignal);
+    }
+    if (!inline && autoOpen) {
       handleOpen();
     }
     return () => {
+      if (inline && typeof globalThis !== "undefined") {
+        globalThis.removeEventListener("scan:release", onReleaseSignal);
+      }
+      releasePairingIfArmed();
       cleanup();
       refs.current.sessionId++;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Render — the trigger button always renders; the modal only when open.
+  // Inline render: no trigger, no Dialog. The wizard's step container owns
+  // the chrome; we just render the body + a Back / Cancel affordance.
+  if (inline) {
+    return (
+      <InlineFlow
+        flow={flow.value}
+        prefersReducedMotion={prefersReducedMotion}
+        onPickCharger={(c) => beginPair(c, null)}
+        onRetry={() => void beginLoadChargers()}
+        onExit={() => {
+          releasePairingIfArmed();
+          cleanup();
+          refs.current.sessionId++;
+          flow.value = { kind: "idle" };
+          onExit?.();
+        }}
+      />
+    );
+  }
+
+  // Modal render (legacy deep-link path). Trigger button opens the Dialog.
   return (
     <>
       <Button
         type="button"
         size="lg"
-        className={`w-full h-12 text-base font-semibold ${className ?? ""}`}
+        className={`w-full h-12 text-base font-semibold bg-sky-600 text-white hover:bg-sky-500 dark:bg-sky-500 dark:hover:bg-sky-400 ${
+          className ?? ""
+        }`}
         onClick={handleOpen}
       >
         <ScanLine class="mr-2 size-5" />
@@ -504,6 +582,156 @@ export default function CustomerScanLoginIsland({
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+// Inline flow body — the wizard version with side-by-side countdown ring +
+// instructions. Same state machine as the modal FlowBody; different layout.
+function InlineFlow({
+  flow,
+  prefersReducedMotion,
+  onPickCharger,
+  onRetry,
+  onExit,
+}: {
+  flow: FlowState;
+  prefersReducedMotion: boolean;
+  onPickCharger: (chargeBoxId: string) => void;
+  onRetry: () => void;
+  onExit: () => void;
+}) {
+  if (flow.kind === "idle" || flow.kind === "loadingChargers") {
+    return (
+      <div class="flex flex-col items-center gap-2 py-8 text-center">
+        <Loader2 class="size-6 animate-spin text-muted-foreground" />
+        <p class="text-sm text-muted-foreground">Looking for your chargers…</p>
+      </div>
+    );
+  }
+
+  if (flow.kind === "noChargers") {
+    return (
+      <div class="space-y-3 text-center py-4">
+        <WifiOff class="size-8 mx-auto text-muted-foreground" />
+        <p class="text-sm font-medium text-foreground">No chargers online</p>
+        <p class="text-xs text-muted-foreground">
+          We couldn't reach a reader right now. Use email instead or try again in
+          a minute.
+        </p>
+        <div class="flex gap-2 justify-center">
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            <RotateCcw class="mr-1 size-3.5" />
+            Try again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (flow.kind === "picker") {
+    return (
+      <div class="space-y-3">
+        <p class="text-xs text-muted-foreground">
+          Which reader are you at?
+        </p>
+        <ChargerPickerInline
+          chargers={flow.chargers}
+          onSelect={onPickCharger}
+        />
+      </div>
+    );
+  }
+
+  // Pairing / waiting share the [ring | instructions] layout so the UI
+  // doesn't jump when the API call resolves.
+  const chargerName = flow.kind === "pairing" || flow.kind === "waiting"
+    ? (flow.chargerName ?? null)
+    : null;
+  const displayName = chargerName && chargerName.trim()
+    ? chargerName
+    : "the reader";
+
+  if (flow.kind === "pairing" || flow.kind === "waiting") {
+    const isArmed = flow.kind === "waiting";
+    const remaining = flow.kind === "waiting" ? flow.secondsRemaining : 0;
+    const total = PAIRING_DEFAULT_TTL_SEC;
+    const tone = isArmed && remaining <= 15 ? "amber" : "cyan";
+
+    const steps: string[] = [
+      "Wake your card",
+      `Tap it on ${displayName}`,
+      "Login, just like that!",
+    ];
+
+    return (
+      <div class="flex items-stretch gap-4">
+        {/* Countdown lives in its own card; instructions sit alongside as
+            plain content so the eye parses the ring as the active element
+            and the steps as guidance. */}
+        <div class="shrink-0 rounded-xl border bg-card/60 p-4 sm:p-5 flex items-center justify-center">
+          {isArmed
+            ? (
+              <ScanCountdownRing
+                remaining={remaining}
+                total={total}
+                tone={tone}
+                reducedMotion={prefersReducedMotion}
+              />
+            )
+            : (
+              <div
+                class="inline-flex size-32 items-center justify-center rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
+                aria-label="Arming reader"
+              >
+                <Loader2 class="size-8 animate-spin" />
+              </div>
+            )}
+        </div>
+        {/* Instructions are centered vertically next to the countdown card,
+            stacked tightly so the eye reads them as a single block. Numbers
+            are dimmed so the verbs carry the visual weight. */}
+        <ol class="min-w-0 flex-1 flex flex-col justify-center gap-2 py-1">
+          {steps.map((step, i) => (
+            <li key={i} class="flex items-baseline gap-2">
+              <span
+                class="text-xs font-mono tabular-nums text-muted-foreground/60 shrink-0"
+                aria-hidden="true"
+              >
+                {i + 1}.
+              </span>
+              <span class="text-sm leading-snug">{step}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+    );
+  }
+
+  if (flow.kind === "loggingIn" || flow.kind === "success") {
+    return (
+      <div class="flex flex-col items-center gap-2 py-8 text-center">
+        <Loader2 class="size-6 animate-spin text-primary" />
+        <p class="text-sm font-medium text-foreground">
+          {flow.kind === "success" ? "Signed in. Redirecting…" : "Signing you in…"}
+        </p>
+      </div>
+    );
+  }
+
+  // error
+  return (
+    <div class="space-y-3 text-center py-4">
+      <AlertCircle class="size-8 mx-auto text-destructive" />
+      <p class="text-sm text-foreground">{flow.message}</p>
+      {flow.canRetry && (
+        <div class="flex justify-center">
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            <RotateCcw class="mr-1 size-3.5" />
+            Try again
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -584,16 +812,24 @@ function FlowBody({
   }
 
   if (flow.kind === "waiting") {
+    const name = flow.chargerName?.trim() ? flow.chargerName : "the reader";
+    const tone = flow.secondsRemaining <= 15 ? "amber" : "cyan";
     return (
       <div class="space-y-4">
-        <PairingCodeDisplay
-          pairingCode={flow.pairingCode}
-          secondsRemaining={flow.secondsRemaining}
-          chargerName={flow.chargerName ?? flow.chargeBoxId}
-          noBeam={prefersReducedMotion}
-        />
+        <div class="flex flex-col items-center gap-3 py-2">
+          <ScanCountdownRing
+            remaining={flow.secondsRemaining}
+            total={PAIRING_DEFAULT_TTL_SEC}
+            tone={tone}
+            reducedMotion={prefersReducedMotion}
+          />
+          <p class="text-sm text-center">
+            Hold your RFID card against{" "}
+            <span class="font-semibold text-foreground">{name}</span>.
+          </p>
+        </div>
         <p class="text-xs text-center text-muted-foreground">
-          Tap your card on the reader. We'll sign you in automatically.
+          We'll sign you in the moment it's detected.
         </p>
         <div class="flex justify-center">
           <button

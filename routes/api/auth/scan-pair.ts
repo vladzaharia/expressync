@@ -28,7 +28,7 @@
  *     login.
  */
 
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { define } from "../../../utils.ts";
 import { db } from "../../../src/db/index.ts";
 import { chargersCache, verifications } from "../../../src/db/schema.ts";
@@ -43,7 +43,7 @@ import { logger } from "../../../src/lib/utils/logger.ts";
 const log = logger.child("ScanPair");
 
 const PAIRING_TTL_SEC = 90;
-const ONLINE_WINDOW_MS = 60 * 60 * 1000; // 60-min "online" window
+const ONLINE_WINDOW_MS = 10 * 60 * 1000; // 10-min "online" window
 const RATE_LIMIT_PER_IP = 5; // per minute
 const RATE_LIMIT_GLOBAL = 100; // per minute (cap on total churn)
 
@@ -213,4 +213,68 @@ export const handler = define.handlers({
       expiresInSec: PAIRING_TTL_SEC,
     });
   },
+
+  /**
+   * Release an armed pairing before it expires. Called when the user backs
+   * out of the scan step in the login wizard — without it the
+   * `already_armed_for_charger` guard in POST would block a re-attempt for
+   * the remainder of the 90-second TTL, and the charger stays visibly
+   * "listening" for a tap the user no longer intends to make.
+   *
+   * Body: { chargeBoxId: string, pairingCode: string }
+   * Public route; the chargeBoxId+pairingCode pair is the auth token.
+   */
+  async DELETE(ctx) {
+    if (!FEATURE_SCAN_LOGIN) {
+      return featureDisabledResponse("scan-login");
+    }
+    const ip = getClientIp(ctx.req);
+    if (!await checkRateLimit(`scanpair:ip:${ip}`, RATE_LIMIT_PER_IP)) {
+      return jsonResponse(429, { error: "rate_limited" });
+    }
+
+    let body: { chargeBoxId?: unknown; pairingCode?: unknown } = {};
+    try {
+      const raw = await ctx.req.text();
+      if (raw.trim() !== "") body = JSON.parse(raw);
+    } catch {
+      return jsonResponse(400, { error: "invalid_json" });
+    }
+    const chargeBoxId = typeof body.chargeBoxId === "string"
+      ? body.chargeBoxId.trim()
+      : "";
+    const pairingCode = typeof body.pairingCode === "string"
+      ? body.pairingCode.trim()
+      : "";
+    if (!chargeBoxId || !pairingCode) {
+      return jsonResponse(400, { error: "chargeBoxId and pairingCode required" });
+    }
+
+    const identifier = `scan-pair:${chargeBoxId}:${pairingCode}`;
+    try {
+      const deleted = await db
+        .delete(verifications)
+        .where(eq(verifications.identifier, identifier))
+        .returning({ id: verifications.id });
+      void logAuthEvent("scan.released", {
+        ip,
+        ua: ctx.req.headers.get("user-agent") ?? null,
+        route: "/api/auth/scan-pair",
+        metadata: {
+          chargeBoxId,
+          existed: deleted.length > 0,
+        },
+      });
+      // Idempotent: if the row was already expired/consumed, still 204.
+      return new Response(null, { status: 204 });
+    } catch (err) {
+      log.error("Failed to release pairing", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return jsonResponse(500, { error: "internal" });
+    }
+  },
 });
+
+// Silence unused-import warning if a future refactor drops the helper.
+void and;

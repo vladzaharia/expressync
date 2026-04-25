@@ -37,7 +37,7 @@
  * access by entering their email at /login at any time.
  */
 
-import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { db as _db } from "../db/index.ts";
 import { userMappings, users } from "../db/schema.ts";
 import { lagoClient } from "../lib/lago-client.ts";
@@ -293,6 +293,25 @@ export async function resolveOrCreateCustomerAccount(
   tx: DrizzleTx,
   lagoCustomerExternalId: string,
 ): Promise<ResolveCustomerAccountResult> {
+  // 0. Direct link lookup (migration 0030). `users.lago_customer_external_id`
+  //    is the canonical idempotency key — if a user was previously
+  //    provisioned for this Lago customer we reuse it unconditionally,
+  //    regardless of whether any mappings exist yet. Without this, the
+  //    no-email branch would INSERT a fresh row every reconcile pass.
+  const [directLinked] = await tx
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(eq(users.lagoCustomerExternalId, lagoCustomerExternalId))
+    .limit(1);
+  if (directLinked) {
+    return {
+      userId: directLinked.id,
+      created: false,
+      reused: true,
+      email: directLinked.email,
+    };
+  }
+
   // 1. Sibling lookup — most common path is "admin previously linked a
   //    different mapping for the same Lago customer; reuse the same user".
   const sibling = await findExistingUserViaSibling(
@@ -307,6 +326,16 @@ export async function resolveOrCreateCustomerAccount(
       .where(eq(users.id, sibling.userId))
       .limit(1);
     if (existing) {
+      // Backfill the direct link so future lookups short-circuit at step 0.
+      await tx
+        .update(users)
+        .set({ lagoCustomerExternalId })
+        .where(
+          and(
+            eq(users.id, sibling.userId),
+            isNull(users.lagoCustomerExternalId),
+          ),
+        );
       log.debug("Reused existing user via sibling lookup", {
         lagoCustomerExternalId,
         userId: sibling.userId,
@@ -394,16 +423,35 @@ async function createNoEmailUser(
 ): Promise<ResolveCustomerAccountResult> {
   const userId = generateUserId();
   const displayName = buildDisplayName({ ...customer, email: null });
-  const [inserted] = await tx
-    .insert(users)
-    .values({
-      id: userId,
-      email: null,
-      name: displayName,
-      role: "customer",
-      emailVerified: false,
-    })
-    .returning({ id: users.id, email: users.email });
+  let inserted: { id: string; email: string | null };
+  try {
+    [inserted] = await tx
+      .insert(users)
+      .values({
+        id: userId,
+        email: null,
+        name: displayName,
+        role: "customer",
+        emailVerified: false,
+        lagoCustomerExternalId,
+      })
+      .returning({ id: users.id, email: users.email });
+  } catch (err) {
+    if (!isUniqueViolation(err)) throw err;
+    // Another tx just inserted for this external_id — reuse it.
+    const [raced] = await tx
+      .select({ id: users.id, email: users.email })
+      .from(users)
+      .where(eq(users.lagoCustomerExternalId, lagoCustomerExternalId))
+      .limit(1);
+    if (!raced) throw err;
+    return {
+      userId: raced.id,
+      created: false,
+      reused: true,
+      email: raced.email,
+    };
+  }
   await logCustomerAccountAutoProvisioned({
     userId: inserted.id,
     email: null,
@@ -465,6 +513,15 @@ async function resolveOrCreateForEmail(
         `Email ${email} is already linked to Lago customer ${conflictingLagoId}.`,
       );
     }
+    await tx
+      .update(users)
+      .set({ lagoCustomerExternalId })
+      .where(
+        and(
+          eq(users.id, existing.id),
+          isNull(users.lagoCustomerExternalId),
+        ),
+      );
     log.info("Reusing existing customer account by email", {
       userId: existing.id,
       email,
@@ -509,6 +566,7 @@ async function createUserWithRaceRetry(
         name: displayName,
         role: "customer",
         emailVerified: false,
+        lagoCustomerExternalId,
       })
       .returning({ id: users.id, email: users.email });
     await logCustomerAccountAutoProvisioned({
@@ -531,13 +589,26 @@ async function createUserWithRaceRetry(
     if (!isUniqueViolation(err)) {
       throw err;
     }
-    // PG 23505: another transaction inserted the same email between our
-    // SELECT and our INSERT. Re-do the lookup once. If THAT also fails the
-    // happy path we surface as 500 (something is very wrong).
+    // PG 23505: another transaction inserted the same email or direct-link
+    // between our SELECT and our INSERT. Re-do both lookups once. If THAT
+    // also fails the happy path we surface as 500 (something is very wrong).
     log.warn("Race detected creating user; retrying lookup once", {
       email,
       lagoCustomerExternalId,
     });
+    const [directLinked] = await tx
+      .select({ id: users.id, email: users.email, role: users.role })
+      .from(users)
+      .where(eq(users.lagoCustomerExternalId, lagoCustomerExternalId))
+      .limit(1);
+    if (directLinked) {
+      return {
+        userId: directLinked.id,
+        created: false,
+        reused: true,
+        email: directLinked.email,
+      };
+    }
     const retried = await findExistingUserByEmail(tx, email);
     if (!retried) {
       throw err;

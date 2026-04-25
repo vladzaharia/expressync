@@ -10,6 +10,7 @@
 import { useState } from "preact/hooks";
 import { AlertTriangle, X } from "lucide-preact";
 import { Button } from "@/components/ui/button.tsx";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 interface Props {
   customerName: string;
@@ -37,14 +38,14 @@ export default function ImpersonationBanner(
         const target = (body && typeof body.redirectTo === "string")
           ? body.redirectTo
           : redirectTo;
-        globalThis.location.href = target;
+        clientNavigate(target);
         return;
       }
     } catch (err) {
       console.error("ImpersonationBanner exit failed:", err);
     }
     // Fallback — hard-reload to the admin shell so the URL drops `?as=`.
-    globalThis.location.href = redirectTo;
+    clientNavigate(redirectTo);
   };
 
   return (

@@ -18,6 +18,7 @@ import {
 } from "lucide-preact";
 import { Button } from "@/components/ui/button.tsx";
 import { SectionCard } from "@/components/shared/SectionCard.tsx";
+import { PlanBadge } from "@/components/shared/PlanBadge.tsx";
 
 interface Props {
   idTag: string;
@@ -59,8 +60,14 @@ export function LinkageSummaryCard(
         </dt>
         <dd class="truncate">
           {subscription
-            ? <span>{subscription.name}</span>
-            : <span class="text-muted-foreground italic">No subscription</span>}
+            ? (
+              <PlanBadge
+                name={subscription.name}
+                planCode={subscription.externalId}
+                size="sm"
+              />
+            )
+            : <PlanBadge name={null} size="sm" />}
         </dd>
       </dl>
 
