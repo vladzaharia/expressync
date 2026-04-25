@@ -16,12 +16,15 @@
  * meta-tag-ness is a render-time derivation, not a persisted category.
  */
 
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { define } from "../../../../utils.ts";
 import { db } from "../../../../src/db/index.ts";
 import * as schema from "../../../../src/db/schema.ts";
 import { logger } from "../../../../src/lib/utils/logger.ts";
 import { isTagType } from "../../../../src/lib/types/tags.ts";
+import { steveClient } from "../../../../src/lib/steve-client.ts";
+import { getAllChildTags } from "../../../../src/lib/tag-hierarchy.ts";
+import { syncSingleTagToSteve } from "../../../../src/services/tag-sync.service.ts";
 
 const log = logger.child("TagMetadata");
 
@@ -92,10 +95,48 @@ export const handler = define.handlers({
           .where(eq(schema.userMappings.id, existing.id))
           .returning();
 
+        // Cascade an is_active flip to descendants. The OCPP-tag invariant
+        // is that a child tag follows its parent's active state; without
+        // this cascade, deactivating a parent through this metadata route
+        // would leave child tags charging-allowed.
+        const cascadedChildren: schema.UserMapping[] = [];
+        if (isActive !== undefined) {
+          try {
+            const allTags = await steveClient.getOcppTags();
+            const descendantPks = getAllChildTags(ocppIdTag, allTags)
+              .map((t) => t.ocppTagPk);
+            if (descendantPks.length > 0) {
+              const updatedChildren = await db
+                .update(schema.userMappings)
+                .set({ isActive, updatedAt: new Date() })
+                .where(
+                  inArray(schema.userMappings.steveOcppTagPk, descendantPks),
+                )
+                .returning();
+              cascadedChildren.push(...updatedChildren);
+            }
+          } catch (err) {
+            log.warn("Cascade fetch failed; child mappings may be stale", {
+              ocppTagPk,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+
+        // Inline-sync the parent + any cascaded children to SteVe so the
+        // max_active_transaction_count reflects the new is_active state.
+        if (isActive !== undefined && updated) {
+          await syncSingleTagToSteve(updated);
+          for (const child of cascadedChildren) {
+            await syncSingleTagToSteve(child);
+          }
+        }
+
         log.info("Updated tag metadata", {
           mappingId: existing.id,
           ocppTagPk,
           fieldsUpdated: Object.keys(patch).filter((k) => k !== "updatedAt"),
+          cascadedChildren: cascadedChildren.length,
         });
         return json(200, { ok: true, mapping: updated });
       }
