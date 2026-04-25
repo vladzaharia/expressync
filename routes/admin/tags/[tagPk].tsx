@@ -1,7 +1,7 @@
 import { define } from "../../../utils.ts";
 import { db } from "../../../src/db/index.ts";
 import * as schema from "../../../src/db/schema.ts";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { SidebarLayout } from "../../../components/SidebarLayout.tsx";
 import { PageCard } from "../../../components/PageCard.tsx";
 import TagMetadataForm from "../../../islands/TagMetadataForm.tsx";
@@ -190,6 +190,26 @@ export const handler = define.handlers({
           }
         }
 
+        // Friendly-name lookup for the rendered chargers.
+        const cbids = Array.from(new Set(last10.map((t) => t.chargeBoxId)));
+        const friendlyByCbid = new Map<string, string | null>();
+        if (cbids.length > 0) {
+          try {
+            const cacheRows = await db
+              .select({
+                chargeBoxId: schema.chargersCache.chargeBoxId,
+                friendlyName: schema.chargersCache.friendlyName,
+              })
+              .from(schema.chargersCache)
+              .where(inArray(schema.chargersCache.chargeBoxId, cbids));
+            for (const r of cacheRows) {
+              friendlyByCbid.set(r.chargeBoxId, r.friendlyName);
+            }
+          } catch (err) {
+            console.error("[tags/[tagPk]] friendly-name lookup failed:", err);
+          }
+        }
+
         recentTransactions = last10.map((t) => {
           const startWh = parseInt(t.startValue);
           const stopWh = t.stopValue !== null ? parseInt(t.stopValue) : null;
@@ -200,6 +220,7 @@ export const handler = define.handlers({
           return {
             steveTransactionId: t.id,
             chargeBoxId: t.chargeBoxId,
+            friendlyName: friendlyByCbid.get(t.chargeBoxId) ?? null,
             connectorId: t.connectorId,
             startedAt: t.startTimestamp,
             stoppedAt: t.stopTimestamp,
