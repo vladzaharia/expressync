@@ -238,6 +238,42 @@ function createSmartTx(store: FakeStore): {
         },
       };
     },
+    /**
+     * Drizzle's `update(table).set({...}).where(predicate)` chain. The
+     * provisioner uses this to back-fill `users.lagoCustomerExternalId`
+     * when an existing email-matched account is reused. We resolve the
+     * target user via the most recently set `lookupUserId` (or fall
+     * through to email match) and patch in-place; the predicate's
+     * "only if NULL" guard is enforced manually here so re-runs are
+     * safe.
+     */
+    update(_table: unknown) {
+      return {
+        set(patch: Record<string, unknown>) {
+          return {
+            where(_predicate: unknown) {
+              const targetUserId = store.lookupUserId;
+              const targetEmail = store.lookupEmail?.toLowerCase();
+              for (const u of store.users) {
+                if (
+                  (targetUserId && u.id === targetUserId) ||
+                  (targetEmail && u.email.toLowerCase() === targetEmail)
+                ) {
+                  if (patch.lagoCustomerExternalId !== undefined) {
+                    (u as unknown as {
+                      lagoCustomerExternalId?: string | null;
+                    })
+                      .lagoCustomerExternalId =
+                        patch.lagoCustomerExternalId as string;
+                  }
+                }
+              }
+              return Promise.resolve();
+            },
+          };
+        },
+      };
+    },
   };
 
   return { tx: tx as unknown as DrizzleTx, inserted };
