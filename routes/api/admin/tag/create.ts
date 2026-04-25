@@ -77,6 +77,9 @@ export const handler = define.handlers({
           notes,
           isActive,
           tagType,
+          // Mirror SteVe's parent_id_tag locally so the inline sync's
+          // full-PUT doesn't clobber it. Migration 0031 added the column.
+          steveParentIdTag: parentIdTag ?? null,
         })
         .returning({ id: schema.userMappings.id });
       log.info("Tag created", {

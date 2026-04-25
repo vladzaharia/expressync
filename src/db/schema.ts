@@ -161,6 +161,20 @@ export const userMappings = pgTable("user_mappings", {
   // Status
   isActive: boolean("is_active").default(true),
 
+  // === Polaris OCPP-tag invariants ===
+  // SteVe's `ocpp_tag` table has its own `parent_id_tag` and `expiry_date`
+  // columns; SteVe stores them as the source of truth for the OCPP wire
+  // semantics. We mirror them here so `syncSingleTagToSteve` (which does a
+  // full PUT of the tag on every is_active toggle) doesn't have to issue
+  // an extra GET to preserve those fields. Without these, the inline sync
+  // would clobber `parent_id_tag` to NULL on every link/unlink/metadata
+  // edit.
+  // - `steveParentIdTag`: nullable; matches SteVe's `parent_id_tag`. The
+  //   parent _must_ exist in SteVe before we can set it.
+  // - `steveExpiryDate`: nullable; matches SteVe's `expiry_date`.
+  steveParentIdTag: text("steve_parent_id_tag"),
+  steveExpiryDate: timestamp("steve_expiry_date", { withTimezone: true }),
+
   // Polaris Track A: link to the customer account that owns this mapping
   // (nullable; ON DELETE SET NULL). The trigger from migration 0018 enforces
   // that the referenced user MUST have role='customer' (admins cannot own
