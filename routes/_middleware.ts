@@ -135,6 +135,14 @@ async function applyRateLimits(
   pathname: string,
   ip: string,
 ): Promise<boolean> {
+  // Service-to-service paths bypass rate-limiting entirely. /api/ocpp is
+  // SteVe → ExpresSync hook traffic (HMAC-signed; abuse is bounded by
+  // the auth gate, not by IP). A busy charging hour can easily push
+  // past 100 calls/min from a single SteVe instance.
+  if (pathname.startsWith("/api/ocpp")) {
+    return true;
+  }
+
   // Always check the coarse bucket first (cheapest disqualification).
   if (!await checkRateLimit(`general:${ip}`, RATE_LIMIT_GENERAL_MAX)) {
     return false;

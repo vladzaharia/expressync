@@ -43,6 +43,8 @@ import CustomerChargersSection, {
 interface ActiveSession {
   steveTransactionId: number;
   chargeBoxId: string | null;
+  /** Operator-set friendly name (mirrored from StEvE description). */
+  friendlyName?: string | null;
   connectorId?: number | null;
   connectorType?: string | null;
   initialKwh: number;
@@ -70,6 +72,8 @@ interface RecentSession {
 interface NextReservation {
   id: number;
   chargeBoxId: string;
+  /** Operator-set friendly name (mirrored from StEvE description). */
+  friendlyName?: string | null;
   connectorId: number | null;
   connectorType?: string | null;
   startAtIso: string;

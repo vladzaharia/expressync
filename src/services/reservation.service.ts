@@ -735,3 +735,38 @@ export function toReservationRowDTO(
     chargingProfileTaskId: r.chargingProfileTaskId,
   };
 }
+
+/**
+ * Best-effort: hydrate the friendly_name field on a batch of DTOs from the
+ * `chargers_cache` table so UI surfaces can show the operator-set description
+ * as the primary label. A cache miss leaves friendlyName at null — callers
+ * MUST fall back to chargeBoxId in that case.
+ */
+export async function enrichDtosWithFriendlyNames(
+  rows: schema.ReservationRowDTO[],
+): Promise<schema.ReservationRowDTO[]> {
+  if (rows.length === 0) return rows;
+  const cbids = Array.from(new Set(rows.map((r) => r.chargeBoxId)));
+  try {
+    const cacheRows = await db
+      .select({
+        chargeBoxId: schema.chargersCache.chargeBoxId,
+        friendlyName: schema.chargersCache.friendlyName,
+      })
+      .from(schema.chargersCache)
+      .where(inArray(schema.chargersCache.chargeBoxId, cbids));
+    const byCbid = new Map<string, string | null>();
+    for (const c of cacheRows) byCbid.set(c.chargeBoxId, c.friendlyName);
+    return rows.map((r) => ({
+      ...r,
+      friendlyName: byCbid.get(r.chargeBoxId) ?? null,
+    }));
+  } catch (err) {
+    logger.warn(
+      "ReservationService",
+      "friendly-name enrichment failed; falling back to chargeBoxId",
+      { error: err instanceof Error ? err.message : String(err) },
+    );
+    return rows;
+  }
+}
