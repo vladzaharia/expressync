@@ -10,7 +10,6 @@
  */
 
 import { define } from "../../../../utils.ts";
-import { config } from "../../../../src/lib/config.ts";
 import {
   openSseStream,
   parseLastEventId,
@@ -34,10 +33,6 @@ export const handler = define.handlers({
           headers: { "Content-Type": "application/json" },
         },
       );
-    }
-
-    if (!config.ENABLE_SSE) {
-      return sseDisabledResponse("SSE disabled (ENABLE_SSE=false)");
     }
 
     const stream = openSseStream({
