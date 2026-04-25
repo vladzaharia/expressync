@@ -49,10 +49,6 @@ import { sql } from "drizzle-orm";
 import { define } from "../../../utils.ts";
 import { db } from "../../../src/db/index.ts";
 import { config } from "../../../src/lib/config.ts";
-import {
-  FEATURE_PAIR_INTENT_INTERCEPT,
-  featureDisabledResponse,
-} from "../../../src/lib/feature-flags.ts";
 import { eventBus } from "../../../src/services/event-bus.service.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
 
@@ -102,10 +98,6 @@ interface HookBody {
 
 export const handler = define.handlers({
   async POST(ctx) {
-    if (!FEATURE_PAIR_INTENT_INTERCEPT) {
-      return featureDisabledResponse("pair-intent-intercept");
-    }
-
     // Read the raw body so HMAC verification matches what SteVe signed.
     let raw: string;
     try {

@@ -73,9 +73,9 @@ export default function NotificationBell({
   // admin. We layer SSE on top of the existing 30s poll:
   //   - If SSE connects within 2s, we stop the interval.
   //   - If SSE goes down for more than 10s, we resume polling.
-  // This preserves correct behaviour on hosts where SSE is blocked
-  // (ENABLE_SSE=false, hostile proxies, etc.) while eliminating poll traffic
-  // when the stream is healthy.
+  // This preserves correct behaviour on hosts where SSE is blocked (hostile
+  // proxies, CDN buffering, etc.) while eliminating poll traffic when the
+  // stream is healthy.
   useEffect(() => {
     let cancelled = false;
     let intervalId: number | null = null;

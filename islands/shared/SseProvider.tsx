@@ -16,11 +16,11 @@
  * Reconnect: native EventSource already reconnects, but we back off manually
  * on hard errors so transient outages don't hammer the server. Capped at 30s.
  *
- * Graceful fallback: if `ENABLE_SSE=false` on the server the endpoints reply
- * 503 and native EventSource will retry indefinitely; consumers watching the
- * `__sseConnected` signal see `false` and switch to polling. Islands must
- * continue to implement polling paths — SSE is an optimization, not a
- * requirement.
+ * Graceful fallback: if the SSE endpoints become unreachable (proxy buffering,
+ * CDN limits, connection cap reached) native EventSource retries indefinitely;
+ * consumers watching the `__sseConnected` signal see `false` and switch to
+ * polling. Islands must continue to implement polling paths — SSE is an
+ * optimization, not a requirement.
  */
 
 import { useEffect } from "preact/hooks";

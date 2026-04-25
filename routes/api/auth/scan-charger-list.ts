@@ -29,10 +29,6 @@ import { define } from "../../../utils.ts";
 import { db } from "../../../src/db/index.ts";
 import { chargersCache } from "../../../src/db/schema.ts";
 import { checkRateLimit } from "../../../src/lib/utils/rate-limit.ts";
-import {
-  FEATURE_SCAN_LOGIN,
-  featureDisabledResponse,
-} from "../../../src/lib/feature-flags.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
 
 const log = logger.child("ScanChargerList");
@@ -62,10 +58,6 @@ function rateLimited(): Response {
 
 export const handler = define.handlers({
   async GET(ctx) {
-    if (!FEATURE_SCAN_LOGIN) {
-      return featureDisabledResponse("scan-login");
-    }
-
     const ip = getClientIp(ctx.req);
     if (!await checkRateLimit(`scancharger:${ip}`, RATE_LIMIT_PER_IP)) {
       return rateLimited();

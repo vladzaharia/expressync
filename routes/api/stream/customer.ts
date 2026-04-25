@@ -29,7 +29,6 @@
  */
 
 import { define } from "../../../utils.ts";
-import { config } from "../../../src/lib/config.ts";
 import {
   openSseStream,
   parseLastEventId,
@@ -44,10 +43,6 @@ export const handler = define.handlers({
         JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { "Content-Type": "application/json" } },
       );
-    }
-
-    if (!config.ENABLE_SSE) {
-      return sseDisabledResponse("SSE disabled (ENABLE_SSE=false)");
     }
 
     const scope = await resolveCustomerScope(ctx);

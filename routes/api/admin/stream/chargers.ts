@@ -11,7 +11,6 @@
  */
 
 import { define } from "../../../../utils.ts";
-import { config } from "../../../../src/lib/config.ts";
 import {
   openSseStream,
   parseLastEventId,
@@ -25,10 +24,6 @@ export const handler = define.handlers({
     // in isolation if the middleware prefix list ever regresses.
     if (ctx.state.user?.role !== "admin") {
       return new Response("Forbidden", { status: 403 });
-    }
-
-    if (!config.ENABLE_SSE) {
-      return sseDisabledResponse("SSE disabled (ENABLE_SSE=false)");
     }
 
     const stream = openSseStream({

@@ -33,10 +33,6 @@ import { define } from "../../../utils.ts";
 import { db } from "../../../src/db/index.ts";
 import { chargersCache, verifications } from "../../../src/db/schema.ts";
 import { checkRateLimit } from "../../../src/lib/utils/rate-limit.ts";
-import {
-  FEATURE_SCAN_LOGIN,
-  featureDisabledResponse,
-} from "../../../src/lib/feature-flags.ts";
 import { logAuthEvent } from "../../../src/lib/audit.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
 
@@ -129,9 +125,6 @@ async function resolveChargeBoxId(
 
 export const handler = define.handlers({
   async POST(ctx) {
-    if (!FEATURE_SCAN_LOGIN) {
-      return featureDisabledResponse("scan-login");
-    }
     const ip = getClientIp(ctx.req);
     if (!await checkRateLimit(`scanpair:ip:${ip}`, RATE_LIMIT_PER_IP)) {
       return jsonResponse(429, { error: "rate_limited" });
@@ -229,9 +222,6 @@ export const handler = define.handlers({
    * Public route; the chargeBoxId+pairingCode pair is the auth token.
    */
   async DELETE(ctx) {
-    if (!FEATURE_SCAN_LOGIN) {
-      return featureDisabledResponse("scan-login");
-    }
     const ip = getClientIp(ctx.req);
     if (!await checkRateLimit(`scanpair:ip:${ip}`, RATE_LIMIT_PER_IP)) {
       return jsonResponse(429, { error: "rate_limited" });
