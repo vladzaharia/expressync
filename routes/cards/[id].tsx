@@ -31,19 +31,18 @@ import {
   SectionCard,
 } from "../../components/shared/index.ts";
 import { MetricTile } from "../../components/shared/MetricTile.tsx";
-import { Button } from "../../components/ui/button.tsx";
 import {
   Activity,
   Calendar,
   Clock,
   CreditCard,
-  Mail,
   Tag as TagIcon,
 } from "lucide-preact";
 import CardDetailStats from "../../islands/customer/CardDetailStats.tsx";
 import CustomerSessionsTable, {
   type CustomerSessionRow,
 } from "../../islands/customer/CustomerSessionsTable.tsx";
+import ReportLostCardDialog from "../../islands/customer/ReportLostCardDialog.tsx";
 
 const RECENT_PAGE_SIZE = 10;
 
@@ -154,21 +153,9 @@ export const handler = define.handlers({
   },
 });
 
-function ReportLostButton({ operatorEmail }: { operatorEmail: string }) {
-  const subject = encodeURIComponent("Report lost charging card");
-  return (
-    <Button
-      asChild
-      variant="outline"
-      size="mobile"
-    >
-      <a href={`mailto:${operatorEmail}?subject=${subject}`}>
-        <Mail class="size-4" />
-        Report lost
-      </a>
-    </Button>
-  );
-}
+// `ReportLostButton` previously rendered an inert mailto link. The
+// real flow now lives in `islands/customer/ReportLostCardDialog.tsx`
+// and is hydrated below in the PageCard headerActions.
 
 export default define.page<typeof handler>(
   function CustomerCardDetailPage({ data, url, state }) {
@@ -193,7 +180,13 @@ export default define.page<typeof handler>(
             headerActions={
               <div class="flex items-center gap-2">
                 <CardStatusBadge isActive={card.isActive} large />
-                <ReportLostButton operatorEmail={data.operatorEmail} />
+                {card.isActive && (
+                  <ReportLostCardDialog
+                    cardId={card.id}
+                    cardName={name}
+                    operatorEmail={data.operatorEmail}
+                  />
+                )}
               </div>
             }
           >
