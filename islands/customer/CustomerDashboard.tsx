@@ -52,6 +52,16 @@ interface ActiveSession {
   tagDisplayName: string | null;
   estimatedCost?: number;
   currencySymbol?: string;
+  /**
+   * Per-kWh tariff resolved from the customer's active Lago plan when the
+   * dashboard loader builds the session. Forwarded to the live card so it
+   * can render a running cost tile that updates as kWh climbs. Omit for
+   * flat-rate or membership plans.
+   */
+  tariffPerKwh?: number;
+  /** Vehicle efficiency override (mi/kWh); defaults to 4 in the card. */
+  milesPerKwh?: number;
+  distanceUnit?: "imperial" | "metric";
 }
 
 interface RecentSession {

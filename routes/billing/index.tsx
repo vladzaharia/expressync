@@ -38,7 +38,9 @@ import type { CustomerInvoiceFilter } from "../../islands/customer/CustomerInvoi
 import CustomerWalletSection, {
   type WalletData,
 } from "../../islands/customer/CustomerWalletSection.tsx";
+import HeroSessionCard from "../../islands/customer/HeroSessionCard.tsx";
 import {
+  BatteryCharging,
   Bolt,
   CalendarClock,
   CircleDollarSign,
@@ -85,6 +87,26 @@ interface BillingPageData {
   hasLagoLink: boolean;
   currency: string;
   operatorEmail?: string;
+  /**
+   * In-progress charging session for this customer, if any. When present
+   * the page renders a "Currently charging" SectionCard with a live
+   * `LiveSessionCard` near the top.
+   */
+  activeSession: {
+    steveTransactionId: number;
+    chargeBoxId: string | null;
+    friendlyName?: string | null;
+    connectorId: number | null;
+    connectorType: string | null;
+    initialKwh: number;
+    startedAt: string | null;
+    tagDisplayName: string | null;
+    estimatedCost?: number;
+    currencySymbol?: string;
+    tariffPerKwh?: number;
+    walletBalanceCents?: number;
+    walletThresholdCents?: number;
+  } | null;
 }
 
 const ALLOWED_STATUS: CustomerInvoiceFilter[] = ["open", "paid", "voided"];
@@ -192,6 +214,68 @@ export const handler = define.handlers({
     ) => ({ date, kwh: Number(kwh.toFixed(3)) }));
 
     let wallet: WalletData | null = null;
+
+    // ── Active charging session (live tile) ───────────────────────────
+    // Mirrors the dashboard active-session lookup (routes/index.tsx) so
+    // the billing page can show the same live "Currently charging" tile
+    // up top. Best-effort: failures fall back to no card rendered.
+    let activeSessionData: BillingPageData["activeSession"] = null;
+    if (scope.mappingIds.length > 0) {
+      try {
+        const [active] = await db
+          .select({
+            steveTransactionId:
+              schema.syncedTransactionEvents.steveTransactionId,
+            syncedAt: schema.syncedTransactionEvents.syncedAt,
+            totalKwhBilled: schema.transactionSyncState.totalKwhBilled,
+            isFinalized: schema.transactionSyncState.isFinalized,
+            tagDisplayName: schema.userMappings.displayName,
+          })
+          .from(schema.syncedTransactionEvents)
+          .leftJoin(
+            schema.transactionSyncState,
+            eq(
+              schema.syncedTransactionEvents.steveTransactionId,
+              schema.transactionSyncState.steveTransactionId,
+            ),
+          )
+          .leftJoin(
+            schema.userMappings,
+            eq(
+              schema.syncedTransactionEvents.userMappingId,
+              schema.userMappings.id,
+            ),
+          )
+          .where(
+            and(
+              inArray(
+                schema.syncedTransactionEvents.userMappingId,
+                scope.mappingIds,
+              ),
+              eq(schema.transactionSyncState.isFinalized, false),
+            ),
+          )
+          .orderBy(schema.syncedTransactionEvents.syncedAt)
+          .limit(1);
+        if (active) {
+          const initialKwh = Number(active.totalKwhBilled ?? 0);
+          activeSessionData = {
+            steveTransactionId: active.steveTransactionId,
+            chargeBoxId: null,
+            friendlyName: null,
+            connectorId: null,
+            connectorType: null,
+            initialKwh,
+            startedAt: active.syncedAt ? active.syncedAt.toISOString() : null,
+            tagDisplayName: active.tagDisplayName ?? null,
+          };
+        }
+      } catch (err) {
+        log.warn("billing page active-session lookup failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
 
     if (hasLagoLink) {
       const extCustomerId = scope.lagoCustomerExternalId!;
@@ -386,6 +470,24 @@ export const handler = define.handlers({
       operatorEmail: config.OPERATOR_CONTACT_EMAIL || undefined,
     };
 
+    // Enrich the active session with currency + tariff + wallet figures
+    // pulled from Lago above, so `LiveSessionCard` can render running cost
+    // and a wallet tile without an extra round-trip.
+    if (activeSessionData) {
+      activeSessionData.currencySymbol = currencySymbolFor(currency);
+      const perKwh = planInfo?.perKwhCharge != null
+        ? planInfo.perKwhCharge
+        : undefined;
+      if (perKwh && perKwh > 0) {
+        activeSessionData.tariffPerKwh = perKwh;
+        activeSessionData.estimatedCost =
+          Number((activeSessionData.initialKwh * perKwh).toFixed(2));
+      }
+      if (wallet) {
+        activeSessionData.walletBalanceCents = wallet.balanceCents;
+      }
+    }
+
     return {
       data: {
         overview,
@@ -402,6 +504,7 @@ export const handler = define.handlers({
         hasLagoLink,
         currency,
         operatorEmail: config.OPERATOR_CONTACT_EMAIL || undefined,
+        activeSession: activeSessionData,
       } satisfies BillingPageData,
     };
   },
@@ -520,6 +623,33 @@ export default define.page<typeof handler>(function BillingIndexPage(
           <BlurFade direction="up" duration={0.35}>
             <StatStrip accent="blue" items={stats} />
           </BlurFade>
+
+          {data.activeSession && (
+            <SectionCard
+              title="Currently charging"
+              icon={BatteryCharging}
+              accent="emerald"
+              borderBeam
+            >
+              <HeroSessionCard
+                session={{
+                  steveTransactionId: data.activeSession.steveTransactionId,
+                  chargeBoxId: data.activeSession.chargeBoxId,
+                  friendlyName: data.activeSession.friendlyName,
+                  connectorId: data.activeSession.connectorId,
+                  connectorType: data.activeSession.connectorType,
+                  initialKwh: data.activeSession.initialKwh,
+                  startedAt: data.activeSession.startedAt,
+                  tagDisplayName: data.activeSession.tagDisplayName,
+                  estimatedCost: data.activeSession.estimatedCost,
+                  currencySymbol: data.activeSession.currencySymbol,
+                  tariffPerKwh: data.activeSession.tariffPerKwh,
+                  walletBalanceCents: data.activeSession.walletBalanceCents,
+                  walletThresholdCents: data.activeSession.walletThresholdCents,
+                }}
+              />
+            </SectionCard>
+          )}
 
           <SectionCard
             title="Overview"
