@@ -55,17 +55,72 @@ export async function composeUp(
   ctx: ComposeContext,
   opts: { wait?: boolean; timeoutSec?: number } = {},
 ): Promise<void> {
+  // Register teardown BEFORE `up` runs — partial-up failures (e.g. one
+  // service crashes during build) still create containers and networks
+  // that need cleaning. Registering after `up` returns would leak them.
+  registerCleanup(() => composeDown(ctx));
   const args = ["up", "-d", "--build"];
   if (opts.wait) args.push("--wait", "--wait-timeout", String(opts.timeoutSec ?? 600));
   const r = await run(composeArgs(ctx, args));
   if (r.code !== 0) {
     throw new Error(`compose up failed (code=${r.code})`);
   }
-  registerCleanup(() => composeDown(ctx));
 }
 
+/**
+ * Tears down a project. Tries `docker compose down` first (with a 30s
+ * stop timeout); on failure or hang, falls back to label-based force
+ * removal so a stuck container can never block teardown.
+ */
 export async function composeDown(ctx: ComposeContext): Promise<void> {
-  await run(composeArgs(ctx, ["down", "-v", "--remove-orphans"]), { quiet: true });
+  const downArgs = composeArgs(ctx, ["down", "-v", "--remove-orphans", "--timeout", "30"]);
+  const ok = await runWithDeadline(downArgs, 90_000);
+  if (!ok) {
+    console.warn(`[harness] compose down for ${ctx.project} did not finish cleanly — forcing`);
+    await forceTeardown(ctx.project);
+  }
+}
+
+async function runWithDeadline(args: string[], deadlineMs: number): Promise<boolean> {
+  const cmd = new Deno.Command("docker", { args, stdout: "null", stderr: "null" });
+  const child = cmd.spawn();
+  const timer = setTimeout(() => {
+    try { child.kill("SIGKILL"); } catch { /* */ }
+  }, deadlineMs);
+  try {
+    const { code } = await child.output();
+    return code === 0;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Last-resort teardown for a project: list and force-remove every
+ * container, network, and volume tagged with the compose project label.
+ * Idempotent — safe to run on a project that's already gone.
+ */
+export async function forceTeardown(project: string): Promise<void> {
+  const projectFilter = `label=com.docker.compose.project=${project}`;
+  const ids = async (kind: "container" | "network" | "volume") => {
+    const subcmd = kind === "container" ? ["ps", "-a"] : kind === "network" ? ["network", "ls"] : ["volume", "ls"];
+    const r = await run([...subcmd, "--filter", projectFilter, "--format", "{{.ID}}"], { capture: true });
+    return r.stdout.split("\n").map((s) => s.trim()).filter(Boolean);
+  };
+  const cids = await ids("container");
+  if (cids.length) {
+    await run(["rm", "-f", "-v", ...cids], { quiet: true });
+  }
+  const nids = await ids("network");
+  for (const n of nids) {
+    await run(["network", "rm", n], { quiet: true });
+  }
+  const vids = await ids("volume");
+  if (vids.length) {
+    await run(["volume", "rm", "-f", ...vids], { quiet: true });
+  }
 }
 
 export async function getHostPort(
