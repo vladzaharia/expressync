@@ -51,6 +51,7 @@ import {
 import { CommandGroup } from "@/components/command-palette/CommandGroup.tsx";
 import { CommandItem } from "@/components/command-palette/CommandItem.tsx";
 import type { CommandSearchResponse } from "@/routes/api/admin/command-palette/search.ts";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 /**
  * Polaris Track H — surface the palette is mounted in. Customer surface
@@ -127,7 +128,7 @@ interface RecentEntry {
 }
 
 function navigate(href: string) {
-  globalThis.location.href = href;
+  clientNavigate(href);
 }
 
 function loadRecent(): RecentEntry[] {

@@ -460,3 +460,19 @@
       var(--blur-fade-delay, 0s) forwards;
   }
 }
+
+/* Tailwind v4 drops the implicit pointer cursor on buttons. Restore it
+   globally so every interactive element — buttons, role="button" (e.g.
+   Radix dropdown triggers), links with href, submit/reset inputs — gets
+   the expected affordance. `:not(:disabled)` keeps disabled controls on
+   the default cursor. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  [type="button"]:not(:disabled),
+  [type="submit"]:not(:disabled),
+  [type="reset"]:not(:disabled) {
+    cursor: pointer;
+  }
+}

@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Filter, X } from "lucide-preact";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 export interface WebhookFilterState {
   type: string;
@@ -80,13 +81,13 @@ export default function WebhookEventFilters({ initial }: Props) {
       qs.set("notification_fired", "0");
     }
     const suffix = qs.toString();
-    globalThis.location.href = suffix
+    clientNavigate(suffix
       ? `/admin/webhook-events?${suffix}`
-      : `/admin/webhook-events`;
+      : `/admin/webhook-events`);
   }, [type, status, customer, subscription, start, end, notificationFired]);
 
   const reset = useCallback(() => {
-    globalThis.location.href = `/admin/webhook-events`;
+    clientNavigate(`/admin/webhook-events`);
   }, []);
 
   return (

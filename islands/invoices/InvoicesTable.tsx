@@ -19,6 +19,7 @@ import {
   monthKey,
   monthLabel,
 } from "@/src/lib/invoice-ui.ts";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 interface Props {
   invoices: InvoiceListDTO[];
@@ -98,9 +99,9 @@ export default function InvoicesTable({
                       key={row.id}
                       className="cursor-pointer hover:bg-muted/40"
                       onClick={() => {
-                        globalThis.location.href = `/invoices/${
+                        clientNavigate(`/invoices/${
                           encodeURIComponent(row.id)
-                        }`;
+                        }`);
                       }}
                     >
                       <TableCell>

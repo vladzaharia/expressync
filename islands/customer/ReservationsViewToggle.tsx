@@ -8,6 +8,7 @@
 
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { CalendarDays, ListOrdered } from "lucide-preact";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 export type ReservationsView = "calendar" | "list";
 
@@ -35,10 +36,10 @@ export default function ReservationsViewToggle(
       value={value}
       onValueChange={(next: string) => {
         if (!next || next === value) return;
-        globalThis.location.href = buildHref(
+        clientNavigate(buildHref(
           basePath,
           next as ReservationsView,
-        );
+        ));
       }}
       variant="outline-joined"
       size="sm"

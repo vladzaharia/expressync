@@ -1,14 +1,31 @@
-import type { ComponentChildren } from "preact";
+import type { ComponentChildren, ComponentType } from "preact";
 import {
   SidebarInset,
   SidebarProvider,
   useSidebar,
 } from "@/components/ui/sidebar.tsx";
 import { AppSidebar, CHROME_SIZE } from "@/components/AppSidebar.tsx";
+import { ExpresSyncBrand } from "@/components/brand/ExpresSyncBrand.tsx";
+import { PolarisExpressBrand } from "@/components/brand/PolarisExpressBrand.tsx";
 import { SectionNav } from "@/components/SectionNav.tsx";
 import PaletteTriggerPill from "@/islands/PaletteTriggerPill.tsx";
 import NotificationBell from "@/islands/NotificationBell.tsx";
 import UserMenu from "@/islands/UserMenu.tsx";
+
+// Shared shape used by `AppSidebar.brandComponent`. ExpresSyncBrand doesn't
+// declare the "header-mobile" variant (only Polaris does), but AppSidebar
+// never invokes that variant on desktop, so widening via a cast is safe.
+type SidebarBrandComponent = ComponentType<
+  {
+    variant?:
+      | "logo-only"
+      | "sidebar-collapsed"
+      | "sidebar-expanded"
+      | "login"
+      | "header-mobile";
+    className?: string;
+  }
+>;
 import { cn } from "@/src/lib/utils/cn.ts";
 import { type AccentColor, accentTailwindClasses } from "@/src/lib/colors.ts";
 import { ADMIN_NAV_SECTIONS } from "@/src/lib/admin-navigation.ts";
@@ -44,9 +61,10 @@ function TopBarContent({
   actions,
   accentColor = "blue",
   user,
+  role = "admin",
 }: Pick<
   SidebarWrapperProps,
-  "currentPath" | "actions" | "accentColor" | "user"
+  "currentPath" | "actions" | "accentColor" | "user" | "role"
 >) {
   const { isMobile } = useSidebar();
 
@@ -69,10 +87,13 @@ function TopBarContent({
         <SectionNav currentPath={currentPath} />
       </div>
 
-      {/* Center-right: palette trigger pill */}
-      <div className="flex items-center shrink-0">
-        <PaletteTriggerPill />
-      </div>
+      {/* Center-right: palette trigger pill — admin only. Removed on the
+          customer surface (Polaris) so the top bar stays uncluttered. */}
+      {role !== "customer" && (
+        <div className="flex items-center shrink-0">
+          <PaletteTriggerPill />
+        </div>
+      )}
 
       {/* Page action section — preserves accent gradient behavior. */}
       {actions && (
@@ -86,7 +107,8 @@ function TopBarContent({
         </div>
       )}
 
-      {/* Right cluster: NotificationBell + UserMenu */}
+      {/* Right cluster: NotificationBell + UserMenu. Sign-out lives in the
+          avatar dropdown for both surfaces — no separate icon button. */}
       <div className="flex items-center gap-2 px-3 border-l shrink-0">
         <NotificationBell variant="topbar" />
         <UserMenu user={user} />
@@ -113,6 +135,9 @@ export default function SidebarWrapper({
         user={user}
         navSections={navSections}
         role={role}
+        brandComponent={(role === "customer"
+          ? PolarisExpressBrand
+          : ExpresSyncBrand) as SidebarBrandComponent}
       />
       <SidebarInset>
         <TopBarContent
@@ -120,10 +145,16 @@ export default function SidebarWrapper({
           actions={actions}
           accentColor={accentColor}
           user={user}
+          role={role}
         />
         <main
           id="main-content"
-          className="flex-1 overflow-auto p-4 md:p-6"
+          className={cn(
+            "flex-1 overflow-auto p-4 md:p-6",
+            // Customer mobile has a fixed 64px bottom tab bar; keep page
+            // content from slipping underneath it on phone viewports.
+            role === "customer" && "pb-20 md:pb-6",
+          )}
         >
           {children}
         </main>

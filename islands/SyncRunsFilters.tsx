@@ -10,6 +10,7 @@ import { useSignal } from "@preact/signals";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 type StatusFilter = "" | "completed" | "failed" | "running";
 type SegmentFilter = "" | "tag_linking" | "transaction_sync" | "scheduling";
@@ -36,11 +37,11 @@ export default function SyncRunsFilters({ initial }: Props) {
     if (to.value) params.set("to", to.value);
     if (segment.value) params.set("segment", segment.value);
     const qs = params.toString();
-    globalThis.location.href = qs ? `/sync?${qs}` : "/sync";
+    clientNavigate(qs ? `/sync?${qs}` : "/sync");
   };
 
   const reset = () => {
-    globalThis.location.href = "/sync";
+    clientNavigate("/sync");
   };
 
   const hasAny = !!(status.value || from.value || to.value || segment.value);

@@ -44,6 +44,19 @@ export default define.page<typeof handler>(
       l.segment === "transaction_sync"
     );
     const schedulingLogs = logs.filter((l) => l.segment === "scheduling");
+    const lagoCustomersLogs = logs.filter((l) => l.segment === "lago_customers");
+    const lagoSubscriptionsLogs = logs.filter((l) =>
+      l.segment === "lago_subscriptions"
+    );
+    const lagoPlansLogs = logs.filter((l) => l.segment === "lago_plans");
+    const lagoInvoicesLogs = logs.filter((l) => l.segment === "lago_invoices");
+    const lagoWalletsLogs = logs.filter((l) => l.segment === "lago_wallets");
+    const lagoBillableMetricsLogs = logs.filter((l) =>
+      l.segment === "lago_billable_metrics"
+    );
+    const localReconcileLogs = logs.filter((l) =>
+      l.segment === "local_reconcile"
+    );
     const isAdmin = state.user?.role === "admin";
     const runIsRunning = run.status === "running";
     const canRetry = run.status === "failed" && isAdmin;
@@ -192,6 +205,13 @@ export default define.page<typeof handler>(
                 tagLinkingLogs={tagLinkingLogs}
                 transactionSyncLogs={transactionSyncLogs}
                 schedulingLogs={schedulingLogs}
+                lagoCustomersLogs={lagoCustomersLogs}
+                lagoSubscriptionsLogs={lagoSubscriptionsLogs}
+                lagoPlansLogs={lagoPlansLogs}
+                lagoInvoicesLogs={lagoInvoicesLogs}
+                lagoWalletsLogs={lagoWalletsLogs}
+                lagoBillableMetricsLogs={lagoBillableMetricsLogs}
+                localReconcileLogs={localReconcileLogs}
                 runIsRunning={runIsRunning}
               />
             </SectionCard>

@@ -22,11 +22,17 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
+  Gauge,
   Info,
   Link2,
   MinusCircle,
+  Package,
   Receipt,
+  RefreshCcw,
   Search,
+  Shuffle,
+  Users,
+  Wallet,
 } from "lucide-preact";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -40,10 +46,35 @@ interface Props {
   tagLinkingLogs: SyncRunLog[];
   transactionSyncLogs: SyncRunLog[];
   schedulingLogs: SyncRunLog[];
+  lagoCustomersLogs: SyncRunLog[];
+  lagoSubscriptionsLogs: SyncRunLog[];
+  lagoPlansLogs: SyncRunLog[];
+  lagoInvoicesLogs: SyncRunLog[];
+  lagoWalletsLogs: SyncRunLog[];
+  lagoBillableMetricsLogs: SyncRunLog[];
+  localReconcileLogs: SyncRunLog[];
   runIsRunning: boolean;
 }
 
-type TabKey = "tag_linking" | "transaction_sync" | "scheduling";
+type TabKey =
+  | "tag_linking"
+  | "transaction_sync"
+  | "scheduling"
+  | "lago_customers"
+  | "lago_subscriptions"
+  | "lago_plans"
+  | "lago_invoices"
+  | "lago_wallets"
+  | "lago_billable_metrics"
+  | "local_reconcile";
+
+/** Derive segment status from logs (no dedicated sync_runs column). */
+function deriveStatus(logs: SyncRunLog[]): string | null {
+  if (logs.length === 0) return null;
+  if (logs.some((l) => l.level === "error")) return "error";
+  if (logs.some((l) => l.level === "warn")) return "warning";
+  return "success";
+}
 
 function SegmentStatusBadge({
   status,
@@ -115,6 +146,13 @@ export default function SyncSegmentTabs(
     tagLinkingLogs,
     transactionSyncLogs,
     schedulingLogs,
+    lagoCustomersLogs,
+    lagoSubscriptionsLogs,
+    lagoPlansLogs,
+    lagoInvoicesLogs,
+    lagoWalletsLogs,
+    lagoBillableMetricsLogs,
+    localReconcileLogs,
     runIsRunning,
   }: Props,
 ) {
@@ -173,6 +211,62 @@ export default function SyncSegmentTabs(
       status: schedulingStatus,
       logs: schedulingLogs,
       searchable: false,
+    },
+    {
+      key: "lago_customers",
+      label: "Customers",
+      icon: Users,
+      status: deriveStatus(lagoCustomersLogs),
+      logs: lagoCustomersLogs,
+      searchable: true,
+    },
+    {
+      key: "lago_subscriptions",
+      label: "Subscriptions",
+      icon: RefreshCcw,
+      status: deriveStatus(lagoSubscriptionsLogs),
+      logs: lagoSubscriptionsLogs,
+      searchable: true,
+    },
+    {
+      key: "lago_plans",
+      label: "Plans",
+      icon: Package,
+      status: deriveStatus(lagoPlansLogs),
+      logs: lagoPlansLogs,
+      searchable: true,
+    },
+    {
+      key: "lago_invoices",
+      label: "Invoices",
+      icon: Receipt,
+      status: deriveStatus(lagoInvoicesLogs),
+      logs: lagoInvoicesLogs,
+      searchable: true,
+    },
+    {
+      key: "lago_wallets",
+      label: "Wallets",
+      icon: Wallet,
+      status: deriveStatus(lagoWalletsLogs),
+      logs: lagoWalletsLogs,
+      searchable: true,
+    },
+    {
+      key: "lago_billable_metrics",
+      label: "Metrics",
+      icon: Gauge,
+      status: deriveStatus(lagoBillableMetricsLogs),
+      logs: lagoBillableMetricsLogs,
+      searchable: true,
+    },
+    {
+      key: "local_reconcile",
+      label: "Local Reconcile",
+      icon: Shuffle,
+      status: deriveStatus(localReconcileLogs),
+      logs: localReconcileLogs,
+      searchable: true,
     },
   ];
 

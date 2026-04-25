@@ -12,6 +12,7 @@ import { LinkingStatStrip } from "../../../components/links/LinkingStatStrip.tsx
 import { LinkingEmptyState } from "../../../components/links/LinkingEmptyState.tsx";
 import { isMetaTag } from "../../../src/lib/tag-hierarchy.ts";
 import { steveClient } from "../../../src/lib/steve-client.ts";
+import { eq } from "drizzle-orm";
 
 /**
  * Tag Linking — list page.
@@ -25,8 +26,19 @@ import { steveClient } from "../../../src/lib/steve-client.ts";
  */
 
 export const handler = define.handlers({
-  async GET(_ctx) {
-    const mappings = await db.select().from(schema.userMappings);
+  async GET(ctx) {
+    const url = new URL(ctx.req.url);
+    // `?include=inactive` shows soft-deactivated mappings alongside active ones.
+    // Default view hides them so a delete makes the row disappear, matching
+    // the operator's intent.
+    const includeInactive = url.searchParams.get("include") === "inactive";
+
+    const mappings = includeInactive
+      ? await db.select().from(schema.userMappings)
+      : await db
+          .select()
+          .from(schema.userMappings)
+          .where(eq(schema.userMappings.isActive, true));
 
     const subscriptionNames = new Map<string, string>();
     const customerLagoIds = new Map<string, string>();
@@ -84,6 +96,7 @@ export const handler = define.handlers({
           metaTagsLinked,
           unlinkedTagCount,
         },
+        includeInactive,
       },
     };
   },
@@ -129,6 +142,32 @@ export default define.page<typeof handler>(
         >
           <div class="mb-6">
             <LinkingStatStrip totals={data.totals} />
+          </div>
+
+          <div class="mb-4 flex items-center gap-2 text-sm">
+            <span class="text-muted-foreground">Show:</span>
+            <a
+              href="/links"
+              class={`px-2.5 py-1 rounded-md border text-xs transition-colors ${
+                data.includeInactive
+                  ? "text-muted-foreground hover:bg-muted/50"
+                  : "bg-accent text-accent-foreground border-accent"
+              }`}
+              aria-current={data.includeInactive ? undefined : "true"}
+            >
+              Active only
+            </a>
+            <a
+              href="/links?include=inactive"
+              class={`px-2.5 py-1 rounded-md border text-xs transition-colors ${
+                data.includeInactive
+                  ? "bg-accent text-accent-foreground border-accent"
+                  : "text-muted-foreground hover:bg-muted/50"
+              }`}
+              aria-current={data.includeInactive ? "true" : undefined}
+            >
+              Including inactive
+            </a>
           </div>
 
           {groupedMappings.length === 0

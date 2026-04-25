@@ -14,6 +14,7 @@ import {
 } from "@/src/lib/types/tags.ts";
 import { isMetaTag, META_TAG_PREFIX } from "@/src/lib/tag-hierarchy.ts";
 import { tagTypeBgClass, tagTypeTextClass } from "@/src/lib/tag-visuals.ts";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 interface Props {
   /** Prefilled id-tag (from scanner or URL query). */
@@ -82,9 +83,9 @@ export default function NewTagForm(
         return;
       }
       if (typeof payload.tagPk === "number") {
-        globalThis.location.href = `/tags/${payload.tagPk}`;
+        clientNavigate(`/tags/${payload.tagPk}`);
       } else {
-        globalThis.location.href = "/tags";
+        clientNavigate("/tags");
       }
     } catch (err) {
       errorMessage.value = err instanceof Error ? err.message : String(err);

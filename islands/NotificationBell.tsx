@@ -31,6 +31,7 @@ import {
 } from "@/components/notifications/NotificationRow.tsx";
 import { toast } from "sonner";
 import { sseConnected, subscribeSse } from "@/islands/shared/SseProvider.tsx";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 const CHROME_SIZE = "3.5rem";
 const POLL_INTERVAL_MS = 30_000;
@@ -245,7 +246,7 @@ export default function NotificationBell({
     if (href.startsWith("http")) {
       globalThis.open(href, "_blank", "noopener,noreferrer");
     } else {
-      globalThis.location.href = href;
+      clientNavigate(href);
     }
   };
 

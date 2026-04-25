@@ -9,6 +9,7 @@ import {
 } from "@/components/shared/index.ts";
 import type { SyncRun } from "@/src/db/schema.ts";
 import { formatDate, formatDuration } from "@/src/lib/utils/format.ts";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 interface Props {
   syncRuns: SyncRun[];
@@ -81,7 +82,7 @@ export default function SyncRunsTable({
   hideFooterText = false,
 }: Props) {
   const handleRowClick = (run: SyncRun) => {
-    globalThis.location.href = `/sync/${run.id}`;
+    clientNavigate(`/sync/${run.id}`);
   };
 
   return (

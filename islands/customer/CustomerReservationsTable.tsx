@@ -24,6 +24,7 @@ import {
 import { ReservationStatusBadge } from "@/components/shared/ReservationStatusBadge.tsx";
 import { MobileCardRow } from "@/components/shared/MobileCardRow.tsx";
 import type { ReservationRowDTO } from "@/src/db/schema.ts";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 interface Props {
   reservations: ReservationRowDTO[];
@@ -132,7 +133,7 @@ export default function CustomerReservationsTable(
       pageSize={pageSize}
       getItemKey={(row) => row.id}
       onRowClick={(row) => {
-        globalThis.location.href = `/reservations/${row.id}`;
+        clientNavigate(`/reservations/${row.id}`);
       }}
       emptyMessage="No reservations match the current filter"
       renderMobileCard={renderMobileCard}
