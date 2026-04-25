@@ -108,6 +108,36 @@ function rateLimitedResponse(retryAfterSeconds = 60): Response {
   );
 }
 
+/**
+ * Content-Security-Policy — REPORT-ONLY for now.
+ *
+ * We're intentionally not enforcing yet because the theme bootstrap in
+ * `routes/_app.tsx` is an inline <script>, and Fresh's island serializer
+ * also emits inline JSON state blobs. Once those are migrated to nonced
+ * external modules we can drop `'unsafe-inline'` from `script-src` and
+ * promote this to `Content-Security-Policy` (enforcing).
+ *
+ *  - default-src 'self'                — same-origin by default.
+ *  - script-src + 'unsafe-inline'      — temporary; tracking removal.
+ *  - script-src + 'unsafe-eval'        — required by some Vite/HMR paths.
+ *  - style-src + 'unsafe-inline'       — Tailwind's runtime style is fine,
+ *                                         but a few islands still inject.
+ *  - img-src ... assets.polaris.express— marketing/asset CDN host.
+ *  - frame-ancestors 'none'            — matches X-Frame-Options: DENY.
+ *  - base-uri / form-action 'self'     — defense vs <base> hijack and
+ *                                         cross-origin form posts.
+ */
+const CSP_REPORT_ONLY = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: https://assets.polaris.express",
+  "connect-src 'self'",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join("; ");
+
 /** Apply standard security headers + HSTS to a Response. */
 function applySecurityHeaders(response: Response): Response {
   response.headers.set("X-Content-Type-Options", "nosniff");
@@ -118,6 +148,10 @@ function applySecurityHeaders(response: Response): Response {
     "Strict-Transport-Security",
     "max-age=63072000; includeSubDomains",
   );
+  // Report-only initially — we'll promote to enforcing once the inline
+  // theme bootstrap in _app.tsx is migrated and `'unsafe-inline'` can be
+  // dropped from script-src.
+  response.headers.set("Content-Security-Policy-Report-Only", CSP_REPORT_ONLY);
   return response;
 }
 

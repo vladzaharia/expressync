@@ -1100,6 +1100,35 @@ export type ImpersonationAudit = typeof impersonationAudit.$inferSelect;
 export type NewImpersonationAudit = typeof impersonationAudit.$inferInsert;
 
 // ============================================================================
+// IDEMPOTENCY KEYS
+//
+// Cached responses for state-changing endpoints that opt-in via the
+// `Idempotency-Key` request header. The key + route + (optional) userId
+// triple identifies a unique attempt; replays return the cached response
+// for 24h. The cleanup is best-effort, run from the sync-worker cron.
+// ============================================================================
+export const idempotencyKeys = pgTable("idempotency_keys", {
+  /** Caller-supplied opaque token (typically a UUID). */
+  key: text("key").primaryKey(),
+  /** Server-side route identifier — keys are scoped per route. */
+  route: text("route").notNull(),
+  /** Authenticated user (NULL for anonymous endpoints). */
+  userId: text("user_id"),
+  /** Cached HTTP status. */
+  responseStatus: integer("response_status").notNull(),
+  /** Cached response body, JSON-encoded. */
+  responseBody: jsonb("response_body").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+}, (table) => [
+  index("idempotency_keys_created_at_idx").on(table.createdAt),
+]);
+
+export type IdempotencyKey = typeof idempotencyKeys.$inferSelect;
+export type NewIdempotencyKey = typeof idempotencyKeys.$inferInsert;
+
+// ============================================================================
 // === Lago entity cache (Lago is source of truth) ===
 //
 // One row per Lago entity. `payload` carries the full Lago response so the

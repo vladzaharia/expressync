@@ -1,6 +1,7 @@
 import { define } from "../../../../utils.ts";
 import { triggerSync } from "../../../../src/services/sync-notifier.service.ts";
 import { logger } from "../../../../src/lib/utils/logger.ts";
+import { withIdempotency } from "../../../../src/lib/idempotency.ts";
 
 /**
  * POST /api/sync/trigger
@@ -12,29 +13,31 @@ import { logger } from "../../../../src/lib/utils/logger.ts";
  * This endpoint returns immediately after sending the notification.
  */
 export const handler = define.handlers({
-  async POST(_req) {
-    try {
-      logger.info("API", "Manual sync triggered via notification");
-      await triggerSync("api");
+  POST(ctx) {
+    return withIdempotency(ctx, "POST /api/admin/sync/trigger", async () => {
+      try {
+        logger.info("API", "Manual sync triggered via notification");
+        await triggerSync("api");
 
-      return new Response(
-        JSON.stringify({
-          message: "Sync trigger notification sent to worker",
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    } catch (error) {
-      logger.error("API", "Failed to trigger sync", error as Error);
-      return new Response(
-        JSON.stringify({ error: "Failed to trigger sync" }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
+        return new Response(
+          JSON.stringify({
+            message: "Sync trigger notification sent to worker",
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      } catch (error) {
+        logger.error("API", "Failed to trigger sync", error as Error);
+        return new Response(
+          JSON.stringify({ error: "Failed to trigger sync" }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+    });
   },
 });

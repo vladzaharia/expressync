@@ -1,17 +1,54 @@
 import { define } from "../../../../utils.ts";
 import { db } from "../../../../src/db/index.ts";
 import { users } from "../../../../src/db/schema.ts";
-import { eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { auth } from "../../../../src/lib/auth.ts";
 import { logger } from "../../../../src/lib/utils/logger.ts";
 
 export const handler = define.handlers({
   /**
-   * GET /api/user - List all users (admin only)
+   * GET /api/user - List users (admin only)
+   *
+   * Pagination params (optional):
+   *   ?limit=  default 25, clamped [1, 100]
+   *   ?skip=   default 0
+   *
+   * Back-compat: when neither param is provided, returns the legacy bare
+   * array. When either is present, returns `{ rows, total, limit, skip }`
+   * to match `routes/api/admin/transaction/index.ts`.
    */
-  async GET(_ctx) {
+  async GET(ctx) {
     try {
-      const allUsers = await db
+      const url = new URL(ctx.req.url);
+      const hasPaginationParams = url.searchParams.has("limit") ||
+        url.searchParams.has("skip");
+      const skipRaw = parseInt(url.searchParams.get("skip") || "0", 10);
+      const skip = isNaN(skipRaw) || skipRaw < 0 ? 0 : skipRaw;
+      const limitRaw = parseInt(url.searchParams.get("limit") || "25", 10);
+      const limit = isNaN(limitRaw)
+        ? 25
+        : Math.max(1, Math.min(100, limitRaw));
+
+      if (!hasPaginationParams) {
+        const allUsers = await db
+          .select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            role: users.role,
+            createdAt: users.createdAt,
+          })
+          .from(users);
+        return new Response(JSON.stringify(allUsers), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const [{ value: total }] = await db
+        .select({ value: count() })
+        .from(users);
+
+      const rows = await db
         .select({
           id: users.id,
           name: users.name,
@@ -19,11 +56,14 @@ export const handler = define.handlers({
           role: users.role,
           createdAt: users.createdAt,
         })
-        .from(users);
+        .from(users)
+        .limit(limit)
+        .offset(skip);
 
-      return new Response(JSON.stringify(allUsers), {
-        headers: { "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ rows, total, limit, skip }),
+        { headers: { "Content-Type": "application/json" } },
+      );
     } catch (error) {
       logger.error("API", "Failed to fetch users", error as Error);
       return new Response(

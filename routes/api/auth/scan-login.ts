@@ -37,10 +37,6 @@ import { db } from "../../../src/db/index.ts";
 import { userMappings, users, verifications } from "../../../src/db/schema.ts";
 import { config } from "../../../src/lib/config.ts";
 import { checkRateLimit } from "../../../src/lib/utils/rate-limit.ts";
-import {
-  FEATURE_SCAN_LOGIN,
-  featureDisabledResponse,
-} from "../../../src/lib/feature-flags.ts";
 import { createCustomerSession } from "../../../src/lib/auth-helpers.ts";
 import {
   logScanLoginFailed,
@@ -131,10 +127,6 @@ interface LoginBody {
 
 export const handler = define.handlers({
   async POST(ctx) {
-    if (!FEATURE_SCAN_LOGIN) {
-      return featureDisabledResponse("scan-login");
-    }
-
     const ip = getClientIp(ctx.req);
     const ua = ctx.req.headers.get("user-agent");
     if (!await checkRateLimit(`scanlogin:ip:${ip}`, RATE_LIMIT_PER_IP)) {
@@ -255,8 +247,12 @@ export const handler = define.handlers({
           chargeBoxId,
         },
       });
-      // 410 Gone — the pairing was valid but is no longer usable.
-      return jsonResponse(410, { error: "pairing_unusable" });
+      // Unify with the per-pairing rate-limit response (429 / "rate_limited")
+      // above. Returning a distinct status/body here lets an attacker
+      // distinguish "this pairing code was real and just got consumed" from
+      // "this pairing code is throttled" — the latter is information about
+      // a real code's existence. Collapsing both into 429 hides the signal.
+      return jsonResponse(429, { error: "rate_limited" });
     }
 
     // Step 4 + 5: look up the user_mapping.
