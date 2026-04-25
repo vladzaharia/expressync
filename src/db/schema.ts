@@ -1,5 +1,6 @@
 import {
   type AnyPgColumn,
+  bigint,
   boolean,
   check,
   index,
@@ -1127,6 +1128,28 @@ export const idempotencyKeys = pgTable("idempotency_keys", {
 
 export type IdempotencyKey = typeof idempotencyKeys.$inferSelect;
 export type NewIdempotencyKey = typeof idempotencyKeys.$inferInsert;
+
+/**
+ * Single-row breaker state for the Lago webhook dispatch path. The
+ * in-process module-level counters survive a deploy by hydrating from
+ * this row at startup and writing through on every transition. A
+ * multi-replica deployment trips the breaker once and all replicas
+ * converge on the next read.
+ *
+ * Always exactly one row with id=1 — enforced by the CHECK constraint.
+ */
+export const lagoWebhookBreakerState = pgTable("lago_webhook_breaker_state", {
+  id: integer("id").primaryKey(),
+  consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+  /** epoch ms when the breaker re-arms. NULL when closed. */
+  disabledUntilMs: bigint("disabled_until_ms", { mode: "number" }),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export type LagoWebhookBreakerStateRow =
+  typeof lagoWebhookBreakerState.$inferSelect;
 
 // ============================================================================
 // === Lago entity cache (Lago is source of truth) ===

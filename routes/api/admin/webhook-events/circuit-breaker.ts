@@ -32,14 +32,14 @@ export const handler = define.handlers({
     );
   },
 
-  POST(ctx) {
+  async POST(ctx) {
     if (ctx.state.user?.role !== "admin") {
       return new Response(
         JSON.stringify({ error: "Forbidden: admin access required" }),
         { status: 403, headers: { "Content-Type": "application/json" } },
       );
     }
-    resetCircuitBreaker();
+    await resetCircuitBreaker();
     log.info("Circuit breaker reset via admin UI", {
       userId: ctx.state.user?.id,
       email: ctx.state.user?.email,
