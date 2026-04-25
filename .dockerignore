@@ -2,6 +2,16 @@
 .git
 .gitignore
 
+# Claude Code agent worktrees + scratch (multi-GB; never needed in image)
+.claude
+_email-preview.html
+
+# Fresh build outputs
+_fresh
+
+# Integration test harness — built on the host, not packaged into the image
+tests/integration
+
 # Design docs
 _design
 

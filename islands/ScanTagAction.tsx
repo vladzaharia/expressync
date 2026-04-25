@@ -34,6 +34,10 @@ interface Props {
   panelTitle?: string;
   /** Helper line under the panel title. */
   panelSubtitle?: string;
+  /** Override the arm-intent endpoint (defaults to admin scan-arm). */
+  armEndpoint?: string;
+  /** Optional fixed chargeBoxId to arm at; auto-discovered when omitted. */
+  chargeBoxId?: string;
 }
 
 export default function ScanTagAction(
@@ -45,6 +49,8 @@ export default function ScanTagAction(
     accent,
     panelTitle,
     panelSubtitle,
+    armEndpoint,
+    chargeBoxId,
   }: Props,
 ) {
   const open = useSignal(false);
@@ -87,6 +93,8 @@ export default function ScanTagAction(
         accent={accent}
         panelTitle={panelTitle}
         panelSubtitle={panelSubtitle}
+        armEndpoint={armEndpoint}
+        chargeBoxId={chargeBoxId}
       />
     </>
   );

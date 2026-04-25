@@ -18,8 +18,17 @@ process to verify the 14 scenarios in `scan_login_test.ts`.
 From the repo root:
 
 ```sh
-deno task test:integration:scan-login
+deno task test:integration:scan-login          # fast suite only (~5 min)
+RUN_SLOW=1 deno task test:integration:scan-login  # include slow recreate scenarios
 ```
+
+### Fast vs slow split
+
+Scenarios 5, 6, 7 and 9 each `recreateService("steve")` with an env
+override; the SteVe container's `start_period` is 240 s so each restart
+adds 5+ minutes. Those four are gated behind `RUN_SLOW=1` and skipped by
+default (`Deno.test` `ignore: !RUN_SLOW`). All other scenarios (1, 2, 3,
+4, 8, 10, 11, 12, 13, 14) run on every invocation.
 
 That invokes `runner.ts`, which:
 
@@ -82,6 +91,23 @@ scan-login/
 12. Concurrent intents
 13. Replay / idempotency
 14. Latency: p99 < 50ms over 200 calls
+
+## Charger pre-auth config
+
+The pre-auth hook only fires if every Authorize hits SteVe — chargers
+that pre-authorize from their local cache or local auth list bypass it
+entirely. For each production charger that participates in scan-to-login,
+push the four OCPP ConfigurationKeys (`LocalPreAuthorize`,
+`LocalAuthorizeOffline`, `AuthorizationCacheEnabled`,
+`LocalAuthListEnabled`, all `false`) once with the helper script:
+
+```sh
+deno run -A scripts/push-charger-preauth-config.ts <chargeBoxId>
+```
+
+The script invokes SteVe's `ChangeConfiguration` REST operation four
+times and prints the resulting `taskId` per key. It exits non-zero if
+any of the four operations report errors or exceptions.
 
 ## Notes / gotchas
 
