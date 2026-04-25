@@ -36,6 +36,24 @@ interface HeroSession {
   /** Estimated cost in user currency. */
   estimatedCost?: number;
   currencySymbol?: string;
+  /**
+   * Per-kWh tariff resolved from the customer's active Lago plan. When
+   * present, the live card renders a running cost tile that updates as
+   * kWh climbs. Omit for flat-rate / membership plans where running cost
+   * is not meaningful.
+   */
+  tariffPerKwh?: number;
+  /** Vehicle efficiency override (mi/kWh); defaults to 4. */
+  milesPerKwh?: number;
+  distanceUnit?: "imperial" | "metric";
+  /** Authoritative billed kWh from the Lago billing pipeline. */
+  billedKwh?: number;
+  /** Authoritative billed cost in cents from the Lago billing pipeline. */
+  billedCostCents?: number;
+  /** Customer wallet balance in cents (renders an extra tile). */
+  walletBalanceCents?: number;
+  /** Wallet auto-top-up threshold in cents. */
+  walletThresholdCents?: number;
 }
 
 interface Props {
@@ -89,6 +107,14 @@ export default function HeroSessionCard({ session }: Props) {
         connectorId={session.connectorId ?? null}
         initialKwh={session.initialKwh}
         startedAt={session.startedAt}
+        tariffPerKwh={session.tariffPerKwh}
+        currencySymbol={session.currencySymbol}
+        milesPerKwh={session.milesPerKwh}
+        distanceUnit={session.distanceUnit}
+        billedKwh={session.billedKwh}
+        billedCostCents={session.billedCostCents}
+        walletBalanceCents={session.walletBalanceCents}
+        walletThresholdCents={session.walletThresholdCents}
       />
 
       {/* Tag chip + Stop CTA */}
