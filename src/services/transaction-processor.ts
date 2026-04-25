@@ -18,6 +18,10 @@ import { eq } from "drizzle-orm";
  */
 const NON_USAGE_PLAN_CODES = new Set<string>(["ExpressChargeM"]);
 
+function round6(n: number): number {
+  return Math.round(n * 1e6) / 1e6;
+}
+
 export interface ProcessedTransaction {
   steveTransactionId: number;
   userMappingId: number;
@@ -28,7 +32,17 @@ export interface ProcessedTransaction {
   isFinal: boolean;
   lagoEventTransactionId: string;
   shouldSendToLago: boolean; // False if no subscription available or plan is non-usage
-  skipReason: "no_subscription" | "non_usage_plan" | null;
+  skipReason:
+    | "no_subscription"
+    | "non_usage_plan"
+    /**
+     * Wave R: the incremental billing emitter has already pushed enough
+     * events to Lago to cover (or exceed) the post-tx total. We still
+     * want to finalize the sync state so this transaction isn't
+     * reprocessed forever, but we must NOT emit a duplicate Lago event.
+     */
+    | "already_billed_incrementally"
+    | null;
   stopTimestamp: string | null; // ISO timestamp of when the transaction stopped
   // === Phase D: event enrichment metadata (threaded through for lago events) ===
   chargeBoxId: string;
@@ -155,34 +169,86 @@ export async function processTransaction(
     skipReason = "non_usage_plan";
   }
 
-  // Calculate delta
-  const delta = calculateDelta(tx);
+  // Calculate delta from StEvE's authoritative meter values.
+  const fullDelta = calculateDelta(tx);
 
-  if (!delta) {
+  if (!fullDelta) {
     logger.debug("TransactionProcessor", "No new usage, skipping", {
       transactionId: tx.id,
     });
     return null;
   }
 
+  // Wave R — subtract anything already billed by the incremental emitter.
+  // `transaction_sync_state.totalKwhBilled` is the running sum of every
+  // per-tick event we've successfully pushed. A reconciliation pass either
+  // sends a small "true-up" delta covering what incremental missed (e.g.
+  // the first kWh before the receiver caught up) or, when incremental
+  // covered everything, finalizes the sync state without sending anything.
+  const priorBilledKwh = Number(syncState?.totalKwhBilled ?? 0);
+  const remainingKwh = round6(fullDelta.kwhDelta - priorBilledKwh);
+
+  // Tolerance: 1 Wh — guards against IEEE-754 noise. The incremental
+  // emitter rounds to 6 decimals; sync-state Numeric(12,6) rounds the
+  // same way; subtraction of two 6-dp values can leave a 1e-15 residue.
+  const ALREADY_BILLED_TOLERANCE_KWH = 0.001;
+  if (remainingKwh <= ALREADY_BILLED_TOLERANCE_KWH) {
+    logger.info(
+      "TransactionProcessor",
+      "Reconciliation: incremental already covered this transaction",
+      {
+        transactionId: tx.id,
+        fullKwh: fullDelta.kwhDelta,
+        priorBilledKwh,
+      },
+    );
+    return {
+      steveTransactionId: tx.id,
+      userMappingId: mapping.id,
+      lagoSubscriptionExternalId: subscriptionId,
+      kwhDelta: 0,
+      meterValueFrom: fullDelta.meterValueFrom,
+      meterValueTo: fullDelta.meterValueTo,
+      isFinal: tx.isCompleted,
+      // No Lago event will be sent — but we still pick a unique key in
+      // case audit code logs it. The marker suffix avoids any chance of
+      // colliding with a real `_final` event.
+      lagoEventTransactionId: `steve_tx_${tx.id}_final_noop`,
+      shouldSendToLago: false,
+      skipReason: "already_billed_incrementally",
+      stopTimestamp: tx.stopTimestamp,
+      chargeBoxId: tx.chargeBoxId,
+      connectorId: tx.connectorId,
+      startTimestamp: tx.startTimestamp,
+    };
+  }
+
+  // Reconciliation: bill only the gap. `meterValueFrom` advances to where
+  // incremental left off so the audit row is accurate.
+  const meterValueFrom = fullDelta.meterValueFrom +
+    Math.round(priorBilledKwh * 1000);
+
   logger.debug("TransactionProcessor", "Delta calculated", {
     transactionId: tx.id,
-    kwhDelta: delta.kwhDelta,
-    meterValueFrom: delta.meterValueFrom,
-    meterValueTo: delta.meterValueTo,
+    fullKwh: fullDelta.kwhDelta,
+    priorBilledKwh,
+    reconciliationKwh: remainingKwh,
+    meterValueFrom,
+    meterValueTo: fullDelta.meterValueTo,
   });
 
-  // Generate unique transaction ID for Lago (for idempotency)
-  // Post-transaction billing: one event per completed session, deterministic ID
+  // Generate unique transaction ID for Lago (for idempotency).
+  // The reconciliation pass deliberately keeps the deterministic `_final`
+  // suffix so it's distinct from incremental flush keys (`_<unixSec>`).
   const lagoEventTransactionId = `steve_tx_${tx.id}_final`;
 
   const result: ProcessedTransaction = {
     steveTransactionId: tx.id,
     userMappingId: mapping.id,
     lagoSubscriptionExternalId: subscriptionId,
-    kwhDelta: delta.kwhDelta,
-    meterValueFrom: delta.meterValueFrom,
-    meterValueTo: delta.meterValueTo,
+    kwhDelta: remainingKwh,
+    meterValueFrom,
+    meterValueTo: fullDelta.meterValueTo,
     isFinal: tx.isCompleted,
     lagoEventTransactionId,
     shouldSendToLago: skipReason === null,
