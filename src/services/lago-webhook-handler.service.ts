@@ -27,6 +27,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db/index.ts";
 import {
+  lagoWebhookBreakerState,
   lagoWebhookEvents,
   type NewLagoWebhookEvent,
   userMappings,
@@ -114,21 +115,13 @@ export function notify(n: AdminNotification): void {
 }
 
 // ----------------------------------------------------------------------------
-// Circuit breaker state (module-level, process-local).
+// Circuit breaker state (persisted; see lagoWebhookBreakerState in schema).
 //
-// LIMITATION: this state lives in memory only. A worker restart (deploy,
-// OOM, container rotation) clears `consecutiveFailures` and `disabledUntilMs`
-// back to zero — so a breaker that tripped right before a restart will
-// silently re-arm with a fresh counter on the next boot. In single-process
-// deployments this is acceptable (the alternative is eating webhook traffic
-// for the cooldown window across a deploy), but in multi-replica setups
-// each replica tracks its own breaker independently.
-//
-// TODO: persist breaker state to DB (or Redis if we take that dep later) so
-// trip/cooldown survive restarts and are shared across replicas. Suggested
-// schema: a single-row `lago_webhook_breaker_state` table with
-// `(consecutive_failures, disabled_until_at, updated_at)` guarded by a
-// `SELECT ... FOR UPDATE` on read-modify-write paths.
+// In-memory counters serve hot reads (sub-microsecond); every transition
+// also writes through to the singleton DB row so a restart hydrates the
+// real state instead of starting at zero. Multi-replica deployments
+// converge: any replica that observes a failure persists the new counter,
+// and other replicas pick it up the next time they read.
 // ----------------------------------------------------------------------------
 
 const CIRCUIT_BREAKER_THRESHOLD = 5;
@@ -137,18 +130,78 @@ const CIRCUIT_BREAKER_COOLDOWN_MS = 5 * 60_000; // 5 minutes
 
 let consecutiveFailures = 0;
 let disabledUntilMs: number | null = null;
+let hydrated = false;
 
-function isDispatchDisabled(): boolean {
+async function hydrateBreakerStateOnce(): Promise<void> {
+  if (hydrated) return;
+  hydrated = true;
+  try {
+    const [row] = await db
+      .select()
+      .from(lagoWebhookBreakerState)
+      .where(eq(lagoWebhookBreakerState.id, 1))
+      .limit(1);
+    if (row) {
+      consecutiveFailures = row.consecutiveFailures ?? 0;
+      disabledUntilMs = row.disabledUntilMs ?? null;
+      log.debug("Hydrated breaker state from DB", {
+        consecutiveFailures,
+        disabledUntilMs,
+      });
+    }
+  } catch (err) {
+    // Non-fatal: stay with the in-memory defaults.
+    log.warn("Failed to hydrate breaker state; starting clean", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+/**
+ * Write-through to the singleton row. Awaitable — the dispatch path is
+ * already async, and awaiting here ensures (a) Deno test runners don't
+ * see leaked postgres timers if the write fails, and (b) consecutive
+ * failure transitions land in order across multi-replica deployments.
+ *
+ * Best-effort: failures log but never throw, so a transient DB hiccup
+ * can't break the dispatch flow on top of a Lago hiccup.
+ */
+async function persistBreakerState(): Promise<void> {
+  try {
+    await db
+      .insert(lagoWebhookBreakerState)
+      .values({
+        id: 1,
+        consecutiveFailures,
+        disabledUntilMs,
+      })
+      .onConflictDoUpdate({
+        target: lagoWebhookBreakerState.id,
+        set: {
+          consecutiveFailures,
+          disabledUntilMs,
+          updatedAt: new Date(),
+        },
+      });
+  } catch (err) {
+    log.warn("Failed to persist breaker state", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+async function isDispatchDisabled(): Promise<boolean> {
   if (disabledUntilMs === null) return false;
   if (Date.now() >= disabledUntilMs) {
     // cooldown elapsed — allow one attempt; counter resets on success
     disabledUntilMs = null;
+    await persistBreakerState();
     return false;
   }
   return true;
 }
 
-function recordDispatchSuccess(): void {
+async function recordDispatchSuccess(): Promise<void> {
   // The breaker is considered "open" when either the cooldown window is still
   // active OR the failure counter reached the threshold at any point. Note
   // `isDispatchDisabled()` clears `disabledUntilMs` when the cooldown elapses
@@ -165,6 +218,7 @@ function recordDispatchSuccess(): void {
   }
   consecutiveFailures = 0;
   disabledUntilMs = null;
+  await persistBreakerState();
   if (wasDisabled) {
     notify({
       kind: "lago_webhook_recovered",
@@ -179,8 +233,9 @@ function recordDispatchSuccess(): void {
   }
 }
 
-function recordDispatchFailure(err: unknown): void {
+async function recordDispatchFailure(err: unknown): Promise<void> {
   consecutiveFailures += 1;
+  await persistBreakerState();
   log.warn("Dispatch failure recorded", {
     consecutiveFailures,
     threshold: CIRCUIT_BREAKER_THRESHOLD,
@@ -191,6 +246,7 @@ function recordDispatchFailure(err: unknown): void {
     disabledUntilMs === null
   ) {
     disabledUntilMs = Date.now() + CIRCUIT_BREAKER_COOLDOWN_MS;
+    await persistBreakerState();
     notify({
       kind: "lago_webhook_dispatch_disabled",
       severity: "error",
@@ -254,10 +310,11 @@ export function getCircuitBreakerState(): CircuitBreakerSnapshot {
  * flag. Distinct from `recordDispatchSuccess()` in that it does not emit a
  * `lago_webhook_recovered` notification — the admin already knows.
  */
-export function resetCircuitBreaker(): void {
+export async function resetCircuitBreaker(): Promise<void> {
   const previousFailures = consecutiveFailures;
   consecutiveFailures = 0;
   disabledUntilMs = null;
+  await persistBreakerState();
   log.info("Circuit breaker reset by admin", { previousFailures });
 }
 
@@ -400,7 +457,8 @@ export async function dispatch(
   body: unknown,
   rowId: number,
 ): Promise<void> {
-  if (isDispatchDisabled()) {
+  await hydrateBreakerStateOnce();
+  if (await isDispatchDisabled()) {
     log.warn("Dispatch skipped (circuit breaker open)", { rowId });
     await markProcessed(rowId, "circuit_breaker_open");
     return;
@@ -431,7 +489,7 @@ export async function dispatch(
     }
 
     await markProcessed(rowId, null, notificationFired);
-    recordDispatchSuccess();
+    await recordDispatchSuccess();
     log.debug("Dispatch complete", {
       rowId,
       ms: Date.now() - startedAt,
@@ -440,7 +498,7 @@ export async function dispatch(
     const msg = err instanceof Error ? err.message : String(err);
     log.error("Dispatch threw", { rowId, error: msg });
     await markProcessed(rowId, msg);
-    recordDispatchFailure(err);
+    await recordDispatchFailure(err);
   }
 }
 
