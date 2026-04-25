@@ -8,6 +8,7 @@
  */
 
 import { useEffect } from "preact/hooks";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 interface AutoRedirectProps {
   href: string;
@@ -21,9 +22,11 @@ export default function AutoRedirect(
   useEffect(() => {
     const t = setTimeout(() => {
       try {
-        globalThis.location.href = href;
+        clientNavigate(href);
       } catch {
-        // Some test runners / sandbox envs don't allow location writes.
+        // Some test runners / sandbox envs don't allow location writes;
+        // clientNavigate's own try/catch falls back to location.assign,
+        // so this outer catch only fires for truly hostile environments.
       }
     }, delayMs);
     return () => clearTimeout(t);

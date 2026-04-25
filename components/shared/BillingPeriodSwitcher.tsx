@@ -8,10 +8,10 @@
  *   - previous → ?period=previous
  *   - year     → ?period=year
  *
- * Selection updates the URL via a full navigation (NOT AJAX) so the page
- * loader reruns. We intentionally avoid client-side fetching for the same
- * reason invoice filters do: the loader is the single source of truth and
- * the URL is the canonical UI state.
+ * Selection updates the URL via Fresh's partial-nav (NOT a full reload) so
+ * the page loader reruns without losing client state in islands. We avoid
+ * client-side fetching for the same reason invoice filters do: the loader
+ * is the single source of truth and the URL is the canonical UI state.
  *
  * `value` is the currently selected period (driven by the loader). The
  * component renders single-select toggle chips via the canonical
@@ -21,6 +21,7 @@
 
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 export type BillingPeriod = "current" | "previous" | "year";
 
@@ -74,10 +75,7 @@ export function BillingPeriodSwitcher(
         if (!next) return;
         if (next === value) return;
         if (supported && !supported.has(next as BillingPeriod)) return;
-        globalThis.location.href = buildHref(
-          basePath,
-          next as BillingPeriod,
-        );
+        clientNavigate(buildHref(basePath, next as BillingPeriod));
       }}
       variant="outline-joined"
       size="sm"
