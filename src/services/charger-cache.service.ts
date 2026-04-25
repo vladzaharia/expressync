@@ -94,9 +94,29 @@ export async function refreshChargerCache(dbh: Db = defaultDb): Promise<{
     return { upserted: 0 };
   }
 
+  // Look up the operator-provided friendly name (charge_box.description
+  // in SteVe). The forked SteVe REST endpoint /v1/chargeBoxes returns
+  // it; vanilla SteVe would 404 and the call falls back to a description-
+  // less list, in which case friendly_name stays whatever it was.
+  let descByChargeBoxId = new Map<string, string | null>();
+  try {
+    const { steveClient } = await import("../lib/steve-client.ts");
+    const boxes = await steveClient.getChargeBoxes();
+    for (const b of boxes) {
+      const trimmed = (b.description ?? "").trim();
+      descByChargeBoxId.set(b.chargeBoxId, trimmed === "" ? null : trimmed);
+    }
+  } catch (err) {
+    logger.warn("ChargerCache", "Failed to fetch chargeBox descriptions", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    descByChargeBoxId = new Map();
+  }
+
   const values: NewChargerCache[] = Array.from(seen.values()).map((row) => ({
     chargeBoxId: row.chargeBoxId,
     chargeBoxPk: row.chargeBoxPk ?? null,
+    friendlyName: descByChargeBoxId.get(row.chargeBoxId) ?? null,
   }));
 
   await dbh
@@ -108,6 +128,10 @@ export async function refreshChargerCache(dbh: Db = defaultDb): Promise<{
         // Only overwrite charge_box_pk when we have a fresh non-null value.
         chargeBoxPk:
           sql`COALESCE(EXCLUDED.charge_box_pk, ${chargersCache.chargeBoxPk})`,
+        // friendly_name: replace with whatever SteVe currently has,
+        // including null if the operator cleared the description. The
+        // SteVe-side description is the source of truth.
+        friendlyName: sql`EXCLUDED.friendly_name`,
         lastSeenAt: sql`now()`,
       },
     });

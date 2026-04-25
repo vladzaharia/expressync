@@ -84,11 +84,30 @@ export type StEvEOcppTag = z.infer<typeof StEvEOcppTagSchema>;
  * Zod schema for StEvE Charge Box
  */
 export const StEvEChargeBoxSchema = z.object({
-  /** Charge box identifier */
+  /** Charge box identifier (stable machine-readable id, e.g. "CP-A-edb47d05") */
   chargeBoxId: z.string(),
 
   /** Internal primary key */
   chargeBoxPk: z.number(),
+
+  /**
+   * Operator-provided friendly name. Maps to the `charge_box.description`
+   * column in SteVe's MariaDB. ExpresSync uses this as the user-facing
+   * charger name (the `chargeBoxId` is just a number / opaque string).
+   * Nullable when the operator hasn't set one yet — UIs should fall back
+   * to `chargeBoxId` in that case.
+   */
+  description: z.string().nullable().optional(),
+
+  /** OCPP wire protocol the charger most recently used (e.g. "ocpp1.6"). */
+  ocppProtocol: z.string().nullable().optional(),
+
+  /**
+   * Last heartbeat timestamp as a humanised string (SteVe's
+   * `DateTimeUtils.humanize` output). Nullable for chargers that never
+   * connected.
+   */
+  lastHeartbeatTimestamp: z.string().nullable().optional(),
 });
 
 export type StEvEChargeBox = z.infer<typeof StEvEChargeBoxSchema>;
