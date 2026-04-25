@@ -136,6 +136,7 @@ export const handler = define.handlers({
     // connectorId, startTimestamp for the LiveSessionCard. Failures here are
     // non-fatal: the rest of the page still renders.
     let liveChargeBoxId: string | null = null;
+    let liveFriendlyName: string | null = null;
     let liveConnectorId: number | null = null;
     let liveStartedAt: string | null = null;
     if (isLive) {
@@ -155,6 +156,18 @@ export const handler = define.handlers({
           "StEvE lookup for live customer session failed — rendering without chargeBoxId",
           { error: error instanceof Error ? error.message : String(error) },
         );
+      }
+    }
+    if (liveChargeBoxId) {
+      try {
+        const [cacheRow] = await db
+          .select({ friendlyName: schema.chargersCache.friendlyName })
+          .from(schema.chargersCache)
+          .where(eq(schema.chargersCache.chargeBoxId, liveChargeBoxId))
+          .limit(1);
+        liveFriendlyName = cacheRow?.friendlyName ?? null;
+      } catch (_err) {
+        // Best-effort; the chargeBoxId fallback is fine.
       }
     }
 
@@ -233,6 +246,7 @@ export const handler = define.handlers({
         costCurrency: null,
         invoiceId: null,
         liveChargeBoxId,
+        liveFriendlyName,
         liveConnectorId,
         liveStartedAt,
         liveInitialKwh: totalKwh,
@@ -271,6 +285,7 @@ export default define.page<typeof handler>(
                 <LiveSessionCard
                   steveTransactionId={data.steveTransactionId}
                   chargeBoxId={data.liveChargeBoxId}
+                  friendlyName={data.liveFriendlyName}
                   connectorId={data.liveConnectorId}
                   initialKwh={data.liveInitialKwh}
                   startedAt={data.liveStartedAt}
@@ -298,6 +313,7 @@ export default define.page<typeof handler>(
                 costCurrency={data.costCurrency}
                 invoiceId={data.invoiceId}
                 chargeBoxId={data.liveChargeBoxId}
+                friendlyName={data.liveFriendlyName}
                 connectorId={data.liveConnectorId}
               />
 

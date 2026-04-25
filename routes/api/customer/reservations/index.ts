@@ -27,6 +27,7 @@ import {
 } from "../../../../src/db/schema.ts";
 import {
   createReservation,
+  enrichDtosWithFriendlyNames,
   suggestAlternatives,
   toReservationRowDTO,
 } from "../../../../src/services/reservation.service.ts";
@@ -127,8 +128,11 @@ export const handler = define.handlers({
         .from(schema.reservations)
         .where(whereClause);
 
+      const reservations = await enrichDtosWithFriendlyNames(
+        rows.map(toReservationRowDTO),
+      );
       return jsonResponse(200, {
-        reservations: rows.map(toReservationRowDTO),
+        reservations,
         total: Number(total) || 0,
         skip,
         limit,

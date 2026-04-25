@@ -21,6 +21,8 @@ import { toast } from "sonner";
 interface Reservation {
   id: number;
   chargeBoxId: string;
+  /** Operator-set friendly name (mirrored from StEvE description). */
+  friendlyName?: string | null;
   connectorId: number | null;
   connectorType?: string | null;
   startAtIso: string;
@@ -128,10 +130,26 @@ export default function NextReservationCard({ reservation }: Props) {
       </div>
 
       <div class="flex flex-wrap items-center gap-2 text-sm">
-        <span class="inline-flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-0.5 text-xs">
-          <Zap class="size-3.5 text-orange-500" aria-hidden="true" />
-          <span class="font-mono">{reservation.chargeBoxId}</span>
-        </span>
+        {(() => {
+          const friendly = reservation.friendlyName?.trim() ?? "";
+          const useFriendly = friendly.length > 0 &&
+            friendly !== reservation.chargeBoxId;
+          return (
+            <span class="inline-flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-0.5 text-xs">
+              <Zap class="size-3.5 text-orange-500" aria-hidden="true" />
+              {useFriendly
+                ? (
+                  <>
+                    <span class="font-medium">{friendly}</span>
+                    <span class="font-mono text-[10px] text-muted-foreground">
+                      {reservation.chargeBoxId}
+                    </span>
+                  </>
+                )
+                : <span class="font-mono">{reservation.chargeBoxId}</span>}
+            </span>
+          );
+        })()}
         {reservation.connectorId != null && (
           <span class="inline-flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-0.5 text-xs">
             <Plug class="size-3.5 text-cyan-500" aria-hidden="true" />
@@ -180,7 +198,9 @@ export default function NextReservationCard({ reservation }: Props) {
         description={
           <span>
             You're about to cancel your reservation for{" "}
-            <span class="font-mono">{reservation.chargeBoxId}</span> on{" "}
+            <span class="font-medium">
+              {reservation.friendlyName?.trim() || reservation.chargeBoxId}
+            </span> on{" "}
             <span class="font-medium">
               {formatDate(reservation.startAtIso)}
             </span>. This cannot be undone.

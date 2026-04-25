@@ -44,7 +44,11 @@ const log = logger.child("ScanPair");
 
 const PAIRING_TTL_SEC = 90;
 const ONLINE_WINDOW_MS = 10 * 60 * 1000; // 10-min "online" window
-const RATE_LIMIT_PER_IP = 5; // per minute
+// 5/min was too tight: legitimate users re-arm a couple of times during a
+// normal sign-in (Cancel → re-pick a charger) plus the integration suite
+// hammers the endpoint across 10 scenarios in <30s. 30/min still deters
+// brute-force without breaking real usage.
+const RATE_LIMIT_PER_IP = 30; // per minute
 const RATE_LIMIT_GLOBAL = 100; // per minute (cap on total churn)
 
 function getClientIp(req: Request): string {

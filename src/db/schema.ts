@@ -765,6 +765,12 @@ export const RESERVATION_STATUSES: readonly ReservationStatus[] = [
 export interface ReservationRowDTO {
   id: number;
   chargeBoxId: string;
+  /**
+   * Operator-set friendly name (mirrored from StEvE description into
+   * `chargers_cache.friendly_name`). May be null when the operator has not
+   * supplied one — UIs must fall back to `chargeBoxId`.
+   */
+  friendlyName?: string | null;
   connectorId: number;
   ocppTagPk: number;
   ocppTagId: string;

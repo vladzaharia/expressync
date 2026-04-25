@@ -1,7 +1,7 @@
 import { define } from "../../../utils.ts";
 import { db } from "../../../src/db/index.ts";
 import * as schema from "../../../src/db/schema.ts";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { SidebarLayout } from "../../../components/SidebarLayout.tsx";
 import { PageCard } from "../../../components/PageCard.tsx";
 import MappingForm from "../../../islands/MappingForm.tsx";
@@ -103,27 +103,50 @@ export const handler = define.handlers({
       const txs = await steveClient.getTransactions({
         ocppIdTag: mapping.steveOcppIdTag,
       });
-      recentTransactions = txs
+      const sliced = txs
         .sort((a, b) =>
           new Date(b.startTimestamp).getTime() -
           new Date(a.startTimestamp).getTime()
         )
-        .slice(0, 5)
-        .map((tx) => {
-          const startWh = Number(tx.startValue);
-          const stopWh = tx.stopValue == null ? null : Number(tx.stopValue);
-          const kwh = stopWh != null && Number.isFinite(startWh) &&
-              Number.isFinite(stopWh)
-            ? Math.max(0, (stopWh - startWh) / 1000)
-            : null;
-          return {
-            id: tx.id,
-            startTimestamp: tx.startTimestamp,
-            stopTimestamp: tx.stopTimestamp,
-            kwh,
-            chargeBoxId: tx.chargeBoxId,
-          };
-        });
+        .slice(0, 5);
+
+      // Enrich with friendly names from chargers_cache so the activity rows
+      // can render the operator-set description as the primary label.
+      const ids = Array.from(new Set(sliced.map((t) => t.chargeBoxId)));
+      const friendlyByCbid = new Map<string, string | null>();
+      if (ids.length > 0) {
+        try {
+          const cacheRows = await db
+            .select({
+              chargeBoxId: schema.chargersCache.chargeBoxId,
+              friendlyName: schema.chargersCache.friendlyName,
+            })
+            .from(schema.chargersCache)
+            .where(inArray(schema.chargersCache.chargeBoxId, ids));
+          for (const r of cacheRows) {
+            friendlyByCbid.set(r.chargeBoxId, r.friendlyName);
+          }
+        } catch (err) {
+          console.error("Failed to load friendly names for activity:", err);
+        }
+      }
+
+      recentTransactions = sliced.map((tx) => {
+        const startWh = Number(tx.startValue);
+        const stopWh = tx.stopValue == null ? null : Number(tx.stopValue);
+        const kwh = stopWh != null && Number.isFinite(startWh) &&
+            Number.isFinite(stopWh)
+          ? Math.max(0, (stopWh - startWh) / 1000)
+          : null;
+        return {
+          id: tx.id,
+          startTimestamp: tx.startTimestamp,
+          stopTimestamp: tx.stopTimestamp,
+          kwh,
+          chargeBoxId: tx.chargeBoxId,
+          friendlyName: friendlyByCbid.get(tx.chargeBoxId) ?? null,
+        };
+      });
     } catch (err) {
       console.error("Failed to fetch recent transactions:", err);
     }

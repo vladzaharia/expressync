@@ -23,6 +23,8 @@ import { toast } from "sonner";
 interface HeroSession {
   steveTransactionId: number;
   chargeBoxId: string | null;
+  /** Operator-set friendly name (mirrored from StEvE description). */
+  friendlyName?: string | null;
   connectorId?: number | null;
   connectorType?: string | null;
   /** Initial energy in kWh — refreshed live by LiveSessionCard's SSE. */
@@ -83,6 +85,7 @@ export default function HeroSessionCard({ session }: Props) {
       <LiveSessionCard
         steveTransactionId={session.steveTransactionId}
         chargeBoxId={session.chargeBoxId}
+        friendlyName={session.friendlyName}
         connectorId={session.connectorId ?? null}
         initialKwh={session.initialKwh}
         startedAt={session.startedAt}
@@ -117,8 +120,9 @@ export default function HeroSessionCard({ session }: Props) {
         description={
           <span>
             You're about to stop charging on{" "}
-            <span class="font-mono">
-              {session.chargeBoxId ?? "the charger"}
+            <span class="font-medium">
+              {session.friendlyName?.trim() || session.chargeBoxId ||
+                "the charger"}
             </span>. Current usage:{" "}
             <span class="font-semibold tabular-nums">
               {session.initialKwh.toFixed(2)} kWh

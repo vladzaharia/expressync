@@ -40,6 +40,8 @@ interface TransactionMeterPayload {
 interface Props {
   steveTransactionId: number;
   chargeBoxId: string | null;
+  /** Operator-set friendly name (mirrored from StEvE description). */
+  friendlyName?: string | null;
   connectorId?: number | null;
   initialKwh: number;
   /** ISO timestamp when charging started; null if unknown. */
@@ -159,24 +161,38 @@ export default function LiveSessionCard(props: Props) {
           accent={ended.value ? "slate" : "green"}
         />
         {props.chargeBoxId
-          ? (
-            <MetricTile
-              icon={MapPin}
-              label="Charger"
-              value={
-                <a
-                  href={`/chargers/${encodeURIComponent(props.chargeBoxId)}`}
-                  class="font-mono text-sm hover:underline"
-                >
-                  {props.chargeBoxId}
-                </a>
-              }
-              sublabel={props.connectorId != null
-                ? `Connector ${props.connectorId}`
-                : undefined}
-              accent="cyan"
-            />
-          )
+          ? (() => {
+            const friendly = props.friendlyName?.trim() ?? "";
+            const showChip = friendly.length > 0 &&
+              friendly !== props.chargeBoxId;
+            return (
+              <MetricTile
+                icon={MapPin}
+                label="Charger"
+                value={
+                  <a
+                    href={`/chargers/${encodeURIComponent(props.chargeBoxId)}`}
+                    class="inline-flex items-baseline gap-2 hover:underline"
+                  >
+                    <span class="text-sm font-medium">
+                      {friendly || props.chargeBoxId}
+                    </span>
+                    {showChip
+                      ? (
+                        <span class="font-mono text-xs text-muted-foreground">
+                          {props.chargeBoxId}
+                        </span>
+                      )
+                      : null}
+                  </a>
+                }
+                sublabel={props.connectorId != null
+                  ? `Connector ${props.connectorId}`
+                  : undefined}
+                accent="cyan"
+              />
+            );
+          })()
           : (
             <MetricTile
               icon={Zap}

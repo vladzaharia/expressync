@@ -97,6 +97,7 @@ export const handler = define.handlers({
     // already have.
     const isLive = !syncState?.isFinalized;
     let liveChargeBoxId: string | null = null;
+    let liveFriendlyName: string | null = null;
     let liveConnectorId: number | null = null;
     let liveStartedAt: string | null = null;
     const liveInitialKwh = Number(syncState?.totalKwhBilled ?? 0);
@@ -144,6 +145,18 @@ export const handler = define.handlers({
         );
       }
     }
+    if (liveChargeBoxId) {
+      try {
+        const [cacheRow] = await db
+          .select({ friendlyName: schema.chargersCache.friendlyName })
+          .from(schema.chargersCache)
+          .where(eq(schema.chargersCache.chargeBoxId, liveChargeBoxId))
+          .limit(1);
+        liveFriendlyName = cacheRow?.friendlyName ?? null;
+      } catch {
+        // Non-fatal; falls back to chargeBoxId.
+      }
+    }
 
     const isAdmin = ctx.state.user?.role === "admin";
 
@@ -157,6 +170,7 @@ export const handler = define.handlers({
         ocppTagPk,
         isLive,
         liveChargeBoxId,
+        liveFriendlyName,
         liveConnectorId,
         liveStartedAt,
         liveInitialKwh,
@@ -179,6 +193,7 @@ export default define.page<typeof handler>(function TransactionDetailsPage({
     ocppTagPk,
     isLive,
     liveChargeBoxId,
+    liveFriendlyName,
     liveConnectorId,
     liveStartedAt,
     liveInitialKwh,
@@ -199,6 +214,7 @@ export default define.page<typeof handler>(function TransactionDetailsPage({
           <LiveSessionCard
             steveTransactionId={steveTransactionId}
             chargeBoxId={liveChargeBoxId}
+            friendlyName={liveFriendlyName}
             connectorId={liveConnectorId}
             initialKwh={liveInitialKwh}
             startedAt={liveStartedAt}

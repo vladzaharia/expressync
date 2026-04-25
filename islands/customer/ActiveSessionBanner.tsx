@@ -38,6 +38,8 @@ import { toast } from "sonner";
 interface ActiveSession {
   steveTransactionId: number;
   chargeBoxId: string | null;
+  /** Operator-set friendly name (mirrored from StEvE description). */
+  friendlyName?: string | null;
   connectorType?: string | null;
   connectorId?: number | null;
   /** Current power draw, kW. */
@@ -247,14 +249,28 @@ export default function ActiveSessionBanner({ initial }: Props) {
           </span>
 
           {/* Charger label — desktop only */}
-          {s.chargeBoxId && (
-            <span class="hidden md:inline-flex items-center gap-1 truncate font-mono text-xs text-foreground">
-              {s.chargeBoxId}
-              {s.connectorType && (
-                <span class="text-muted-foreground">· {s.connectorType}</span>
-              )}
-            </span>
-          )}
+          {s.chargeBoxId && (() => {
+            const friendly = s.friendlyName?.trim() ?? "";
+            const useFriendly = friendly.length > 0 &&
+              friendly !== s.chargeBoxId;
+            return (
+              <span class="hidden md:inline-flex items-center gap-1 truncate text-xs text-foreground">
+                {useFriendly
+                  ? (
+                    <>
+                      <span class="font-medium">{friendly}</span>
+                      <span class="font-mono text-[11px] text-muted-foreground">
+                        {s.chargeBoxId}
+                      </span>
+                    </>
+                  )
+                  : <span class="font-mono">{s.chargeBoxId}</span>}
+                {s.connectorType && (
+                  <span class="text-muted-foreground">· {s.connectorType}</span>
+                )}
+              </span>
+            );
+          })()}
           <span
             class="text-muted-foreground hidden md:inline"
             aria-hidden="true"
@@ -318,7 +334,9 @@ export default function ActiveSessionBanner({ initial }: Props) {
         description={
           <span>
             You're about to stop charging on{" "}
-            <span class="font-mono">{s.chargeBoxId ?? "the charger"}</span>.
+            <span class="font-medium">
+              {s.friendlyName?.trim() || s.chargeBoxId || "the charger"}
+            </span>.
             Current usage:{" "}
             <span class="font-semibold tabular-nums">
               {s.kwh.toFixed(2)} kWh

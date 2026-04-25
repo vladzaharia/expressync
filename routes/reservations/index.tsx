@@ -17,7 +17,10 @@ import { and, asc, desc, gte, inArray } from "drizzle-orm";
 import { db } from "../../src/db/index.ts";
 import * as schema from "../../src/db/schema.ts";
 import type { ReservationRowDTO } from "../../src/db/schema.ts";
-import { toReservationRowDTO } from "../../src/services/reservation.service.ts";
+import {
+  enrichDtosWithFriendlyNames,
+  toReservationRowDTO,
+} from "../../src/services/reservation.service.ts";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
 import { CHROME_SIZE } from "../../components/AppSidebar.tsx";
@@ -112,9 +115,13 @@ export const handler = define.handlers({
         if (startMs >= startOfMonth.getTime()) thisMonth += 1;
       }
 
+      const dtoRows: ReservationRowDTO[] = await enrichDtosWithFriendlyNames(
+        rows.map(toReservationRowDTO),
+      );
+
       return {
         data: {
-          reservations: rows.map(toReservationRowDTO),
+          reservations: dtoRows,
           stats: {
             upcoming,
             thisWeek,

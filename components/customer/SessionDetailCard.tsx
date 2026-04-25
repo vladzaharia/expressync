@@ -58,6 +58,8 @@ interface SessionDetailCardProps {
   invoiceId: string | null;
   /** Charger box id from the StEvE transaction (when known). */
   chargeBoxId: string | null;
+  /** Operator-set friendly name (mirrored from StEvE description). */
+  friendlyName?: string | null;
   /** Connector index on the charger (when known). */
   connectorId: number | null;
 }
@@ -87,8 +89,13 @@ export function SessionDetailCard({
   costCurrency,
   invoiceId,
   chargeBoxId,
+  friendlyName,
   connectorId,
 }: SessionDetailCardProps) {
+  const friendly = friendlyName?.trim() ?? "";
+  const chargerLabel = friendly || chargeBoxId || "—";
+  const showChargeBoxIdChip = !!friendly && chargeBoxId !== null &&
+    friendly !== chargeBoxId;
   const cardLink = session.ocppTagMappingId !== null
     ? `/cards/${session.ocppTagMappingId}`
     : null;
@@ -158,8 +165,15 @@ export function SessionDetailCard({
             icon={Zap}
             label="Charger"
             value={
-              <span class="font-mono text-sm">
-                {chargeBoxId ?? "—"}
+              <span class="flex items-baseline gap-2">
+                <span class="text-sm font-medium">{chargerLabel}</span>
+                {showChargeBoxIdChip
+                  ? (
+                    <span class="font-mono text-xs text-muted-foreground">
+                      {chargeBoxId}
+                    </span>
+                  )
+                  : null}
               </span>
             }
             accent="blue"

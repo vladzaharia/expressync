@@ -142,7 +142,9 @@ export default function ChargerCard(
     await postOperation("UnlockConnector", { connectorId: 1 });
   };
 
-  const displayName = charger.friendlyName ?? charger.chargeBoxId;
+  const displayName = charger.friendlyName?.trim() || charger.chargeBoxId;
+  const showChargeBoxIdChip = !!charger.friendlyName?.trim() &&
+    charger.friendlyName.trim() !== charger.chargeBoxId;
   const isCharging = status === "Charging";
 
   return (
@@ -186,9 +188,18 @@ export default function ChargerCard(
               </Tooltip>
               <a
                 href={`/chargers/${charger.chargeBoxId}`}
-                class="min-w-0 flex-1 truncate text-xl font-semibold tracking-tight hover:underline"
+                class="flex min-w-0 flex-1 items-baseline gap-2 hover:underline"
               >
-                {displayName}
+                <span class="truncate text-xl font-semibold tracking-tight">
+                  {displayName}
+                </span>
+                {showChargeBoxIdChip
+                  ? (
+                    <span class="shrink-0 font-mono text-xs text-muted-foreground">
+                      {charger.chargeBoxId}
+                    </span>
+                  )
+                  : null}
               </a>
             </div>
 

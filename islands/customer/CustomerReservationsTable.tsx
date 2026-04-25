@@ -88,14 +88,34 @@ export default function CustomerReservationsTable(
       key: "charger",
       header: "Charger",
       hideOnMobile: true,
-      render: (row) => (
-        <span className="font-mono text-sm text-muted-foreground">
-          {row.chargeBoxId}
-          {row.connectorId !== 0 && (
-            <span className="ml-1 text-xs">· #{row.connectorId}</span>
-          )}
-        </span>
-      ),
+      render: (row) => {
+        const friendly = row.friendlyName?.trim() ?? "";
+        const useFriendly = friendly.length > 0 &&
+          friendly !== row.chargeBoxId;
+        return (
+          <span className="text-sm">
+            {useFriendly
+              ? (
+                <>
+                  <span className="font-medium">{friendly}</span>
+                  <span className="ml-2 font-mono text-xs text-muted-foreground">
+                    {row.chargeBoxId}
+                  </span>
+                </>
+              )
+              : (
+                <span className="font-mono text-muted-foreground">
+                  {row.chargeBoxId}
+                </span>
+              )}
+            {row.connectorId !== 0 && (
+              <span className="ml-1 text-xs text-muted-foreground">
+                · #{row.connectorId}
+              </span>
+            )}
+          </span>
+        );
+      },
     },
     {
       key: "status",
@@ -108,14 +128,28 @@ export default function CustomerReservationsTable(
     <MobileCardRow
       topLeft={formatDay(row.startAtIso)}
       topRight={<ReservationStatusBadge status={row.status} />}
-      secondaryLine={
-        <span className="font-mono">
-          {row.chargeBoxId}
-          {row.connectorId !== 0 && (
-            <span className="ml-1">· #{row.connectorId}</span>
-          )}
-        </span>
-      }
+      secondaryLine={(() => {
+        const friendly = row.friendlyName?.trim() ?? "";
+        const useFriendly = friendly.length > 0 &&
+          friendly !== row.chargeBoxId;
+        return (
+          <span>
+            {useFriendly
+              ? (
+                <>
+                  <span className="font-medium">{friendly}</span>
+                  <span className="ml-1 font-mono text-xs text-muted-foreground">
+                    {row.chargeBoxId}
+                  </span>
+                </>
+              )
+              : <span className="font-mono">{row.chargeBoxId}</span>}
+            {row.connectorId !== 0 && (
+              <span className="ml-1">· #{row.connectorId}</span>
+            )}
+          </span>
+        );
+      })()}
       primaryStat={
         <span className="tabular-nums">
           {formatTime(row.startAtIso)} → {formatTime(row.endAtIso)}

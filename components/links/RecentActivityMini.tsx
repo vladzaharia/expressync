@@ -18,6 +18,7 @@ export interface RecentActivityRow {
   stopTimestamp: string | null;
   kwh: number | null;
   chargeBoxId: string;
+  friendlyName: string | null;
 }
 
 interface Props {
@@ -58,9 +59,22 @@ export function RecentActivityMini({ rows, tagPk, class: className }: Props) {
                   class="flex items-center justify-between gap-3 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 rounded-sm"
                 >
                   <div class="min-w-0">
-                    <p class="truncate font-mono text-xs text-foreground">
-                      {row.chargeBoxId}
-                    </p>
+                    {row.friendlyName?.trim()
+                      ? (
+                        <p class="flex items-baseline gap-2 truncate text-xs text-foreground">
+                          <span class="truncate font-medium">
+                            {row.friendlyName.trim()}
+                          </span>
+                          <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
+                            {row.chargeBoxId}
+                          </span>
+                        </p>
+                      )
+                      : (
+                        <p class="truncate font-mono text-xs text-foreground">
+                          {row.chargeBoxId}
+                        </p>
+                      )}
                     <p
                       class="text-[11px] text-muted-foreground"
                       title={row.startTimestamp}

@@ -136,9 +136,10 @@ function Row({ session }: { session: RecentActivityItem }) {
   const factor = (session.formFactor ?? "generic") as FormFactor;
   const Icon = chargerFormFactorIcons[factor] ??
     chargerFormFactorIcons.generic;
-  const chargerLabel = session.chargerName?.trim() ||
-    session.chargeBoxId ||
-    "Unknown charger";
+  const friendly = session.chargerName?.trim() ?? "";
+  const chargerLabel = friendly || session.chargeBoxId || "Unknown charger";
+  const showChargeBoxIdChip = friendly.length > 0 && !!session.chargeBoxId &&
+    friendly !== session.chargeBoxId;
   const duration = formatDuration(session.durationMinutes);
 
   return (
@@ -156,7 +157,16 @@ function Row({ session }: { session: RecentActivityItem }) {
         </span>
         <div class="flex min-w-0 flex-1 items-start justify-between gap-3">
           <div class="min-w-0">
-            <p class="truncate font-medium text-foreground">{chargerLabel}</p>
+            <p class="truncate font-medium text-foreground">
+              {chargerLabel}
+              {showChargeBoxIdChip
+                ? (
+                  <span class="ml-2 font-mono text-xs font-normal text-muted-foreground">
+                    {session.chargeBoxId}
+                  </span>
+                )
+                : null}
+            </p>
             <p class="truncate text-xs text-muted-foreground">
               {formatTimeRange(
                 session.startedAt ?? null,

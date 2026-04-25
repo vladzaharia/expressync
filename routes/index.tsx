@@ -438,6 +438,18 @@ async function loadCustomerData(
 
   const firstRun = recentSessions.length === 0 && scope.mappingIds.length === 0;
 
+  // Enrich nextReservation with the charger's friendly name (already cached
+   // in chargerMeta from the chargers query above).
+  if (nextReservation) {
+    const meta = chargerMeta.get(nextReservation.chargeBoxId);
+    if (meta?.friendlyName) {
+      nextReservation = {
+        ...nextReservation,
+        friendlyName: meta.friendlyName,
+      };
+    }
+  }
+
   const props: CustomerDashboardProps = {
     user: {
       id: args.userId,

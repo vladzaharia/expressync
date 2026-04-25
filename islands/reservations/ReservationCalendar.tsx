@@ -300,7 +300,19 @@ function CalendarBlock(
             />
           </div>
           <div class="truncate text-[11px] text-muted-foreground">
-            {r.chargeBoxId} · connector {r.connectorId || "any"}
+            {(() => {
+              const friendly = r.friendlyName?.trim() ?? "";
+              const useFriendly = friendly.length > 0 &&
+                friendly !== r.chargeBoxId;
+              return useFriendly
+                ? (
+                  <>
+                    <span class="font-medium text-foreground">{friendly}</span>
+                    <span class="ml-1 font-mono">{r.chargeBoxId}</span>
+                  </>
+                )
+                : <span>{r.chargeBoxId}</span>;
+            })()} · connector {r.connectorId || "any"}
           </div>
         </div>
       </a>

@@ -15,6 +15,7 @@ import { formatRelative } from "@/islands/shared/charger-visuals.ts";
 export interface RecentTransactionRow {
   steveTransactionId: number;
   chargeBoxId: string;
+  friendlyName: string | null;
   connectorId: number;
   startedAt: string;
   stoppedAt: string | null;
@@ -169,7 +170,16 @@ export function TagRecentTransactionsSection(
                               class="h-3 w-3 text-orange-500"
                               aria-hidden="true"
                             />
-                            <code class="font-mono">{r.chargeBoxId}</code>
+                            {r.friendlyName?.trim()
+                              ? (
+                                <>
+                                  <span>{r.friendlyName.trim()}</span>
+                                  <code class="font-mono text-[10px] text-muted-foreground">
+                                    {r.chargeBoxId}
+                                  </code>
+                                </>
+                              )
+                              : <code class="font-mono">{r.chargeBoxId}</code>}
                             <span class="text-muted-foreground">
                               · C{r.connectorId}
                             </span>
