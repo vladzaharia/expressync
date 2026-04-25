@@ -25,6 +25,7 @@ import { config, validateSyncWorkerConfig } from "./src/lib/config.ts";
 import { runSync, type SyncResult } from "./src/services/sync.service.ts";
 import { SyncScheduler } from "./src/services/sync-scheduler.ts";
 import { ensureLagoMetricSafety } from "./src/services/lago-safety.service.ts";
+import { pruneExpiredIdempotencyKeys } from "./src/lib/idempotency.ts";
 import { db } from "./src/db/index.ts";
 import {
   authAudit,
@@ -213,6 +214,19 @@ const rateLimitCleanupJob = new Cron(
       }
     } catch (err) {
       console.error("[Sync Worker] magic_link_audit cleanup failed:", err);
+    }
+
+    // 5. idempotency_keys — 24-hour retention. Cached responses for
+    //    state-changing endpoints; the helper handles its own errors.
+    try {
+      const removed = await pruneExpiredIdempotencyKeys();
+      if (removed > 0) {
+        console.log(
+          `[Sync Worker] idempotency_keys cleanup ok; rows removed: ${removed}`,
+        );
+      }
+    } catch (err) {
+      console.error("[Sync Worker] idempotency_keys cleanup failed:", err);
     }
   },
 );

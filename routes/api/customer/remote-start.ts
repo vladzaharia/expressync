@@ -29,6 +29,7 @@ import {
 } from "../../../src/lib/capabilities.ts";
 import { logCustomerAction } from "../../../src/lib/audit.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
+import { withIdempotency } from "../../../src/lib/idempotency.ts";
 
 const log = logger.child("CustomerRemoteStartAPI");
 
@@ -40,7 +41,11 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 export const handler = define.handlers({
-  async POST(ctx) {
+  POST(ctx) {
+    return withIdempotency(
+      ctx,
+      "POST /api/customer/remote-start",
+      async () => {
     if (!ctx.state.user) {
       return jsonResponse(401, { error: "Unauthorized" });
     }
@@ -179,5 +184,7 @@ export const handler = define.handlers({
       log.error("Failed to dispatch remote-start", err as Error);
       return jsonResponse(500, { error: "Failed to start charging" });
     }
+      },
+    );
   },
 });

@@ -6,8 +6,18 @@ import { db } from "../../../../src/db/index.ts";
 import { userMappings } from "../../../../src/db/schema.ts";
 
 export const handler = define.handlers({
-  async GET(_ctx) {
+  async GET(ctx) {
     try {
+      const url = new URL(ctx.req.url);
+      const hasPaginationParams = url.searchParams.has("limit") ||
+        url.searchParams.has("skip");
+      const skipRaw = parseInt(url.searchParams.get("skip") || "0", 10);
+      const skip = isNaN(skipRaw) || skipRaw < 0 ? 0 : skipRaw;
+      const limitRaw = parseInt(url.searchParams.get("limit") || "25", 10);
+      const limit = isNaN(limitRaw)
+        ? 25
+        : Math.max(1, Math.min(100, limitRaw));
+
       // Use the properly configured StEvE client
       const tags = await steveClient.getOcppTags();
 
@@ -57,9 +67,21 @@ export const handler = define.handlers({
         };
       });
 
-      return new Response(JSON.stringify(simplifiedTags), {
-        headers: { "Content-Type": "application/json" },
-      });
+      // StEvE returns the full set in one call, so we paginate post-fetch
+      // in JS. Back-compat: legacy callers (TagPickerCombobox + others)
+      // expect a bare array, so we only switch to the wrapped pagination
+      // shape when the caller opts in by passing `?limit=` or `?skip=`.
+      if (!hasPaginationParams) {
+        return new Response(JSON.stringify(simplifiedTags), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const total = simplifiedTags.length;
+      const page = simplifiedTags.slice(skip, skip + limit);
+      return new Response(
+        JSON.stringify({ rows: page, total, limit, skip }),
+        { headers: { "Content-Type": "application/json" } },
+      );
     } catch (error) {
       logger.error("API", "Failed to fetch OCPP tags", error as Error);
       return new Response(
