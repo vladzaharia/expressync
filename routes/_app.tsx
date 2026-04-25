@@ -2,8 +2,10 @@
 // it must execute before hydration to prevent a flash of the wrong theme.
 // deno-lint-ignore-file react-no-danger
 import { define } from "../utils.ts";
+import { Partial } from "fresh/runtime";
 import { Toaster } from "sonner";
 import CommandPalette from "../islands/CommandPalette.tsx";
+import ScanTagPaletteHost from "../islands/ScanTagPaletteHost.tsx";
 import SseProvider from "../islands/shared/SseProvider.tsx";
 
 /**
@@ -125,9 +127,27 @@ export default define.page(function App({ Component, state }) {
         >
           Skip to main content
         </a>
-        <Component />
+        {/*
+          Fresh 2 client-side navigation requires every route response to
+          contain at least one named <Partial>. The runtime fetches the new
+          page, looks for `<!--frsh:partial:NAME...-->` markers, and replaces
+          the matching Partial in-place. Without this wrapper, partial-nav
+          fetches throw "Found no partials in HTML response" — but the URL has
+          already been pushed via history.pushState, so users see the URL
+          change with no DOM update (the originally reported "broken nav"
+          symptom). Keep the global chrome (Toaster, CommandPalette,
+          SseProvider) OUTSIDE the partial so they survive route swaps and
+          retain their state.
+        */}
+        <Partial name="body">
+          <Component />
+        </Partial>
         <Toaster richColors position="bottom-right" />
         <CommandPalette surface={surface} />
+        {/* Admin-only: hidden modal host that the palette's "Scan EV Card"
+            action opens. Mounting it once at the root means the action
+            works from any page, not only /admin/tags. */}
+        {isAdmin && <ScanTagPaletteHost />}
         <SseProvider />
       </body>
     </html>
