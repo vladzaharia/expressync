@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Search } from "lucide-preact";
 import type { InvoiceUiStatus } from "@/src/lib/invoice-ui.ts";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 interface Props {
   initial: {
@@ -43,11 +44,11 @@ export default function InvoiceFilters({ initial }: Props) {
     if (dateTo.value) params.set("to", dateTo.value);
     if (customerId.value) params.set("customerId", customerId.value);
     const qs = params.toString();
-    globalThis.location.href = qs ? `/invoices?${qs}` : "/invoices";
+    clientNavigate(qs ? `/invoices?${qs}` : "/invoices");
   };
 
   const reset = () => {
-    globalThis.location.href = "/invoices";
+    clientNavigate("/invoices");
   };
 
   const exportCsv = () => {
@@ -58,9 +59,10 @@ export default function InvoiceFilters({ initial }: Props) {
     if (dateTo.value) params.set("to", dateTo.value);
     if (customerId.value) params.set("customerId", customerId.value);
     const qs = params.toString();
-    globalThis.location.href = qs
+    // CSV export: bypass client-nav so the browser handles the file download.
+    globalThis.location.assign(qs
       ? `/api/admin/invoice/export.csv?${qs}`
-      : "/api/admin/invoice/export.csv";
+      : "/api/admin/invoice/export.csv");
   };
 
   return (

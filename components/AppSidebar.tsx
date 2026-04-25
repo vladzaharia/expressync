@@ -1,5 +1,6 @@
 import * as React from "preact/compat";
 import type { ComponentType } from "preact";
+import { useState } from "preact/hooks";
 import {
   Sidebar,
   SidebarContent,
@@ -11,16 +12,19 @@ import NotificationBell from "../islands/NotificationBell.tsx";
 import {
   LayoutDashboard,
   LogOut,
+  Menu,
   PanelLeftClose,
   PanelLeftOpen,
   User,
 } from "lucide-preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip.tsx";
+import { Sheet, SheetContent, SheetTitle } from "./ui/sheet.tsx";
 import { BorderBeam } from "./magicui/border-beam.tsx";
 import { Particles } from "./magicui/particles.tsx";
 import { ExpresSyncBrand } from "./brand/ExpresSyncBrand.tsx";
 import { PolarisExpressBrand } from "./brand/PolarisExpressBrand.tsx";
+import { MobileBottomTabBar } from "./customer/MobileBottomTabBar.tsx";
 import { type AccentColor, accentTailwindClasses } from "@/src/lib/colors.ts";
 import {
   ADMIN_NAV_SECTIONS,
@@ -28,6 +32,7 @@ import {
   type NavItem,
   type NavSection,
 } from "@/src/lib/admin-navigation.ts";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 // Shared chrome size - used by both sidebar and top bar
 export const CHROME_SIZE = "3.5rem"; // 56px
@@ -96,6 +101,75 @@ export const accentClasses: Record<
     tooltip: "bg-primary/90 text-primary-foreground",
   },
 };
+
+// Admin mobile nav Sheet — hamburger trigger + left-side slide-out panel
+// that renders the full grouped IA (Operations / Billing / Identity / Admin).
+// Replaces the horizontal icon strip that clipped off-screen above ~6 items.
+function AdminNavSheet(
+  { visibleSections, isActive }: {
+    visibleSections: { id: string; title: string; items: NavItem[] }[];
+    isActive: (url: string) => boolean;
+  },
+) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Open navigation"
+        className="flex items-center justify-center shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+        style={{ width: CHROME_SIZE, height: CHROME_SIZE }}
+      >
+        <Menu className="size-5" />
+      </button>
+      <SheetContent side="left" className="w-72 max-w-[85vw] p-0">
+        <SheetTitle className="sr-only">Admin navigation</SheetTitle>
+        <nav className="flex flex-col h-full overflow-y-auto">
+          {visibleSections.map((section, sIdx) => (
+            <div key={section.id} className="flex flex-col">
+              {section.title && (
+                <div
+                  className={cn(
+                    "px-4 pt-3 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground shrink-0",
+                    sIdx > 0 && "border-t",
+                  )}
+                >
+                  {section.title}
+                </div>
+              )}
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const accent = accentClasses[item.accentColor];
+                const active = isActive(item.path);
+                return (
+                  <a
+                    key={item.id}
+                    href={item.path}
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 px-4 border-b transition-colors shrink-0",
+                      active
+                        ? cn(accent.bg, accent.text)
+                        : cn(
+                          "text-muted-foreground hover:text-foreground",
+                          accent.bgHover,
+                        ),
+                    )}
+                    style={{ height: CHROME_SIZE, minHeight: CHROME_SIZE }}
+                  >
+                    <Icon className="size-5 shrink-0" />
+                    <span className="text-sm font-medium">{item.title}</span>
+                  </a>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+      </SheetContent>
+    </Sheet>
+  );
+}
 
 // Full-block nav link component
 function NavSectionLink({
@@ -182,109 +256,38 @@ export function AppSidebar({
 
   const handleSignOut = async () => {
     await fetch("/api/auth/sign-out", { method: "POST" });
-    globalThis.location.href = "/login";
+    clientNavigate("/login");
   };
 
   const toggleTheme = useThemeToggle();
 
-  // Mobile layout
-  //
-  // For the customer surface, the mobile shell is the bottom-tab bar built
-  // in Track G1 (`components/customer/MobileBottomTabBar.tsx`). That file
-  // doesn't exist yet — the sidebar gracefully falls back to the existing
-  // horizontal-bar admin pattern below until G1 lands. Once the bottom-tab
-  // bar component is committed, swap in:
-  //
-  //   if (isMobile && role === "customer") {
-  //     return <MobileBottomTabBar ... />;
-  //   }
-  //
-  // The horizontal-bar fallback below is identical to the previous admin
-  // mobile shell so admin tests continue to pass without changes.
+  // Mobile layout — two distinct shells:
+  //   • admin → top bar with hamburger that opens a left-side Sheet with
+  //     the full grouped nav. Fixes the clipping bug where >6 icon buttons
+  //     overflowed off-screen on a phone-width viewport.
+  //   • customer → slim top bar (logo + right cluster) with primary nav
+  //     delegated to the fixed bottom tab bar.
   if (isMobile) {
-    return (
-      <Sidebar
-        collapsible="icon"
-        style={{
-          "--sidebar-width": SIDEBAR_EXPANDED_WIDTH,
-          "--sidebar-width-icon": CHROME_SIZE,
-        } as React.CSSProperties}
-      >
-        {/* Left section: Logo + Nav items */}
-        <div className="flex items-center h-full">
-          {/* Compact logo - no toggle functionality */}
-          <a
-            href="/"
-            className={cn(
-              "relative flex items-center justify-center shrink-0",
-              "bg-gradient-to-br from-primary/5 via-accent/5 to-primary/5",
-            )}
-            style={{ width: CHROME_SIZE, height: CHROME_SIZE }}
-          >
-            <Brand variant="sidebar-collapsed" />
-          </a>
+    const rightCluster = (
+      <div className="flex items-center h-full">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex items-center justify-center shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+              style={{ width: CHROME_SIZE, height: CHROME_SIZE }}
+              aria-label="Toggle theme"
+            >
+              <ThemeToggle />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={8}>Toggle Theme</TooltipContent>
+        </Tooltip>
 
-          {/* Nav items as icons - square buttons */}
-          {flatNavItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.path);
-            const accent = accentClasses[item.accentColor];
+        <NotificationBell variant="mobile" />
 
-            return (
-              <Tooltip key={item.id}>
-                <TooltipTrigger asChild>
-                  <a
-                    href={item.path}
-                    className={cn(
-                      "flex items-center justify-center shrink-0 transition-colors",
-                      active ? cn(accent.bg, accent.text) : cn(
-                        "text-muted-foreground hover:text-foreground",
-                        accent.bgHover,
-                      ),
-                    )}
-                    style={{ width: CHROME_SIZE, height: CHROME_SIZE }}
-                  >
-                    <Icon className="size-5" />
-                  </a>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" sideOffset={8}>
-                  {item.title}
-                </TooltipContent>
-              </Tooltip>
-            );
-          })}
-        </div>
-
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* Right section: Theme, Notifications, User, Logout - square buttons */}
-        <div className="flex items-center h-full">
-          {/* Theme toggle */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={toggleTheme}
-                className="flex items-center justify-center shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                style={{ width: CHROME_SIZE, height: CHROME_SIZE }}
-              >
-                <ThemeToggle />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={8}>
-              Toggle Theme
-            </TooltipContent>
-          </Tooltip>
-
-          {/* Notifications bell — after ThemeToggle, before User */}
-          <NotificationBell variant="mobile" />
-
-          {
-            /* Command palette trigger (Phase P6) — mobile-only; admin-only
-              via API-backed search. Fires `cmdk:open` so this component
-              stays decoupled from the island. */
-          }
+        {role !== "customer" && (
           <Tooltip>
             <TooltipTrigger asChild>
               <button
@@ -298,68 +301,118 @@ export function AppSidebar({
                 <span aria-hidden="true">⌘K</span>
               </button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={8}>
-              Command Palette
-            </TooltipContent>
+            <TooltipContent side="bottom" sideOffset={8}>Command Palette</TooltipContent>
           </Tooltip>
+        )}
 
-          {/* User icon */}
-          {user && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div
-                  className="flex items-center justify-center shrink-0 text-primary bg-primary/5"
-                  style={{ width: CHROME_SIZE, height: CHROME_SIZE }}
-                >
-                  <User className="size-5" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" sideOffset={8}>
-                {user.name || user.email}
-              </TooltipContent>
-            </Tooltip>
-          )}
-
-          {/* Sign out */}
+        {user && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={handleSignOut}
-                className="flex items-center justify-center shrink-0 bg-red-950/50 hover:bg-red-950/70 text-red-400 hover:text-red-300 transition-colors"
+              <div
+                className="flex items-center justify-center shrink-0 text-primary bg-primary/5"
                 style={{ width: CHROME_SIZE, height: CHROME_SIZE }}
               >
-                <LogOut className="size-5" />
-              </button>
+                <User className="size-5" />
+              </div>
             </TooltipTrigger>
-            <TooltipContent
-              side="bottom"
-              sideOffset={8}
-              className={accentClasses.red.tooltip}
-            >
-              Sign Out
+            <TooltipContent side="bottom" sideOffset={8}>
+              {user.name || user.email}
             </TooltipContent>
           </Tooltip>
+        )}
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="flex items-center justify-center shrink-0 bg-red-950/50 hover:bg-red-950/70 text-red-400 hover:text-red-300 transition-colors"
+              style={{ width: CHROME_SIZE, height: CHROME_SIZE }}
+              aria-label="Sign out"
+            >
+              <LogOut className="size-5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent
+            side="bottom"
+            sideOffset={8}
+            className={accentClasses.red.tooltip}
+          >
+            Sign Out
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    );
+
+    const logoAnchor = (
+      <a
+        href="/"
+        className={cn(
+          "relative flex items-center justify-center shrink-0",
+          "bg-gradient-to-br from-primary/5 via-accent/5 to-primary/5",
+        )}
+        style={{ width: CHROME_SIZE, height: CHROME_SIZE }}
+        aria-label="Go to dashboard"
+      >
+        <Brand variant="sidebar-collapsed" />
+      </a>
+    );
+
+    if (role === "customer") {
+      return (
+        <>
+          <Sidebar
+            collapsible="icon"
+            style={{
+              "--sidebar-width": SIDEBAR_EXPANDED_WIDTH,
+              "--sidebar-width-icon": CHROME_SIZE,
+            } as React.CSSProperties}
+          >
+            <div className="flex items-center h-full">{logoAnchor}</div>
+            <div className="flex-1" />
+            {rightCluster}
+          </Sidebar>
+          <MobileBottomTabBar currentPath={currentPath} />
+        </>
+      );
+    }
+
+    // Admin mobile: hamburger + logo + right cluster. Nav lives in Sheet.
+    return (
+      <Sidebar
+        collapsible="icon"
+        style={{
+          "--sidebar-width": SIDEBAR_EXPANDED_WIDTH,
+          "--sidebar-width-icon": CHROME_SIZE,
+        } as React.CSSProperties}
+      >
+        <div className="flex items-center h-full">
+          <AdminNavSheet
+            visibleSections={visibleSections}
+            isActive={isActive}
+          />
+          {logoAnchor}
         </div>
+        <div className="flex-1" />
+        {rightCluster}
       </Sidebar>
     );
   }
 
-  // Desktop layout - vertical sidebar (existing code)
-  // Logo content - brand that morphs to sidebar toggle on hover
+  // Desktop layout — vertical sidebar. The logo links home; the sidebar
+  // collapse/expand is driven by the footer toggle + Ctrl+B shortcut.
   const logoContent = (
-    <button
-      type="button"
-      onClick={toggleSidebar}
+    <a
+      href="/"
       className={cn(
-        "relative flex items-center border-b transition-colors shrink-0 overflow-hidden group/logo cursor-pointer w-full",
+        "relative flex items-center border-b transition-colors shrink-0 overflow-hidden w-full",
         isCollapsed ? "justify-center" : "justify-start gap-3 px-4",
         "bg-gradient-to-br from-primary/5 via-accent/5 to-primary/5",
         "hover:from-primary/10 hover:via-accent/10 hover:to-primary/10",
       )}
       style={{ height: CHROME_SIZE, minHeight: CHROME_SIZE }}
+      aria-label="Go to dashboard"
     >
-      {/* Particles effect */}
       <Particles
         className="absolute inset-0"
         quantity={isCollapsed ? 8 : 15}
@@ -369,29 +422,12 @@ export function AppSidebar({
         ease={80}
       />
 
-      {/* Default state: brand */}
-      <div className="flex items-center gap-3 transition-all duration-200 group-hover/logo:opacity-0 group-hover/logo:scale-90">
+      <div className="flex items-center gap-3">
         <Brand
           variant={isCollapsed ? "sidebar-collapsed" : "sidebar-expanded"}
         />
       </div>
 
-      {/* Hover state: Sidebar toggle */}
-      <div
-        className={cn(
-          "absolute inset-0 flex items-center transition-all duration-200 opacity-0 scale-110 group-hover/logo:opacity-100 group-hover/logo:scale-100",
-          isCollapsed ? "justify-center" : "justify-start gap-3 px-4",
-        )}
-      >
-        {isCollapsed ? <PanelLeftOpen className="size-5 text-primary" /> : (
-          <>
-            <PanelLeftClose className="size-5 text-primary shrink-0" />
-            <span className="text-sm font-medium">Close Sidebar</span>
-          </>
-        )}
-      </div>
-
-      {/* Border beam effect */}
       <BorderBeam
         size={50}
         duration={2}
@@ -407,7 +443,7 @@ export function AppSidebar({
         colorTo="hsl(var(--primary))"
         className="opacity-60"
       />
-    </button>
+    </a>
   );
 
   return (
@@ -418,13 +454,13 @@ export function AppSidebar({
         "--sidebar-width-icon": CHROME_SIZE,
       } as React.CSSProperties}
     >
-      {/* Logo section with sidebar toggle on hover */}
+      {/* Logo — always a link to the dashboard. */}
       {isCollapsed
         ? (
           <Tooltip>
             <TooltipTrigger asChild>{logoContent}</TooltipTrigger>
             <TooltipContent side="right" sideOffset={8}>
-              Open Sidebar
+              Dashboard
             </TooltipContent>
           </Tooltip>
         )
@@ -481,37 +517,30 @@ export function AppSidebar({
             </div>
           </div>
         )}
-
-        {/* Sign out section - dark red background */}
-        {(() => {
-          const signOutContent = (
+        <Tooltip>
+          <TooltipTrigger asChild>
             <button
               type="button"
-              onClick={handleSignOut}
+              onClick={toggleSidebar}
+              aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               className={cn(
-                "flex items-center border-t bg-red-950/50 hover:bg-red-950/70 text-red-400 hover:text-red-300 transition-colors w-full shrink-0 cursor-pointer",
-                isCollapsed ? "justify-center" : "gap-3 px-4",
+                "flex items-center border-t text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0 cursor-pointer",
+                isCollapsed ? "justify-center" : "justify-start gap-3 px-4",
               )}
               style={{ height: CHROME_SIZE, minHeight: CHROME_SIZE }}
             >
-              <LogOut className="size-5 shrink-0" />
+              {isCollapsed
+                ? <PanelLeftOpen className="size-5 shrink-0" />
+                : <PanelLeftClose className="size-5 shrink-0" />}
               {!isCollapsed && (
-                <span className="text-sm font-medium">Sign Out</span>
+                <span className="text-sm font-medium">Collapse</span>
               )}
             </button>
-          );
-
-          return isCollapsed
-            ? (
-              <Tooltip>
-                <TooltipTrigger asChild>{signOutContent}</TooltipTrigger>
-                <TooltipContent side="right" sideOffset={8}>
-                  Sign Out
-                </TooltipContent>
-              </Tooltip>
-            )
-            : signOutContent;
-        })()}
+          </TooltipTrigger>
+          <TooltipContent side="right" sideOffset={8}>
+            {isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          </TooltipContent>
+        </Tooltip>
       </SidebarFooter>
     </Sidebar>
   );

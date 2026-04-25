@@ -31,6 +31,7 @@ import { logger } from "../lib/utils/logger.ts";
 import { buildMappingLookupWithInheritance } from "./mapping-resolver.ts";
 import { syncTagStatus } from "./tag-sync.service.ts";
 import { SyncLogger } from "./sync-logger.ts";
+import { runLagoReconcile } from "./lago-reconcile/index.ts";
 import { eventBus } from "./event-bus.service.ts";
 import { config } from "../lib/config.ts";
 import { refreshChargerCache } from "./charger-cache.service.ts";
@@ -59,6 +60,21 @@ export interface SyncResult {
   transactionsProcessed: number;
   eventsCreated: number;
   errors: string[];
+}
+
+/**
+ * Best-effort Lago entity reconcile block. Invoked from every successful exit
+ * path in `runSync`. Never throws — each reconcile segment records its own
+ * errors inside the segment's log buffer.
+ */
+async function runLagoReconcileBlock(syncLogger: SyncLogger): Promise<void> {
+  try {
+    await runLagoReconcile(syncLogger);
+  } catch (err) {
+    logger.warn("Sync", "Lago reconcile block threw (caught)", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 /**
@@ -184,6 +200,8 @@ export async function runSync(): Promise<SyncResult> {
         "transaction_sync",
         "No transactions to process",
       );
+
+      await runLagoReconcileBlock(syncLogger);
 
       await markSyncComplete(syncRun.id, 0, 0, undefined, tagStats);
       await safeRefreshChargerCache(syncRun.id);
@@ -371,6 +389,8 @@ export async function runSync(): Promise<SyncResult> {
 
       await syncLogger.endSegment();
 
+      await runLagoReconcileBlock(syncLogger);
+
       await markSyncComplete(
         syncRun.id,
         transactionsProcessed,
@@ -523,6 +543,8 @@ export async function runSync(): Promise<SyncResult> {
     eventsCreated = successfullySentTransactions.length;
 
     await syncLogger.endSegment(errors.length > 0 ? "warning" : undefined);
+
+    await runLagoReconcileBlock(syncLogger);
 
     // 11. Mark sync as complete
     await markSyncComplete(

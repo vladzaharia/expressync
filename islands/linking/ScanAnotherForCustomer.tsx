@@ -14,6 +14,7 @@
 
 import ScanTagAction from "@/islands/ScanTagAction.tsx";
 import type { ScanResult } from "@/islands/shared/use-scan-tag.ts";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 interface Props {
   /** Lago customer external id — passed through as `?customerId=` on the
@@ -24,7 +25,7 @@ interface Props {
 export default function ScanAnotherForCustomer({ customerExternalId }: Props) {
   const handleDetected = (r: ScanResult) => {
     if (r.exists && r.hasMapping && typeof r.mappingId === "number") {
-      globalThis.location.href = `/links/${r.mappingId}`;
+      clientNavigate(`/links/${r.mappingId}`);
       return;
     }
     if (r.exists && typeof r.tagPk === "number") {
@@ -32,13 +33,13 @@ export default function ScanAnotherForCustomer({ customerExternalId }: Props) {
         tagPk: String(r.tagPk),
         customerId: customerExternalId,
       });
-      globalThis.location.href = `/links/new?${qs.toString()}`;
+      clientNavigate(`/links/new?${qs.toString()}`);
       return;
     }
     // Unknown tag — send them through `/tags/new` to register it. The
     // customer context is preserved as a returnable search param on the
     // `/tags/new` page; today we just forward the idTag.
-    globalThis.location.href = `/tags/new?idTag=${encodeURIComponent(r.idTag)}`;
+    clientNavigate(`/tags/new?idTag=${encodeURIComponent(r.idTag)}`);
   };
 
   return (

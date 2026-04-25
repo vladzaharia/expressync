@@ -36,6 +36,12 @@ interface Props {
   basePath?: string;
   /** Extra classes merged onto the toggle group root. */
   className?: string;
+  /**
+   * Optional whitelist of supported periods. Unsupported options render as
+   * disabled chips (aria-disabled + muted) rather than navigating to broken
+   * states. Defaults to all three.
+   */
+  supportedPeriods?: BillingPeriod[];
 }
 
 /**
@@ -55,8 +61,11 @@ function buildHref(basePath: string, period: BillingPeriod): string {
 }
 
 export function BillingPeriodSwitcher(
-  { value, basePath = "/billing", className }: Props,
+  { value, basePath = "/billing", className, supportedPeriods }: Props,
 ) {
+  const supported = supportedPeriods
+    ? new Set(supportedPeriods)
+    : null;
   return (
     <ToggleGroup
       type="single"
@@ -64,6 +73,7 @@ export function BillingPeriodSwitcher(
       onValueChange={(next: string) => {
         if (!next) return;
         if (next === value) return;
+        if (supported && !supported.has(next as BillingPeriod)) return;
         globalThis.location.href = buildHref(
           basePath,
           next as BillingPeriod,
@@ -74,15 +84,23 @@ export function BillingPeriodSwitcher(
       aria-label="Billing period"
       className={cn("inline-flex", className)}
     >
-      {(Object.keys(PERIOD_LABELS) as BillingPeriod[]).map((p) => (
-        <ToggleGroupItem
-          key={p}
-          value={p}
-          aria-label={`Show ${PERIOD_LABELS[p].toLowerCase()} period`}
-        >
-          {PERIOD_LABELS[p]}
-        </ToggleGroupItem>
-      ))}
+      {(Object.keys(PERIOD_LABELS) as BillingPeriod[]).map((p) => {
+        const isDisabled = supported ? !supported.has(p) : false;
+        return (
+          <ToggleGroupItem
+            key={p}
+            value={p}
+            disabled={isDisabled}
+            aria-disabled={isDisabled || undefined}
+            aria-label={`Show ${PERIOD_LABELS[p].toLowerCase()} period`}
+            className={cn(
+              isDisabled && "text-muted-foreground opacity-50",
+            )}
+          >
+            {PERIOD_LABELS[p]}
+          </ToggleGroupItem>
+        );
+      })}
     </ToggleGroup>
   );
 }

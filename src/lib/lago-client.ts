@@ -17,6 +17,8 @@ import {
   LagoInvoiceSchema,
   type LagoLifetimeUsage,
   LagoLifetimeUsageSchema,
+  type LagoPlan,
+  LagoPlanSchema,
   type LagoSubscription,
   type LagoSubscriptionAlert,
   LagoSubscriptionAlertSchema,
@@ -799,6 +801,92 @@ class LagoClient {
    * typically cache the result for an hour and re-fetch on verification
    * failure.
    */
+  /**
+   * List every plan. Used by the Lago reconcile job to keep a local plan
+   * cache in sync — Lago plans are relatively low-churn so this is cheap.
+   */
+  async listPlans(): Promise<{ plans: LagoPlan[] }> {
+    const plans = await this.requestAllPages(
+      "/plans",
+      "plans",
+      LagoPlanSchema,
+    );
+    return { plans };
+  }
+
+  /**
+   * Fetch a single plan by code. The `LagoPlanSchema` passes through any
+   * additional fields Lago returns — most importantly the `charges` array
+   * with per-metric `charge_model` + `properties` (tiered/volume pricing).
+   * Callers read these raw off the returned object.
+   */
+  async getPlan(code: string): Promise<LagoPlan> {
+    const res = await this.request(
+      `/plans/${encodeURIComponent(code)}`,
+      z.object({ plan: LagoPlanSchema }),
+    );
+    return res.plan;
+  }
+
+  /**
+   * List every billable metric. Used by the reconcile job. The existing
+   * `getBillableMetric(code)` is kept for the startup safety gate.
+   */
+  async listBillableMetrics(): Promise<{
+    billable_metrics: LagoBillableMetric[];
+  }> {
+    const billable_metrics = await this.requestAllPages(
+      "/billable_metrics",
+      "billable_metrics",
+      LagoBillableMetricSchema,
+    );
+    return { billable_metrics };
+  }
+
+  /**
+   * List wallets for a specific customer. Lago's `/wallets` endpoint requires
+   * `external_customer_id`, so the reconciler iterates customers.
+   */
+  async listWalletsForCustomer(
+    externalCustomerId: string,
+  ): Promise<{ wallets: LagoWallet[] }> {
+    const wallets = await this.requestAllPages(
+      `/wallets?external_customer_id=${encodeURIComponent(externalCustomerId)}`,
+      "wallets",
+      LagoWalletSchema,
+    );
+    return { wallets };
+  }
+
+  /**
+   * List every invoice (all pages). Returns extended invoice records so the
+   * reconciler can denormalize fees. Lightweight wrapper over `listInvoices`
+   * that walks pagination.
+   */
+  async listAllInvoices(opts: {
+    status?: string | string[];
+    paymentStatus?: string | string[];
+  } = {}): Promise<{ invoices: LagoInvoiceExtended[] }> {
+    const all: LagoInvoiceExtended[] = [];
+    const MAX_PAGES = 200;
+    let page = 1;
+    while (true) {
+      if (page > MAX_PAGES) {
+        logger.warn("Lago", "listAllInvoices: max page limit reached", { page });
+        break;
+      }
+      const { invoices, meta } = await this.listInvoices({
+        ...opts,
+        page,
+        perPage: 100,
+      });
+      all.push(...invoices);
+      if (page >= meta.total_pages || invoices.length < 100) break;
+      page++;
+    }
+    return { invoices: all };
+  }
+
   async getWebhookPublicKey(): Promise<string> {
     const url = `${this.baseUrl}/webhooks/public_key`;
     const controller = new AbortController();

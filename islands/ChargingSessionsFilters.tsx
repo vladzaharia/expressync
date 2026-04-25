@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 import { X } from "lucide-preact";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 export type ChargingSessionStatus = "all" | "active" | "completed";
 
@@ -47,11 +48,11 @@ export default function ChargingSessionsFilters({
     if (to.value) params.set("to", to.value);
     if (tag.value) params.set("tag", tag.value);
     const qs = params.toString();
-    globalThis.location.href = qs ? `/transactions?${qs}` : "/transactions";
+    clientNavigate(qs ? `/transactions?${qs}` : "/transactions");
   };
 
   const clear = () => {
-    globalThis.location.href = "/transactions";
+    clientNavigate("/transactions");
   };
 
   const hasFilter = status.value !== "all" || from.value || to.value ||

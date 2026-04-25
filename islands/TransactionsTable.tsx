@@ -5,6 +5,7 @@ import {
 import { Calendar, Hash, Zap } from "lucide-preact";
 import { TransactionStatusBadge } from "@/components/shared/index.ts";
 import type { TransactionSummary } from "@/routes/admin/transactions/index.tsx";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 interface Props {
   transactions: TransactionSummary[];
@@ -81,7 +82,7 @@ export default function TransactionsTable({
     "No charging sessions found. Sessions will appear here after syncing.",
 }: Props) {
   const handleRowClick = (tx: TransactionSummary) => {
-    globalThis.location.href = `/transactions/${tx.steveTransactionId}`;
+    clientNavigate(`/transactions/${tx.steveTransactionId}`);
   };
 
   return (

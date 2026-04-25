@@ -44,6 +44,13 @@ export const users = pgTable("users", {
   emailVerified: boolean("email_verified").default(false),
   image: text("image"),
   role: text("role").notNull().default("customer"), // "admin" | "customer"
+  // Direct link to the Lago customer this user was provisioned from. Added
+  // in migration 0030 so the no-email provisioning path is idempotent: the
+  // reconcile loop used to create a fresh `users` row every time it saw a
+  // Lago customer without an email (no sibling mapping + no email lookup
+  // fell through to a blind INSERT), producing one duplicate row per run.
+  // Uniqueness is enforced by a partial index in the migration file.
+  lagoCustomerExternalId: text("lago_customer_external_id"),
   onboardedAt: timestamp("onboarded_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
@@ -411,7 +418,17 @@ export type SyncRunLog = typeof syncRunLogs.$inferSelect;
 export type NewSyncRunLog = typeof syncRunLogs.$inferInsert;
 
 // Sync segment types
-export type SyncSegment = "tag_linking" | "transaction_sync" | "scheduling";
+export type SyncSegment =
+  | "tag_linking"
+  | "transaction_sync"
+  | "scheduling"
+  | "lago_customers"
+  | "lago_subscriptions"
+  | "lago_plans"
+  | "lago_invoices"
+  | "lago_wallets"
+  | "lago_billable_metrics"
+  | "local_reconcile";
 export type SyncSegmentStatus = "success" | "warning" | "error" | "skipped";
 export type SyncLogLevel = "info" | "warn" | "error" | "debug";
 
@@ -1061,3 +1078,184 @@ export const impersonationAudit = pgTable("impersonation_audit", {
 
 export type ImpersonationAudit = typeof impersonationAudit.$inferSelect;
 export type NewImpersonationAudit = typeof impersonationAudit.$inferInsert;
+
+// ============================================================================
+// === Lago entity cache (Lago is source of truth) ===
+//
+// One row per Lago entity. `payload` carries the full Lago response so the
+// UI/services can read fields we haven't denormalized. `deleted_at` is set by
+// the periodic reconciler when an entity disappears from Lago; clearing it
+// (which any upsert does) re-activates the row, so an entity re-created with
+// the same Lago id automatically reappears.
+// ============================================================================
+
+export const lagoCustomers = pgTable("lago_customers", {
+  lagoId: text("lago_id").primaryKey(),
+  externalId: text("external_id").notNull(),
+  name: text("name"),
+  email: text("email"),
+  currency: text("currency"),
+  payload: jsonb("payload").notNull(),
+  lagoUpdatedAt: timestamp("lago_updated_at", { withTimezone: true }),
+  syncedAt: timestamp("synced_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("lago_customers_external_id_unique").on(table.externalId),
+  index("idx_lago_customers_deleted_at").on(table.deletedAt),
+]);
+
+export const lagoSubscriptions = pgTable("lago_subscriptions", {
+  lagoId: text("lago_id").primaryKey(),
+  externalId: text("external_id").notNull(),
+  externalCustomerId: text("external_customer_id"),
+  customerLagoId: text("customer_lago_id"),
+  planCode: text("plan_code"),
+  status: text("status"),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  terminatedAt: timestamp("terminated_at", { withTimezone: true }),
+  payload: jsonb("payload").notNull(),
+  lagoUpdatedAt: timestamp("lago_updated_at", { withTimezone: true }),
+  syncedAt: timestamp("synced_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("lago_subscriptions_external_id_unique").on(table.externalId),
+  index("idx_lago_subscriptions_customer").on(table.externalCustomerId),
+  index("idx_lago_subscriptions_status").on(table.status),
+  index("idx_lago_subscriptions_deleted_at").on(table.deletedAt),
+]);
+
+export const lagoPlans = pgTable("lago_plans", {
+  lagoId: text("lago_id").primaryKey(),
+  code: text("code").notNull(),
+  name: text("name"),
+  interval: text("interval"),
+  amountCents: integer("amount_cents"),
+  currency: text("currency"),
+  payload: jsonb("payload").notNull(),
+  lagoUpdatedAt: timestamp("lago_updated_at", { withTimezone: true }),
+  syncedAt: timestamp("synced_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("lago_plans_code_unique").on(table.code),
+  index("idx_lago_plans_deleted_at").on(table.deletedAt),
+]);
+
+export const lagoInvoices = pgTable("lago_invoices", {
+  lagoId: text("lago_id").primaryKey(),
+  number: text("number"),
+  externalCustomerId: text("external_customer_id"),
+  status: text("status"),
+  paymentStatus: text("payment_status"),
+  invoiceType: text("invoice_type"),
+  totalAmountCents: integer("total_amount_cents"),
+  currency: text("currency"),
+  issuingDate: text("issuing_date"),
+  paymentOverdue: boolean("payment_overdue"),
+  payload: jsonb("payload").notNull(),
+  lagoUpdatedAt: timestamp("lago_updated_at", { withTimezone: true }),
+  syncedAt: timestamp("synced_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (table) => [
+  index("idx_lago_invoices_customer").on(table.externalCustomerId),
+  index("idx_lago_invoices_status").on(table.status),
+  index("idx_lago_invoices_payment_status").on(table.paymentStatus),
+  index("idx_lago_invoices_deleted_at").on(table.deletedAt),
+]);
+
+export const lagoFees = pgTable("lago_fees", {
+  lagoId: text("lago_id").primaryKey(),
+  invoiceLagoId: text("invoice_lago_id"),
+  externalSubscriptionId: text("external_subscription_id"),
+  itemCode: text("item_code"),
+  itemName: text("item_name"),
+  units: numeric("units", { precision: 16, scale: 6 }),
+  amountCents: integer("amount_cents"),
+  currency: text("currency"),
+  payload: jsonb("payload").notNull(),
+  syncedAt: timestamp("synced_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (table) => [
+  index("idx_lago_fees_invoice").on(table.invoiceLagoId),
+  index("idx_lago_fees_subscription").on(table.externalSubscriptionId),
+  index("idx_lago_fees_deleted_at").on(table.deletedAt),
+]);
+
+export const lagoWallets = pgTable("lago_wallets", {
+  lagoId: text("lago_id").primaryKey(),
+  externalCustomerId: text("external_customer_id"),
+  status: text("status"),
+  currency: text("currency"),
+  balanceCents: integer("balance_cents"),
+  payload: jsonb("payload").notNull(),
+  lagoUpdatedAt: timestamp("lago_updated_at", { withTimezone: true }),
+  syncedAt: timestamp("synced_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (table) => [
+  index("idx_lago_wallets_customer").on(table.externalCustomerId),
+  index("idx_lago_wallets_deleted_at").on(table.deletedAt),
+]);
+
+export const lagoBillableMetrics = pgTable("lago_billable_metrics", {
+  lagoId: text("lago_id").primaryKey(),
+  code: text("code").notNull(),
+  name: text("name"),
+  aggregationType: text("aggregation_type"),
+  fieldName: text("field_name"),
+  recurring: boolean("recurring"),
+  payload: jsonb("payload").notNull(),
+  syncedAt: timestamp("synced_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("lago_billable_metrics_code_unique").on(table.code),
+  index("idx_lago_billable_metrics_deleted_at").on(table.deletedAt),
+]);
+
+export type LagoCustomerRow = typeof lagoCustomers.$inferSelect;
+export type NewLagoCustomerRow = typeof lagoCustomers.$inferInsert;
+export type LagoSubscriptionRow = typeof lagoSubscriptions.$inferSelect;
+export type NewLagoSubscriptionRow = typeof lagoSubscriptions.$inferInsert;
+export type LagoPlanRow = typeof lagoPlans.$inferSelect;
+export type NewLagoPlanRow = typeof lagoPlans.$inferInsert;
+export type LagoInvoiceRow = typeof lagoInvoices.$inferSelect;
+export type NewLagoInvoiceRow = typeof lagoInvoices.$inferInsert;
+export type LagoFeeRow = typeof lagoFees.$inferSelect;
+export type NewLagoFeeRow = typeof lagoFees.$inferInsert;
+export type LagoWalletRow = typeof lagoWallets.$inferSelect;
+export type NewLagoWalletRow = typeof lagoWallets.$inferInsert;
+export type LagoBillableMetricRow = typeof lagoBillableMetrics.$inferSelect;
+export type NewLagoBillableMetricRow = typeof lagoBillableMetrics.$inferInsert;
+
+// New sync segments emitted by the Lago reconciler. Each is its own segment
+// so the SyncSegmentTabs UI can render per-entity logs and statuses.
+export type LagoReconcileSegment =
+  | "lago_customers"
+  | "lago_subscriptions"
+  | "lago_plans"
+  | "lago_invoices"
+  | "lago_wallets"
+  | "lago_billable_metrics"
+  | "local_reconcile";
+
+export const LAGO_RECONCILE_SEGMENTS: readonly LagoReconcileSegment[] = [
+  "lago_billable_metrics",
+  "lago_plans",
+  "lago_customers",
+  "lago_subscriptions",
+  "lago_invoices",
+  "lago_wallets",
+  "local_reconcile",
+] as const;

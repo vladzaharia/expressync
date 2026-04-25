@@ -33,8 +33,8 @@
   "kv_namespaces": [
     {
       "binding": "EMAIL_NONCE_DEDUP",
-      "id": "REPLACE_WITH_KV_NAMESPACE_ID",
-      "preview_id": "REPLACE_WITH_KV_PREVIEW_ID"
+      "id": "5adfb38cc8df49f5a14cae9209e69076",
+      "preview_id": "155aaa7da20e4c7aa647eeb043ed6ccb"
     }
   ],
 

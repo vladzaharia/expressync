@@ -26,6 +26,7 @@ import {
   type NotificationRowItem,
 } from "@/components/notifications/NotificationRow.tsx";
 import { Check, CheckCheck, Loader2, Trash2 } from "lucide-preact";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 type SeverityFilter = "all" | "info" | "success" | "warn" | "error";
 type ReadFilter = "any" | "unread" | "read";
@@ -127,7 +128,7 @@ export default function NotificationArchiveTable(
       if (n.sourceUrl.startsWith("http")) {
         globalThis.open(n.sourceUrl, "_blank", "noopener,noreferrer");
       } else {
-        globalThis.location.href = n.sourceUrl;
+        clientNavigate(n.sourceUrl);
       }
     }
   };

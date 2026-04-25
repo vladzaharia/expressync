@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useSignal } from "@preact/signals";
 import type { SyncedTransactionEvent } from "@/src/db/schema.ts";
 import { formatDate } from "@/src/lib/utils/format.ts";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 /**
  * Row shape for this table. Core fields come from SyncedTransactionEvent
@@ -250,7 +251,7 @@ export default function TransactionsPaginatedTable({
   showLoadMore = true,
 }: Props) {
   const handleRowClick = (event: TransactionEventWithTag) => {
-    globalThis.location.href = `/transactions/${event.steveTransactionId}`;
+    clientNavigate(`/transactions/${event.steveTransactionId}`);
   };
 
   return (

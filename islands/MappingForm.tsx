@@ -26,6 +26,7 @@ import TagPicker from "@/islands/linking/TagPicker.tsx";
 import CustomerPicker from "@/islands/linking/CustomerPicker.tsx";
 import SubscriptionPicker from "@/islands/linking/SubscriptionPicker.tsx";
 import { isMetaTag } from "@/src/lib/tag-hierarchy.ts";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 interface MappingSeed {
   id: number;
@@ -145,12 +146,12 @@ export default function MappingForm(props: Props) {
               data.totalCreated - 1
             } children)`;
           setTimeout(() => {
-            globalThis.location.href = "/links";
+            clientNavigate("/links");
           }, 1500);
         } else if (!mapping && data.parentMapping?.id) {
-          globalThis.location.href = `/links/${data.parentMapping.id}`;
+          clientNavigate(`/links/${data.parentMapping.id}`);
         } else {
-          globalThis.location.href = "/links";
+          clientNavigate("/links");
         }
       } else {
         const data = await res.json().catch(() => ({}));

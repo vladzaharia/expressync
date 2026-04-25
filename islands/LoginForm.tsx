@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card.tsx";
 import { Loader2 } from "lucide-preact";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 export default function LoginForm() {
   const email = useSignal("");
@@ -35,7 +36,7 @@ export default function LoginForm() {
       const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
-        globalThis.location.href = "/";
+        clientNavigate("/");
       } else {
         error.value = data.error?.message || data.message ||
           `Login failed (${res.status}). Please check your credentials.`;

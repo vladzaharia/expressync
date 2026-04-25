@@ -105,7 +105,10 @@ export default define.page(function App({ Component, state }) {
           }}
         />
       </head>
-      <body class="min-h-screen bg-background text-foreground antialiased">
+      <body
+        class="min-h-screen bg-background text-foreground antialiased"
+        f-client-nav
+      >
         {
           /*
           Polaris Track H — Skip-link. Hidden visually until focused, then

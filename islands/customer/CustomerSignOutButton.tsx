@@ -12,6 +12,7 @@
 import { useState } from "preact/hooks";
 import { Loader2, LogOut } from "lucide-preact";
 import { Button } from "@/components/ui/button.tsx";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 export default function CustomerSignOutButton() {
   const [busy, setBusy] = useState(false);
@@ -19,11 +20,15 @@ export default function CustomerSignOutButton() {
   const signOut = async () => {
     setBusy(true);
     try {
-      await fetch("/api/auth/sign-out", { method: "POST" });
+      await fetch("/api/auth/sign-out", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
     } catch {
       // Non-fatal — still navigate.
     }
-    globalThis.location.href = "/login";
+    clientNavigate("/login");
   };
 
   return (

@@ -25,7 +25,9 @@ import { useSignal } from "@preact/signals";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
+import { type AccentColor, stripToneClasses } from "@/src/lib/colors.ts";
 import { cn } from "@/src/lib/utils/cn.ts";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 /**
  * Three customer-friendly filter buckets. Maps to Lago `status` +
@@ -47,11 +49,19 @@ interface Props {
   };
   /** Pathname to navigate to (defaults to `/billing`). */
   basePath?: string;
+  /** Page accent for active chip styling. Defaults to "blue". */
+  accent?: AccentColor;
 }
 
 export default function CustomerInvoiceFilterBar(
-  { initial, basePath = "/billing" }: Props,
+  { initial, basePath = "/billing", accent = "blue" }: Props,
 ) {
+  const tone = stripToneClasses[accent];
+  // Active-chip fill from the accent's iconWell (bg-{accent}-500/10 + text).
+  const activeChipClass = cn(
+    tone.iconWell,
+    "border-transparent",
+  );
   const statusSet = useSignal<Set<CustomerInvoiceFilter>>(
     new Set(initial.status),
   );
@@ -71,13 +81,13 @@ export default function CustomerInvoiceFilterBar(
     if (dateFrom.value) params.set("from", dateFrom.value);
     if (dateTo.value) params.set("to", dateTo.value);
     const qs = params.toString();
-    globalThis.location.href = qs
+    clientNavigate(qs
       ? `${basePath}?${qs}#invoices`
-      : `${basePath}#invoices`;
+      : `${basePath}#invoices`);
   };
 
   const reset = () => {
-    globalThis.location.href = `${basePath}#invoices`;
+    clientNavigate(`${basePath}#invoices`);
   };
 
   return (
@@ -97,7 +107,7 @@ export default function CustomerInvoiceFilterBar(
               className={cn(
                 "rounded-md border px-2.5 py-1 text-xs font-medium capitalize",
                 active
-                  ? "border-teal-500/40 bg-teal-500/15 text-teal-700 dark:text-teal-300"
+                  ? activeChipClass
                   : "border-border text-muted-foreground hover:bg-muted/50",
               )}
             >

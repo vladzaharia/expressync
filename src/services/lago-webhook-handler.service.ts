@@ -46,6 +46,13 @@ import {
 } from "./notification.service.ts";
 import { eventBus } from "./event-bus.service.ts";
 import { syncSingleTagToSteve } from "./tag-sync.service.ts";
+import {
+  handleCustomerWebhook,
+  handleInvoiceWebhook,
+  handlePlanWebhook,
+  handleSubscriptionWebhook,
+  handleWalletWebhook,
+} from "./lago-reconcile/webhook-upserts.ts";
 
 const log = logger.child("LagoWebhookHandler");
 
@@ -475,6 +482,11 @@ async function reactTo(payload: LagoWebhook, rowId: number): Promise<boolean> {
     sourceId: String(rowId),
   };
 
+  // Lago → local cache upsert (runs before the notification-firing logic so
+  // downstream surfaces see the latest entity state regardless of whether we
+  // also emit an admin notification). Errors are logged but never thrown.
+  await upsertWebhookIntoCache(payload, rowId);
+
   // Phase P7: publish `invoice.updated` for every invoice.* webhook so the
   // InvoiceDetail island can refresh in near-real-time. The payload carries
   // enough state for the client to decide whether to refetch. This runs in
@@ -694,6 +706,52 @@ async function reactTo(payload: LagoWebhook, rowId: number): Promise<boolean> {
   }
 }
 
+/**
+ * Upsert (or soft-delete) the entity carried by a Lago webhook into our local
+ * cache tables. Webhook-driven path complements the periodic reconciler so
+ * the cache stays current without waiting up to 15 minutes.
+ *
+ * Best-effort — any failure is logged and swallowed so the notification path
+ * still runs.
+ */
+async function upsertWebhookIntoCache(
+  payload: LagoWebhook,
+  rowId: number,
+): Promise<void> {
+  const wt = payload.webhook_type;
+  const raw = payload as unknown as Record<string, unknown>;
+
+  let result: { ok: boolean; error?: string } | null = null;
+  try {
+    if (wt.startsWith("customer.")) {
+      result = await handleCustomerWebhook(raw, wt);
+    } else if (wt.startsWith("subscription.")) {
+      result = await handleSubscriptionWebhook(raw, wt);
+    } else if (wt.startsWith("plan.")) {
+      result = await handlePlanWebhook(raw, wt);
+    } else if (wt.startsWith("invoice.")) {
+      result = await handleInvoiceWebhook(raw, wt);
+    } else if (wt.startsWith("wallet.") || wt === "wallet_transaction.created") {
+      result = await handleWalletWebhook(raw, wt);
+    }
+  } catch (err) {
+    log.warn("Webhook cache upsert threw (caught)", {
+      webhookType: wt,
+      rowId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return;
+  }
+
+  if (result && !result.ok) {
+    log.debug("Webhook cache upsert skipped", {
+      webhookType: wt,
+      rowId,
+      reason: result.error,
+    });
+  }
+}
+
 // ============================================================================
 // Polaris Track A — subscription/customer webhook helpers
 // ============================================================================
@@ -834,11 +892,16 @@ async function handleSubscriptionStateChange(args: {
 
 /**
  * Compare the email Lago sent us in a customer.updated event to the email
- * stored on the linked `users` row. If they differ, emit an admin
- * notification so the operator can reconcile manually. NEVER auto-update
- * users.email — portal email is the user's stable identity for login.
+ * stored on the linked `users` row.
  *
- * Returns true when a drift notification is created.
+ *   - Both non-null and different → emit a drift notification (manual fix
+ *     required; portal email is the user's stable login identity, so we never
+ *     overwrite a real value with Lago's).
+ *   - Local email NULL + Lago email present → backfill the local row.
+ *     Common case: customer auto-provisioned without an email and the
+ *     operator later added one in Lago.
+ *
+ * Returns true when a drift notification is fired.
  */
 async function handleCustomerUpdated(args: {
   externalCustomerId: string;
@@ -861,10 +924,43 @@ async function handleCustomerUpdated(args: {
     .limit(1);
 
   const linked = rows[0];
-  if (!linked || !linked.userId || !linked.email) {
+  if (!linked || !linked.userId) {
     log.debug("customer.updated: no linked user — skipping drift check", {
       externalCustomerId,
     });
+    return false;
+  }
+
+  // Backfill the local users.email from Lago when local is NULL.
+  if (!linked.email && lagoEmail) {
+    await db
+      .update(users)
+      .set({ email: lagoEmail, updatedAt: new Date() })
+      .where(eq(users.id, linked.userId));
+    log.info("customer.updated: backfilled users.email from Lago", {
+      externalCustomerId,
+      userId: linked.userId,
+    });
+    notify({
+      kind: "lago_email_backfilled",
+      severity: "info",
+      title: "Customer email synced from Lago",
+      body:
+        `Local user ${linked.userId} had no email; backfilled "${lagoEmail}" from Lago customer ${externalCustomerId}.`,
+      sourceType: "subscription",
+      sourceId: externalCustomerId,
+      context: {
+        externalCustomerId,
+        userId: linked.userId,
+        lagoEmail,
+        webhookEventId: rowId,
+      },
+    });
+    return true;
+  }
+
+  if (!linked.email) {
+    // Local null + Lago null — nothing to do.
     return false;
   }
 

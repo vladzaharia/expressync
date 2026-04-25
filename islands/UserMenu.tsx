@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu.tsx";
 import { useThemeToggle } from "@/islands/ThemeToggle.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
+import { signOutAndRedirect } from "@/src/lib/nav.ts";
 
 interface UserMenuProps {
   user?: {
@@ -57,14 +58,7 @@ export default function UserMenu({ user }: UserMenuProps) {
     };
   }, []);
 
-  const handleSignOut = async () => {
-    try {
-      await fetch("/api/auth/sign-out", { method: "POST" });
-    } catch {
-      // Non-fatal; still navigate so the user isn't stuck on a stale page.
-    }
-    globalThis.location.href = "/login";
-  };
+  const handleSignOut = () => signOutAndRedirect("/login");
 
   const displayName = user?.name || user?.email || "User";
 

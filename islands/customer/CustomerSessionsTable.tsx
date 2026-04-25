@@ -22,6 +22,7 @@ import {
   TransactionStatusBadge,
 } from "@/components/shared/index.ts";
 import { Calendar, Tag as TagIcon, Zap } from "lucide-preact";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 /**
  * Row shape — matches the Track F `/api/customer/sessions` items. We only
@@ -134,7 +135,7 @@ export default function CustomerSessionsTable({
   emptyMessage = "No charging sessions yet.",
 }: Props) {
   const handleRowClick = (row: CustomerSessionRow) => {
-    globalThis.location.href = `/sessions/${row.id}`;
+    clientNavigate(`/sessions/${row.id}`);
   };
 
   return (

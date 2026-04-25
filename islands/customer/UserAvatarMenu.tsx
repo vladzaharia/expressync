@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dropdown-menu.tsx";
 import { useThemeToggle } from "@/islands/ThemeToggle.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
+import { clientNavigate, signOutAndRedirect } from "@/src/lib/nav.ts";
 
 interface UserAvatarMenuProps {
   user?: {
@@ -76,14 +77,7 @@ export default function UserAvatarMenu({ user }: UserAvatarMenuProps) {
     };
   }, []);
 
-  const handleSignOut = async () => {
-    try {
-      await fetch("/api/auth/sign-out", { method: "POST" });
-    } catch {
-      // Non-fatal.
-    }
-    globalThis.location.href = "/login";
-  };
+  const handleSignOut = () => signOutAndRedirect("/login");
 
   const displayName = user?.name || user?.email || "Guest";
   const initialsText = user
@@ -137,9 +131,7 @@ export default function UserAvatarMenu({ user }: UserAvatarMenuProps) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onSelect={() => {
-                globalThis.location.href = "/account";
-              }}
+              onSelect={() => clientNavigate("/account")}
             >
               <UserIcon class="size-4" />
               <span>Profile</span>

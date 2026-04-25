@@ -2,6 +2,7 @@ import { cn } from "@/src/lib/utils/cn.ts";
 import { AuroraText } from "../magicui/aurora-text.tsx";
 import { Particles } from "../magicui/particles.tsx";
 import { BorderBeam } from "../magicui/border-beam.tsx";
+import { ExpresSyncLogo } from "./ExpresSyncBrand.tsx";
 
 /**
  * Polaris Track A — customer-surface brand component.
@@ -185,7 +186,7 @@ export function PolarisExpressBrand({
     case "logo-only":
     case "sidebar-collapsed":
       return (
-        <PolarisExpressLogo
+        <ExpresSyncLogo
           size="sm"
           showParticles={showParticles}
           className={className}
@@ -195,7 +196,7 @@ export function PolarisExpressBrand({
     case "sidebar-expanded":
       return (
         <div className={cn("flex items-center gap-3", className)}>
-          <PolarisExpressLogo size="sm" showParticles={showParticles} />
+          <ExpresSyncLogo size="sm" showParticles={showParticles} />
           <PolarisExpressWordmark size="sm" />
         </div>
       );
@@ -203,7 +204,7 @@ export function PolarisExpressBrand({
     case "header-mobile":
       return (
         <div className={cn("flex items-center gap-2", className)}>
-          <PolarisExpressLogo size="sm" showParticles={showParticles} />
+          <ExpresSyncLogo size="sm" showParticles={showParticles} />
           <PolarisExpressWordmark size="sm" />
         </div>
       );
@@ -211,7 +212,7 @@ export function PolarisExpressBrand({
     case "login":
       return (
         <div className={cn("flex items-center gap-3", className)}>
-          <PolarisExpressLogo size="lg" showParticles={showParticles} />
+          <ExpresSyncLogo size="lg" showParticles={showParticles} />
           <PolarisExpressWordmark size="lg" />
         </div>
       );

@@ -30,10 +30,16 @@ interface CustomerLoginFormProps {
    * empty string.
    */
   defaultEmail?: string;
+  /**
+   * Optional "Back" callback. When set, the form renders a ghost Back
+   * button below the submit — wired by the wizard so the user can return
+   * to the method picker. Omit when Email is the only method.
+   */
+  onBack?: () => void;
 }
 
 export default function CustomerLoginForm(
-  { defaultEmail = "" }: CustomerLoginFormProps,
+  { defaultEmail = "", onBack }: CustomerLoginFormProps,
 ) {
   const email = useSignal(defaultEmail);
   const loading = useSignal(false);
@@ -106,7 +112,7 @@ export default function CustomerLoginForm(
   }
 
   return (
-    <form class="space-y-3" onSubmit={submit} noValidate>
+    <form class="space-y-6" onSubmit={submit} noValidate>
       <div class="space-y-1.5">
         <Label htmlFor="login-email">Email address</Label>
         <Input
@@ -151,6 +157,19 @@ export default function CustomerLoginForm(
             </>
           )}
       </Button>
+      {onBack && (
+        <div class="flex justify-center">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={onBack}
+            disabled={loading.value}
+          >
+            Back
+          </Button>
+        </div>
+      )}
     </form>
   );
 }

@@ -20,13 +20,12 @@ import {
   FEATURE_SCAN_LOGIN,
 } from "../src/lib/feature-flags.ts";
 import { isEmailEnabled } from "../src/lib/email.ts";
-import { ExpresSyncBrand } from "../components/brand/ExpresSyncBrand.tsx";
+import { PolarisExpressBrand } from "../components/brand/PolarisExpressBrand.tsx";
 import { Particles } from "../components/magicui/particles.tsx";
 import { GridPattern } from "../components/magicui/grid-pattern.tsx";
 import { ShineBorder } from "../components/magicui/shine-border.tsx";
 import { BlurFade } from "../components/magicui/blur-fade.tsx";
-import CustomerLoginForm from "../islands/customer/CustomerLoginForm.tsx";
-import CustomerScanLoginIsland from "../islands/customer/CustomerScanLoginIsland.tsx";
+import CustomerLoginWizard from "../islands/customer/CustomerLoginWizard.tsx";
 
 interface CustomerLoginData {
   operatorEmail: string;
@@ -35,18 +34,46 @@ interface CustomerLoginData {
   autoOpenScan: boolean;
   initialChargeBoxId: string | null;
   defaultEmail: string;
+  adminLoginUrl: string;
 }
 
 export const handler = define.handlers({
-  GET(ctx) {
+  async GET(ctx) {
     const url = new URL(ctx.req.url);
     const scanParam = url.searchParams.get("scan");
     const chargerParam = url.searchParams.get("chargeBoxId");
     const emailParam = url.searchParams.get("email") ?? "";
+
+    // Scan-to-login only makes sense when at least one charger has been
+    // heard from in the last 60 minutes. Otherwise a tap-to-scan CTA fires
+    // into the void. Lazy-load to avoid pulling DB into the login GET
+    // when the feature flag is off.
+    let hasOnlineCharger = false;
+    if (FEATURE_SCAN_LOGIN) {
+      try {
+        const { db } = await import("../src/db/index.ts");
+        const schema = await import("../src/db/schema.ts");
+        const { gte, sql } = await import("drizzle-orm");
+        // 10-minute window — a charger that hasn't sent a heartbeat in
+        // this window can't realistically complete a scan-to-login round
+        // trip, so we'd rather hide the option than offer a dead-end CTA.
+        const cutoff = new Date(Date.now() - 10 * 60 * 1000);
+        const [row] = await db
+          .select({ c: sql<number>`count(*)::int` })
+          .from(schema.chargersCache)
+          .where(gte(schema.chargersCache.lastSeenAt, cutoff));
+        hasOnlineCharger = Number(row?.c ?? 0) > 0;
+      } catch {
+        hasOnlineCharger = false;
+      }
+    }
+
     return {
       data: {
         operatorEmail: config.OPERATOR_CONTACT_EMAIL,
-        scanLoginEnabled: FEATURE_SCAN_LOGIN,
+        // Scan only renders when (a) the feature flag is on AND (b) we have
+        // at least one charger online — otherwise the CTA is a dead end.
+        scanLoginEnabled: FEATURE_SCAN_LOGIN && hasOnlineCharger,
         // Hide the magic-link UI when (a) the feature flag is off OR
         // (b) the email worker isn't configured. Without (b), customers
         // would submit "email me a link" → see "check your email" → wait
@@ -55,6 +82,7 @@ export const handler = define.handlers({
         autoOpenScan: scanParam === "1",
         initialChargeBoxId: chargerParam,
         defaultEmail: emailParam,
+        adminLoginUrl: `${config.ADMIN_BASE_URL}/login`,
       } satisfies CustomerLoginData,
     };
   },
@@ -90,44 +118,44 @@ export default define.page<typeof handler>(function CustomerLoginPage(
         <BlurFade delay={0} duration={0.5} direction="down">
           <div class="flex justify-center mb-8">
             <div class="relative">
-              <ExpresSyncBrand variant="login" showParticles />
+              <PolarisExpressBrand variant="login" showParticles />
             </div>
           </div>
         </BlurFade>
 
         <BlurFade delay={0.2} duration={0.5} direction="up">
-          <ShineBorder borderRadius={12} borderWidth={1} duration={10}>
-            <div class="space-y-5 p-5 sm:p-6">
-              {data.scanLoginEnabled
-                ? (
-                  <CustomerScanLoginIsland
-                    autoOpen={data.autoOpenScan}
-                    initialChargeBoxId={data.initialChargeBoxId}
-                  />
-                )
-                : null}
-
-              {data.scanLoginEnabled && data.magicLinkEnabled
-                ? (
-                  <div
-                    class="relative flex items-center"
-                    role="separator"
-                    aria-orientation="horizontal"
-                  >
-                    <span class="flex-1 h-px bg-border" />
-                    <span class="px-3 text-xs uppercase tracking-wide text-muted-foreground">
-                      or
-                    </span>
-                    <span class="flex-1 h-px bg-border" />
-                  </div>
-                )
-                : null}
-
-              {data.magicLinkEnabled
-                ? <CustomerLoginForm defaultEmail={data.defaultEmail} />
-                : null}
-            </div>
-          </ShineBorder>
+          <div class="relative">
+            <ShineBorder borderRadius={12} borderWidth={1} duration={10}>
+              <div class="space-y-5 p-5 sm:p-6">
+                {data.scanLoginEnabled || data.magicLinkEnabled
+                  ? (
+                    <CustomerLoginWizard
+                      scanEnabled={data.scanLoginEnabled}
+                      emailEnabled={data.magicLinkEnabled}
+                      autoOpenScan={data.autoOpenScan}
+                      initialChargeBoxId={data.initialChargeBoxId}
+                      defaultEmail={data.defaultEmail}
+                    />
+                  )
+                  : (
+                    <div class="text-center text-sm text-muted-foreground py-2">
+                      <p class="font-medium text-foreground">
+                        No sign-in methods are available right now.
+                      </p>
+                      <p class="mt-1">
+                        Please contact your operator for assistance.
+                      </p>
+                    </div>
+                  )}
+              </div>
+            </ShineBorder>
+            <a
+              href={data.adminLoginUrl}
+              class="absolute right-4 top-0 z-20 -translate-y-1/2 inline-flex items-center gap-1 rounded-full border border-slate-500/40 bg-background px-3 py-1 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-muted hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-200"
+            >
+              Admin login →
+            </a>
+          </div>
         </BlurFade>
 
         <BlurFade delay={0.35} duration={0.5} direction="up">

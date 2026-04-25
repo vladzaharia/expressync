@@ -38,7 +38,7 @@ import { logger } from "../../../src/lib/utils/logger.ts";
 const log = logger.child("ScanChargerList");
 
 const RATE_LIMIT_PER_IP = 30; // per minute
-const ONLINE_WINDOW_MS = 60 * 60 * 1000; // 60 minutes
+const ONLINE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes — match login-page gate
 
 function getClientIp(req: Request): string {
   return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??

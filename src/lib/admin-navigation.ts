@@ -29,7 +29,6 @@ import {
   Bell,
   CalendarClock,
   FileText,
-  LayoutDashboard,
   Link2,
   type LucideIcon,
   Receipt,
@@ -62,20 +61,6 @@ export interface NavSection {
 }
 
 export const ADMIN_NAV_SECTIONS: NavSection[] = [
-  {
-    id: "dashboard",
-    title: "Dashboard",
-    items: [
-      {
-        id: "nav:/",
-        title: "Dashboard",
-        path: "/",
-        icon: LayoutDashboard,
-        accentColor: "primary",
-        keywords: ["home", "overview"],
-      },
-    ],
-  },
   {
     id: "operations",
     title: "Operations",

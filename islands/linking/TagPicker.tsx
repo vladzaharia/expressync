@@ -36,6 +36,7 @@ import { isMetaTag } from "@/src/lib/tag-hierarchy.ts";
 import { tagTypeIcons } from "@/components/brand/tags/index.ts";
 import { type TagType, tagTypeLabels } from "@/src/lib/types/tags.ts";
 import { tagTypeBgClass, tagTypeTextClass } from "@/src/lib/tag-visuals.ts";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 export interface OcppTag {
   id: string;
@@ -362,9 +363,9 @@ export default function TagPicker(props: Props) {
               // Tag doesn't exist yet — send the operator to /tags/new with
               // the scanned idTag prefilled. The plan forbids inline create
               // on /links/new; /tags/new owns tag creation.
-              globalThis.location.href = `/tags/new?idTag=${
+              clientNavigate(`/tags/new?idTag=${
                 encodeURIComponent(tagId)
-              }`;
+              }`);
             }
           }}
         />

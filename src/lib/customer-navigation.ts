@@ -24,7 +24,6 @@ import {
   type LucideIcon,
   Receipt,
   Wallet,
-  Zap,
 } from "lucide-preact";
 import type { AccentColor } from "./colors.ts";
 
@@ -61,14 +60,6 @@ export const CUSTOMER_NAV_SECTIONS: NavSection[] = [
     id: "main",
     title: "",
     items: [
-      {
-        id: "nav:/",
-        title: "Dashboard",
-        path: "/",
-        icon: Zap,
-        accentColor: "primary",
-        keywords: ["home", "overview", "charge"],
-      },
       {
         id: "nav:/sessions",
         title: "Sessions",

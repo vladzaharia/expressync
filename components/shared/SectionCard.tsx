@@ -14,8 +14,13 @@
 
 import type { ComponentChildren } from "preact";
 import type { LucideIcon } from "lucide-preact";
-import { type AccentColor, stripToneClasses } from "@/src/lib/colors.ts";
+import {
+  type AccentColor,
+  borderBeamColors,
+  stripToneClasses,
+} from "@/src/lib/colors.ts";
 import { cn } from "@/src/lib/utils/cn.ts";
+import { BorderBeam } from "@/components/magicui/border-beam.tsx";
 
 interface SectionCardProps {
   title: string;
@@ -24,6 +29,13 @@ interface SectionCardProps {
   actions?: ComponentChildren;
   /** Inherits the page's accent — applies a header wash + tinted border. */
   accent?: AccentColor;
+  /**
+   * When true, renders the animated BorderBeam around the card coloured by
+   * `accent`. Normally reserved for the outer PageCard, but opted-into on
+   * surfaces like the customer dashboard that don't have a wrapping PageCard
+   * so the sections read as first-class containers.
+   */
+  borderBeam?: boolean;
   children: ComponentChildren;
   className?: string;
   headerClassName?: string;
@@ -36,6 +48,7 @@ export function SectionCard({
   icon: Icon,
   actions,
   accent,
+  borderBeam,
   children,
   className,
   headerClassName,
@@ -44,11 +57,13 @@ export function SectionCard({
   const tone = accent ? stripToneClasses[accent] : undefined;
   // Icon-well gets the accent icon colour if accent is set; otherwise neutral.
   const iconWellClass = tone ? tone.iconWell : "bg-muted text-muted-foreground";
+  const beam = borderBeam && accent ? borderBeamColors[accent] : null;
 
-  return (
+  const inner = (
     <div
       class={cn(
-        "flex flex-col rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden",
+        "flex flex-col border bg-card text-card-foreground shadow-sm overflow-hidden",
+        beam ? "rounded-[inherit]" : "rounded-xl",
         className,
       )}
     >
@@ -83,6 +98,24 @@ export function SectionCard({
         )}
       </header>
       <div class={cn("p-5", contentClassName)}>{children}</div>
+    </div>
+  );
+
+  if (!beam) return inner;
+
+  // BorderBeam needs a sibling element inside a rounded+overflow-hidden
+  // wrapper so its animated gradient can travel around the perimeter
+  // without being clipped by the card's own border. Mirror the PageCard
+  // layering pattern.
+  return (
+    <div class="relative overflow-hidden rounded-xl">
+      {inner}
+      <BorderBeam
+        size={200}
+        duration={15}
+        colorFrom={beam.from}
+        colorTo={beam.to}
+      />
     </div>
   );
 }

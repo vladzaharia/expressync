@@ -466,10 +466,14 @@ export const handler = define.handlers({
     }
   },
 
-  // Soft-deactivate mapping (formerly hard-delete).
-  // - Flip is_active=false on parent + every child mapping (preserving
-  //   user_id so historical session joins still resolve).
-  // - Inline-sync each affected mapping to StEvE so the user can't charge
+  // Soft-deactivate THIS mapping only.
+  // - Flip is_active=false on the target row (preserving user_id so
+  //   historical session joins still resolve).
+  // - Child mappings that inherit via StEvE's parentIdTag hierarchy are
+  //   hard links: they are only modified in StEvE directly or via an
+  //   explicit UI action. Unlinking a parent must not silently deactivate
+  //   descendants.
+  // - Inline-sync the flipped mapping to StEvE so the user can't charge
   //   the millisecond after admin clicks "Unlink".
   // - If the user has zero remaining active mappings, bulk-cancel any
   //   future-dated reservations they own.
@@ -485,7 +489,6 @@ export const handler = define.handlers({
         });
       }
 
-      // Get the current mapping to find its tag (outside the tx).
       const [currentMapping] = await db
         .select()
         .from(schema.userMappings)
@@ -498,31 +501,15 @@ export const handler = define.handlers({
         });
       }
 
-      const allTags = await steveClient.getOcppTags();
-      const childTags = getAllChildTags(currentMapping.steveOcppIdTag, allTags);
-
       const updatedMappings: schema.UserMapping[] = [];
 
       await db.transaction(async (tx) => {
-        // Soft-deactivate the parent.
         const [parent] = await tx
           .update(schema.userMappings)
           .set({ isActive: false, updatedAt: new Date() })
           .where(eq(schema.userMappings.id, id))
           .returning();
         if (parent) updatedMappings.push(parent);
-
-        // Soft-deactivate each child.
-        for (const childTag of childTags) {
-          const [child] = await tx
-            .update(schema.userMappings)
-            .set({ isActive: false, updatedAt: new Date() })
-            .where(
-              eq(schema.userMappings.steveOcppTagPk, childTag.ocppTagPk),
-            )
-            .returning();
-          if (child) updatedMappings.push(child);
-        }
       });
 
       // Push every flip to StEvE inline (best-effort).

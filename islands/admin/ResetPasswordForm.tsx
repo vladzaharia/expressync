@@ -10,6 +10,7 @@
  */
 
 import { useSignal } from "@preact/signals";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 interface ResetPasswordFormProps {
   token: string;
@@ -69,7 +70,7 @@ export default function ResetPasswordForm(props: ResetPasswordFormProps) {
       const to = typeof body?.redirectTo === "string"
         ? body.redirectTo
         : "/login";
-      globalThis.location.href = to;
+      clientNavigate(to);
     } catch (_err) {
       error.value = humanize("");
       loading.value = false;

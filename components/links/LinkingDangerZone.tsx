@@ -34,6 +34,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 interface Props {
   mappingId: number;
@@ -111,16 +112,16 @@ export default function LinkingDangerZone(props: Props) {
       });
       if (!res.ok) throw new Error("server");
       const data = await res.json().catch(() => ({}));
-      if (data.deletedCount && data.deletedCount > 1) {
+      if (data.deactivatedCount && data.deactivatedCount > 1) {
         toast.success(
-          `Deleted ${data.deletedCount} mappings (1 parent + ${
-            data.deletedCount - 1
+          `Deleted ${data.deactivatedCount} mappings (1 parent + ${
+            data.deactivatedCount - 1
           } children)`,
         );
       } else {
         toast.success("Link deleted");
       }
-      globalThis.location.href = "/links";
+      clientNavigate("/links");
     } catch (_e) {
       toast.error("Failed to delete link");
       deleting.value = false;

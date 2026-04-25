@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button.tsx";
 import TapToAddModal from "./TapToAddModal.tsx";
 import type { ScanResult } from "@/islands/shared/use-scan-tag.ts";
 import type { AccentColor } from "@/src/lib/colors.ts";
+import { clientNavigate } from "@/src/lib/nav.ts";
 
 /**
  * Header-action island on /tags (and any other page that wants a
@@ -58,7 +59,7 @@ export default function ScanTagAction(
     const dest = r.exists && typeof r.tagPk === "number"
       ? `/tags/${r.tagPk}`
       : `/tags/new?idTag=${encodeURIComponent(r.idTag)}`;
-    globalThis.location.href = dest;
+    clientNavigate(dest);
   };
 
   return (
