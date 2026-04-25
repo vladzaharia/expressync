@@ -16,6 +16,7 @@ import { BorderBeam } from "../../components/magicui/border-beam.tsx";
 import SyncRunsTable from "../../islands/SyncRunsTable.tsx";
 import RecentTransactionsTable from "../../islands/RecentTransactionsTable.tsx";
 import DashboardStatsCards from "../../islands/DashboardStatsCards.tsx";
+import ActiveSessionsCard from "../../islands/admin/ActiveSessionsCard.tsx";
 import type { SyncRun } from "../../src/db/schema.ts";
 import { steveClient } from "../../src/lib/steve-client.ts";
 import { lagoClient } from "../../src/lib/lago-client.ts";
@@ -290,6 +291,11 @@ export default define.page<typeof handler>(
               </div>
             )
             : null}
+
+          {/* Live active sessions — pure SSE-driven, returns null when idle. */}
+          <div className="mb-3">
+            <ActiveSessionsCard />
+          </div>
 
           {/* Main dashboard grid: 1/3 stats, 2/3 tables */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:h-full">

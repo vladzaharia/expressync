@@ -1,5 +1,7 @@
-import { useState } from "preact/hooks";
-import { Lock, RefreshCw, StopCircle } from "lucide-preact";
+import { useEffect, useState } from "preact/hooks";
+import { useSignal } from "@preact/signals";
+import { Lock, RefreshCw, StopCircle, Zap } from "lucide-preact";
+import { subscribeSse } from "@/islands/shared/SseProvider.tsx";
 import { BorderBeam } from "@/components/magicui/border-beam.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {
@@ -68,6 +70,73 @@ export default function ChargerCard(
   const [reserveOpen, setReserveOpen] = useState(false);
   const [unlockConfirmOpen, setUnlockConfirmOpen] = useState(false);
   const [pendingStop, setPendingStop] = useState(false);
+
+  // Live kW chip — driven by `transaction.meter` SSE events filtered by this
+  // card's chargeBoxId. Tracks per-connector kW since chargers can (rarely)
+  // run multiple sessions; chip shows the max.
+  const liveKw = useSignal<number | null>(null);
+  useEffect(() => {
+    const perConnector = new Map<
+      string,
+      { kw: number; lastSeen: number }
+    >();
+    let dirty = false;
+    let flushHandle: number | null = null;
+
+    const flush = () => {
+      flushHandle = null;
+      if (!dirty) return;
+      dirty = false;
+      const cutoff = Date.now() - 90_000;
+      let max = 0;
+      let any = false;
+      for (const [k, v] of perConnector) {
+        if (v.lastSeen < cutoff) {
+          perConnector.delete(k);
+          continue;
+        }
+        any = true;
+        if (v.kw > max) max = v.kw;
+      }
+      liveKw.value = any ? max : null;
+    };
+
+    const schedule = () => {
+      dirty = true;
+      if (flushHandle !== null) return;
+      flushHandle = setTimeout(flush, 250) as unknown as number;
+    };
+
+    const unsub = subscribeSse("transaction.meter", (raw) => {
+      const p = raw as {
+        transactionId: number | string;
+        chargeBoxId?: string;
+        connectorId?: number;
+        powerKw?: number;
+        endedAt?: string;
+      };
+      if (p.chargeBoxId !== charger.chargeBoxId) return;
+      const key = `${p.connectorId ?? "_"}:${p.transactionId}`;
+      if (p.endedAt) {
+        perConnector.delete(key);
+        schedule();
+        return;
+      }
+      const kw = typeof p.powerKw === "number" && Number.isFinite(p.powerKw)
+        ? Math.max(0, p.powerKw)
+        : (perConnector.get(key)?.kw ?? 0);
+      perConnector.set(key, { kw, lastSeen: Date.now() });
+      schedule();
+    });
+
+    const sweep = setInterval(schedule, 5_000);
+
+    return () => {
+      unsub();
+      clearInterval(sweep);
+      if (flushHandle !== null) clearTimeout(flushHandle);
+    };
+  }, [charger.chargeBoxId]);
 
   const status = normalizeStatus(
     charger.lastStatus,
@@ -201,6 +270,20 @@ export default function ChargerCard(
                   )
                   : null}
               </a>
+              {liveKw.value !== null && (
+                <span
+                  class={cn(
+                    "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium",
+                    "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+                  )}
+                  aria-label={`Live ${liveKw.value.toFixed(1)} kilowatts`}
+                >
+                  <Zap class="size-3" aria-hidden="true" />
+                  <span class="tabular-nums">
+                    {liveKw.value.toFixed(1)} kW
+                  </span>
+                </span>
+              )}
             </div>
 
             {/* Divider */}

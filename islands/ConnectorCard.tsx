@@ -7,11 +7,14 @@
  * upward because the panel is a sibling island.
  */
 
+import { useEffect } from "preact/hooks";
+import { useSignal } from "@preact/signals";
 import { Ban, Lock, Play, Square, Timer } from "lucide-preact";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { BorderBeam } from "@/components/magicui/border-beam.tsx";
+import { subscribeSse } from "@/islands/shared/SseProvider.tsx";
 import { formatSessionDuration } from "./shared/charger-visuals.ts";
 
 export type ConnectorUiStatus =
@@ -132,10 +135,58 @@ function launchAction(
 }
 
 export default function ConnectorCard(
-  { chargeBoxId: _chargeBoxId, connector, isAdmin }: Props,
+  { chargeBoxId, connector, isAdmin }: Props,
 ) {
+  // Live kW from SSE — overrides the SSR-rendered `connector.currentKw`
+  // when meter events stream in. Filters strictly by chargeBoxId+connectorId.
+  const liveKw = useSignal<number | null>(null);
+  useEffect(() => {
+    let lastSeen = 0;
+    let dirty = false;
+    let flushHandle: number | null = null;
+
+    const flush = () => {
+      flushHandle = null;
+      if (!dirty) return;
+      dirty = false;
+      if (Date.now() - lastSeen > 90_000) liveKw.value = null;
+    };
+    const schedule = () => {
+      dirty = true;
+      if (flushHandle !== null) return;
+      flushHandle = setTimeout(flush, 250) as unknown as number;
+    };
+
+    const unsub = subscribeSse("transaction.meter", (raw) => {
+      const p = raw as {
+        chargeBoxId?: string;
+        connectorId?: number;
+        powerKw?: number;
+        endedAt?: string;
+      };
+      if (p.chargeBoxId !== chargeBoxId) return;
+      if (p.connectorId !== connector.connectorId) return;
+      if (p.endedAt) {
+        liveKw.value = null;
+        return;
+      }
+      if (typeof p.powerKw === "number" && Number.isFinite(p.powerKw)) {
+        liveKw.value = Math.max(0, p.powerKw);
+        lastSeen = Date.now();
+        schedule();
+      }
+    });
+    const sweep = setInterval(schedule, 5_000);
+    return () => {
+      unsub();
+      clearInterval(sweep);
+      if (flushHandle !== null) clearTimeout(flushHandle);
+    };
+  }, [chargeBoxId, connector.connectorId]);
+
   const hasActiveSession = connector.activeTransactionId !== null;
-  const isDrawingPower = (connector.currentKw ?? 0) > 0 && hasActiveSession;
+  const effectiveKw = liveKw.value ?? connector.currentKw;
+  const isDrawingPower = (effectiveKw ?? 0) > 0 && hasActiveSession;
   const style = styleFor(connector.uiStatus, isDrawingPower);
 
   return (
@@ -215,10 +266,21 @@ export default function ConnectorCard(
                   : "—"}
               </dd>
             </div>
-            {connector.currentKw !== null && (
+            {effectiveKw !== null && (
               <div class="col-span-2 flex items-center justify-between">
                 <dt class="text-muted-foreground">Current power</dt>
-                <dd class="font-medium">{connector.currentKw.toFixed(2)} kW</dd>
+                <dd class="flex items-center gap-1.5 font-medium">
+                  {liveKw.value !== null && (
+                    <span
+                      aria-hidden="true"
+                      class="relative flex size-1.5"
+                    >
+                      <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                      <span class="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+                    </span>
+                  )}
+                  <span class="tabular-nums">{effectiveKw.toFixed(2)} kW</span>
+                </dd>
               </div>
             )}
           </dl>

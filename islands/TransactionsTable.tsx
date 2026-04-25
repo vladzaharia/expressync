@@ -97,6 +97,10 @@ export default function TransactionsTable({
       emptyMessage={emptyMessage}
       onRowClick={handleRowClick}
       getItemKey={(tx) => tx.id}
+      rowClassName={(tx) =>
+        !tx.isFinalized
+          ? "border-l-2 border-l-emerald-500/70 bg-emerald-500/5"
+          : ""}
     />
   );
 }
