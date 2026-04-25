@@ -19,7 +19,7 @@
  */
 
 import { assert, assertEquals } from "@std/assert";
-import { type ComposeContext, execInService, recreateService, streamLogs } from "./harness/compose.ts";
+import { type ComposeContext, execInService, getHostPort, recreateService as composeRecreate, streamLogs } from "./harness/compose.ts";
 import { Cpsim } from "./harness/cpsim.ts";
 import { pgQueryJson, pgQuery, mysqlQuery } from "./harness/db.ts";
 import { openSse } from "./harness/sse.ts";
@@ -33,8 +33,12 @@ function envOrThrow(k: string): string {
 
 const PROJECT = envOrThrow("TEST_PROJECT");
 const ENV_PATH = envOrThrow("TEST_ENV_PATH");
-const BASE_URL = envOrThrow("EXPRESSYNC_BASE_URL"); // http://127.0.0.1:NNNN
-const STEVE_WS_URL = envOrThrow("STEVE_WS_URL"); // ws://127.0.0.1:NNNN/steve/websocket/CentralSystemService
+// Mutable: docker compose binds random host ports (`0:8000`), so when a
+// scenario `recreateService`s a container the host port flips. The
+// recreateService() wrapper below refreshes these globals so subsequent
+// fetches don't hit a dead port.
+let BASE_URL = envOrThrow("EXPRESSYNC_BASE_URL"); // http://127.0.0.1:NNNN
+let STEVE_WS_URL = envOrThrow("STEVE_WS_URL"); // ws://127.0.0.1:NNNN/steve/websocket/CentralSystemService
 const CPSIM_BIN = envOrThrow("CPSIM_BIN");
 const STEVE_PREAUTH_HMAC_KEY = envOrThrow("STEVE_PREAUTH_HMAC_KEY");
 const STEVE_DB_PASSWORD = envOrThrow("STEVE_DB_PASSWORD");
@@ -45,6 +49,23 @@ const TAG_BLOCKED = envOrThrow("TAG_BLOCKED");
 const TAG_UNKNOWN = envOrThrow("TAG_UNKNOWN");
 
 const ctx: ComposeContext = { project: PROJECT, envPath: ENV_PATH };
+
+/**
+ * Wraps the compose helper so the host-port mapping is re-fetched after
+ * each recreate. Without this refresh, BASE_URL / STEVE_WS_URL go stale
+ * and subsequent fetches hit a dead port (Connection refused —
+ * scenarios 10-14 cascade-fail otherwise).
+ */
+async function recreateService(ctx: ComposeContext, service: string): Promise<void> {
+  await composeRecreate(ctx, service);
+  if (service === "expressync-app") {
+    const app = await getHostPort(ctx, "expressync-app", 8000);
+    BASE_URL = `http://${app.host}:${app.port}`;
+  } else if (service === "steve") {
+    const steve = await getHostPort(ctx, "steve", 8180);
+    STEVE_WS_URL = `ws://${steve.host}:${steve.port}/steve/websocket/CentralSystemService`;
+  }
+}
 
 // Scenarios 5-7 and 9 each `recreateService("steve")` with an env override.
 // Container start_period is 240s, so each one costs ~5+ minutes. They are
