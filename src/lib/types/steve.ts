@@ -183,6 +183,7 @@ export const ALLOWED_OPERATIONS = [
   "DataTransfer",
   "SetChargingProfile",
   "ChangeAvailability",
+  "ChangeConfiguration",
 ] as const;
 
 export type OcppOperationName = typeof ALLOWED_OPERATIONS[number];
@@ -365,6 +366,24 @@ export type SetChargingProfileParams = z.infer<
   typeof SetChargingProfileParamsSchema
 >;
 
+/**
+ * `POST /v1/operations/ChangeConfiguration`
+ *
+ * Sets a single OCPP ConfigurationKey on the target charger(s). Used by
+ * `scripts/push-charger-preauth-config.ts` to disable local-auth caches
+ * so every Authorize hits the CS (and therefore the pre-auth hook).
+ */
+export const ChangeConfigurationParamsSchema = MultipleChargeBoxSelectionSchema
+  .and(
+    z.object({
+      key: z.string().min(1),
+      value: z.string(),
+    }),
+  );
+export type ChangeConfigurationParams = z.infer<
+  typeof ChangeConfigurationParamsSchema
+>;
+
 /** OCPP 1.6 AvailabilityType. */
 export const AvailabilityTypeEnum = z.enum(["Inoperative", "Operative"]);
 
@@ -403,6 +422,7 @@ export const OPERATION_PARAM_SCHEMAS: Record<
   DataTransfer: DataTransferParamsSchema,
   SetChargingProfile: SetChargingProfileParamsSchema,
   ChangeAvailability: ChangeAvailabilityParamsSchema,
+  ChangeConfiguration: ChangeConfigurationParamsSchema,
 };
 
 // --- Response schemas -------------------------------------------------------
