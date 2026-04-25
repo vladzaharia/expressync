@@ -30,6 +30,7 @@ import {
   OwnershipError,
 } from "../../../../../src/lib/scoping.ts";
 import { syncSingleTagToSteve } from "../../../../../src/services/tag-sync.service.ts";
+import { stopActiveTransactionsForMappings } from "../../../../../src/services/auto-stop.service.ts";
 import { createNotification } from "../../../../../src/services/notification.service.ts";
 import { logger } from "../../../../../src/lib/utils/logger.ts";
 
@@ -117,6 +118,21 @@ export const handler = define.handlers({
         error: err instanceof Error ? err.message : String(err),
       });
     }
+
+    // Wave R: if a session is already in flight on this card, stop it
+    // immediately. The customer almost certainly didn't intend to keep
+    // accruing charges on a card they just reported lost.
+    void stopActiveTransactionsForMappings([id], {
+      code: "card_reported_lost",
+      detail: reason
+        ? `Card reported lost by customer: ${reason}`
+        : "Card reported lost by customer",
+    }).catch((err) => {
+      log.warn("Auto-stop on report-lost failed (non-fatal)", {
+        mappingId: id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
 
     // Append a row to tag_change_log for audit trail.
     try {
