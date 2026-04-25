@@ -78,16 +78,13 @@ export default function HeroSessionCard({ session }: Props) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body?.error ?? "Failed to stop session");
       }
+      // Removed the misleading "Undo for 5s" affordance: the resume path
+      // is owned by the scan-start flow and the toast cannot truly undo
+      // the OCPP RemoteStop. A simple confirmation toast keeps the UX
+      // honest.
       toast.success("Stopping…", {
-        description: "We've asked the charger to stop. You can undo for 5s.",
-        duration: 5000,
-        action: {
-          label: "Undo",
-          onClick: () => {
-            // Track G2 owns the actual scan-start retry. For now log + nudge.
-            toast.info("Resume not yet wired — Track G2 owns scan-start.");
-          },
-        },
+        description: "We've asked the charger to stop charging.",
+        duration: 4000,
       });
       setConfirmOpen(false);
     } catch (err) {
@@ -160,7 +157,7 @@ export default function HeroSessionCard({ session }: Props) {
                   {session.estimatedCost.toFixed(2)})
                 </>
               )
-              : null}. You can undo this for 5 seconds.
+              : null}.
           </span>
         }
         variant="destructive"
