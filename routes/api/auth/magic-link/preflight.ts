@@ -40,10 +40,6 @@ import {
   logAuthEvent,
   logMagicLinkRequested,
 } from "../../../../src/lib/audit.ts";
-import {
-  FEATURE_MAGIC_LINK,
-  featureDisabledResponse,
-} from "../../../../src/lib/feature-flags.ts";
 import { isEmailEnabled } from "../../../../src/lib/email.ts";
 import { logger } from "../../../../src/lib/utils/logger.ts";
 
@@ -96,10 +92,19 @@ export const handler = define.handlers({
   async POST(ctx) {
     // Defense in depth: the customer login UI hides the magic-link form
     // when the email worker isn't configured, but a stale tab or direct
-    // API caller should still get a clear feature-disabled response so
-    // they can't trigger the rate-limit + DB lookup pipeline for nothing.
-    if (!FEATURE_MAGIC_LINK || !isEmailEnabled()) {
-      return featureDisabledResponse("magic-link");
+    // API caller should still get a clear capability-unavailable response
+    // so they can't trigger the rate-limit + DB lookup pipeline for nothing.
+    if (!isEmailEnabled()) {
+      return new Response(
+        JSON.stringify({
+          error: "Email worker is not configured",
+          retry: false,
+        }),
+        {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     let body: unknown;

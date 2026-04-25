@@ -38,7 +38,6 @@ import { chargerOperationLog } from "../db/schema.ts";
 import { eventBus } from "./event-bus.service.ts";
 import { subscribe as subscribeDockerLogs } from "./docker-log-subscriber.ts";
 import { steveClient } from "../lib/steve-client.ts";
-import { FEATURE_PAIR_INTENT_INTERCEPT } from "../lib/feature-flags.ts";
 import { logger } from "../lib/utils/logger.ts";
 
 const log = logger.child("PairIntentWatchdog");
@@ -66,10 +65,6 @@ let unsubDocker: (() => void) | null = null;
 
 export function startPairIntentWatchdog(): void {
   if (started) return;
-  if (!FEATURE_PAIR_INTENT_INTERCEPT) {
-    log.info("Feature flag off — not starting watchdog");
-    return;
-  }
   started = true;
 
   // Subscribe to the event bus first — this catches tx.started events

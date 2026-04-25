@@ -6,12 +6,11 @@
  * every 15s. Supports `Last-Event-ID` replay within the event-bus' 60-second
  * ring buffer.
  *
- * When `ENABLE_SSE=false`, replies 503 so the client falls through to the
- * existing 30s `/unread-count` polling path.
+ * Polling fallback: clients keep their existing 30s `/unread-count` poll
+ * available so an SSE outage degrades gracefully.
  */
 
 import { define } from "../../../../utils.ts";
-import { config } from "../../../../src/lib/config.ts";
 import {
   openSseStream,
   parseLastEventId,
@@ -20,10 +19,6 @@ import {
 
 export const handler = define.handlers({
   GET(ctx) {
-    if (!config.ENABLE_SSE) {
-      return sseDisabledResponse("SSE disabled (ENABLE_SSE=false)");
-    }
-
     const userId = ctx.state.user?.id;
     if (!userId) {
       // Middleware normally catches this, but be explicit — bare 401 keeps

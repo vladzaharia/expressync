@@ -15,10 +15,6 @@
 
 import { define } from "../utils.ts";
 import { config } from "../src/lib/config.ts";
-import {
-  FEATURE_MAGIC_LINK,
-  FEATURE_SCAN_LOGIN,
-} from "../src/lib/feature-flags.ts";
 import { isEmailEnabled } from "../src/lib/email.ts";
 import { PolarisExpressBrand } from "../components/brand/PolarisExpressBrand.tsx";
 import { Particles } from "../components/magicui/particles.tsx";
@@ -45,40 +41,34 @@ export const handler = define.handlers({
     const emailParam = url.searchParams.get("email") ?? "";
 
     // Scan-to-login only makes sense when at least one charger has been
-    // heard from in the last 60 minutes. Otherwise a tap-to-scan CTA fires
-    // into the void. Lazy-load to avoid pulling DB into the login GET
-    // when the feature flag is off.
+    // heard from in the last 10 minutes. Otherwise a tap-to-scan CTA fires
+    // into the void.
     let hasOnlineCharger = false;
-    if (FEATURE_SCAN_LOGIN) {
-      try {
-        const { db } = await import("../src/db/index.ts");
-        const schema = await import("../src/db/schema.ts");
-        const { gte, sql } = await import("drizzle-orm");
-        // 10-minute window — a charger that hasn't sent a heartbeat in
-        // this window can't realistically complete a scan-to-login round
-        // trip, so we'd rather hide the option than offer a dead-end CTA.
-        const cutoff = new Date(Date.now() - 10 * 60 * 1000);
-        const [row] = await db
-          .select({ c: sql<number>`count(*)::int` })
-          .from(schema.chargersCache)
-          .where(gte(schema.chargersCache.lastSeenAt, cutoff));
-        hasOnlineCharger = Number(row?.c ?? 0) > 0;
-      } catch {
-        hasOnlineCharger = false;
-      }
+    try {
+      const { db } = await import("../src/db/index.ts");
+      const schema = await import("../src/db/schema.ts");
+      const { gte, sql } = await import("drizzle-orm");
+      const cutoff = new Date(Date.now() - 10 * 60 * 1000);
+      const [row] = await db
+        .select({ c: sql<number>`count(*)::int` })
+        .from(schema.chargersCache)
+        .where(gte(schema.chargersCache.lastSeenAt, cutoff));
+      hasOnlineCharger = Number(row?.c ?? 0) > 0;
+    } catch {
+      hasOnlineCharger = false;
     }
 
     return {
       data: {
         operatorEmail: config.OPERATOR_CONTACT_EMAIL,
-        // Scan only renders when (a) the feature flag is on AND (b) we have
-        // at least one charger online — otherwise the CTA is a dead end.
-        scanLoginEnabled: FEATURE_SCAN_LOGIN && hasOnlineCharger,
-        // Hide the magic-link UI when (a) the feature flag is off OR
-        // (b) the email worker isn't configured. Without (b), customers
-        // would submit "email me a link" → see "check your email" → wait
-        // forever for an email that can never be sent.
-        magicLinkEnabled: FEATURE_MAGIC_LINK && isEmailEnabled(),
+        // Scan only renders when at least one charger is online — otherwise
+        // the CTA is a dead end (data-driven, not a feature flag).
+        scanLoginEnabled: hasOnlineCharger,
+        // Hide the magic-link UI when the email worker isn't configured.
+        // Without it, customers would submit "email me a link" → see
+        // "check your email" → wait forever for an email that can never
+        // be sent. (Capability detection, not a feature flag.)
+        magicLinkEnabled: isEmailEnabled(),
         autoOpenScan: scanParam === "1",
         initialChargeBoxId: chargerParam,
         defaultEmail: emailParam,

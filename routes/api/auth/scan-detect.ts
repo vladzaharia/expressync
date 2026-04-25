@@ -28,10 +28,6 @@ import { sql } from "drizzle-orm";
 import { define } from "../../../utils.ts";
 import { db } from "../../../src/db/index.ts";
 import { config } from "../../../src/lib/config.ts";
-import {
-  FEATURE_SCAN_LOGIN,
-  featureDisabledResponse,
-} from "../../../src/lib/feature-flags.ts";
 import { subscribe } from "../../../src/services/docker-log-subscriber.ts";
 import { eventBus } from "../../../src/services/event-bus.service.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
@@ -102,9 +98,6 @@ async function signNonce(
 
 export const handler = define.handlers({
   async GET(ctx) {
-    if (!FEATURE_SCAN_LOGIN) {
-      return featureDisabledResponse("scan-login");
-    }
     const url = new URL(ctx.req.url);
     const pairingCode = url.searchParams.get("pairingCode") ?? "";
     const chargeBoxId = url.searchParams.get("chargeBoxId") ?? "";
