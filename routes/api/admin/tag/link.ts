@@ -384,11 +384,18 @@ export const handler = define.handlers({
           mapping = updatedParent;
           updatedMappings.push(updatedParent);
 
-          // If Lago customer/subscription changed, update child mappings too.
-          if (
-            body.lagoCustomerExternalId !== undefined ||
-            body.lagoSubscriptionExternalId !== undefined
-          ) {
+          // Cascade to all descendant tags whenever any of:
+          //   - Lago customer is reassigned
+          //   - subscription link changes
+          //   - is_active flips
+          // Children share their parent's status by construction (per the
+          // OCPP-tag invariant: a child tag follows its parent's billing
+          // identity AND active state). `getAllChildTags` walks the
+          // hierarchy recursively, so grandchildren are covered too.
+          const cascadeIsActive = body.isActive !== undefined;
+          const cascadeLago = body.lagoCustomerExternalId !== undefined ||
+            body.lagoSubscriptionExternalId !== undefined;
+          if (cascadeIsActive || cascadeLago) {
             const allTags = await steveClient.getOcppTags();
             const childTags = getAllChildTags(
               currentMapping.steveOcppIdTag,
@@ -398,15 +405,23 @@ export const handler = define.handlers({
             for (const childTag of childTags) {
               const childUpdates: Partial<
                 typeof schema.userMappings.$inferInsert
-              > = {
-                lagoCustomerExternalId: body.lagoCustomerExternalId ??
-                  currentMapping.lagoCustomerExternalId,
-                lagoSubscriptionExternalId: body.lagoSubscriptionExternalId ??
-                  currentMapping.lagoSubscriptionExternalId,
-              };
+              > = {};
+              if (cascadeLago) {
+                childUpdates.lagoCustomerExternalId =
+                  body.lagoCustomerExternalId ??
+                    currentMapping.lagoCustomerExternalId;
+                childUpdates.lagoSubscriptionExternalId =
+                  body.lagoSubscriptionExternalId ??
+                    currentMapping.lagoSubscriptionExternalId;
+              }
+              if (cascadeIsActive) {
+                childUpdates.isActive = body.isActive;
+              }
               if (isReassign && updates.userId !== undefined) {
                 childUpdates.userId = updates.userId;
               }
+              if (Object.keys(childUpdates).length === 0) continue;
+              childUpdates.updatedAt = new Date();
               const [updatedChild] = await tx
                 .update(schema.userMappings)
                 .set(childUpdates)
@@ -466,14 +481,17 @@ export const handler = define.handlers({
     }
   },
 
-  // Soft-deactivate THIS mapping only.
+  // Soft-deactivate THIS mapping AND every descendant via StEvE's
+  // parentIdTag hierarchy.
   // - Flip is_active=false on the target row (preserving user_id so
   //   historical session joins still resolve).
-  // - Child mappings that inherit via StEvE's parentIdTag hierarchy are
-  //   hard links: they are only modified in StEvE directly or via an
-  //   explicit UI action. Unlinking a parent must not silently deactivate
-  //   descendants.
-  // - Inline-sync the flipped mapping to StEvE so the user can't charge
+  // - Recursively walk all descendants (`getAllChildTags`) and flip their
+  //   mappings to is_active=false too. Children share their parent's
+  //   status by invariant: if the parent is no longer linked to a
+  //   subscription, neither are the child tags. The previous "leaves
+  //   children alone" policy was wrong — it left charging-allowed child
+  //   tags attached to a deactivated parent.
+  // - Inline-sync every flipped mapping to StEvE so the user can't charge
   //   the millisecond after admin clicks "Unlink".
   // - If the user has zero remaining active mappings, bulk-cancel any
   //   future-dated reservations they own.
@@ -503,6 +521,22 @@ export const handler = define.handlers({
 
       const updatedMappings: schema.UserMapping[] = [];
 
+      // Resolve descendants OUTSIDE the transaction: getAllChildTags hits
+      // the SteVe REST API, which we don't want to do under a DB lock.
+      let descendantPks: number[] = [];
+      try {
+        const allTags = await steveClient.getOcppTags();
+        descendantPks = getAllChildTags(currentMapping.steveOcppIdTag, allTags)
+          .map((t) => t.ocppTagPk);
+      } catch (err) {
+        // SteVe unreachable: fall through with an empty descendant set
+        // rather than fail the unlink. The background sync will catch
+        // up when SteVe is healthy again.
+        logger.warn("API", "Could not fetch SteVe tags for cascade", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+
       await db.transaction(async (tx) => {
         const [parent] = await tx
           .update(schema.userMappings)
@@ -510,6 +544,15 @@ export const handler = define.handlers({
           .where(eq(schema.userMappings.id, id))
           .returning();
         if (parent) updatedMappings.push(parent);
+
+        for (const childPk of descendantPks) {
+          const [updatedChild] = await tx
+            .update(schema.userMappings)
+            .set({ isActive: false, updatedAt: new Date() })
+            .where(eq(schema.userMappings.steveOcppTagPk, childPk))
+            .returning();
+          if (updatedChild) updatedMappings.push(updatedChild);
+        }
       });
 
       // Push every flip to StEvE inline (best-effort).
