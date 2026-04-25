@@ -120,9 +120,7 @@ export function PlanBadge(
     >
       {showIcon && <BadgeCheck class="size-3 shrink-0" aria-hidden="true" />}
       <span class="truncate max-w-[14rem]">{name}</span>
-      {subtitle && (
-        <span class="opacity-70 font-normal">· {subtitle}</span>
-      )}
+      {subtitle && <span class="opacity-70 font-normal">· {subtitle}</span>}
     </span>
   );
 }

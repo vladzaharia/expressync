@@ -363,9 +363,7 @@ export default function TagPicker(props: Props) {
               // Tag doesn't exist yet — send the operator to /tags/new with
               // the scanned idTag prefilled. The plan forbids inline create
               // on /links/new; /tags/new owns tag creation.
-              clientNavigate(`/tags/new?idTag=${
-                encodeURIComponent(tagId)
-              }`);
+              clientNavigate(`/tags/new?idTag=${encodeURIComponent(tagId)}`);
             }
           }}
         />

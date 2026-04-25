@@ -24,8 +24,8 @@ import {
 } from "../../../../src/db/schema.ts";
 import {
   createReservation,
-  toReservationRowDTO,
   enrichDtosWithFriendlyNames,
+  toReservationRowDTO,
 } from "../../../../src/services/reservation.service.ts";
 import { logger } from "../../../../src/lib/utils/logger.ts";
 

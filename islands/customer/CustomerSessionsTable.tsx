@@ -171,9 +171,7 @@ function buildColumns(): PaginatedTableColumn<CustomerSessionRow>[] {
             </span>
           );
         }
-        return (
-          <span class="font-medium tabular-nums">{rowKwh(row)}</span>
-        );
+        return <span class="font-medium tabular-nums">{rowKwh(row)}</span>;
       },
     },
     {

@@ -7,7 +7,12 @@
  * the Lago hosted portal or a confirm modal.
  */
 
-import { ArrowDownCircle, ArrowUpCircle, Clock, Wallet as WalletIcon } from "lucide-preact";
+import {
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Clock,
+  Wallet as WalletIcon,
+} from "lucide-preact";
 import { MetricTile } from "@/components/shared/MetricTile.tsx";
 import { MoneyBadge } from "@/components/billing/MoneyBadge.tsx";
 import type { AccentColor } from "@/src/lib/colors.ts";
@@ -55,7 +60,10 @@ export default function CustomerWalletSection(
           icon={WalletIcon}
           label="Balance"
           value={
-            <MoneyBadge cents={wallet.balanceCents} currency={wallet.currency} />
+            <MoneyBadge
+              cents={wallet.balanceCents}
+              currency={wallet.currency}
+            />
           }
           accent={accent}
         />
@@ -63,7 +71,10 @@ export default function CustomerWalletSection(
           icon={ArrowDownCircle}
           label="Consumed this period"
           value={
-            <MoneyBadge cents={wallet.consumedCents} currency={wallet.currency} />
+            <MoneyBadge
+              cents={wallet.consumedCents}
+              currency={wallet.currency}
+            />
           }
           accent={accent}
         />
@@ -82,7 +93,9 @@ export default function CustomerWalletSection(
           </p>
           <ul class="divide-y">
             {wallet.transactions.map((t) => {
-              const Icon = t.type === "inbound" ? ArrowDownCircle : ArrowUpCircle;
+              const Icon = t.type === "inbound"
+                ? ArrowDownCircle
+                : ArrowUpCircle;
               const sign = t.type === "inbound" ? "+" : "-";
               return (
                 <li

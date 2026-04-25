@@ -157,7 +157,8 @@ export async function stopActiveTransactionsForMappings(
       await createNotification({
         kind: "auto_stop",
         severity: result.failed > 0 ? "warn" : "info",
-        title: `Auto-stopped ${result.succeeded}/${result.attempted} session(s)`,
+        title:
+          `Auto-stopped ${result.succeeded}/${result.attempted} session(s)`,
         body:
           `${reason.detail}\n\n${result.succeeded} session(s) stopped, ${result.failed} failed. ` +
           `Source: ${reason.code}.`,
@@ -279,7 +280,9 @@ export async function stopActiveTransactionsForSubscription(
         externalSubscriptionId,
       ),
     );
-  if (rows.length === 0) return { attempted: 0, succeeded: 0, failed: 0, results: [] };
+  if (rows.length === 0) {
+    return { attempted: 0, succeeded: 0, failed: 0, results: [] };
+  }
   return await stopActiveTransactionsForMappings(rows.map((r) => r.id), reason);
 }
 
@@ -301,7 +304,9 @@ export async function stopActiveTransactionsForCustomer(
         eq(schema.userMappings.isActive, true),
       ),
     );
-  if (rows.length === 0) return { attempted: 0, succeeded: 0, failed: 0, results: [] };
+  if (rows.length === 0) {
+    return { attempted: 0, succeeded: 0, failed: 0, results: [] };
+  }
   return await stopActiveTransactionsForMappings(rows.map((r) => r.id), reason);
 }
 

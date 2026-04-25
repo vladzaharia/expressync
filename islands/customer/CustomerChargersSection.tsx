@@ -58,8 +58,7 @@ const STATUS_META: Record<CustomerChargerStatus, StatusMeta> = {
   },
   in_use: {
     label: "In use",
-    pillClass:
-      "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30",
+    pillClass: "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30",
     haloClass: "bg-sky-500/15 text-sky-600 dark:text-sky-400",
   },
   reserved: {
@@ -70,14 +69,15 @@ const STATUS_META: Record<CustomerChargerStatus, StatusMeta> = {
   },
   offline: {
     label: "Offline",
-    pillClass:
-      "bg-muted text-muted-foreground border-border",
+    pillClass: "bg-muted text-muted-foreground border-border",
     haloClass: "bg-muted text-muted-foreground",
   },
 };
 
 function reasonStartDisabled(status: CustomerChargerStatus): string | null {
-  if (status === "in_use") return "A session is already running on this charger.";
+  if (status === "in_use") {
+    return "A session is already running on this charger.";
+  }
   if (status === "offline") return null;
   return null;
 }

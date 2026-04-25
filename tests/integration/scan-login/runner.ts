@@ -28,7 +28,9 @@ async function cleanupAndExit(code: number) {
   // and any leftover stack will be reaped by the next run's sweep.
   const deadline = new Promise<void>((resolve) =>
     setTimeout(() => {
-      console.error(`[runner] cleanup deadline (${CLEANUP_DEADLINE_MS}ms) hit — exiting; leftover stacks (if any) will be reaped on next run`);
+      console.error(
+        `[runner] cleanup deadline (${CLEANUP_DEADLINE_MS}ms) hit — exiting; leftover stacks (if any) will be reaped on next run`,
+      );
       resolve();
     }, CLEANUP_DEADLINE_MS)
   );
@@ -36,7 +38,9 @@ async function cleanupAndExit(code: number) {
   Deno.exit(code);
 }
 
-const onSignal = () => { cleanupAndExit(130); };
+const onSignal = () => {
+  cleanupAndExit(130);
+};
 Deno.addSignalListener("SIGINT", onSignal);
 Deno.addSignalListener("SIGTERM", onSignal);
 Deno.addSignalListener("SIGHUP", onSignal);
@@ -60,7 +64,11 @@ async function main() {
   console.log("[runner] sweeping orphan stacks from prior runs...");
   const swept = await sweepOrphans({ excludePid: Deno.pid, verbose: true });
   if (swept.orphans.length) {
-    console.log(`[runner] reaped ${swept.orphans.length} orphan stack(s): ${swept.orphans.join(", ")}`);
+    console.log(
+      `[runner] reaped ${swept.orphans.length} orphan stack(s): ${
+        swept.orphans.join(", ")
+      }`,
+    );
   }
 
   console.log("[runner] generating env...");
@@ -71,13 +79,28 @@ async function main() {
   console.log("[runner] building cpsim...");
   const cpsimBin = await buildCpsim(env.envDir);
 
-  console.log("[runner] composing up (this builds SteVe + ExpresSync, may take 5+ minutes)...");
-  await composeUp({ project, envPath: env.envPath }, { wait: true, timeoutSec: 900 });
+  console.log(
+    "[runner] composing up (this builds SteVe + ExpresSync, may take 5+ minutes)...",
+  );
+  await composeUp({ project, envPath: env.envPath }, {
+    wait: true,
+    timeoutSec: 900,
+  });
 
   console.log("[runner] discovering host ports...");
-  const steve = await getHostPort({ project, envPath: env.envPath }, "steve", 8180);
-  const app = await getHostPort({ project, envPath: env.envPath }, "expressync-app", 8000);
-  console.log(`[runner] steve at ${steve.host}:${steve.port}, expressync at ${app.host}:${app.port}`);
+  const steve = await getHostPort(
+    { project, envPath: env.envPath },
+    "steve",
+    8180,
+  );
+  const app = await getHostPort(
+    { project, envPath: env.envPath },
+    "expressync-app",
+    8000,
+  );
+  console.log(
+    `[runner] steve at ${steve.host}:${steve.port}, expressync at ${app.host}:${app.port}`,
+  );
 
   console.log("[runner] seeding databases...");
   const seedVals = {
@@ -98,7 +121,8 @@ async function main() {
     TEST_PROJECT: project,
     TEST_ENV_PATH: env.envPath,
     EXPRESSYNC_BASE_URL: `http://${app.host}:${app.port}`,
-    STEVE_WS_URL: `ws://${steve.host}:${steve.port}/steve/websocket/CentralSystemService`,
+    STEVE_WS_URL:
+      `ws://${steve.host}:${steve.port}/steve/websocket/CentralSystemService`,
     CPSIM_BIN: cpsimBin,
   };
 

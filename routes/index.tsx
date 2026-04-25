@@ -9,7 +9,18 @@
  */
 
 import type { FreshContext } from "fresh";
-import { and, asc, desc, eq, gte, inArray, isNotNull, lt, ne, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  lt,
+  ne,
+  sql,
+} from "drizzle-orm";
 import { define } from "../utils.ts";
 import type { State } from "../utils.ts";
 import { db } from "../src/db/index.ts";
@@ -407,8 +418,10 @@ async function loadCustomerData(
         );
       const subId = mappingRows[0]?.subscriptionExternalId ?? null;
       if (subId) {
-        const [{ subscription } , usage] = await Promise.all([
-          lagoClient.getSubscription(subId).catch(() => ({ subscription: null } as const)),
+        const [{ subscription }, usage] = await Promise.all([
+          lagoClient.getSubscription(subId).catch(
+            () => ({ subscription: null } as const),
+          ),
           lagoClient.getCurrentUsage(scope.lagoCustomerExternalId, subId).catch(
             () => null,
           ),
@@ -423,7 +436,9 @@ async function loadCustomerData(
               usageValue,
               currencySymbolFor(currency),
             );
-            if (planInfo && subscription?.name) planInfo.name = subscription.name;
+            if (planInfo && subscription?.name) {
+              planInfo.name = subscription.name;
+            }
           }
         }
       }
@@ -439,7 +454,7 @@ async function loadCustomerData(
   const firstRun = recentSessions.length === 0 && scope.mappingIds.length === 0;
 
   // Enrich nextReservation with the charger's friendly name (already cached
-   // in chargerMeta from the chargers query above).
+  // in chargerMeta from the chargers query above).
   if (nextReservation) {
     const meta = chargerMeta.get(nextReservation.chargeBoxId);
     if (meta?.friendlyName) {

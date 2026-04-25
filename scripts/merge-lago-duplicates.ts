@@ -49,7 +49,9 @@ async function main() {
   const groups = await db
     .select({
       name: users.name,
-      userIds: sql<string[]>`array_agg(${users.id} ORDER BY ${users.createdAt})`,
+      userIds: sql<
+        string[]
+      >`array_agg(${users.id} ORDER BY ${users.createdAt})`,
       count: sql<number>`count(*)::int`,
     })
     .from(users)

@@ -44,7 +44,10 @@ import {
   ChargerPickerInline,
 } from "@/components/customer/ChargerPickerInline.tsx";
 import { ScanCountdownRing } from "@/components/scan/ScanCountdownRing.tsx";
-import { ScanPanel, type ScanPanelState } from "@/components/scan/ScanPanel.tsx";
+import {
+  ScanPanel,
+  type ScanPanelState,
+} from "@/components/scan/ScanPanel.tsx";
 import {
   AlertCircle,
   Loader2,
@@ -666,7 +669,9 @@ function mapCustomerFlowToPanelState(flow: FlowState): ScanPanelState {
         readerName: flow.chargerName,
         steps: [
           "Wake your card",
-          `Tap it on ${flow.chargerName?.trim() ? flow.chargerName : "the reader"}`,
+          `Tap it on ${
+            flow.chargerName?.trim() ? flow.chargerName : "the reader"
+          }`,
           "Login, just like that!",
         ],
       };

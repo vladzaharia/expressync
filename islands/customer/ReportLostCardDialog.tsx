@@ -79,10 +79,9 @@ export default function ReportLostCardDialog(
         description={
           <div class="space-y-3">
             <p>
-              We'll deactivate{" "}
-              <span class="font-medium">{cardName}</span>{" "}
-              right away so it can't start a new charging session. An admin
-              will be notified to issue a replacement.
+              We'll deactivate <span class="font-medium">{cardName}</span>{" "}
+              right away so it can't start a new charging session. An admin will
+              be notified to issue a replacement.
             </p>
             <label class="block text-sm">
               <span class="text-muted-foreground">
@@ -93,8 +92,10 @@ export default function ReportLostCardDialog(
                 rows={3}
                 maxLength={280}
                 value={reason.value}
-                onInput={(e) =>
-                  (reason.value = (e.currentTarget as HTMLTextAreaElement).value)}
+                onInput={(
+                  e,
+                ) => (reason.value =
+                  (e.currentTarget as HTMLTextAreaElement).value)}
                 placeholder="Where did you lose it? Any details that might help…"
               />
             </label>

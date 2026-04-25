@@ -92,7 +92,9 @@ export async function softDeleteCustomer(lagoId: string): Promise<void> {
   await db
     .update(lagoCustomers)
     .set({ deletedAt: new Date() })
-    .where(and(eq(lagoCustomers.lagoId, lagoId), isNull(lagoCustomers.deletedAt)));
+    .where(
+      and(eq(lagoCustomers.lagoId, lagoId), isNull(lagoCustomers.deletedAt)),
+    );
 }
 
 // Silence unused-import warnings if a future refactor drops one of these.

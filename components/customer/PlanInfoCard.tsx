@@ -110,7 +110,10 @@ export function PlanInfoCard(
   }
 
   const tone = stripToneClasses[accent];
-  const perTierConsumed = splitConsumedAcrossTiers(plan.tiers, plan.consumedKwh);
+  const perTierConsumed = splitConsumedAcrossTiers(
+    plan.tiers,
+    plan.consumedKwh,
+  );
 
   return (
     <div class={cn("flex flex-col gap-5", className)}>

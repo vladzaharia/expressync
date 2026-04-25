@@ -31,10 +31,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { BorderBeam } from "@/components/magicui/border-beam.tsx";
 import { BlurFade } from "@/components/magicui/blur-fade.tsx";
 import { ExternalLink, Keyboard } from "lucide-preact";
-import {
-  type AccentColor,
-  borderBeamColors,
-} from "@/src/lib/colors.ts";
+import { type AccentColor, borderBeamColors } from "@/src/lib/colors.ts";
 import {
   type ScanResult,
   type ScanTagState,
@@ -491,4 +488,3 @@ function ScanModalActions({
       return null;
   }
 }
-
