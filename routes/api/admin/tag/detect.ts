@@ -71,6 +71,10 @@ export const handler = define.handlers({
         const sub = await subscribe(
           (event) => {
             if (closed) return;
+            // Admin tag-detect only cares about rejected tags (the existing
+            // contract). `start-tx` events flow to the pair-intent
+            // watchdog, not here.
+            if (event.type !== "reject" || !event.idTag) return;
             // Admin flow: dedupe by tag id + check timeout.
             if (Date.now() - startTime > timeoutMs) {
               safeEnqueue(

@@ -45,6 +45,9 @@ const RULES: readonly RouteRule[] = [
   { prefix: "/api/auth", classification: "PUBLIC" },
   { prefix: "/api/health", classification: "PUBLIC" },
   { prefix: "/api/webhook/lago", classification: "PUBLIC" },
+  // SteVe pre-authorize hook — internal service-to-service call from the
+  // SteVe fork's HttpPreAuthorizeHook. HMAC-signed; no session.
+  { prefix: "/api/ocpp", classification: "PUBLIC" },
 
   // ------- PUBLIC (admin surface only) -------
   // Admin URLs are file-system rewritten to /admin/X, so the public admin

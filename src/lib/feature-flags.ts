@@ -15,6 +15,8 @@ import { config } from "./config.ts";
 
 export const FEATURE_MAGIC_LINK: boolean = config.FEATURE_MAGIC_LINK;
 export const FEATURE_SCAN_LOGIN: boolean = config.FEATURE_SCAN_LOGIN;
+export const FEATURE_PAIR_INTENT_INTERCEPT: boolean =
+  config.FEATURE_PAIR_INTENT_INTERCEPT;
 
 /**
  * Build a 503 Response for a feature gated off in this environment.
