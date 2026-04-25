@@ -434,21 +434,58 @@ export async function runSync(): Promise<SyncResult> {
     // Track which batch indices were successfully sent to Lago
     const successfulBatchIndices = new Set<number>();
 
+    // Per-batch retry with exponential backoff. Without this, a transient
+    // 429 or 5xx left the batch in `errors` and ratcheted nothing in
+    // sync state — the next sync run would eventually retry, but only
+    // after the cadence (15 min active, 1 h idle). With backoff we recover
+    // inside the same run for transient blips.
+    //
+    // Bounded at 3 attempts (1s / 4s / 16s) so a sustained Lago outage
+    // doesn't hold the run open for minutes; sustained failures still
+    // surface in `errors` and the next sync sweep re-emits.
+    const RETRY_DELAYS_MS = [1_000, 4_000, 16_000];
+
     for (let i = 0; i < eventBatches.length; i++) {
       const batch = eventBatches[i];
-      try {
-        syncLogger.debug(`Sending batch ${i + 1}/${eventBatches.length}`, {
-          batchSize: batch.length,
-        });
-        await lagoClient.createBatchEvents(batch);
-        successfulBatchIndices.add(i);
-        syncLogger.info(
-          `Batch ${i + 1}/${eventBatches.length} sent successfully`,
-        );
-      } catch (error) {
-        const errorMsg = `Failed to send batch ${i + 1}: ${
-          (error as Error).message
-        }`;
+      let lastErr: Error | null = null;
+      for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+        try {
+          syncLogger.debug(
+            `Sending batch ${i + 1}/${eventBatches.length} (attempt ${
+              attempt + 1
+            })`,
+            { batchSize: batch.length },
+          );
+          await lagoClient.createBatchEvents(batch);
+          successfulBatchIndices.add(i);
+          if (attempt > 0) {
+            syncLogger.info(
+              `Batch ${i + 1}/${eventBatches.length} sent successfully on retry`,
+              { attempts: attempt + 1 },
+            );
+          } else {
+            syncLogger.info(
+              `Batch ${i + 1}/${eventBatches.length} sent successfully`,
+            );
+          }
+          lastErr = null;
+          break;
+        } catch (error) {
+          lastErr = error as Error;
+          const delay = RETRY_DELAYS_MS[attempt];
+          if (delay !== undefined) {
+            syncLogger.warn(
+              `Batch ${i + 1} failed, retrying in ${delay}ms`,
+              { error: lastErr.message, attempt: attempt + 1 },
+            );
+            await new Promise((r) => setTimeout(r, delay));
+          }
+        }
+      }
+      if (lastErr) {
+        const errorMsg = `Failed to send batch ${i + 1} after ${
+          RETRY_DELAYS_MS.length + 1
+        } attempts: ${lastErr.message}`;
         syncLogger.error(errorMsg);
         errors.push(errorMsg);
       }
