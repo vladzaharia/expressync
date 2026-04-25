@@ -315,7 +315,8 @@ export default function CommandPalette(
         if (online.length === 0) {
           scanPicker.value = null;
           toast.error("No chargers online", {
-            description: "Wait for a charger to come back online and try again.",
+            description:
+              "Wait for a charger to come back online and try again.",
           });
           return;
         }
@@ -576,9 +577,11 @@ export default function CommandPalette(
                 : `No matches. Try a charger ID, tag name, or "sync".`}
             </Command.Empty>
 
-            {/* Scan EV Card subview — when active, replaces the normal
+            {
+              /* Scan EV Card subview — when active, replaces the normal
                 results stack with a charger picker. Selecting a charger
-                closes the palette and arms the TapToAddModal at it. */}
+                closes the palette and arms the TapToAddModal at it. */
+            }
             {scanPicker.value && !scanPicker.value.loading &&
               scanPicker.value.chargers && (
               <CommandGroup heading="Pick a charger to scan at">
@@ -613,9 +616,11 @@ export default function CommandPalette(
               </CommandGroup>
             )}
 
-            {/* Navigate + Actions + dynamic results — hidden while the
+            {
+              /* Navigate + Actions + dynamic results — hidden while the
                 Scan EV Card subview is open so the operator only sees
-                charger options during that flow. */}
+                charger options during that flow. */
+            }
             {!scanPicker.value && (
               <>
                 <CommandGroup heading="Navigate">

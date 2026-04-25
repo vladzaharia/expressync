@@ -263,8 +263,8 @@ function createSmartTx(store: FakeStore): {
                     (u as unknown as {
                       lagoCustomerExternalId?: string | null;
                     })
-                      .lagoCustomerExternalId =
-                        patch.lagoCustomerExternalId as string;
+                      .lagoCustomerExternalId = patch
+                        .lagoCustomerExternalId as string;
                   }
                 }
               }

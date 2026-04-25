@@ -28,7 +28,10 @@ export class Cpsim {
   private child!: Deno.ChildProcess;
   private writer!: WritableStreamDefaultWriter<Uint8Array>;
   private nextId = 1;
-  private pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
+  private pending = new Map<
+    number,
+    { resolve: (v: unknown) => void; reject: (e: Error) => void }
+  >();
   private buffer = "";
   private closed = false;
   private enc = new TextEncoder();
@@ -45,7 +48,9 @@ export class Cpsim {
     inst.writer = inst.child.stdin.getWriter();
     inst.pumpStdout();
     inst.pumpStderr();
-    registerCleanup(async () => { await inst.dispose(); });
+    registerCleanup(async () => {
+      await inst.dispose();
+    });
     return inst;
   }
 
@@ -102,7 +107,10 @@ export class Cpsim {
     const id = this.nextId++;
     const payload = JSON.stringify({ id, method, params }) + "\n";
     return new Promise<T>((resolve, reject) => {
-      this.pending.set(id, { resolve: resolve as (v: unknown) => void, reject });
+      this.pending.set(id, {
+        resolve: resolve as (v: unknown) => void,
+        reject,
+      });
       this.writer.write(this.enc.encode(payload)).catch(reject);
       // Hard timeout per RPC.
       setTimeout(() => {
@@ -118,19 +126,37 @@ export class Cpsim {
     return this.call<{ connected: boolean }>("connect", { url, chargeBoxId });
   }
   bootNotification(model = "cpsim", vendor = "ExpresSyncTest") {
-    return this.call<{ status: string; interval: number }>("bootNotification", { model, vendor });
+    return this.call<{ status: string; interval: number }>("bootNotification", {
+      model,
+      vendor,
+    });
   }
-  statusNotification(connectorId: number, status = "Available", errorCode = "NoError") {
-    return this.call<{ ok: boolean }>("statusNotification", { connectorId, status, errorCode });
+  statusNotification(
+    connectorId: number,
+    status = "Available",
+    errorCode = "NoError",
+  ) {
+    return this.call<{ ok: boolean }>("statusNotification", {
+      connectorId,
+      status,
+      errorCode,
+    });
   }
   authorize(idTag: string) {
     return this.call<AuthorizeResult>("authorize", { idTag });
   }
   startTransaction(connectorId: number, idTag: string, meterStart = 0) {
-    return this.call<StartTxResult>("startTransaction", { connectorId, idTag, meterStart });
+    return this.call<StartTxResult>("startTransaction", {
+      connectorId,
+      idTag,
+      meterStart,
+    });
   }
   stopTransaction(transactionId: number, meterStop = 0) {
-    return this.call<{ idTagStatus: string }>("stopTransaction", { transactionId, meterStop });
+    return this.call<{ idTagStatus: string }>("stopTransaction", {
+      transactionId,
+      meterStop,
+    });
   }
   heartbeat() {
     return this.call<{ currentTime: string }>("heartbeat");
@@ -148,9 +174,17 @@ export class Cpsim {
   async dispose() {
     if (this.closed) return;
     this.closed = true;
-    try { await this.disconnect(); } catch { /* */ }
-    try { await this.writer.close(); } catch { /* */ }
-    try { this.child.kill("SIGTERM"); } catch { /* */ }
-    try { await this.child.status; } catch { /* */ }
+    try {
+      await this.disconnect();
+    } catch { /* */ }
+    try {
+      await this.writer.close();
+    } catch { /* */ }
+    try {
+      this.child.kill("SIGTERM");
+    } catch { /* */ }
+    try {
+      await this.child.status;
+    } catch { /* */ }
   }
 }

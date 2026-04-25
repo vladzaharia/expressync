@@ -193,7 +193,9 @@ export default function LiveSessionCard(props: Props) {
           }
         }
       }
-      if (typeof payload.powerKw === "number" && Number.isFinite(payload.powerKw)) {
+      if (
+        typeof payload.powerKw === "number" && Number.isFinite(payload.powerKw)
+      ) {
         reportedPowerKw.value = Math.max(0, payload.powerKw);
       }
       lastUpdateMs.value = now;
@@ -309,9 +311,7 @@ export default function LiveSessionCard(props: Props) {
                   {power.toFixed(power >= 10 ? 1 : 2)} kW
                 </span>
               }
-              sublabel={isEstimated
-                ? "60s rolling average"
-                : undefined}
+              sublabel={isEstimated ? "60s rolling average" : undefined}
               accent="cyan"
             />
           );
@@ -338,7 +338,10 @@ export default function LiveSessionCard(props: Props) {
                 value={
                   <span class="tabular-nums">
                     {symbol}
-                    {billed.toFixed(2)} <span class="text-xs font-normal text-muted-foreground">billed</span>
+                    {billed.toFixed(2)}{" "}
+                    <span class="text-xs font-normal text-muted-foreground">
+                      billed
+                    </span>
                   </span>
                 }
                 sublabel={diverged && estimate !== null

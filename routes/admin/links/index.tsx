@@ -36,9 +36,9 @@ export const handler = define.handlers({
     const mappings = includeInactive
       ? await db.select().from(schema.userMappings)
       : await db
-          .select()
-          .from(schema.userMappings)
-          .where(eq(schema.userMappings.isActive, true));
+        .select()
+        .from(schema.userMappings)
+        .where(eq(schema.userMappings.isActive, true));
 
     const subscriptionNames = new Map<string, string>();
     const customerLagoIds = new Map<string, string>();

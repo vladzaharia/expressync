@@ -1,11 +1,11 @@
 # scan-login OCPP intercept — integration test harness
 
-End-to-end regression suite for the scan-to-login Pre-Authorize hook
-feature shipped across SteVe (`/docker/services/ocpp/`) and ExpresSync
-(this repo). Spins up a self-contained docker compose stack (mariadb +
-SteVe + postgres + ExpresSync app + migrate), seeds it, then drives a
-Go-based OCPP 1.6J chargepoint simulator (`cpsim`) from a Deno test
-process to verify the 14 scenarios in `scan_login_test.ts`.
+End-to-end regression suite for the scan-to-login Pre-Authorize hook feature
+shipped across SteVe (`/docker/services/ocpp/`) and ExpresSync (this repo).
+Spins up a self-contained docker compose stack (mariadb + SteVe + postgres +
+ExpresSync app + migrate), seeds it, then drives a Go-based OCPP 1.6J
+chargepoint simulator (`cpsim`) from a Deno test process to verify the 14
+scenarios in `scan_login_test.ts`.
 
 ## Prerequisites
 
@@ -24,21 +24,21 @@ RUN_SLOW=1 deno task test:integration:scan-login  # include slow recreate scenar
 
 ### Fast vs slow split
 
-Scenarios 5, 6, 7 and 9 each `recreateService("steve")` with an env
-override; the SteVe container's `start_period` is 240 s so each restart
-adds 5+ minutes. Those four are gated behind `RUN_SLOW=1` and skipped by
-default (`Deno.test` `ignore: !RUN_SLOW`). All other scenarios (1, 2, 3,
-4, 8, 10, 11, 12, 13, 14) run on every invocation.
+Scenarios 5, 6, 7 and 9 each `recreateService("steve")` with an env override;
+the SteVe container's `start_period` is 240 s so each restart adds 5+ minutes.
+Those four are gated behind `RUN_SLOW=1` and skipped by default (`Deno.test`
+`ignore: !RUN_SLOW`). All other scenarios (1, 2, 3, 4, 8, 10, 11, 12, 13, 14)
+run on every invocation.
 
 That invokes `runner.ts`, which:
 
 1. Generates a per-run env file in `mktemp -d` (random secrets, random
    charge-box ids and tags). All credentials are 32-byte random hex.
 2. Builds the cpsim Go binary into the temp dir.
-3. `docker compose -p scanlogin-<id> up --build --wait` (timeout 900s —
-   SteVe runs Maven inside the container on first boot).
-4. Discovers the host-mapped ports for `steve:8180` and
-   `expressync-app:8000` (compose binds `0:<port>`).
+3. `docker compose -p scanlogin-<id> up --build --wait` (timeout 900s — SteVe
+   runs Maven inside the container on first boot).
+4. Discovers the host-mapped ports for `steve:8180` and `expressync-app:8000`
+   (compose binds `0:<port>`).
 5. Seeds mariadb (ocpp_tag, charge_box rows) and postgres (users,
    user_mappings).
 6. Runs `deno test scan_login_test.ts`.
@@ -94,36 +94,34 @@ scan-login/
 
 ## Charger pre-auth config
 
-The pre-auth hook only fires if every Authorize hits SteVe — chargers
-that pre-authorize from their local cache or local auth list bypass it
-entirely. For each production charger that participates in scan-to-login,
-push the four OCPP ConfigurationKeys (`LocalPreAuthorize`,
-`LocalAuthorizeOffline`, `AuthorizationCacheEnabled`,
-`LocalAuthListEnabled`, all `false`) once with the helper script:
+The pre-auth hook only fires if every Authorize hits SteVe — chargers that
+pre-authorize from their local cache or local auth list bypass it entirely. For
+each production charger that participates in scan-to-login, push the four OCPP
+ConfigurationKeys (`LocalPreAuthorize`, `LocalAuthorizeOffline`,
+`AuthorizationCacheEnabled`, `LocalAuthListEnabled`, all `false`) once with the
+helper script:
 
 ```sh
 deno run -A scripts/push-charger-preauth-config.ts <chargeBoxId>
 ```
 
-The script invokes SteVe's `ChangeConfiguration` REST operation four
-times and prints the resulting `taskId` per key. It exits non-zero if
-any of the four operations report errors or exceptions.
+The script invokes SteVe's `ChangeConfiguration` REST operation four times and
+prints the resulting `taskId` per key. It exits non-zero if any of the four
+operations report errors or exceptions.
 
 ## Notes / gotchas
 
-- The SteVe Dockerfile runs `./mvnw clean package` at container start.
-  First build takes 5–10 minutes; subsequent runs reuse the
-  Docker layer cache. The compose healthcheck has a 240s `start_period`
-  to allow this.
-- `host.docker.internal` is used by SteVe (in scenarios 6, 7, 9) to
-  reach a Deno-side stub on the host. On Linux Docker this requires
-  `--add-host host.docker.internal:host-gateway` — covered by the
-  default compose extra_hosts inheritance from the daemon's
-  `host-gateway` plumbing on Docker 20.10+.
-- Each scenario that bounces SteVe waits up to 180s for it to come back.
-  This is necessary because SteVe re-runs its Maven build on recreate;
-  if you hit this often, build a multi-stage Dockerfile that bakes the
-  .war once.
-- For latency scenario (#14), measurement is host-side (Deno → app).
-  In-cluster latency (SteVe → app over the docker network) is typically
-  lower, so the 50ms ceiling is conservative.
+- The SteVe Dockerfile runs `./mvnw clean package` at container start. First
+  build takes 5–10 minutes; subsequent runs reuse the Docker layer cache. The
+  compose healthcheck has a 240s `start_period` to allow this.
+- `host.docker.internal` is used by SteVe (in scenarios 6, 7, 9) to reach a
+  Deno-side stub on the host. On Linux Docker this requires
+  `--add-host host.docker.internal:host-gateway` — covered by the default
+  compose extra_hosts inheritance from the daemon's `host-gateway` plumbing on
+  Docker 20.10+.
+- Each scenario that bounces SteVe waits up to 180s for it to come back. This is
+  necessary because SteVe re-runs its Maven build on recreate; if you hit this
+  often, build a multi-stage Dockerfile that bakes the .war once.
+- For latency scenario (#14), measurement is host-side (Deno → app). In-cluster
+  latency (SteVe → app over the docker network) is typically lower, so the 50ms
+  ceiling is conservative.

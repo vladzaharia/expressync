@@ -68,7 +68,9 @@ export function PeriodBreakdownCard(
       icon: TrendingUp,
       label: "Avg on active days",
       value: avgActive > 0 ? `${formatKwh(avgActive)} kWh` : "—",
-      sub: daysCharged > 0 ? `across ${daysCharged} day${daysCharged === 1 ? "" : "s"}` : undefined,
+      sub: daysCharged > 0
+        ? `across ${daysCharged} day${daysCharged === 1 ? "" : "s"}`
+        : undefined,
       empty: avgActive === 0,
     },
     {

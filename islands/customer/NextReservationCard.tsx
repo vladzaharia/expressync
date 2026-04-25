@@ -200,7 +200,8 @@ export default function NextReservationCard({ reservation }: Props) {
             You're about to cancel your reservation for{" "}
             <span class="font-medium">
               {reservation.friendlyName?.trim() || reservation.chargeBoxId}
-            </span> on{" "}
+            </span>{" "}
+            on{" "}
             <span class="font-medium">
               {formatDate(reservation.startAtIso)}
             </span>. This cannot be undone.

@@ -87,8 +87,10 @@ function TopBarContent({
         <SectionNav currentPath={currentPath} />
       </div>
 
-      {/* Center-right: palette trigger pill — admin only. Removed on the
-          customer surface (Polaris) so the top bar stays uncluttered. */}
+      {
+        /* Center-right: palette trigger pill — admin only. Removed on the
+          customer surface (Polaris) so the top bar stays uncluttered. */
+      }
       {role !== "customer" && (
         <div className="flex items-center shrink-0">
           <PaletteTriggerPill />
@@ -107,8 +109,10 @@ function TopBarContent({
         </div>
       )}
 
-      {/* Right cluster: NotificationBell + UserMenu. Sign-out lives in the
-          avatar dropdown for both surfaces — no separate icon button. */}
+      {
+        /* Right cluster: NotificationBell + UserMenu. Sign-out lives in the
+          avatar dropdown for both surfaces — no separate icon button. */
+      }
       <div className="flex items-center gap-2 px-3 border-l shrink-0">
         <NotificationBell variant="topbar" />
         <UserMenu user={user} />

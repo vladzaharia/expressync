@@ -363,9 +363,11 @@ export default function ReservationWizard(
         // Brief celebration on the customer surface — for now we just rely
         // on the toast to set the mood while we navigate. The detail page
         // can layer richer UI later (e.g. SparklesText on the title).
-        clientNavigate(`${redirectPathPrefix}/${body.reservation.id}${
+        clientNavigate(
+          `${redirectPathPrefix}/${body.reservation.id}${
             _celebrateOnSuccess ? "?celebrate=1" : ""
-          }`);
+          }`,
+        );
         return;
       }
       if (res.status === 409) {

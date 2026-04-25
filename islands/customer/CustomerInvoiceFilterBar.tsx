@@ -81,9 +81,7 @@ export default function CustomerInvoiceFilterBar(
     if (dateFrom.value) params.set("from", dateFrom.value);
     if (dateTo.value) params.set("to", dateTo.value);
     const qs = params.toString();
-    clientNavigate(qs
-      ? `${basePath}?${qs}#invoices`
-      : `${basePath}#invoices`);
+    clientNavigate(qs ? `${basePath}?${qs}#invoices` : `${basePath}#invoices`);
   };
 
   const reset = () => {

@@ -77,9 +77,9 @@ async function main(): Promise<void> {
       if (failed && res.errorResponses) {
         for (const e of res.errorResponses) {
           console.log(
-            `         err: ${e.errorCode ?? "?"} ${
-              e.errorDescription ?? ""
-            } ${e.errorDetails ?? ""}`,
+            `         err: ${e.errorCode ?? "?"} ${e.errorDescription ?? ""} ${
+              e.errorDetails ?? ""
+            }`,
           );
         }
       }

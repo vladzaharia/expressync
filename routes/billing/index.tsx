@@ -333,14 +333,18 @@ export const handler = define.handlers({
           }
           const planCode = subscription?.plan_code ?? null;
           if (planCode) {
-            const planRaw = await lagoClient.getPlan(planCode).catch(() => null);
+            const planRaw = await lagoClient.getPlan(planCode).catch(() =>
+              null
+            );
             if (planRaw) {
               planInfo = derivePlanInfo(
                 planRaw as unknown as Record<string, unknown>,
                 usageValueKwh,
                 currencySymbolFor(currency),
               );
-              if (planInfo && subscriptionName) planInfo.name = subscriptionName;
+              if (planInfo && subscriptionName) {
+                planInfo.name = subscriptionName;
+              }
             }
           }
         } catch (err) {
@@ -488,8 +492,9 @@ export const handler = define.handlers({
         : undefined;
       if (perKwh && perKwh > 0) {
         activeSessionData.tariffPerKwh = perKwh;
-        activeSessionData.estimatedCost =
-          Number((activeSessionData.initialKwh * perKwh).toFixed(2));
+        activeSessionData.estimatedCost = Number(
+          (activeSessionData.initialKwh * perKwh).toFixed(2),
+        );
       }
       if (wallet) {
         activeSessionData.walletBalanceCents = wallet.balanceCents;
@@ -571,9 +576,7 @@ export default define.page<typeof handler>(function BillingIndexPage(
     );
   }
 
-  const overdueCellTone = data.overview.overdueCents > 0
-    ? "amber"
-    : undefined;
+  const overdueCellTone = data.overview.overdueCents > 0 ? "amber" : undefined;
 
   const stats: StatStripItem[] = [
     {

@@ -104,9 +104,7 @@ export default function CustomerInvoicesTable(
       fetchParams={fetchParams}
       getItemKey={(row) => row.id}
       onRowClick={(row) => {
-        clientNavigate(`/billing/invoices/${
-          encodeURIComponent(row.id)
-        }`);
+        clientNavigate(`/billing/invoices/${encodeURIComponent(row.id)}`);
       }}
       emptyMessage="No invoices match the current filters"
       renderMobileCard={renderMobileCard}
