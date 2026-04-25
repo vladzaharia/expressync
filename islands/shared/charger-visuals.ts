@@ -99,13 +99,21 @@ export function formatUptime(firstSeenIso: string): string {
   return `${hours}h ${minutes}m`;
 }
 
-/** "12 min" / "1h 34m" — live session duration on a connector card. */
+/**
+ * Canonical "h:mm" elapsed-time format used everywhere a live charging
+ * session shows duration. Always pads minutes to two digits so the value
+ * doesn't shift width as the session progresses ("0:09" → "0:10").
+ *
+ * Examples: 0:12, 1:34, 23:05.
+ *
+ * For sessions running > 24h we keep the hour count growing (no day
+ * rollover) so operators reading a chart don't lose context.
+ */
 export function formatSessionDuration(startIso: string): string {
   const diff = Date.now() - new Date(startIso).getTime();
-  if (diff < 0) return "0 min";
+  if (diff < 0) return "0:00";
   const totalMin = Math.floor(diff / 60000);
-  if (totalMin < 60) return `${totalMin} min`;
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
-  return `${h}h ${m}m`;
+  return `${h}:${m.toString().padStart(2, "0")}`;
 }
