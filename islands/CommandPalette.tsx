@@ -181,7 +181,7 @@ export default function CommandPalette(
   const triggeringElement = useRef<Element | null>(null);
   // Sub-page state for the "Scan EV Card" two-step flow. When non-null,
   // the palette body switches from search results to a charger picker.
-  // `loading=true` while the GET /api/auth/scan-charger-list call is in
+  // `loading=true` while the GET /api/auth/scan-tap-targets call is in
   // flight; `chargers` is the filtered (online-only) list when present.
   const scanPicker = useSignal<
     | { loading: true; chargers: null }
@@ -299,19 +299,30 @@ export default function CommandPalette(
       if (isCustomer) return;
       scanPicker.value = { loading: true, chargers: null };
       try {
-        const res = await fetch("/api/auth/scan-charger-list", {
+        const res = await fetch("/api/auth/scan-tap-targets", {
           method: "GET",
           credentials: "same-origin",
         });
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}`);
         }
+        // Wave 2 response shape: `{ devices: TapTargetEntry[] }`. The
+        // palette's "Scan EV Card" flow only knows how to arm at a charger,
+        // so we filter to `pairableType === 'charger'` rows and map them
+        // back to the legacy ScanPickerCharger fields. D3 (Wave 4) extends
+        // this surface to surface phone targets too.
         const data = await res.json() as {
-          chargers: Array<
-            ScanPickerCharger & { online: boolean }
-          >;
+          devices: Array<{
+            deviceId: string;
+            pairableType: "device" | "charger";
+            kind: "charger" | "phone_nfc" | "laptop_nfc";
+            label: string;
+            isOnline: boolean;
+          }>;
         };
-        const online = (data.chargers ?? []).filter((c) => c.online);
+        const online = (data.devices ?? []).filter(
+          (d) => d.pairableType === "charger" && d.isOnline,
+        );
         if (online.length === 0) {
           scanPicker.value = null;
           toast.error("No chargers online", {
@@ -327,7 +338,7 @@ export default function CommandPalette(
           close();
           globalThis.dispatchEvent(
             new CustomEvent("evcard:scan-open", {
-              detail: { chargeBoxId: c.chargeBoxId },
+              detail: { chargeBoxId: c.deviceId },
             }),
           );
           return;
@@ -336,9 +347,9 @@ export default function CommandPalette(
         scanPicker.value = {
           loading: false,
           chargers: online.map((c) => ({
-            chargeBoxId: c.chargeBoxId,
-            friendlyName: c.friendlyName,
-            status: c.status,
+            chargeBoxId: c.deviceId,
+            friendlyName: c.label,
+            status: null,
           })),
         };
         // Reset query so the picker isn't pre-filtered by whatever the
