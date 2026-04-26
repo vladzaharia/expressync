@@ -48,6 +48,14 @@ const RULES: readonly RouteRule[] = [
   // SteVe pre-authorize hook — internal service-to-service call from the
   // SteVe fork's HttpPreAuthorizeHook. HMAC-signed; no session.
   { prefix: "/api/ocpp", classification: "PUBLIC" },
+  // ExpresScan device-registration entry point. Authenticated by the
+  // PKCE (oneTimeCode, codeVerifier) tuple at the handler level — the
+  // iOS app's URLSession cannot carry the admin cookie that minted the
+  // code (ASWebAuthenticationSession sandboxes its own cookie jar) and
+  // doesn't send an Origin header. The PKCE claim itself proves which
+  // admin the device should be owned by. See `routes/api/devices/register.ts`
+  // step 3 (`claimOneTimeCode`).
+  { prefix: "/api/devices/register", classification: "PUBLIC" },
 
   // ------- PUBLIC (admin surface only) -------
   // Admin URLs are file-system rewritten to /admin/X, so the public admin

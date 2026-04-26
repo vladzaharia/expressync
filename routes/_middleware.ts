@@ -239,9 +239,15 @@ export function selectAuth(pathname: string): AuthScheme {
   // SteVe → ExpresSync hooks. HMAC-signed; no session.
   if (pathname.startsWith("/api/ocpp/")) return "ocpp-hmac";
 
-  // Device register is the cookie+PKCE entry point — the bearer token is
+  // Device register is the PKCE entry point — the bearer token is
   // minted FROM this call, so the request itself can't carry one.
-  if (pathname === "/api/devices/register") return "cookie";
+  // It also can't carry the admin cookie (the iOS app's URLSession is
+  // a separate cookie jar from `ASWebAuthenticationSession`'s) so it
+  // is classified PUBLIC by the route-classifier and authenticated by
+  // the handler via `claimOneTimeCode`. Returning `"public-or-cookie"`
+  // here is cosmetic — step 4's PUBLIC bypass short-circuits before
+  // `selectAuth` is consulted on this path.
+  if (pathname === "/api/devices/register") return "public-or-cookie";
 
   // Bearer-only device routes. The set is exhaustive because future
   // additions go through this function — we'd rather reject an unknown

@@ -1,18 +1,21 @@
 /**
  * POST /api/devices/register — handler-direct unit tests.
  *
+ * The endpoint is PKCE-authenticated (NOT cookie-gated) — the iOS app's
+ * URLSession can't carry the admin cookie that minted the one-time code
+ * (ASWebAuthenticationSession sandboxes its own jar). So the handler
+ * relies on `claimOneTimeCode` for auth; cookie state is ignored.
+ *
  * No DB required for the early-rejection paths:
- *   - missing cookie session → 401
- *   - non-admin role → 403
  *   - malformed JSON → 400 invalid_body
  *   - body missing fields → 400 (mapped via zodReason)
  *   - bad platform → 400 invalid_platform
  *   - bad capability → 400 invalid_capabilities
  *   - bad codeVerifier (too short) → 400 invalid_verifier
+ *   - body otherwise valid but no matching code → 400 invalid_code
  *
- * The DB-bound paths (claim, insert) are exercised by an integration
- * harness in Wave 2's gate; here we focus on locking in the handler's
- * branch table and the security-critical response headers.
+ * The DB-bound success paths (claim, insert) are exercised by an
+ * integration harness in Wave 2's gate.
  *
  * `sanitizeResources` is disabled because the handler imports the
  * postgres pool which keeps connections alive even when no query runs.
@@ -94,30 +97,38 @@ function customerState(): MockState {
 }
 
 // ============================================================================
-// Auth gating
+// Auth gating — PKCE-only, cookie state is ignored.
 // ============================================================================
 
 Deno.test({
-  name: "register — no cookie session returns 401",
+  name:
+    "register — empty cookie state still reaches PKCE claim (no auth gate at handler)",
   sanitizeResources: false,
   sanitizeOps: false,
   fn: async () => {
+    // The handler doesn't pre-check cookie state any more. With a valid
+    // body shape but a non-existent one-time code, the claim fails and
+    // the response is 400 invalid_code — proving we got past the body
+    // validation without 401/403.
     const res = await callRegister({}, VALID_CHALLENGE_BODY_BASE);
-    assertEquals(res.status, 401);
+    assertEquals(res.status, 400);
     const body = await res.json();
-    assertEquals(body.error, "unauthorized");
+    assertEquals(body.error, "invalid_code");
   },
 });
 
 Deno.test({
-  name: "register — customer-role session returns 403",
+  name: "register — customer-role session is no longer rejected (PKCE-only)",
   sanitizeResources: false,
   sanitizeOps: false,
   fn: async () => {
+    // Cookie state is ignored — what matters is the PKCE proof. A
+    // customer cookie no longer 403's; the request reaches the claim
+    // and fails on the bogus code.
     const res = await callRegister(customerState(), VALID_CHALLENGE_BODY_BASE);
-    assertEquals(res.status, 403);
+    assertEquals(res.status, 400);
     const body = await res.json();
-    assertEquals(body.error, "forbidden");
+    assertEquals(body.error, "invalid_code");
   },
 });
 

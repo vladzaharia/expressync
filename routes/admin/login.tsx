@@ -181,12 +181,6 @@ export default define.page<typeof handler>(function LoginPage({ data }) {
                 </div>
               )}
             </ShineBorder>
-            <a
-              href="/login"
-              class="absolute right-4 top-0 z-20 -translate-y-1/2 inline-flex items-center gap-1 rounded-full border border-sky-500/40 bg-background px-3 py-1 text-xs font-medium text-sky-600 shadow-sm transition-colors hover:bg-muted hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200"
-            >
-              Customer login →
-            </a>
           </div>
         </BlurFade>
 

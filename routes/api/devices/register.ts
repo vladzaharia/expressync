@@ -131,8 +131,7 @@ function zodReason(err: z.ZodError): string {
   return "invalid_body";
 }
 
-interface AdminContext {
-  userId: string;
+interface RequestContext {
   ip: string;
   ua: string | null;
 }
@@ -143,7 +142,7 @@ interface AdminContext {
  */
 async function runRegister(
   body: RegisterBody,
-  admin: AdminContext,
+  reqCtx: RequestContext,
 ): Promise<Response> {
   // Step 3: atomic claim of the one-time code. Returns null for ANY
   // failure mode (mismatch, expired, replay) — we map to a uniform 400/410
@@ -151,21 +150,20 @@ async function runRegister(
   // timing leak, so we collapse the two failure paths into a single
   // `invalid_code` response (matches the anti-enumeration pattern in
   // `scan-login.ts:247-256`).
+  //
+  // The claim is the SOLE auth gate for this endpoint — the iOS app
+  // cannot carry the admin cookie that minted the code (URLSession's
+  // jar is separate from ASWebAuthenticationSession's) and doesn't
+  // send an Origin header. The PKCE proof + the row's stored `userId`
+  // jointly establish "the admin who minted this code is registering
+  // this device". Replay is prevented by the atomic single-use flip
+  // inside `claimOneTimeCode`.
   const claim = await claimOneTimeCode(body.oneTimeCode, body.codeVerifier);
   if (!claim) {
     return jsonResponse(400, { error: "invalid_code" });
   }
 
-  // Defense in depth: the row's `userId` MUST match the cookie session's
-  // admin user. A different admin replaying somebody else's code is a
-  // privilege-escalation attempt — refuse.
-  if (claim.userId !== admin.userId) {
-    log.warn("Cross-admin register attempt", {
-      cookieUserId: admin.userId.slice(0, 8),
-      codeUserId: claim.userId.slice(0, 8),
-    });
-    return jsonResponse(403, { error: "forbidden" });
-  }
+  const ownerUserId = claim.userId;
 
   // Step 4: mint credentials. Raw values leave only on the response body.
   const creds = await generateDeviceCredentials();
@@ -181,7 +179,7 @@ async function runRegister(
         kind: "phone_nfc",
         label: body.label.slice(0, 120),
         capabilities: body.requestedCapabilities as DeviceCapability[],
-        ownerUserId: admin.userId,
+        ownerUserId,
         platform: body.platform,
         model: body.model,
         osVersion: body.osVersion,
@@ -237,9 +235,9 @@ async function runRegister(
 
   // Step 7: audit. Best-effort fire-and-forget — never block the response.
   void logDeviceRegistered({
-    userId: admin.userId,
-    ip: admin.ip,
-    ua: admin.ua,
+    userId: ownerUserId,
+    ip: reqCtx.ip,
+    ua: reqCtx.ua,
     route: REGISTER_ROUTE,
     metadata: {
       deviceId: inserted.id,
@@ -251,9 +249,9 @@ async function runRegister(
     },
   });
   void logDeviceTokenIssued({
-    userId: admin.userId,
-    ip: admin.ip,
-    ua: admin.ua,
+    userId: ownerUserId,
+    ip: reqCtx.ip,
+    ua: reqCtx.ua,
     route: REGISTER_ROUTE,
     metadata: {
       deviceId: inserted.id,
@@ -286,19 +284,11 @@ export const handler = define.handlers({
         setTimeout(resolve, jitterMs)
       );
 
-      // Step 1: admin-only.
-      const sessionUser = ctx.state.user;
-      if (!sessionUser) {
-        await jitterPromise;
-        return jsonResponse(401, { error: "unauthorized" });
-      }
-      if (sessionUser.role !== "admin") {
-        await jitterPromise;
-        return jsonResponse(403, { error: "forbidden" });
-      }
-
-      // Step 2: body validation. Reject malformed early — but still observe
-      // the jitter floor below.
+      // Step 1: body validation. Reject malformed early — but still observe
+      // the jitter floor below. This endpoint is NOT cookie-gated: the
+      // iOS app's URLSession can't carry the admin cookie that minted
+      // the one-time code (ASWebAuthenticationSession sandboxes its
+      // jar). Auth is the PKCE proof, claimed inside `runRegister`.
       let raw: unknown;
       try {
         raw = await ctx.req.json();
@@ -312,8 +302,7 @@ export const handler = define.handlers({
         return jsonResponse(400, { error: zodReason(parsed.error) });
       }
 
-      const admin: AdminContext = {
-        userId: sessionUser.id,
+      const reqCtx: RequestContext = {
         ip: getClientIp(ctx.req),
         ua: ctx.req.headers.get("user-agent"),
       };
@@ -322,7 +311,7 @@ export const handler = define.handlers({
       // floor is the floor, not an additional delay. `Promise.all` resolves
       // when both arms finish — the response is the handler's return.
       const [response] = await Promise.all([
-        runRegister(parsed.data, admin),
+        runRegister(parsed.data, reqCtx),
         jitterPromise,
       ]);
       return response;
