@@ -290,7 +290,7 @@ export default function CommandPalette(
       } catch (err) {
         scanPicker.value = null;
         console.warn("[cmdk] scan-picker fetch failed", err);
-        toast.error("Couldn't load tap-target list");
+        toast.error("Couldn't load scanners");
       }
     };
     globalThis.addEventListener(
@@ -456,7 +456,7 @@ export default function CommandPalette(
               value={query.value}
               onValueChange={(v: string) => (query.value = v)}
               placeholder={scanPicker.value
-                ? "Pick a tap-target..."
+                ? "Pick a scanner..."
                 : "Type exact tag names, charger IDs, or action names..."}
               className="flex-1 bg-transparent outline-none text-sm py-2 placeholder:text-muted-foreground"
               role="combobox"
@@ -495,7 +495,7 @@ export default function CommandPalette(
           >
             <Command.Empty className="px-4 py-6 text-sm text-muted-foreground text-center">
               {scanPicker.value
-                ? "No matching tap-targets online."
+                ? "No matching scanners online."
                 : `No matches. Try a charger ID, tag name, or "sync".`}
             </Command.Empty>
 
@@ -511,9 +511,6 @@ export default function CommandPalette(
               scanPicker.value.targets &&
               scanPicker.value.targets.some((t) => t.isOnline) && (
               <div class="px-3 py-2">
-                <p class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                  Pick a tap-target
-                </p>
                 <DevicePickerInline
                   devices={scanPicker.value.targets}
                   selectedDeviceId={null}
@@ -530,14 +527,9 @@ export default function CommandPalette(
                 aria-live="polite"
               >
                 <Radio class="size-4 opacity-60" aria-hidden="true" />
-                <div class="flex-1">
-                  <div class="font-medium text-foreground">
-                    No scanners available
-                  </div>
-                  <div class="text-xs">
-                    Bring a charger or phone online to scan a tag.
-                  </div>
-                </div>
+                <span class="font-medium text-foreground">
+                  No scanners available
+                </span>
               </div>
             )}
 
