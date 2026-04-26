@@ -7,14 +7,7 @@
 
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
-import {
-  Activity,
-  AlertTriangle,
-  PlugZap,
-  Receipt,
-  ShieldAlert,
-  Smartphone,
-} from "lucide-preact";
+import { Activity, AlertTriangle, PlugZap, Receipt } from "lucide-preact";
 import { MetricTile } from "@/components/shared/MetricTile.tsx";
 import type { AccentColor } from "@/src/lib/colors.ts";
 
@@ -23,8 +16,6 @@ export interface HealthDTO {
   chargersDim10mTo1h: number;
   failedSyncs24h: number;
   overdueInvoices: number;
-  breakerOpen: boolean;
-  devicesOfflineGt1h: number;
 }
 
 interface Props {
@@ -87,20 +78,6 @@ export default function HealthSection({ initial, pollMs = 30_000 }: Props) {
         label="Overdue invoices"
         value={h.overdueInvoices}
         accent={h.overdueInvoices > 0 ? "amber" : "slate"}
-        size="sm"
-      />
-      <MetricTile
-        icon={ShieldAlert}
-        label="Webhook breaker"
-        value={h.breakerOpen ? "OPEN" : "Closed"}
-        accent={h.breakerOpen ? "rose" : "slate"}
-        size="sm"
-      />
-      <MetricTile
-        icon={Smartphone}
-        label="Devices offline >1h"
-        value={h.devicesOfflineGt1h}
-        accent={h.devicesOfflineGt1h > 0 ? "amber" : "slate"}
         size="sm"
       />
       <MetricTile
