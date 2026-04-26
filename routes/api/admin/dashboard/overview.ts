@@ -205,7 +205,10 @@ export async function loadDashboardOverview(): Promise<DashboardOverview> {
           eq(schema.lagoInvoices.paymentOverdue, true),
         ),
       ),
-    db.select().from(schema.lagoWebhookBreakerState).limit(1),
+    // Breaker table is a recent addition (migration 0033). Tolerate its
+    // absence so the dashboard still renders on environments that haven't
+    // applied the migration yet.
+    db.select().from(schema.lagoWebhookBreakerState).limit(1).catch(() => []),
     db
       .select({ value: count() })
       .from(schema.tagChangeLog)
