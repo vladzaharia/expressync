@@ -96,19 +96,31 @@ export function buildNavigateCommands(isAdmin = false): PaletteCommand[] {
 export function buildActionCommands(env: ActionEnv): PaletteCommand[] {
   return [
     {
-      id: "action:scan-ev-card",
+      id: "action:scan-tag",
       kind: "action",
       group: "actions",
-      title: "Scan EV Card",
-      subtitle: "Pick a charger, then tap a card",
+      title: "Scan Tag",
+      subtitle: "Pick a tap-target, then scan a card",
       icon: Radio,
       accent: "cyan",
-      keywords: ["nfc", "rfid", "tag", "tap", "card", "add"],
+      keywords: [
+        "nfc",
+        "rfid",
+        "tag",
+        "tap",
+        "card",
+        "add",
+        "ev",
+        "phone",
+        "scan",
+        "scan ev card",
+      ],
       // Keep the palette open: the palette itself listens for this event,
-      // fetches the charger roster, and either auto-arms (single online
-      // charger) or switches to its inline charger-picker subview. The
-      // actual scan UX lives in the TapToAddModal mounted by
-      // `ScanTagPaletteHost` once a charger is chosen.
+      // fetches the unified tap-target roster (chargers + phones), and
+      // either auto-arms (operator's own phone is the only online target)
+      // or switches to its inline picker subview. The actual scan UX
+      // lives in the TapToAddModal mounted by `ScanTagPaletteHost` once a
+      // tap-target is chosen.
       keepOpenAfterRun: true,
       run: () => {
         if (typeof globalThis.dispatchEvent === "function") {
