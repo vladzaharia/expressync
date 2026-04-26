@@ -108,6 +108,6 @@ export function isShellOrApiPath(pathname: string): boolean {
     pathname === "/manifest.admin.json" ||
     pathname === "/robots.txt" ||
     pathname === "/apple-touch-icon.png" ||
-    /^\/(favicon|polaris-favicon)-(16|32|48|180|192|512)\.png$/.test(pathname)
+    /^\/favicon-(16|32|48|180|192|512)\.png$/.test(pathname)
   );
 }
