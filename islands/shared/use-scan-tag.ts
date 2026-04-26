@@ -77,7 +77,7 @@ export interface UseScanTagOptions {
   /**
    * Charger to arm the intent at. Only used when `armEndpoint` is set.
    * If omitted, the hook auto-discovers the first online charger via
-   * `/api/auth/scan-charger-list`.
+   * `/api/auth/scan-tap-targets`.
    */
   chargeBoxId?: string;
 }
@@ -104,11 +104,22 @@ type Transition = {
   idTag?: string;
 };
 
-interface ChargerListEntry {
-  chargeBoxId: string;
-  friendlyName: string | null;
-  status: string | null;
-  online: boolean;
+/**
+ * One row of the unified tap-target picker as returned by
+ * `GET /api/auth/scan-tap-targets`. The legacy `/api/auth/scan-charger-list`
+ * shape (`chargeBoxId` + `friendlyName` + `online`) was retired in Wave 2;
+ * we now consume `TapTargetEntry`-shaped rows but down-project to the legacy
+ * fields below for the existing scan-charger flow. D3 (Wave 4) replaces this
+ * hook with a device-aware picker that handles both `pairableType` values.
+ */
+interface TapTargetListEntry {
+  deviceId: string;
+  pairableType: "device" | "charger";
+  kind: "charger" | "phone_nfc" | "laptop_nfc";
+  label: string;
+  capabilities: string[];
+  isOnline: boolean;
+  isOwnDevice?: boolean;
 }
 
 interface ArmResponse {
@@ -266,7 +277,7 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
     if (fixedChargeBoxId) return fixedChargeBoxId;
     let resp: Response;
     try {
-      resp = await fetch("/api/auth/scan-charger-list", {
+      resp = await fetch("/api/auth/scan-tap-targets", {
         headers: { Accept: "application/json" },
       });
     } catch {
@@ -287,16 +298,25 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
       return null;
     }
     const body = await resp.json().catch(() => ({}));
-    const list: ChargerListEntry[] = Array.isArray(body?.chargers)
-      ? body.chargers
+    // Wave 2: response shape changed from `{ chargers: [...] }` to
+    // `{ devices: TapTargetEntry[] }`. The legacy hook only knows how to
+    // arm at a charger pairableId, so we filter to charger rows here. D3
+    // in Wave 4 replaces this hook with a device-aware picker that can
+    // arm phone-side scans too.
+    const list: TapTargetListEntry[] = Array.isArray(body?.devices)
+      ? body.devices
       : [];
-    const online = list.find((c) => c.online);
-    if (!online) {
+    const onlineCharger = list.find(
+      (e) => e.pairableType === "charger" && e.isOnline,
+    );
+    if (!onlineCharger) {
       setState({ kind: "unavailable", reason: "detect_503" });
       dispatch("scan-tag:error", { reason: "no_chargers" });
       return null;
     }
-    return online.chargeBoxId;
+    // For chargers the view emits `id = chargeBoxId`, surfaced here as
+    // `deviceId` per the unified contract.
+    return onlineCharger.deviceId;
   };
 
   /**

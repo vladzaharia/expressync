@@ -15,7 +15,7 @@
  *             outer login page's email form is visible again.
  *
  * Flow:
- *   1. Open dialog: GET /api/auth/scan-charger-list
+ *   1. Open dialog: GET /api/auth/scan-tap-targets
  *   2. Auto-pair if N=1; else render ChargerPickerInline for selection.
  *   3. POST /api/auth/scan-pair with { chargeBoxId } → { pairingCode, ... }
  *   4. Render PairingCodeDisplay + open EventSource for scan-detect.
@@ -85,8 +85,22 @@ interface ScanDetectEvent {
   t: number;
 }
 
-interface ChargerListResponse {
-  chargers?: ChargerPickerCharger[];
+/**
+ * Wave 2: response shape from `/api/auth/scan-tap-targets`. The customer
+ * scan-login flow only acts on charger targets (phone tap is the admin
+ * surface), so we filter to `pairableType === 'charger'` rows and re-map
+ * to the legacy `ChargerPickerCharger` shape that `ChargerPickerInline`
+ * still expects. D3 (Wave 4) will rewrite the picker to consume the
+ * unified `TapTargetEntry` shape directly.
+ */
+interface TapTargetsResponse {
+  devices?: Array<{
+    deviceId: string;
+    pairableType: "device" | "charger";
+    kind: "charger" | "phone_nfc" | "laptop_nfc";
+    label: string;
+    isOnline: boolean;
+  }>;
 }
 
 interface PairResponse {
@@ -228,7 +242,7 @@ export default function CustomerScanLoginIsland({
 
     let resp: Response;
     try {
-      resp = await fetch("/api/auth/scan-charger-list", {
+      resp = await fetch("/api/auth/scan-tap-targets", {
         headers: { Accept: "application/json" },
       });
     } catch {
@@ -259,8 +273,18 @@ export default function CustomerScanLoginIsland({
       };
       return;
     }
-    const body: ChargerListResponse = await resp.json().catch(() => ({}));
-    const all = Array.isArray(body.chargers) ? body.chargers : [];
+    const body: TapTargetsResponse = await resp.json().catch(() => ({}));
+    // Filter to charger-type rows; phones aren't a customer-login target.
+    // Re-shape to the legacy `ChargerPickerCharger` fields the existing
+    // picker component expects.
+    const all: ChargerPickerCharger[] = (body.devices ?? [])
+      .filter((d) => d.pairableType === "charger")
+      .map((d) => ({
+        chargeBoxId: d.deviceId,
+        friendlyName: d.label,
+        status: null,
+        online: d.isOnline,
+      }));
     const online = all.filter((c) => c.online);
 
     if (online.length === 0) {

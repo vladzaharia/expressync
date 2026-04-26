@@ -81,7 +81,7 @@ interface Props {
   armEndpoint?: string;
   /**
    * Optional fixed chargeBoxId to arm against. When omitted the hook
-   * auto-discovers the first online charger via `/api/auth/scan-charger-list`.
+   * auto-discovers the first online charger via `/api/auth/scan-tap-targets`.
    */
   chargeBoxId?: string;
 }
