@@ -247,19 +247,26 @@ export const handler = define.handlers({
 
         // Parallel subscription to the event bus for pre-auth hook
         // intercepts (known tags + any tag while an intent is armed).
-        // Filtered by both chargeBoxId AND pairingCode so only THIS
-        // listener's matching scan is delivered, even if multiple
-        // pairings are armed against different chargers in parallel.
+        // Filtered by (pairableType, pairableId, pairingCode) so only
+        // THIS listener's matching scan is delivered. Wave 1 Track A
+        // generalized the payload to support both charger and device
+        // pairables; this endpoint serves the charger-pairable side
+        // (the customer scan-to-login flow), so we filter on
+        // pairableType==="charger" and require the pairableId to match
+        // the bound chargeBoxId.
         unsubBus = eventBus.subscribe(["scan.intercepted"], (delivered) => {
           if (closed) return;
           const p = delivered.payload as {
             idTag: string;
-            chargeBoxId: string;
+            pairableType: "charger" | "device";
+            pairableId: string;
             pairingCode: string;
             purpose?: string;
             t: number;
+            source?: string;
           };
-          if (p.chargeBoxId !== chargeBoxId) return;
+          if (p.pairableType !== "charger") return;
+          if (p.pairableId !== chargeBoxId) return;
           if (p.pairingCode !== pairingCode) return;
           emit(p.idTag, p.t);
         });
@@ -277,12 +284,15 @@ export const handler = define.handlers({
           if (delivered.ts <= replayCutoff) continue;
           const p = delivered.payload as {
             idTag: string;
-            chargeBoxId: string;
+            pairableType: "charger" | "device";
+            pairableId: string;
             pairingCode: string;
             purpose?: string;
             t: number;
+            source?: string;
           };
-          if (p.chargeBoxId !== chargeBoxId) continue;
+          if (p.pairableType !== "charger") continue;
+          if (p.pairableId !== chargeBoxId) continue;
           if (p.pairingCode !== pairingCode) continue;
           emit(p.idTag, p.t);
         }
