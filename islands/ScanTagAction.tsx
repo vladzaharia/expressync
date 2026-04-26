@@ -3,6 +3,7 @@ import { Radio } from "lucide-preact";
 import { Button } from "@/components/ui/button.tsx";
 import TapToAddModal from "./TapToAddModal.tsx";
 import type { ScanResult } from "@/islands/shared/use-scan-tag.ts";
+import type { TapTargetEntry } from "@/src/lib/types/devices.ts";
 import type { AccentColor } from "@/src/lib/colors.ts";
 import { clientNavigate } from "@/src/lib/nav.ts";
 
@@ -36,7 +37,16 @@ interface Props {
   panelSubtitle?: string;
   /** Override the arm-intent endpoint (defaults to admin scan-arm). */
   armEndpoint?: string;
-  /** Optional fixed chargeBoxId to arm at; auto-discovered when omitted. */
+  /** Optional fixed tap-target to arm at; auto-discovered when omitted.
+   *  For phones this is the device UUID; for chargers, the chargeBoxId. */
+  deviceId?: string;
+  /** Pairable kind of `deviceId`. Defaults to `'charger'` when absent. */
+  pairableType?: TapTargetEntry["pairableType"];
+  /**
+   * Backward-compat alias for `deviceId` (with `pairableType: 'charger'`).
+   *
+   * @deprecated Use `deviceId` + `pairableType: 'charger'`.
+   */
   chargeBoxId?: string;
 }
 
@@ -50,6 +60,8 @@ export default function ScanTagAction(
     panelTitle,
     panelSubtitle,
     armEndpoint,
+    deviceId,
+    pairableType,
     chargeBoxId,
   }: Props,
 ) {
@@ -94,7 +106,8 @@ export default function ScanTagAction(
         panelTitle={panelTitle}
         panelSubtitle={panelSubtitle}
         armEndpoint={armEndpoint}
-        chargeBoxId={chargeBoxId}
+        deviceId={deviceId ?? chargeBoxId}
+        pairableType={pairableType ?? (deviceId ? undefined : "charger")}
       />
     </>
   );

@@ -38,7 +38,6 @@ import {
 } from "@/components/ui/sheet.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { CardStatusBadge } from "@/components/shared/CardStatusBadge.tsx";
-import { ChargerPickerInline } from "@/components/customer/ChargerPickerInline.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 
 export interface SheetCharger {
@@ -254,12 +253,9 @@ export default function StartChargingSheet({
           )}
 
           {!noChargers && !noActiveCards && step === "charger" && (
-            <ChargerPickerInline
+            <LocalChargerPicker
               chargers={chargers}
-              onSelect={(id) => {
-                const selected = chargers.find((c) => c.chargeBoxId === id);
-                if (selected) advanceFromCharger(selected);
-              }}
+              onSelect={(c) => advanceFromCharger(c)}
               disabled={submitting}
             />
           )}
@@ -341,6 +337,79 @@ function EmptyHint({
       <p class="text-sm font-medium">{title}</p>
       <p class="mt-1 text-xs text-muted-foreground">{description}</p>
     </div>
+  );
+}
+
+/**
+ * Customer-side charger picker for the Start Charging sheet. Inlined here
+ * (rather than reusing the unified `DevicePickerInline`) because this
+ * surface speaks OCPP-status strings ("Available", "Occupied", …) and
+ * needs a connectorIds-aware `SheetCharger` shape — distinct from the
+ * scan-modal's tap-target picker.
+ */
+function LocalChargerPicker({
+  chargers,
+  onSelect,
+  disabled,
+}: {
+  chargers: SheetCharger[];
+  onSelect: (c: SheetCharger) => void;
+  disabled?: boolean;
+}) {
+  if (chargers.length === 0) return null;
+  return (
+    <ul class="flex flex-col gap-2">
+      {chargers.map((c) => {
+        const offline = c.online === false;
+        const interactionDisabled = disabled || offline;
+        const name = c.friendlyName?.trim() || c.chargeBoxId;
+        const status = offline ? "Offline" : (c.status ?? "Unknown");
+        const tone = offline
+          ? "bg-muted text-muted-foreground border-border"
+          : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30";
+        return (
+          <li key={c.chargeBoxId}>
+            <button
+              type="button"
+              disabled={interactionDisabled}
+              aria-disabled={interactionDisabled}
+              onClick={() => {
+                if (!interactionDisabled) onSelect(c);
+              }}
+              class={cn(
+                "group w-full flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3 text-left transition-colors",
+                "hover:border-primary/40 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "disabled:cursor-not-allowed disabled:opacity-50",
+              )}
+            >
+              <span class="flex flex-col min-w-0">
+                <span class="text-sm font-semibold text-foreground truncate">
+                  {name}
+                </span>
+                {c.friendlyName && c.friendlyName !== c.chargeBoxId && (
+                  <span class="text-xs text-muted-foreground truncate font-mono">
+                    {c.chargeBoxId}
+                  </span>
+                )}
+              </span>
+              <span class="flex items-center gap-2 shrink-0">
+                <span
+                  class={cn(
+                    "inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-medium uppercase tracking-wide",
+                    tone,
+                  )}
+                >
+                  {status}
+                </span>
+                <span class="inline-flex items-center px-3 h-7 rounded-md border border-input bg-background text-xs font-medium text-foreground">
+                  Select
+                </span>
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
