@@ -64,15 +64,15 @@ Upload to `https://assets.polaris.express/email/`:
 - `expressync-logo-160.png`
 - `expressync-logo-320.png`
 
-For now, the in-repo `static/polaris-favicon-*.png` files are 1×1 transparent
-placeholders. To generate real ones from `static/polaris-logo.svg` (already
-shipped):
+Both surfaces share the unified ExpresSync favicon set (`static/favicon-*.png`,
+`static/apple-touch-icon.png`, `static/favicon.ico`) generated from
+`static/logo.svg` — the squircle + thunderbolt brand glyph. Regenerate with:
 
 ```bash
-deno run --allow-read --allow-write --allow-run scripts/generate-polaris-favicons.ts
+deno run --allow-read --allow-write --allow-run scripts/generate-favicons.ts
 ```
 
-This requires ImageMagick. Replace the placeholders before launch.
+This requires ImageMagick.
 
 ### 4. Cloudflare Email Worker
 
@@ -310,9 +310,6 @@ If production is unhappy:
 - **`users.deleted_at`** — schema doesn't yet support GDPR soft-delete.
   `/api/customer/delete-account` returns 501. Plan to add a follow-up migration
   when the operator needs the path.
-- **Real Polaris favicon artwork** — `static/polaris-favicon-*.png` are 1×1
-  placeholders. Generate from `static/polaris-logo.svg` via the
-  scripts/generate-polaris-favicons.ts script.
 - **`/api/customer/sessions?cardId=` filter** — Track G2's card-detail page
   wants to filter recent sessions by card; the Track F endpoint doesn't accept
   this param yet. Cosmetic — currently shows the user's full session history

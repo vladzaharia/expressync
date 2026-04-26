@@ -25,16 +25,13 @@ export default define.page(function App({ Component, state }) {
   const isAdmin = surface === "admin";
 
   const manifestHref = isAdmin ? "/manifest.admin.json" : "/manifest.json";
-  const themeColor = isAdmin ? "#0ea5e9" : "#0E7C66";
+  // Unified ExpresSync brand glyph (squircle + thunderbolt) — both surfaces
+  // share the same favicon set and match the gradient in the React glyph.
+  const themeColor = "#06b6d4";
   const title = isAdmin ? "ExpresSync" : "Polaris Express";
   // Both surfaces default to dark; the bootstrap script reads the
   // per-host localStorage key and overrides if the user picked light.
   const htmlClass = "dark";
-
-  // Favicon set per surface — matches the manifest icon entries so the
-  // browser's <link rel=icon> picker finds the right asset before the
-  // manifest is fetched.
-  const faviconBase = isAdmin ? "favicon" : "polaris-favicon";
 
   // Per-surface localStorage key + default theme. Kept in sync with
   // `hooks/use-theme.tsx` (storageKey + defaultTheme) and the SSR class
@@ -69,31 +66,31 @@ export default define.page(function App({ Component, state }) {
           rel="icon"
           type="image/png"
           sizes="16x16"
-          href={`/${faviconBase}-16.png`}
+          href={`/favicon-16.png`}
         />
         <link
           rel="icon"
           type="image/png"
           sizes="32x32"
-          href={`/${faviconBase}-32.png`}
+          href={`/favicon-32.png`}
         />
         <link
           rel="icon"
           type="image/png"
           sizes="48x48"
-          href={`/${faviconBase}-48.png`}
+          href={`/favicon-48.png`}
         />
         <link
           rel="icon"
           type="image/png"
           sizes="192x192"
-          href={`/${faviconBase}-192.png`}
+          href={`/favicon-192.png`}
         />
         <link
           rel="icon"
           type="image/png"
           sizes="512x512"
-          href={`/${faviconBase}-512.png`}
+          href={`/favicon-512.png`}
         />
         <link
           rel="apple-touch-icon"
