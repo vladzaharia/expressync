@@ -87,11 +87,31 @@ function unauthorizedResponse(): Response {
  * customer URL serves directly from `routes/login.tsx`. The `_surface`
  * parameter is kept on the signature for forwards compat in case the
  * paths diverge (e.g. admin-side moves to `/admin/login` exposed in URL).
+ *
+ * Original-URL preservation: when the unauthenticated request is for a
+ * navigable HTML route (GET, not /api/*, not /login itself), we thread
+ * the path+query through as `?next=…` so the login UI can return the
+ * user to where they came from after sign-in. Critical for the iOS
+ * ExpresScan registration deep-link (`/expresscan/register?codeChallenge=…`)
+ * — losing the codeChallenge during the login bounce stranded the flow.
  */
-function redirectToLogin(_surface: "admin" | "customer"): Response {
+function redirectToLogin(
+  _surface: "admin" | "customer",
+  originalPath?: string,
+): Response {
+  let location = "/login";
+  if (
+    originalPath &&
+    originalPath.startsWith("/") &&
+    !originalPath.startsWith("//") &&
+    !originalPath.startsWith("/login") &&
+    !originalPath.startsWith("/api/")
+  ) {
+    location = `/login?next=${encodeURIComponent(originalPath)}`;
+  }
   return new Response(null, {
     status: 302,
-    headers: { Location: "/login" },
+    headers: { Location: location },
   });
 }
 
@@ -355,7 +375,15 @@ export const handler = define.middleware(async (ctx) => {
     if (pathname.startsWith("/api/")) {
       return applySecurityHeaders(unauthorizedResponse());
     }
-    return applySecurityHeaders(redirectToLogin(surface));
+    // Strip the admin path-rewrite prefix so the `next` value matches the
+    // browser-visible URL — otherwise the post-login redirect would land
+    // at `/admin/admin/...` (rewritten a second time).
+    const browserPath = surface === "admin" && pathname.startsWith("/admin")
+      ? pathname.slice("/admin".length) || "/"
+      : pathname;
+    return applySecurityHeaders(
+      redirectToLogin(surface, browserPath + url.search),
+    );
   }
 
   // Look up the user's role from the database (BetterAuth doesn't know
