@@ -162,6 +162,41 @@ export const config = {
   /** mailto: target shown to inactive customers + on hard error pages. */
   OPERATOR_CONTACT_EMAIL: Deno.env.get("OPERATOR_CONTACT_EMAIL") ||
     "support@polaris.express",
+
+  // ===========================================================================
+  // ExpresScan / Wave 1 Track A — Pocket ID OIDC for admins.
+  //
+  // When `ADMIN_OIDC_ISSUER` is set, the admin login UI presents the OIDC
+  // button and BetterAuth loads the generic-OIDC plugin (`auth-oidc.ts`).
+  // When unset, login falls back to the existing email/password form.
+  // `ADMIN_AUTH_SHOW_FALLBACK=true` keeps the email/password form
+  // visible alongside OIDC as a break-glass.
+  // ===========================================================================
+
+  /** Pocket ID issuer URL (e.g. `https://pocket-id.example.com`). Empty disables OIDC. */
+  ADMIN_OIDC_ISSUER: stripTrailingSlash(
+    Deno.env.get("ADMIN_OIDC_ISSUER") || "",
+  ),
+  /** OAuth client ID issued by Pocket ID. Required when `ADMIN_OIDC_ISSUER` is set. */
+  ADMIN_OIDC_CLIENT_ID: Deno.env.get("ADMIN_OIDC_CLIENT_ID") || "",
+  /** OAuth client secret. Optional for public clients; required for confidential. */
+  ADMIN_OIDC_CLIENT_SECRET: Deno.env.get("ADMIN_OIDC_CLIENT_SECRET") || "",
+  /** Pocket ID group name that grants `role='admin'` on JIT provision. */
+  ADMIN_OIDC_ADMIN_GROUP: Deno.env.get("ADMIN_OIDC_ADMIN_GROUP") || "",
+  /** "true" to render the email/password form as a fallback below the OIDC button. */
+  ADMIN_AUTH_SHOW_FALLBACK: (Deno.env.get("ADMIN_AUTH_SHOW_FALLBACK") || "")
+    .toLowerCase() === "true",
+  // ===========================================================================
+  // === APNs (filled by C-apns) ===
+  //
+  // Reserved block. Track A does NOT add APNs env vars — that belongs to
+  // Wave 2's C-apns track (token-based JWT, ES256 signer, HTTP/2 client to
+  // `api.push.apple.com` / `api.sandbox.push.apple.com`). C-apns appends:
+  //
+  //   APNS_KEY_ID, APNS_TEAM_ID, APNS_KEY_BASE64, APNS_TOPIC
+  //
+  // TODO(C-apns): hydrate this block when Wave 2 lands.
+  // ===========================================================================
 } as const;
 
 /**

@@ -26,6 +26,13 @@ import {
   PostgresNotifyTransport,
   type SseTransport,
 } from "../lib/sse-transport.ts";
+import type {
+  DeviceScanCompletedPayload,
+  DeviceScanRequestedPayload,
+  DeviceSessionReplacedPayload,
+  DeviceTokenRevokedPayload,
+  ScanPurpose,
+} from "../lib/types/devices.ts";
 
 const log = logger.child("EventBus");
 
@@ -44,7 +51,12 @@ export type EventBusEventType =
   | "scan.intercepted"
   | "tx.started"
   | "sync.completed"
-  | "heartbeat";
+  | "heartbeat"
+  // ExpresScan / Wave 1 Track A — device lifecycle events.
+  | "device.scan.requested"
+  | "device.scan.completed"
+  | "device.session.replaced"
+  | "device.token.revoked";
 
 export interface NotificationCreatedPayload {
   id: number;
@@ -135,33 +147,47 @@ export interface TagSeenPayload {
 }
 
 /**
- * Emitted by POST /api/ocpp/pre-authorize when an armed scan-pair row
- * matches an incoming tag scan. The scan-detect SSE consumer filters by
- * chargeBoxId and forwards to the waiting client.
+ * Emitted when an armed scan-pair / device-scan row matches an incoming
+ * tag scan. Fans out to scan-detect SSE consumers (charger source) and
+ * the customer / admin scan-result handlers (device source).
+ *
+ * Two sources, one event:
+ *   - `ocpp-preauth` — `POST /api/ocpp/pre-authorize` matched an armed
+ *     `scan-pair:{chargeBoxId}:{pairingCode}` row. `pairableType='charger'`,
+ *     `pairableId=chargeBoxId`.
+ *   - `device-scan-result` — `POST /api/devices/scan-result` (Track C-result)
+ *     matched an armed `device-scan:{deviceId}:{pairingCode}` row.
+ *     `pairableType='device'`, `pairableId=deviceId`.
+ *
+ * Filter on the `(pairableType, pairableId, pairingCode)` triple — the
+ * legacy `chargeBoxId` field has been removed (Wave 1 Track A
+ * generalization). Consumers are updated in the same commit so the build
+ * stays green.
  *
  * Fires uniformly for known AND unknown tags — the hook's job is to
- * stop the charger from auto-starting and hand off the idTag to the
- * waiting flow. Downstream consumers decide what to do with the idTag
- * based on `purpose`:
+ * stop the charger / surface the scan and hand off the idTag to the
+ * waiting flow. Downstream consumers decide what to do based on `purpose`:
  *
- *   - `login`       — customer is mid-login. scan-login.ts mints a
- *                     session if the idTag resolves to a linked
- *                     customer, else 401.
- *   - `admin-link`  — admin is linking a (possibly unknown) tag to a
- *                     customer from the admin UI.
- *   - `customer-link` — authenticated customer is adding another tag
- *                     to their own account.
+ *   - `login`         — scan-login completes (or 401s on unknown idTag).
+ *   - `admin-link`    — admin links the tag to a customer.
+ *   - `customer-link` — authenticated customer adds another tag.
+ *   - `view-card`     — read-only enrichment (no mutation).
  *
  * Unknown `purpose` strings are forwarded as-is for forward-compat.
  */
 export interface ScanInterceptedPayload {
   idTag: string;
-  chargeBoxId: string;
+  /** Discriminator: which kind of pairable matched. */
+  pairableType: "charger" | "device";
+  /** chargeBoxId when type=charger; deviceId (UUID) when type=device. */
+  pairableId: string;
   pairingCode: string;
   /** Intent purpose — defaults to "login" when the intent was armed without one. */
-  purpose: string;
+  purpose: ScanPurpose | string;
   /** ms since epoch at the time of match. */
   t: number;
+  /** Which producer emitted the event — useful for diagnostics + selective consumers. */
+  source: "ocpp-preauth" | "device-scan-result";
 }
 
 /**
@@ -196,7 +222,12 @@ export type EventBusEvent =
   | { type: "scan.intercepted"; payload: ScanInterceptedPayload }
   | { type: "tx.started"; payload: TxStartedPayload }
   | { type: "sync.completed"; payload: SyncCompletedPayload }
-  | { type: "heartbeat"; payload: { ts: number } };
+  | { type: "heartbeat"; payload: { ts: number } }
+  // ExpresScan / Wave 1 Track A — device lifecycle events.
+  | { type: "device.scan.requested"; payload: DeviceScanRequestedPayload }
+  | { type: "device.scan.completed"; payload: DeviceScanCompletedPayload }
+  | { type: "device.session.replaced"; payload: DeviceSessionReplacedPayload }
+  | { type: "device.token.revoked"; payload: DeviceTokenRevokedPayload };
 
 export interface DeliveredEvent {
   seq: number;

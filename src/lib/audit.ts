@@ -49,7 +49,28 @@ export type AuthAuditEvent =
    * Customer-initiated mutations (start charge, stop session, create
    * reservation, etc.). Concrete action stored in `metadata.action`.
    */
-  | "customer.action";
+  | "customer.action"
+  // ===========================================================================
+  // ExpresScan / Wave 1 Track A — device lifecycle events.
+  // See `expresscan/docs/plan/60-security.md` §12 for the canonical list and
+  // payload conventions. Common payload contract:
+  //   - `userId`         actor (admin / device-owner) when known
+  //   - `metadata.deviceId`  always
+  //   - `metadata.tokenId`   for token.* events
+  //   - `metadata.hashPrefix` first 8 hex chars of sha256(rawToken) — used
+  //                            by token.invalid / token.issued for probe
+  //                            detection without exposing the raw token.
+  //   - `metadata.idTagPrefix` first 4 chars of the hex idTag — never the
+  //                            full UID (matches `scan-login.ts:293`).
+  // ===========================================================================
+  | "device.registered"
+  | "device.deregistered"
+  | "device.scan.armed"
+  | "device.scan.completed"
+  | "device.scan.released"
+  | "device.token.issued"
+  | "device.token.revoked"
+  | "device.token.invalid";
 
 export interface AuthEventPayload {
   /** Optional user reference (set on success; omit on failed-pre-resolve flows). */
@@ -160,3 +181,28 @@ export async function logCustomerAction(
     },
   });
 }
+
+// =============================================================================
+// ExpresScan / Wave 1 Track A — device audit convenience wrappers.
+//
+// Thin shims so call sites read as `await logDeviceRegistered({ ... })`. Each
+// wrapper just forwards to `logAuthEvent` with the event identifier wired in.
+// See `expresscan/docs/plan/60-security.md` §12 for the payload conventions.
+// =============================================================================
+
+export const logDeviceRegistered = (p: AuthEventPayload) =>
+  logAuthEvent("device.registered", p);
+export const logDeviceDeregistered = (p: AuthEventPayload) =>
+  logAuthEvent("device.deregistered", p);
+export const logDeviceScanArmed = (p: AuthEventPayload) =>
+  logAuthEvent("device.scan.armed", p);
+export const logDeviceScanCompleted = (p: AuthEventPayload) =>
+  logAuthEvent("device.scan.completed", p);
+export const logDeviceScanReleased = (p: AuthEventPayload) =>
+  logAuthEvent("device.scan.released", p);
+export const logDeviceTokenIssued = (p: AuthEventPayload) =>
+  logAuthEvent("device.token.issued", p);
+export const logDeviceTokenRevoked = (p: AuthEventPayload) =>
+  logAuthEvent("device.token.revoked", p);
+export const logDeviceTokenInvalid = (p: AuthEventPayload) =>
+  logAuthEvent("device.token.invalid", p);
