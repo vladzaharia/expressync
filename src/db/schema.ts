@@ -12,6 +12,7 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  uuid,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -1331,3 +1332,106 @@ export const LAGO_RECONCILE_SEGMENTS: readonly LagoReconcileSegment[] = [
   "lago_wallets",
   "local_reconcile",
 ] as const;
+
+// ============================================================================
+// === ExpresScan / Wave 1 Track A: devices + device_tokens ===
+//
+// The iOS / future-laptop NFC reader devices that scan tap targets. Mirrors
+// the migration in `drizzle/0034_devices_and_tokens.sql` exactly. The
+// `tappable_devices` view (migration 0035) unions this table with
+// `chargers_cache` so the scan-modal picker sees one tap-target list.
+//
+// Owner-role enforcement: a Postgres trigger (created in 0034) rejects
+// rows whose `owner_user_id` does not reference a user with role='admin'.
+// `POST /api/devices/register` MUST also reject non-admin sessions in app
+// code (so the failure is a clean 403, not a constraint violation).
+// ============================================================================
+
+export const devices = pgTable("devices", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  /** Form-factor — see `src/lib/types/devices.ts#DEVICE_KINDS`. */
+  kind: text("kind").notNull(),
+  /** Human-friendly label shown in admin lists + the device's own UI. */
+  label: text("label").notNull(),
+  /** Granted capabilities — see `DEVICE_CAPABILITIES`. */
+  capabilities: text("capabilities").array().notNull().default(
+    sql`ARRAY['tap']::text[]`,
+  ),
+  /** Admin user that owns / registered the device. Trigger enforces role='admin'. */
+  ownerUserId: text("owner_user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  /** "ios" | "macos" | future. Free-text; trusted to the registering client. */
+  platform: text("platform").notNull(),
+  /** Device model identifier (e.g. "iPhone 16 Pro"). */
+  model: text("model").notNull(),
+  osVersion: text("os_version").notNull(),
+  appVersion: text("app_version").notNull(),
+  /** APNs device token (base64 / hex). NULL until first push-token PUT. */
+  pushToken: text("push_token"),
+  /** "sandbox" | "production" — drives APNs host selection per push. */
+  apnsEnvironment: text("apns_environment"),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+  /** Free-form last-known status JSON (battery, network, etc.). Best-effort. */
+  lastStatus: jsonb("last_status"),
+  registeredAt: timestamp("registered_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  /** Soft-delete: when set, device is hidden + bearer auth fails. */
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  /** Set on admin force-revoke; informational (token rows are independently revoked). */
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  revokedByUserId: text("revoked_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+}, (table) => [
+  check(
+    "devices_kind_check",
+    sql`${table.kind} IN ('phone_nfc','laptop_nfc')`,
+  ),
+  check(
+    "devices_apns_environment_check",
+    sql`${table.apnsEnvironment} IS NULL OR ${table.apnsEnvironment} IN ('sandbox','production')`,
+  ),
+  index("idx_devices_owner_last_seen").on(
+    table.ownerUserId,
+    table.lastSeenAt.desc(),
+  ).where(sql`${table.deletedAt} IS NULL`),
+  index("idx_devices_last_seen").on(table.lastSeenAt.desc()).where(
+    sql`${table.deletedAt} IS NULL`,
+  ),
+]);
+
+export const deviceTokens = pgTable("device_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  deviceId: uuid("device_id")
+    .notNull()
+    .references(() => devices.id, { onDelete: "cascade" }),
+  /** sha256(rawToken) — the raw token only ever leaves on the register response. */
+  tokenHash: text("token_hash").notNull().unique(),
+  /**
+   * Raw HMAC key (base64url, 32 random bytes). HMAC is symmetric; the server
+   * must hold the raw key to verify scan-result nonces. Same threat model as
+   * `STEVE_PREAUTH_HMAC_KEY` (server-resident HMAC key) — DB exfil exposes
+   * forging capability per device, mitigated by per-device + per-rotation
+   * scope. Migration to per-device Ed25519 (Secure-Enclave-held private key,
+   * `device_pubkey` on `devices`) is the planned v2 path.
+   */
+  secret: text("secret").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+}, (table) => [
+  index("idx_device_tokens_device").on(
+    table.deviceId,
+    table.createdAt.desc(),
+  ),
+]);
+
+export type Device = typeof devices.$inferSelect;
+export type NewDevice = typeof devices.$inferInsert;
+export type DeviceToken = typeof deviceTokens.$inferSelect;
+export type NewDeviceToken = typeof deviceTokens.$inferInsert;

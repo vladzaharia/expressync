@@ -15,8 +15,12 @@
  *             outer login page's email form is visible again.
  *
  * Flow:
- *   1. Open dialog: GET /api/auth/scan-charger-list
- *   2. Auto-pair if N=1; else render ChargerPickerInline for selection.
+ *   1. Open dialog: GET /api/auth/scan-tap-targets
+ *   2. Auto-pair if exactly one charger is online; else render
+ *      `DevicePickerInline` for selection. Customers don't own phones in
+ *      v1 so the picker only ever shows charger rows on this surface,
+ *      which means `isOwnDevice` is never true and the auto-pick won't
+ *      accidentally fire for "first online charger I happen to be near."
  *   3. POST /api/auth/scan-pair with { chargeBoxId } → { pairingCode, ... }
  *   4. Render PairingCodeDisplay + open EventSource for scan-detect.
  *   5. On `tag-detected` event, POST /api/auth/scan-login with the payload.
@@ -39,10 +43,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import {
-  type ChargerPickerCharger,
-  ChargerPickerInline,
-} from "@/components/customer/ChargerPickerInline.tsx";
+import { DevicePickerInline } from "@/components/scan/DevicePickerInline.tsx";
 import { ScanCountdownRing } from "@/components/scan/ScanCountdownRing.tsx";
 import {
   ScanPanel,
@@ -56,12 +57,13 @@ import {
   WifiOff,
 } from "lucide-preact";
 import { clientNavigate } from "@/src/lib/nav.ts";
+import type { TapTargetEntry } from "@/src/lib/types/devices.ts";
 
 type FlowState =
   | { kind: "idle" }
   | { kind: "loadingChargers" }
   | { kind: "noChargers" }
-  | { kind: "picker"; chargers: ChargerPickerCharger[] }
+  | { kind: "picker"; targets: TapTargetEntry[] }
   | { kind: "pairing"; chargeBoxId: string; chargerName: string | null }
   | {
     kind: "waiting";
@@ -85,8 +87,16 @@ interface ScanDetectEvent {
   t: number;
 }
 
-interface ChargerListResponse {
-  chargers?: ChargerPickerCharger[];
+/**
+ * Wave 4 D3: response shape from `/api/auth/scan-tap-targets`. The
+ * customer scan-login flow only acts on charger targets — customers
+ * don't own phones in v1 (the iOS app is admin-only) — so the picker
+ * naturally only renders charger rows. We still use the unified
+ * `TapTargetEntry` contract end-to-end so any future expansion (kiosk
+ * NFC, etc.) drops in without another picker swap.
+ */
+interface TapTargetsResponse {
+  devices?: TapTargetEntry[];
 }
 
 interface PairResponse {
@@ -103,8 +113,8 @@ interface LoginResponse {
 
 const PAIRING_DEFAULT_TTL_SEC = 90;
 
-function pickChargerName(c: ChargerPickerCharger): string {
-  return c.friendlyName?.trim() || c.chargeBoxId;
+function pickChargerName(c: TapTargetEntry): string {
+  return c.label?.trim() || c.deviceId;
 }
 
 function readPrefersReducedMotion(): boolean {
@@ -228,7 +238,7 @@ export default function CustomerScanLoginIsland({
 
     let resp: Response;
     try {
-      resp = await fetch("/api/auth/scan-charger-list", {
+      resp = await fetch("/api/auth/scan-tap-targets", {
         headers: { Accept: "application/json" },
       });
     } catch {
@@ -259,9 +269,15 @@ export default function CustomerScanLoginIsland({
       };
       return;
     }
-    const body: ChargerListResponse = await resp.json().catch(() => ({}));
-    const all = Array.isArray(body.chargers) ? body.chargers : [];
-    const online = all.filter((c) => c.online);
+    const body: TapTargetsResponse = await resp.json().catch(() => ({}));
+    // Customers don't own phones in v1 — the iOS app is admin-only — so
+    // the response contains chargers only. We still filter explicitly so
+    // any future server-side widening doesn't accidentally surface an
+    // unowned phone as a customer login target.
+    const chargers: TapTargetEntry[] = (body.devices ?? []).filter(
+      (d) => d.pairableType === "charger",
+    );
+    const online = chargers.filter((c) => c.isOnline);
 
     if (online.length === 0) {
       flow.value = { kind: "noChargers" };
@@ -270,18 +286,20 @@ export default function CustomerScanLoginIsland({
 
     // If a deep-link suggested chargeBoxId, prefer it when present in the list.
     const deepCharger = initialChargeBoxId
-      ? online.find((c) => c.chargeBoxId === initialChargeBoxId)
+      ? online.find((c) => c.deviceId === initialChargeBoxId)
       : undefined;
     if (deepCharger) {
-      await beginPair(deepCharger.chargeBoxId, pickChargerName(deepCharger));
+      await beginPair(deepCharger.deviceId, pickChargerName(deepCharger));
       return;
     }
 
     if (online.length === 1) {
-      await beginPair(online[0].chargeBoxId, pickChargerName(online[0]));
+      await beginPair(online[0].deviceId, pickChargerName(online[0]));
       return;
     }
-    flow.value = { kind: "picker", chargers: online };
+    // Pass the full charger list (including offline rows) so the picker
+    // can surface them grayed-out per the design.
+    flow.value = { kind: "picker", targets: chargers };
   };
 
   // Pair against a specific charger and arm the SSE stream.
@@ -626,9 +644,10 @@ function InlineFlow({
     return (
       <div class="space-y-3">
         <p class="text-xs text-muted-foreground">Which reader are you at?</p>
-        <ChargerPickerInline
-          chargers={flow.chargers}
-          onSelect={onPickCharger}
+        <DevicePickerInline
+          devices={flow.targets}
+          selectedDeviceId={null}
+          onSelect={(target) => onPickCharger(target.deviceId)}
         />
       </div>
     );
@@ -741,9 +760,10 @@ function FlowBody({
         <p class="text-xs text-muted-foreground">
           Pick the charger you're going to tap your card on:
         </p>
-        <ChargerPickerInline
-          chargers={flow.chargers}
-          onSelect={onPickCharger}
+        <DevicePickerInline
+          devices={flow.targets}
+          selectedDeviceId={null}
+          onSelect={(target) => onPickCharger(target.deviceId)}
         />
       </div>
     );

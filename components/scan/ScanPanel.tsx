@@ -131,7 +131,7 @@ export function adaptScanTagState(
     case "idle":
       return { kind: "idle", message: "Getting ready…" };
     case "connecting":
-      return { kind: "idle", message: "Connecting to charger log stream…" };
+      return { kind: "idle", message: "Connecting…" };
     case "waiting":
       return {
         kind: "armed",

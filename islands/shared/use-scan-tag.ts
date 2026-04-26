@@ -17,9 +17,20 @@
  *     `armEndpoint`.
  *   - **arm-intent** (`armEndpoint` set, e.g. `/api/admin/tag/scan-arm`):
  *     POSTs the arm endpoint to register a pairing intent at a specific
- *     `chargeBoxId`, then opens `/api/auth/scan-detect?pairingCode=…&
- *     chargeBoxId=…`. Works for known AND unknown tags via the SteVe
- *     pre-Authorize hook. The arm endpoint is DELETEd on close/unmount.
+ *     tap-target, then opens `/api/auth/scan-detect?pairingCode=…&…`.
+ *     Works for known AND unknown tags via the SteVe pre-Authorize hook
+ *     (chargers) or the device scan-result endpoint (phones / laptops).
+ *     The arm endpoint is DELETEd on close/unmount.
+ *
+ * Wave 4 D3 generalised the hook to handle phone tap-targets in addition
+ * to chargers: the user-facing options now talk in terms of `deviceId`
+ * (the canonical `TapTargetEntry.deviceId`, which is `chargeBoxId` for
+ * chargers and a UUID for phones/laptops), and the arm dispatch branches
+ * on `pairableType`:
+ *   - `'charger'` → POST `armEndpoint` (default `/api/admin/tag/scan-arm`)
+ *     with `{chargeBoxId}`. SSE filter: `?chargeBoxId=…`.
+ *   - `'device'`  → POST `/api/admin/devices/{deviceId}/scan-arm` with
+ *     `{purpose: 'admin-link'}`. SSE filter: `?deviceId=…`.
  *
  * The hook exposes signals so islands can reactively render without extra
  * prop plumbing. Every transition dispatches a `scan-tag:state` CustomEvent
@@ -29,6 +40,7 @@
 
 import { type Signal, signal } from "@preact/signals";
 import { useEffect, useMemo } from "preact/hooks";
+import type { TapTargetEntry } from "@/src/lib/types/devices.ts";
 
 export type ScanTagState =
   | { kind: "idle" }
@@ -63,23 +75,57 @@ export interface UseScanTagOptions {
   /** Fired after a successful `scan-lookup` POST and before routing. */
   onDetected?: (r: ScanResult) => void | Promise<void>;
   /**
-   * Arm-intent endpoint. When set, the hook POSTs `{chargeBoxId}` to this
-   * URL, then subscribes to `/api/auth/scan-detect` with the returned
-   * pairingCode. DELETE is fired on close/unmount. Admin callers pass
-   * `/api/admin/tag/scan-arm`. Customer login uses
-   * `/api/auth/scan-pair` (handled by `CustomerScanLoginIsland` directly,
-   * not this hook).
+   * Arm-intent endpoint for the **charger** branch. When set, the hook
+   * POSTs `{chargeBoxId}` to this URL, then subscribes to
+   * `/api/auth/scan-detect` with the returned pairingCode. DELETE is fired
+   * on close/unmount. Admin callers pass `/api/admin/tag/scan-arm`.
+   * Customer login uses `/api/auth/scan-pair` (handled directly by
+   * `CustomerScanLoginIsland`, not this hook).
+   *
+   * The device-side branch (`pairableType === 'device'`) ignores this opt
+   * and dispatches to `/api/admin/devices/{deviceId}/scan-arm` per Wave 3
+   * C-scan-arm.
    *
    * When omitted, the hook falls back to the legacy log-scrape stream at
-   * `/api/admin/tag/detect` (unknown tags only).
+   * `/api/admin/tag/detect` (unknown tags only, charger-only flow).
    */
   armEndpoint?: string;
   /**
-   * Charger to arm the intent at. Only used when `armEndpoint` is set.
-   * If omitted, the hook auto-discovers the first online charger via
-   * `/api/auth/scan-charger-list`.
+   * Pre-selected tap-target to arm against. For phones this is the device
+   * UUID; for chargers it's the `chargeBoxId` (the unified contract uses
+   * `deviceId` as the canonical name on `TapTargetEntry`). When omitted,
+   * the hook auto-discovers via `/api/auth/scan-tap-targets` — picking an
+   * online own-phone if exactly one is available, otherwise returning the
+   * first online charger so the legacy flow keeps working unchanged.
+   */
+  deviceId?: string;
+  /**
+   * Pairable type of the pre-selected target. Required when `deviceId` is
+   * a phone UUID (`'device'`) so the dispatch hits the right arm
+   * endpoint. Defaults to `'charger'` to preserve the pre-D3 behaviour
+   * for callers that haven't migrated yet.
+   */
+  pairableType?: TapTargetEntry["pairableType"];
+  /**
+   * Backward-compat alias for `deviceId`. Old call sites pass this; new
+   * code should use `deviceId`. When both are set, `deviceId` wins.
+   *
+   * @deprecated Use `deviceId` (with optional `pairableType: 'charger'`).
    */
   chargeBoxId?: string;
+  /**
+   * Hint label woven into the device-side scan-arm POST body. Surfaced in
+   * the iOS push notification ("Tap a card now — Front desk"). Ignored on
+   * the charger branch.
+   */
+  hintLabel?: string;
+  /**
+   * Fired once a tap-target resolves (either supplied or auto-discovered)
+   * so the host UI can stamp `state.steps` / `state.readerName` before the
+   * waiting state renders. Optional — when omitted, the picker selection
+   * UI is owned entirely by the caller via the picker component.
+   */
+  onTargetResolved?: (target: TapTargetEntry) => void;
 }
 
 export interface UseScanTagApi {
@@ -104,17 +150,22 @@ type Transition = {
   idTag?: string;
 };
 
-interface ChargerListEntry {
-  chargeBoxId: string;
-  friendlyName: string | null;
-  status: string | null;
-  online: boolean;
-}
-
 interface ArmResponse {
   pairingCode?: string;
+  /** Charger arm only; absent on device arm responses. */
   chargeBoxId?: string;
+  /** Device arm only; absent on charger arm responses. */
+  deviceId?: string;
   expiresInSec?: number;
+}
+
+/** Active arm-intent binding. We carry pairableType so cleanup hits the
+ *  right release endpoint and the SSE URL gets the right query param. */
+interface ActiveArm {
+  pairableType: TapTargetEntry["pairableType"];
+  pairingCode: string;
+  /** UUID for devices; chargeBoxId for chargers — unified name. */
+  deviceId: string;
 }
 
 function dispatch(name: string, detail: Record<string, unknown>): void {
@@ -143,11 +194,24 @@ function readPrefersReducedMotion(): boolean {
   }
 }
 
+/** URL of the device-side scan-arm endpoint (Wave 3 C-scan-arm). */
+function deviceScanArmUrl(deviceId: string): string {
+  return `/api/admin/devices/${encodeURIComponent(deviceId)}/scan-arm`;
+}
+
 export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
   const timeoutSeconds = Math.max(1, opts?.timeoutSeconds ?? 20);
   const confirmMode = opts?.confirmMode ?? "manual";
   const armEndpoint = opts?.armEndpoint;
-  const fixedChargeBoxId = opts?.chargeBoxId;
+  // Honour the canonical name first; fall back to the legacy alias so
+  // pre-D3 callers (e.g. ScanTagPaletteHost still passing `chargeBoxId`
+  // until its rename lands) keep working without churn.
+  const fixedDeviceId = opts?.deviceId ?? opts?.chargeBoxId;
+  const fixedPairableType: TapTargetEntry["pairableType"] =
+    opts?.pairableType ??
+      "charger";
+  const hintLabel = opts?.hintLabel;
+  const onTargetResolved = opts?.onTargetResolved;
 
   // One signal per island instance — created lazily inside `useMemo` so
   // multiple mounts don't share state.
@@ -166,7 +230,7 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
     // after the user closed the modal.
     sessionId: 0,
     // Active arm-intent binding (only set when `armEndpoint` is in use).
-    arm: null as { pairingCode: string; chargeBoxId: string } | null,
+    arm: null as ActiveArm | null,
   }), []);
 
   const prefersReducedMotion = useMemo(readPrefersReducedMotion, []);
@@ -205,18 +269,37 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
   };
 
   // Best-effort release of an armed pairing. Fired when we tear down the
-  // SSE so the charger doesn't stay "listening" for a tap for the
+  // SSE so the target doesn't stay "listening" for a tap for the
   // remainder of the 90s TTL (and so the next attempt isn't blocked by
-  // the "already_armed_for_charger" guard).
+  // the "already_armed" guard). Branches on the active binding's
+  // `pairableType` so the right release endpoint is hit.
   const releaseArmIfActive = (): void => {
-    if (!armEndpoint || !refs.arm) return;
-    const { pairingCode, chargeBoxId } = refs.arm;
+    if (!refs.arm) return;
+    const arm = refs.arm;
     refs.arm = null;
     try {
+      if (arm.pairableType === "device") {
+        // Device branch: /api/admin/devices/{id}/scan-arm DELETE expects
+        // `{pairingCode}` in the body (deviceId is on the URL).
+        void fetch(deviceScanArmUrl(arm.deviceId), {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pairingCode: arm.pairingCode }),
+          keepalive: true,
+        }).catch(() => {});
+        return;
+      }
+      // Charger branch: legacy admin scan-arm DELETE expects
+      // `{chargeBoxId, pairingCode}`. The configured `armEndpoint` is
+      // required here — without it we can't release.
+      if (!armEndpoint) return;
       void fetch(armEndpoint, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chargeBoxId, pairingCode }),
+        body: JSON.stringify({
+          chargeBoxId: arm.deviceId,
+          pairingCode: arm.pairingCode,
+        }),
         keepalive: true,
       }).catch(() => {});
     } catch {
@@ -255,18 +338,37 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
   };
 
   /**
-   * Pick a charger to arm against. Honors `opts.chargeBoxId` when set;
-   * otherwise queries the public charger list and picks the first online
-   * entry. Returns `null` and signals an unavailability state if no
-   * charger is reachable.
+   * Pick a tap-target to arm against. Honours an explicitly-supplied
+   * `deviceId` (with `pairableType`); otherwise queries
+   * `/api/auth/scan-tap-targets` and:
+   *   1. Auto-picks the operator's own phone when exactly one online
+   *      `isOwnDevice` row exists (the D3 default — fastest path for a
+   *      phone-equipped admin).
+   *   2. Falls back to the first online charger so the legacy admin
+   *      flow keeps working when no phones are registered.
+   *
+   * Returns the resolved target or `null` (and emits an unavailable
+   * state) when no online target is reachable.
    */
-  const resolveChargeBoxId = async (
+  const resolveTapTargetDeviceId = async (
     mySession: number,
-  ): Promise<string | null> => {
-    if (fixedChargeBoxId) return fixedChargeBoxId;
+  ): Promise<TapTargetEntry | null> => {
+    if (fixedDeviceId) {
+      // Synthesize a TapTargetEntry from the caller-supplied opts. We
+      // don't have label/capabilities here; downstream UI is expected to
+      // have already set state.steps / readerName via its own picker.
+      return {
+        deviceId: fixedDeviceId,
+        pairableType: fixedPairableType,
+        kind: fixedPairableType === "charger" ? "charger" : "phone_nfc",
+        label: fixedDeviceId,
+        capabilities: ["tap"],
+        isOnline: true,
+      };
+    }
     let resp: Response;
     try {
-      resp = await fetch("/api/auth/scan-charger-list", {
+      resp = await fetch("/api/auth/scan-tap-targets", {
         headers: { Accept: "application/json" },
       });
     } catch {
@@ -287,34 +389,74 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
       return null;
     }
     const body = await resp.json().catch(() => ({}));
-    const list: ChargerListEntry[] = Array.isArray(body?.chargers)
-      ? body.chargers
+    const list: TapTargetEntry[] = Array.isArray(body?.devices)
+      ? body.devices
       : [];
-    const online = list.find((c) => c.online);
-    if (!online) {
-      setState({ kind: "unavailable", reason: "detect_503" });
-      dispatch("scan-tag:error", { reason: "no_chargers" });
-      return null;
+
+    // D3 auto-pick rule: exactly one online own-phone wins. Otherwise
+    // fall back to the first online charger so the legacy auto-discover
+    // path remains intact for admins without a registered phone.
+    const onlineOwnPhones = list.filter(
+      (e) => e.isOwnDevice === true && e.isOnline,
+    );
+    if (onlineOwnPhones.length === 1) {
+      return onlineOwnPhones[0];
     }
-    return online.chargeBoxId;
+    const onlineCharger = list.find(
+      (e) => e.pairableType === "charger" && e.isOnline,
+    );
+    if (onlineCharger) return onlineCharger;
+
+    setState({ kind: "unavailable", reason: "detect_503" });
+    dispatch("scan-tag:error", { reason: "no_chargers" });
+    return null;
   };
 
   /**
    * Arm-intent pipeline: POST armEndpoint → open scan-detect SSE bound by
-   * pairingCode + chargeBoxId. Runs only when `armEndpoint` is set.
+   * pairingCode + tap-target. Runs only when `armEndpoint` is set (charger
+   * branch) or the resolved target's `pairableType === 'device'`.
    */
   const beginConnectArmIntent = async (mySession: number): Promise<void> => {
-    if (!armEndpoint) return;
-    const chargeBoxId = await resolveChargeBoxId(mySession);
-    if (!chargeBoxId) return;
+    const target = await resolveTapTargetDeviceId(mySession);
+    if (!target) return;
     if (mySession !== refs.sessionId) return;
+
+    // Notify the host UI so it can stamp readerName / steps before
+    // setState transitions into `waiting` (which renders the panel).
+    if (onTargetResolved) {
+      try {
+        onTargetResolved(target);
+      } catch {
+        // swallow — diagnostics only
+      }
+    }
+
+    // Pick the arm URL + body shape based on the resolved pairableType.
+    const isDeviceBranch = target.pairableType === "device";
+    if (isDeviceBranch && armEndpoint && armEndpoint !== "") {
+      // We've been given a charger arm endpoint, but the target is a
+      // phone — that's a misconfiguration. Surface as a network error so
+      // the operator can retry; the picker should have prevented this.
+    }
+    const armUrl = isDeviceBranch
+      ? deviceScanArmUrl(target.deviceId)
+      : armEndpoint;
+    if (!armUrl) {
+      setState({ kind: "network_error", phase: "connect" });
+      dispatch("scan-tag:error", { reason: "arm_failed", status: 0 });
+      return;
+    }
+    const armBody = isDeviceBranch
+      ? { purpose: "admin-link", hintLabel }
+      : { chargeBoxId: target.deviceId };
 
     let armResp: Response;
     try {
-      armResp = await fetch(armEndpoint, {
+      armResp = await fetch(armUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chargeBoxId }),
+        body: JSON.stringify(armBody),
       });
     } catch {
       if (mySession !== refs.sessionId) return;
@@ -328,8 +470,8 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
       dispatch("scan-tag:error", { reason: "detect_503" });
       return;
     }
-    const armBody: ArmResponse = await armResp.json().catch(() => ({}));
-    if (!armResp.ok || !armBody.pairingCode || !armBody.chargeBoxId) {
+    const armRespBody: ArmResponse = await armResp.json().catch(() => ({}));
+    if (!armResp.ok || !armRespBody.pairingCode) {
       setState({ kind: "network_error", phase: "connect" });
       dispatch("scan-tag:error", {
         reason: "arm_failed",
@@ -338,16 +480,25 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
       return;
     }
 
+    // For chargers we trust the server's echoed `chargeBoxId`. For
+    // devices, the URL was keyed by deviceId — re-use the resolved
+    // target's deviceId.
+    const boundDeviceId = isDeviceBranch
+      ? target.deviceId
+      : (armRespBody.chargeBoxId ?? target.deviceId);
+
     refs.arm = {
-      pairingCode: armBody.pairingCode,
-      chargeBoxId: armBody.chargeBoxId,
+      pairableType: target.pairableType,
+      pairingCode: armRespBody.pairingCode,
+      deviceId: boundDeviceId,
     };
 
     let es: EventSource;
     try {
+      const queryParam = isDeviceBranch ? "deviceId" : "chargeBoxId";
       const url = `/api/auth/scan-detect?pairingCode=${
-        encodeURIComponent(armBody.pairingCode)
-      }&chargeBoxId=${encodeURIComponent(armBody.chargeBoxId)}`;
+        encodeURIComponent(armRespBody.pairingCode)
+      }&${queryParam}=${encodeURIComponent(boundDeviceId)}`;
       es = new EventSource(url);
     } catch {
       setState({ kind: "network_error", phase: "connect" });
@@ -521,7 +672,11 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
     const mySession = ++refs.sessionId;
     setState({ kind: "connecting" });
 
-    if (armEndpoint) {
+    // The arm-intent pipeline runs whenever the caller has either set
+    // `armEndpoint` (charger branch) OR pinned a device-side target.
+    const wantsArmIntent = !!armEndpoint ||
+      (!!fixedDeviceId && fixedPairableType === "device");
+    if (wantsArmIntent) {
       void beginConnectArmIntent(mySession);
     } else {
       beginConnectLegacy(mySession);

@@ -49,7 +49,7 @@ import type {
   CustomerChargerCardDto,
   CustomerChargerStatus,
 } from "../islands/customer/CustomerChargersSection.tsx";
-import { normalizeStatus } from "../islands/shared/charger-visuals.ts";
+import { normalizeStatus } from "../islands/shared/device-visuals.ts";
 
 const log = logger.child("DashboardLoader");
 
