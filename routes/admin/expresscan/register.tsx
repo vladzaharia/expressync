@@ -55,7 +55,6 @@
  */
 
 import { define } from "../../../utils.ts";
-import { config } from "../../../src/lib/config.ts";
 import { mintOneTimeCode } from "../../../src/lib/devices/registration.ts";
 import { DEVICE_CAPABILITIES } from "../../../src/lib/types/devices.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
@@ -155,14 +154,19 @@ export const handler = define.handlers({
       };
     }
 
-    // 302 to the Universal Link target. iOS's app-association manifest
-    // (served at /.well-known/apple-app-site-association) claims this
-    // path, so the OS hands the URL to the app instead of opening it
-    // in Safari. The raw oneTimeCode is single-use, 60s-TTL, hashed at
-    // rest — short-lived URL exposure is acceptable per the design.
-    const callback = new URL(
-      `${config.ADMIN_BASE_URL}/expresscan/register/callback`,
-    );
+    // 302 to a custom-scheme URL that the iOS app's
+    // ASWebAuthenticationSession is registered to intercept (via its
+    // `callbackURLScheme`). The session dismisses immediately when the
+    // in-session web view tries to follow this redirect and delivers
+    // the URL to the app's completion handler — works reliably across
+    // iOS versions, no AASA validation in the hot path. The HTTPS
+    // Universal Link target still exists in the AASA manifest as a
+    // belt-and-braces path for users who somehow encounter a stale
+    // callback URL outside the auth session.
+    //
+    // The raw oneTimeCode is single-use, 60s-TTL, hashed at rest —
+    // short-lived URL exposure is acceptable per the design.
+    const callback = new URL("expresscan://register/callback");
     callback.searchParams.set("code", oneTimeCode);
 
     const response = new Response(null, {
