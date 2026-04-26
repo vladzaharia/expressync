@@ -225,6 +225,34 @@
       "when": 1777098278741,
       "tag": "0031_charming_guardsmen",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1777912000000,
+      "tag": "0032_idempotency_keys",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1777912060000,
+      "tag": "0033_lago_webhook_breaker_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1777912120000,
+      "tag": "0034_devices_and_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1777912180000,
+      "tag": "0035_tappable_devices_view",
+      "breakpoints": true
     }
   ]
 }
