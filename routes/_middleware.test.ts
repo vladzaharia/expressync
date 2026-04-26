@@ -11,6 +11,7 @@ import {
   rewriteRequestForSurface,
 } from "@/src/lib/hostname-dispatch.ts";
 import { classifyRoute, getAllRouteRules } from "@/src/lib/route-classifier.ts";
+import { selectAuth } from "./_middleware.ts";
 
 // Phase A7a: rate-limit storage moved from an in-memory Map to Postgres, so we
 // can no longer inspect or reset a shared in-process store. These tests run
@@ -216,4 +217,61 @@ Deno.test("hostname fixture — 8h customer TTL ceiling boundary", () => {
   const ageSec9 = (Date.now() - nineHoursAgo) / 1000;
   assertEquals(ageSec7 < ttl, true, "7h session must be under 8h ceiling");
   assertEquals(ageSec9 > ttl, true, "9h session must be over 8h ceiling");
+});
+
+// =============================================================================
+// ExpresScan / Wave 1 Track A — selectAuth() classifier
+//
+// `selectAuth(pathname)` is the single source of truth for which auth
+// scheme is accepted on a path. The unit test `rejects bearer on admin`
+// (below) is gating: a regression that lets a bearer-only client hit an
+// admin endpoint would slip through here loudly.
+// =============================================================================
+
+Deno.test("selectAuth — rejects bearer on admin paths", () => {
+  // Even though `/api/admin/*` is the most security-sensitive surface,
+  // selectAuth must return "cookie" so the bearer branch in the middleware
+  // is NEVER taken. A valid `Authorization: Bearer dev_…` header on an
+  // admin endpoint is treated like no auth at all (cookie session check
+  // runs and 401s when the cookie is missing).
+  assertEquals(selectAuth("/api/admin/devices"), "cookie");
+  assertEquals(selectAuth("/api/admin/devices/abc"), "cookie");
+  assertEquals(selectAuth("/api/admin/devices/abc/scan-arm"), "cookie");
+  assertEquals(selectAuth("/api/admin/sync"), "cookie");
+  assertEquals(selectAuth("/api/admin/users/u1"), "cookie");
+});
+
+Deno.test("selectAuth — bearer for /api/devices/* lifecycle routes", () => {
+  assertEquals(selectAuth("/api/devices/heartbeat"), "bearer");
+  assertEquals(selectAuth("/api/devices/me"), "bearer");
+  assertEquals(selectAuth("/api/devices/scan-stream"), "bearer");
+  assertEquals(selectAuth("/api/devices/scan-result"), "bearer");
+  assertEquals(selectAuth("/api/devices/scan-result/X7R2KQ"), "bearer");
+  // Per-deviceId paths (DELETE / PUT push-token) are bearer too.
+  assertEquals(
+    selectAuth("/api/devices/00000000-0000-0000-0000-000000000000"),
+    "bearer",
+  );
+  assertEquals(
+    selectAuth(
+      "/api/devices/00000000-0000-0000-0000-000000000000/push-token",
+    ),
+    "bearer",
+  );
+});
+
+Deno.test("selectAuth — register is cookie-only", () => {
+  // The register entrypoint mints the bearer token from a cookie session
+  // + PKCE code, so the request itself can't carry a bearer.
+  assertEquals(selectAuth("/api/devices/register"), "cookie");
+});
+
+Deno.test("selectAuth — customer + ocpp + public", () => {
+  assertEquals(selectAuth("/api/customer/sessions"), "cookie");
+  assertEquals(selectAuth("/api/ocpp/pre-authorize"), "ocpp-hmac");
+  assertEquals(selectAuth("/api/ocpp/meter-values"), "ocpp-hmac");
+  assertEquals(selectAuth("/api/auth/scan-pair"), "public-or-cookie");
+  assertEquals(selectAuth("/api/health"), "public-or-cookie");
+  assertEquals(selectAuth("/api/webhook/lago"), "public-or-cookie");
+  assertEquals(selectAuth("/login"), "public-or-cookie");
 });

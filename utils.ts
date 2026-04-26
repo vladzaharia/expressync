@@ -83,6 +83,27 @@ export interface State {
    * this directly.
    */
   customerScope?: CustomerScope;
+
+  /**
+   * ExpresScan / Wave 1 Track A: bearer-authenticated device context.
+   *
+   * Set by the bearer-auth branch in `_middleware.ts` when a valid
+   * `Authorization: Bearer dev_…` header resolves to a live device + token
+   * row. `device` and `user` are mutually exclusive — bearer auth NEVER
+   * populates `user`, and cookie auth NEVER populates `device`.
+   */
+  device?: {
+    /** UUID of the matched device row. */
+    id: string;
+    /** Owner admin user_id. The trigger guarantees role='admin'. */
+    ownerUserId: string;
+    /** Granted capabilities ("tap", "ev", ...). */
+    capabilities: string[];
+    /** sha256 of the device's HMAC secret — used by scan-result for nonce verify. */
+    secretHash: string;
+    /** UUID of the active `device_tokens` row. Used for revocation events. */
+    tokenId: string;
+  };
 }
 
 export const define = createDefine<State>();

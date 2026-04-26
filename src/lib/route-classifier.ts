@@ -51,7 +51,10 @@ const RULES: readonly RouteRule[] = [
 
   // ------- PUBLIC (admin surface only) -------
   // Admin URLs are file-system rewritten to /admin/X, so the public admin
-  // login page appears as `/admin/login` in `ctx.url.pathname`.
+  // login page appears as `/admin/login` in `ctx.url.pathname`. The
+  // `/admin/login/email` fallback (Wave 1 Track A — only reachable when
+  // ADMIN_AUTH_SHOW_FALLBACK=true) is also public so unauthenticated
+  // admins can reach the email/password form without a session.
   { prefix: "/admin/login", classification: "PUBLIC", surface: "admin" },
   {
     prefix: "/admin/reset-password",
