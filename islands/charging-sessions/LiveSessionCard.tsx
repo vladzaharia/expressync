@@ -34,7 +34,7 @@ import {
 import {
   formatRelative,
   formatSessionDuration,
-} from "@/islands/shared/charger-visuals.ts";
+} from "@/islands/shared/device-visuals.ts";
 import { cn } from "@/src/lib/utils/cn.ts";
 
 interface TransactionMeterPayload {

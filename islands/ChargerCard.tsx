@@ -17,10 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
-import {
-  chargerFormFactorIcons,
-  GenericChargerIcon,
-} from "@/components/brand/chargers/index.ts";
+import { getDeviceIcon } from "@/src/lib/utils/device-icons.ts";
 import { cn } from "@/src/lib/utils/cn.ts";
 
 /**
@@ -60,7 +57,7 @@ import {
   REFRESH_COOLDOWN_MS,
   STALE_DIM_MS,
   STATUS_HALO,
-} from "./shared/charger-visuals.ts";
+} from "./shared/device-visuals.ts";
 
 export default function ChargerCard(
   { charger, activeSession, isAdmin = false, onAction }: ChargerCardProps,
@@ -150,9 +147,7 @@ export default function ChargerCard(
     : Number.POSITIVE_INFINITY;
   const isStale = statusAge > STALE_DIM_MS && status !== "Offline";
 
-  const IconComponent = chargerFormFactorIcons[
-    charger.formFactor as keyof typeof chargerFormFactorIcons
-  ] ?? GenericChargerIcon;
+  const IconComponent = getDeviceIcon("charger", charger.formFactor);
 
   const postOperation = async (
     operation: string,

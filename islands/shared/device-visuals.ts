@@ -1,9 +1,16 @@
 /**
- * Shared visual helpers for charger-related islands and pages.
+ * Shared visual helpers for device-related islands and pages.
  *
- * Extracted from `islands/ChargerCard.tsx` so the Charge Box Details page
- * (`routes/chargers/[chargeBoxId].tsx`), its new `ConnectorCard` island,
- * and the existing `ChargerCard` can all speak the same status vocabulary.
+ * Originally extracted from `islands/ChargerCard.tsx` (then named
+ * `charger-visuals.ts`) so the Charge Box Details page
+ * (`routes/chargers/[chargeBoxId].tsx`), its `ConnectorCard` island, and the
+ * existing `ChargerCard` could all speak the same status vocabulary.
+ *
+ * As the system grew to cover phone/laptop NFC tap-targets alongside
+ * chargers, the file was renamed to `device-visuals.ts` and grew a small
+ * device-status surface (`normalizeDeviceStatus`, `DEVICE_STATUS_HALO`)
+ * sitting next to the unchanged charger-status surface (`normalizeStatus`,
+ * `STATUS_HALO`).
  *
  * Keep in sync with any new OCPP status buckets; Lago / StEvE status strings
  * come in raw and we collapse them here.
@@ -116,4 +123,70 @@ export function formatSessionDuration(startIso: string): string {
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
   return `${h}:${m.toString().padStart(2, "0")}`;
+}
+
+// ---------------------------------------------------------------------------
+// Generic device-status surface (chargers + phones + laptops + future kinds)
+//
+// This is intentionally smaller and simpler than the OCPP-specific
+// `UiStatus` / `normalizeStatus` pair above: device "status" only needs to
+// answer one question for the operator — is this thing reachable right now?
+// — plus a transient "scanning" tone for the live arming window.
+// ---------------------------------------------------------------------------
+
+/**
+ * The canonical UI buckets used by the generic Devices surface (admin
+ * Devices page, the scan-modal device picker, anywhere a phone/laptop or
+ * non-OCPP charger row is rendered).
+ *
+ * Mapping:
+ *   - "Online"   — server has a recent heartbeat (`isOnline === true`).
+ *   - "Offline"  — no fresh heartbeat OR last seen > `OFFLINE_AFTER_MS` ago.
+ *   - "Scanning" — the device is mid-NFC-arm; this is a transient tone
+ *                  callers opt into (e.g. `DEVICE_STATUS_HALO.Scanning`
+ *                  while a scan-stream session is open). The
+ *                  `normalizeDeviceStatus()` helper itself only ever
+ *                  returns "Online" / "Offline" — callers layer "Scanning"
+ *                  on top when they have that signal.
+ */
+export type DeviceStatus = "Online" | "Offline" | "Scanning";
+
+/**
+ * Halo colors for the generic device-icon ring. Mirrors `STATUS_HALO`'s
+ * oklch palette so the chargers page and the devices page sit in the same
+ * visual key.
+ *
+ *   - Online   → teal (matches the `accentTeal` design token used by the
+ *                Devices page in 40-frontend.md)
+ *   - Offline  → red (same as charger Offline/Faulted)
+ *   - Scanning → cyan (callers add the pulse animation themselves; the
+ *                color is the only thing this map fixes)
+ */
+export const DEVICE_STATUS_HALO: Record<DeviceStatus, string> = {
+  Online: "oklch(0.72 0.14 196)", // teal
+  Offline: "oklch(0.65 0.22 25)", // red
+  Scanning: "oklch(0.80 0.15 200)", // cyan pulse
+};
+
+/**
+ * Collapse `(lastSeenAtIso, isOnline)` into the generic `Online`/`Offline`
+ * bucket. We honor `OFFLINE_AFTER_MS` even when the server says "online" so
+ * a stale heartbeat (e.g. the SSE stream just dropped) doesn't read as live
+ * forever.
+ *
+ * The "Scanning" bucket is never returned from this helper — it's a
+ * transient tone callers apply directly when they know a scan-stream is
+ * armed for the device.
+ */
+export function normalizeDeviceStatus(
+  lastSeenAtIso: string | null,
+  isOnline: boolean,
+): DeviceStatus {
+  if (lastSeenAtIso) {
+    const age = Date.now() - new Date(lastSeenAtIso).getTime();
+    if (age > OFFLINE_AFTER_MS) return "Offline";
+  } else if (!isOnline) {
+    return "Offline";
+  }
+  return isOnline ? "Online" : "Offline";
 }
