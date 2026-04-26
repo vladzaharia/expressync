@@ -33,6 +33,7 @@ import {
   type LucideIcon,
   Receipt,
   RefreshCw,
+  Smartphone,
   Tag,
   Users,
   Webhook,
@@ -72,6 +73,19 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
         icon: BatteryCharging,
         accentColor: "orange",
         keywords: ["charge box", "ocpp"],
+      },
+      {
+        // ExpresScan Wave 4 (D2): admin Devices surface — phones-only listing
+        // for v1; chargers stay on /admin/chargers. Position is between
+        // Chargers and Reservations (per docs/plan/40-frontend.md
+        // § Sidebar nav addition).
+        id: "nav:/admin/devices",
+        title: "Devices",
+        path: "/admin/devices",
+        icon: Smartphone,
+        accentColor: "teal",
+        keywords: ["phone", "tap", "nfc", "laptop"],
+        adminOnly: true,
       },
       {
         id: "nav:/reservations",
