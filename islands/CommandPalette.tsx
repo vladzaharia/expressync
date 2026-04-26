@@ -493,11 +493,11 @@ export default function CommandPalette(
             role="listbox"
             className="flex-1 overflow-y-auto py-1"
           >
-            <Command.Empty className="px-4 py-6 text-sm text-muted-foreground text-center">
-              {scanPicker.value
-                ? "No matching scanners online."
-                : `No matches. Try a charger ID, tag name, or "sync".`}
-            </Command.Empty>
+            {!scanPicker.value && (
+              <Command.Empty className="px-4 py-6 text-sm text-muted-foreground text-center">
+                No matches. Try a charger ID, tag name, or "sync".
+              </Command.Empty>
+            )}
 
             {
               /* Scan Tag subview — when active, replaces the normal
