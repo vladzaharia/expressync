@@ -4,7 +4,6 @@
  * Mounted once from `routes/_app.tsx` as a top-level body child. Renders
  * nothing until the user opens it; then a full-screen backdrop + centered
  * panel (mobile: full-screen sheet) appear with:
- *   - Recent (localStorage `cmdk.recent`, 10 items)
  *   - Navigate  (static — every `mainNavItems` entry)
  *   - Actions   (static — Trigger sync, Create reservation, etc.)
  *   - Dynamic entity groups (chargers, tags, customers, invoices,
@@ -29,7 +28,6 @@ import { toast } from "sonner";
 import {
   BatteryCharging,
   CalendarClock,
-  Clock,
   FileText,
   Radio,
   Receipt,
@@ -74,96 +72,10 @@ interface CommandPaletteProps {
   surface?: CommandPaletteSurface;
 }
 
-const RECENT_KEY = "cmdk.recent";
-const RECENT_MIGRATED_KEY = "cmdk.recent.migrated_v1";
-const RECENT_LIMIT = 10;
 const SEARCH_DEBOUNCE_MS = 150;
-
-/**
- * One-shot migration for Recent LRU entries stored before Wave A4:
- *   - Old ids used label-style keys ("nav:transactions"); rewrite to
- *     path-style ("nav:/transactions") which is the new stable id shape.
- *   - Title "Transactions" was renamed to "Charging Sessions".
- * Gated by `cmdk.recent.migrated_v1` so it only runs once per browser.
- */
-function migrateRecentV1() {
-  try {
-    if (localStorage.getItem(RECENT_MIGRATED_KEY) === "true") return;
-    const raw = localStorage.getItem(RECENT_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        // Map of legacy id -> new id (derived from old label-style keys).
-        const idMap: Record<string, string> = {
-          "nav:dashboard": "nav:/",
-          "nav:tags": "nav:/tags",
-          "nav:tag-linking": "nav:/links",
-          "nav:transactions": "nav:/transactions",
-          "nav:invoices": "nav:/invoices",
-          "nav:chargers": "nav:/chargers",
-          "nav:sync": "nav:/sync",
-          "nav:users": "nav:/users",
-          "nav:reservations": "nav:/reservations",
-        };
-        const migrated = parsed.map((e) => {
-          if (!e || typeof e !== "object") return e;
-          const entry = e as Record<string, unknown>;
-          if (typeof entry.id === "string" && idMap[entry.id]) {
-            entry.id = idMap[entry.id];
-          }
-          if (entry.title === "Transactions") {
-            entry.title = "Charging Sessions";
-          }
-          return entry;
-        });
-        localStorage.setItem(RECENT_KEY, JSON.stringify(migrated));
-      }
-    }
-    localStorage.setItem(RECENT_MIGRATED_KEY, "true");
-  } catch {
-    /* ignore storage errors */
-  }
-}
-
-interface RecentEntry {
-  id: string;
-  title: string;
-  href: string;
-  subtitle?: string;
-}
 
 function navigate(href: string) {
   clientNavigate(href);
-}
-
-function loadRecent(): RecentEntry[] {
-  try {
-    const raw = localStorage.getItem(RECENT_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((e): e is RecentEntry =>
-        e && typeof e === "object" && typeof e.id === "string" &&
-        typeof e.title === "string" && typeof e.href === "string"
-      )
-      .slice(0, RECENT_LIMIT);
-  } catch {
-    return [];
-  }
-}
-
-function pushRecent(entry: RecentEntry) {
-  try {
-    const current = loadRecent().filter((e) => e.id !== entry.id);
-    current.unshift(entry);
-    localStorage.setItem(
-      RECENT_KEY,
-      JSON.stringify(current.slice(0, RECENT_LIMIT)),
-    );
-  } catch {
-    /* ignore storage errors */
-  }
 }
 
 export default function CommandPalette(
@@ -173,8 +85,8 @@ export default function CommandPalette(
   const query = useSignal("");
   const searchResults = useSignal<CommandSearchResponse | null>(null);
   const searchLoading = useSignal(false);
-  const recent = useSignal<RecentEntry[]>([]);
   const triggeringElement = useRef<Element | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   // Sub-page state for the "Scan Tag" two-step flow. When non-null, the
   // palette body switches from search results to a tap-target picker.
   // `loading=true` while the GET /api/auth/scan-tap-targets call is in
@@ -241,10 +153,8 @@ export default function CommandPalette(
     const detach = attachPaletteHotkeys({
       isOpen: () => open.value,
       open: () => {
-        migrateRecentV1();
         triggeringElement.current = document.activeElement;
         open.value = true;
-        recent.value = loadRecent();
       },
       close: () => {
         open.value = false;
@@ -268,15 +178,25 @@ export default function CommandPalette(
   useEffect(() => {
     const onOpen = () => {
       if (!open.value) {
-        migrateRecentV1();
         triggeringElement.current = document.activeElement;
         open.value = true;
-        recent.value = loadRecent();
       }
     };
     globalThis.addEventListener("cmdk:open", onOpen);
     return () => globalThis.removeEventListener("cmdk:open", onOpen);
   }, []);
+
+  // -- Focus the input every time the palette opens. `autoFocus` only fires
+  //    on initial DOM mount; the second `cmdk:open` (or hotkey toggle after
+  //    a close) would otherwise leave focus wherever it was, so keyboard
+  //    events weren't being intercepted by the palette.
+  useEffect(() => {
+    if (!open.value) return;
+    const id = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [open.value]);
 
   // -- Auto-close on route change (Fresh full-reload nav fires beforeunload)
   useEffect(() => {
@@ -295,7 +215,14 @@ export default function CommandPalette(
     const onScanPickerOpen = async () => {
       // Skip on customer surface — admin scan inventory only.
       if (isCustomer) return;
-      scanPicker.value = { loading: true, targets: null };
+      // Fetch BEFORE switching to the scan subview. Pre-2026-04 we flipped
+      // `scanPicker` to a loading subview and back if no targets were
+      // online, which made the palette flash main→subview→main with the
+      // toast trailing. Ordering: fetch silently from the main view, then
+      // commit to a single final state (close-and-toast OR auto-arm OR
+      // subview with targets). The roster endpoint is fast in practice
+      // (~50–150 ms); a longer wait is signalled by the input row's
+      // existing `searchLoading` indicator if we ever need it.
       try {
         const res = await fetch("/api/auth/scan-tap-targets", {
           method: "GET",
@@ -311,11 +238,11 @@ export default function CommandPalette(
         const all = (data.devices ?? []) as TapTargetEntry[];
         const online = all.filter((d) => d.isOnline);
         if (online.length === 0) {
-          scanPicker.value = null;
-          toast.error("No tap-targets online", {
-            description:
-              "Wait for a charger or phone to come back online and try again.",
-          });
+          // Switch into the subview with the offline-only roster so the
+          // operator sees an explicit "No scanners available" line item
+          // (rendered below) rather than the palette closing silently.
+          scanPicker.value = { loading: false, targets: all };
+          query.value = "";
           return;
         }
         // D3 auto-arm rule: the operator's own phone, when it's the only
@@ -460,23 +387,11 @@ export default function CommandPalette(
       !!evt && (evt as KeyboardEvent).ctrlKey;
 
     if (cmd.kind === "navigate" && cmd.href) {
-      pushRecent({
-        id: cmd.id,
-        title: cmd.title,
-        href: cmd.href,
-        subtitle: cmd.subtitle,
-      });
       close();
       navigate(cmd.href);
       return;
     }
     if (cmd.kind === "action" && cmd.run) {
-      pushRecent({
-        id: cmd.id,
-        title: cmd.title,
-        href: "",
-        subtitle: cmd.subtitle,
-      });
       try {
         cmd.run(keepOpen);
       } catch (err) {
@@ -487,27 +402,11 @@ export default function CommandPalette(
     }
   };
 
-  const executeRecent = (entry: RecentEntry) => {
-    if (!entry.href) {
-      // Recent action with no href — no-op; user can re-run from Actions group.
-      close();
-      return;
-    }
-    close();
-    navigate(entry.href);
-  };
-
   // -- Entity hit execution ---------------------------------------------
   const executeHit = (
     hit: { id: string; label: string; href: string; subtitle?: string },
-    group: string,
+    _group: string,
   ) => {
-    pushRecent({
-      id: `${group}:${hit.id}`,
-      title: hit.label,
-      href: hit.href,
-      subtitle: hit.subtitle,
-    });
     close();
     navigate(hit.href);
   };
@@ -552,6 +451,7 @@ export default function CommandPalette(
               </span>
             )}
             <Command.Input
+              ref={inputRef}
               autoFocus
               value={query.value}
               onValueChange={(v: string) => (query.value = v)}
@@ -608,7 +508,8 @@ export default function CommandPalette(
                 one place. */
             }
             {scanPicker.value && !scanPicker.value.loading &&
-              scanPicker.value.targets && (
+              scanPicker.value.targets &&
+              scanPicker.value.targets.some((t) => t.isOnline) && (
               <div class="px-3 py-2">
                 <p class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
                   Pick a tap-target
@@ -620,22 +521,24 @@ export default function CommandPalette(
                 />
               </div>
             )}
-
-            {/* Recent — only on empty query */}
-            {!scanPicker.value && !hasQuery && recent.value.length > 0 && (
-              <CommandGroup heading="Recent">
-                {recent.value.map((r) => (
-                  <CommandItem
-                    key={`recent:${r.id}`}
-                    value={`recent:${r.id}`}
-                    icon={Clock}
-                    accent="neutral"
-                    title={r.title}
-                    subtitle={r.subtitle}
-                    onSelect={() => executeRecent(r)}
-                  />
-                ))}
-              </CommandGroup>
+            {scanPicker.value && !scanPicker.value.loading &&
+              scanPicker.value.targets &&
+              !scanPicker.value.targets.some((t) => t.isOnline) && (
+              <div
+                class="mx-3 my-2 px-3 py-2 rounded-md border border-border bg-muted/40 text-sm text-muted-foreground flex items-center gap-2"
+                role="status"
+                aria-live="polite"
+              >
+                <Radio class="size-4 opacity-60" aria-hidden="true" />
+                <div class="flex-1">
+                  <div class="font-medium text-foreground">
+                    No scanners available
+                  </div>
+                  <div class="text-xs">
+                    Bring a charger or phone online to scan a tag.
+                  </div>
+                </div>
+              </div>
             )}
 
             {
