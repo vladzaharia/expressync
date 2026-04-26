@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { BorderBeam } from "@/components/magicui/border-beam.tsx";
 import { subscribeSse } from "@/islands/shared/SseProvider.tsx";
-import { formatSessionDuration } from "./shared/charger-visuals.ts";
+import { formatSessionDuration } from "./shared/device-visuals.ts";
 
 export type ConnectorUiStatus =
   | "Available"

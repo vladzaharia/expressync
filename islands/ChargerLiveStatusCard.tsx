@@ -21,7 +21,7 @@ import {
   REFRESH_COOLDOWN_MS,
   STATUS_HALO,
   type UiStatus,
-} from "./shared/charger-visuals.ts";
+} from "./shared/device-visuals.ts";
 
 interface ActiveSession {
   transactionId: number;

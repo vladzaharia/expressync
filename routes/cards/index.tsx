@@ -33,7 +33,7 @@ import {
   CreditCard,
   XCircle,
 } from "lucide-preact";
-import { formatRelative } from "../../islands/shared/charger-visuals.ts";
+import { formatRelative } from "../../islands/shared/device-visuals.ts";
 import CustomerCardList, {
   type CustomerCard,
 } from "../../islands/customer/CustomerCardList.tsx";
