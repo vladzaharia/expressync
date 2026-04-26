@@ -241,10 +241,14 @@ export const handler = define.handlers({
           type: "scan.intercepted",
           payload: {
             idTag,
-            chargeBoxId,
+            // Wave 1 Track A: payload is generalized — chargers send
+            // pairableType:"charger" with pairableId=chargeBoxId.
+            pairableType: "charger",
+            pairableId: chargeBoxId,
             pairingCode: row.pairing_code,
             purpose: row.purpose ?? "login",
             t: Date.now(),
+            source: "ocpp-preauth",
           },
         });
       } catch (err) {
