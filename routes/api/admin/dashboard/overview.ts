@@ -58,8 +58,6 @@ export interface DashboardOverview {
     chargersDim10mTo1h: number;
     failedSyncs24h: number;
     overdueInvoices: number;
-    breakerOpen: boolean;
-    devicesOfflineGt1h: number;
   };
   weekly: {
     kwhWeek: number;
@@ -92,7 +90,6 @@ export async function loadDashboardOverview(): Promise<DashboardOverview> {
     scheduleRows,
     inFlightRow,
     chargerRollup,
-    devicesOfflineRow,
     pendingReservationsRow,
     completedReservationsWeekRow,
     activeSessionsRow,
@@ -101,7 +98,6 @@ export async function loadDashboardOverview(): Promise<DashboardOverview> {
     syncRateWeekRow,
     syncRunsWeekRow,
     overdueInvoicesRow,
-    breakerRows,
     tagsActivatedWeekRow,
     kwhTodayRow,
     kwhWeekRow,
@@ -135,16 +131,6 @@ export async function loadDashboardOverview(): Promise<DashboardOverview> {
         >`COUNT(*) FILTER (WHERE ${schema.chargersCache.lastStatusAt} IS NULL OR ${schema.chargersCache.lastStatusAt} < ${hr1Ago.toISOString()})`,
       })
       .from(schema.chargersCache),
-    db
-      .select({ value: count() })
-      .from(schema.devices)
-      .where(
-        and(
-          isNull(schema.devices.deletedAt),
-          isNull(schema.devices.revokedAt),
-          sql`${schema.devices.lastSeenAt} IS NULL OR ${schema.devices.lastSeenAt} < ${hr1Ago.toISOString()}`,
-        ),
-      ),
     db
       .select({ value: count() })
       .from(schema.reservations)
@@ -205,10 +191,6 @@ export async function loadDashboardOverview(): Promise<DashboardOverview> {
           eq(schema.lagoInvoices.paymentOverdue, true),
         ),
       ),
-    // Breaker table is a recent addition (migration 0033). Tolerate its
-    // absence so the dashboard still renders on environments that haven't
-    // applied the migration yet.
-    db.select().from(schema.lagoWebhookBreakerState).limit(1).catch(() => []),
     db
       .select({ value: count() })
       .from(schema.tagChangeLog)
@@ -252,10 +234,6 @@ export async function loadDashboardOverview(): Promise<DashboardOverview> {
   const schedule = scheduleRows[0] ?? null;
   const fleet = chargerRollup[0] ?? { total: 0, online: 0, dim: 0, offline: 0 };
   const inFlight = inFlightRow[0] ?? null;
-  const breaker = breakerRows[0] ?? null;
-  const breakerOpen = !!(breaker?.disabledUntilMs &&
-    breaker.disabledUntilMs > Date.now());
-
   const syncRateWeek = syncRateWeekRow[0] ?? { total: 0, success: 0 };
   const syncSuccess7d = Number(syncRateWeek.total) === 0 ? 100 : Math.round(
     (Number(syncRateWeek.success) / Number(syncRateWeek.total)) * 100,
@@ -314,8 +292,6 @@ export async function loadDashboardOverview(): Promise<DashboardOverview> {
       chargersDim10mTo1h: Number(fleet.dim),
       failedSyncs24h: Number(failedSyncs24hRow[0]?.value ?? 0),
       overdueInvoices: Number(overdueInvoicesRow[0]?.value ?? 0),
-      breakerOpen,
-      devicesOfflineGt1h: Number(devicesOfflineRow[0]?.value ?? 0),
     },
     weekly: {
       kwhWeek: Number(kwhWeekRow[0]?.value ?? 0),
