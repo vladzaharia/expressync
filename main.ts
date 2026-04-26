@@ -104,6 +104,10 @@ function shouldRewriteAdminPath(pathname: string): boolean {
     return false;
   }
   if (pathname === "/apple-touch-icon.png") return false;
+  // ExpresScan / Wave 4 Track C-e2e — Apple Universal Links manifest is
+  // fetched WITHOUT auth from the registered domain root (no /admin
+  // prefix), so the rewrite must skip it.
+  if (pathname.startsWith("/.well-known/")) return false;
   // Avoid double-prepending if path already has /admin (shouldn't happen
   // in normal browser navigation but defends against intermediate proxies).
   if (pathname === "/admin" || pathname.startsWith("/admin/")) return false;

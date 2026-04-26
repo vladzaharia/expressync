@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["48H7CLBV8Y.gg.vlad.expresscan"],
+        "components": [
+          { "/": "/expresscan/register/*" }
+        ]
+      }
+    ]
+  }
+}

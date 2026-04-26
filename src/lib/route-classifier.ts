@@ -51,7 +51,10 @@ const RULES: readonly RouteRule[] = [
 
   // ------- PUBLIC (admin surface only) -------
   // Admin URLs are file-system rewritten to /admin/X, so the public admin
-  // login page appears as `/admin/login` in `ctx.url.pathname`.
+  // login page appears as `/admin/login` in `ctx.url.pathname`. The
+  // `/admin/login/email` fallback (Wave 1 Track A — only reachable when
+  // ADMIN_AUTH_SHOW_FALLBACK=true) is also public so unauthenticated
+  // admins can reach the email/password form without a session.
   { prefix: "/admin/login", classification: "PUBLIC", surface: "admin" },
   {
     prefix: "/admin/reset-password",
@@ -108,6 +111,12 @@ const RULES: readonly RouteRule[] = [
   { prefix: "/_fresh", classification: "PUBLIC" },
   { prefix: "/static", classification: "PUBLIC" },
   { prefix: "/assets", classification: "PUBLIC" },
+  // Apple Universal Links manifest. Apple's CDN validator
+  // (`https://app-site-association.cdn-apple.com/a/v1/<host>`) fetches
+  // `/.well-known/apple-app-site-association` (or `.json`) WITHOUT auth,
+  // expecting `Content-Type: application/json` and no redirects. The
+  // manifest must be PUBLIC so the validator can reach it.
+  { prefix: "/.well-known", classification: "PUBLIC" },
   { prefix: "/favicon.ico", classification: "PUBLIC" },
   { prefix: "/favicon-16.png", classification: "PUBLIC" },
   { prefix: "/favicon-32.png", classification: "PUBLIC" },

@@ -35,7 +35,7 @@ import {
   type SseEventType,
   subscribeSse,
 } from "@/islands/shared/SseProvider.tsx";
-import { formatSessionDuration } from "@/islands/shared/charger-visuals.ts";
+import { formatSessionDuration } from "@/islands/shared/device-visuals.ts";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { toast } from "sonner";
 

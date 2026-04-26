@@ -1,0 +1,20 @@
+[
+  {
+    "comment": "All-zero 32-byte secret. Reference HMAC computed with Python's hmac module — see ScanResultSignerTests.swift for the snippet.",
+    "deviceSecretBase64URL": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "idTag": "04AB12CDEF1234",
+    "pairingCode": "X7R2KQ",
+    "deviceId": "00000000-0000-0000-0000-000000000001",
+    "ts": 1745622000,
+    "expectedHex": "2345bb48320f6a0f89953af9491569ba350e83e7e4c8ea136867ca6a5a648e1f"
+  },
+  {
+    "comment": "32 bytes of 0x42 — 'BBBB...' base64. Sanity-check non-trivial key path.",
+    "deviceSecretBase64URL": "QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI",
+    "idTag": "0123456789ABCDEF",
+    "pairingCode": "ABC123",
+    "deviceId": "11111111-2222-3333-4444-555555555555",
+    "ts": 1700000000,
+    "expectedHex": "ce4439749adbb90224d1ef50e788fc28ced71b0ed7674bb0019542e1a9aa8361"
+  }
+]

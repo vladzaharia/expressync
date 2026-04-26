@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table.tsx";
 import { ChevronDown, ChevronRight, RefreshCw } from "lucide-preact";
 import { cn } from "@/src/lib/utils/cn.ts";
-import { formatRelative } from "./shared/charger-visuals.ts";
+import { formatRelative } from "./shared/device-visuals.ts";
 import type { OcppOperationName } from "@/src/lib/types/steve.ts";
 
 export interface OperationLogRow {

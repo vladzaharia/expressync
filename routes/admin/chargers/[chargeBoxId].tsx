@@ -31,7 +31,7 @@ import {
   OFFLINE_AFTER_MS,
   STALE_DIM_MS,
   type UiStatus,
-} from "../../../islands/shared/charger-visuals.ts";
+} from "../../../islands/shared/device-visuals.ts";
 
 import { ChargerHeaderStrip } from "../../../components/chargers/ChargerHeaderStrip.tsx";
 import ChargerIdentityCard from "../../../islands/ChargerIdentityCard.tsx";

@@ -1,27 +1,48 @@
 /**
- * GET /api/auth/scan-detect?pairingCode=X&chargeBoxId=Y
+ * GET /api/auth/scan-detect?pairingCode=…&chargeBoxId=…  (charger flow)
+ * GET /api/auth/scan-detect?pairingCode=…&deviceId=…     (device flow)
  *
  * Polaris Track C — public SSE endpoint that streams matching tag-scan
- * events for a previously armed pairing. The customer login UI opens
- * this stream after `/api/auth/scan-pair` returns; on the first matching
- * event it POSTs `/api/auth/scan-login` to complete the flow.
+ * events for a previously armed pairing.
  *
- * Per-event payload:
+ * Two pairable types share one handler. The query param decides which
+ * branch:
+ *   - chargeBoxId: existing customer scan-to-login flow. Verification
+ *     identifier is `scan-pair:{chargeBoxId}:{pairingCode}`. Filters
+ *     `scan.intercepted` by `(pairableType="charger", pairableId,
+ *     pairingCode)`.
+ *   - deviceId: new ExpresScan flow. The browser-side scan-modal UI
+ *     opens this stream after `POST /api/admin/devices/{deviceId}/scan-arm`
+ *     publishes `device.scan.requested`. Verification identifier is
+ *     `device-scan:{deviceId}:{pairingCode}`. Filters `scan.intercepted`
+ *     by `(pairableType="device", pairableId, pairingCode)`.
+ *
+ * Per-event payload (charger flow):
  *   data: { idTag, nonce, t }
- *   where:
- *     - idTag: the OCPP id-tag string from the StEvE log line
- *     - t: server-side wall-clock at parse time (Date.now())
- *     - nonce: HMAC-SHA256(AUTH_SECRET, `${idTag}:${pairingCode}:${chargeBoxId}:${t}`)
+ *   nonce = HMAC-SHA256(AUTH_SECRET,
+ *     `${idTag}:${pairingCode}:${chargeBoxId}:${t}`)
  *
- * Server filters events by chargeBoxId so events from OTHER chargers are
- * NOT delivered to this listener — the security binding that defeats the
- * earlier cross-pickup attack.
+ * Per-event payload (device flow):
+ *   data: { idTag, nonce, t }
+ *   nonce = HMAC-SHA256(AUTH_SECRET,
+ *     `${idTag}:${pairingCode}:${deviceId}:${t}`)
+ *
+ * The HMAC binding key is the same `AUTH_SECRET` and the nonce shape is
+ * identical — the third positional segment (chargeBoxId vs deviceId) is
+ * the only difference, mirroring the way scan-login.ts already verifies
+ * the binding when the customer surface POSTs the pairing-complete call.
  *
  * Concurrency:
  *   - Per-IP cap: 3 simultaneous connections (in-process Map). When the
  *     cap is hit, the 4th returns 429.
  *   - Server-side timeout: 60s with no consumer activity → close.
  *   - Keep-alive heartbeat every 15s.
+ *
+ * Note: the docker-log-subscriber path is **charger-only** — it parses
+ * StEvE OCPP log lines, which only exist for charger pairings. The
+ * device-scan path doesn't subscribe to the docker log; the
+ * `scan.intercepted` event-bus path covers it via
+ * `pairableType: "device"`, source `device-scan-result`.
  */
 
 import { sql } from "drizzle-orm";
@@ -80,20 +101,30 @@ async function getHmacKey(): Promise<CryptoKey> {
   return cachedHmacKey;
 }
 
-/** Compute HMAC-SHA256 over `${idTag}:${pairingCode}:${chargeBoxId}:${t}`. */
+/** Compute HMAC-SHA256 over `${idTag}:${pairingCode}:${pairableId}:${t}`. */
 async function signNonce(
   idTag: string,
   pairingCode: string,
-  chargeBoxId: string,
+  pairableId: string,
   t: number,
 ): Promise<string> {
   const key = await getHmacKey();
   const sig = await crypto.subtle.sign(
     "HMAC",
     key,
-    _enc.encode(`${idTag}:${pairingCode}:${chargeBoxId}:${t}`),
+    _enc.encode(`${idTag}:${pairingCode}:${pairableId}:${t}`),
   );
   return hexEncode(sig);
+}
+
+type PairableType = "charger" | "device";
+
+interface PairableBinding {
+  pairableType: PairableType;
+  pairableId: string;
+  pairingCode: string;
+  /** verifications.identifier for the armed-row lookup. */
+  identifier: string;
 }
 
 export const handler = define.handlers({
@@ -101,11 +132,32 @@ export const handler = define.handlers({
     const url = new URL(ctx.req.url);
     const pairingCode = url.searchParams.get("pairingCode") ?? "";
     const chargeBoxId = url.searchParams.get("chargeBoxId") ?? "";
-    if (!pairingCode || !chargeBoxId) {
+    const deviceId = url.searchParams.get("deviceId") ?? "";
+    if (!pairingCode || (!chargeBoxId && !deviceId)) {
       return jsonResponse(400, {
-        error: "pairingCode_and_chargeBoxId_required",
+        error: "pairingCode_and_(chargeBoxId|deviceId)_required",
       });
     }
+    if (chargeBoxId && deviceId) {
+      // Pick one — both set is almost certainly a UI bug.
+      return jsonResponse(400, {
+        error: "chargeBoxId_and_deviceId_are_mutually_exclusive",
+      });
+    }
+
+    const binding: PairableBinding = chargeBoxId
+      ? {
+        pairableType: "charger",
+        pairableId: chargeBoxId,
+        pairingCode,
+        identifier: `scan-pair:${chargeBoxId}:${pairingCode}`,
+      }
+      : {
+        pairableType: "device",
+        pairableId: deviceId,
+        pairingCode,
+        identifier: `device-scan:${deviceId}:${pairingCode}`,
+      };
 
     const ip = getClientIp(ctx.req);
     const cur = concurrentByIp.get(ip) ?? 0;
@@ -114,12 +166,11 @@ export const handler = define.handlers({
     }
 
     // Verify the pairing is armed and not expired.
-    const identifier = `scan-pair:${chargeBoxId}:${pairingCode}`;
     let armed = false;
     try {
       const result = await db.execute<{ id: string }>(sql`
         SELECT id FROM verifications
-        WHERE identifier = ${identifier}
+        WHERE identifier = ${binding.identifier}
           AND expires_at > now()
           AND value::jsonb->>'status' = 'armed'
         LIMIT 1
@@ -130,6 +181,7 @@ export const handler = define.handlers({
       armed = list.length > 0;
     } catch (err) {
       log.error("Failed pairing lookup", {
+        pairableType: binding.pairableType,
         error: err instanceof Error ? err.message : String(err),
       });
       return jsonResponse(500, { error: "internal" });
@@ -180,27 +232,39 @@ export const handler = define.handlers({
     const stream = new ReadableStream<Uint8Array>({
       start: async (controller) => {
         ctlRef = controller;
-        // Connected event so the client knows the stream is live.
+        // Connected event so the client knows the stream is live. The
+        // payload includes `pairableType` so the browser-side handler
+        // doesn't need to remember which query param it sent.
         safeEnqueue(
           _enc.encode(
             `event: connected\ndata: ${
-              JSON.stringify({ chargeBoxId, expiresInSec: TIMEOUT_MS / 1000 })
+              JSON.stringify({
+                pairableType: binding.pairableType,
+                pairableId: binding.pairableId,
+                expiresInSec: TIMEOUT_MS / 1000,
+                // Legacy field for backwards compat with the existing
+                // customer login flow (`CustomerScanLoginIsland.tsx`).
+                ...(binding.pairableType === "charger"
+                  ? { chargeBoxId: binding.pairableId }
+                  : {}),
+              })
             }\n\n`,
           ),
         );
 
-        // Emit an HMAC-signed scan event to the client. Called by both
-        // the docker-log `reject` path (unknown tag intercepted by log
-        // scraping) and the event-bus `scan.intercepted` path (pre-auth
-        // hook intercepted a known-or-unknown tag during an armed
+        // Emit an HMAC-signed scan event to the client. Used by both
+        // the docker-log path (charger only — log scraping intercepts
+        // unknown tags) and the event-bus `scan.intercepted` path
+        // (charger and device — the pre-auth hook + scan-result
+        // handler emit it for known and unknown tags during an armed
         // window).
         const emit = (idTag: string, t: number): void => {
           (async () => {
             try {
               const nonce = await signNonce(
                 idTag,
-                pairingCode,
-                chargeBoxId,
+                binding.pairingCode,
+                binding.pairableId,
                 t,
               );
               safeEnqueue(
@@ -216,59 +280,85 @@ export const handler = define.handlers({
           })();
         };
 
-        const sub = await subscribe(
-          (event) => {
-            if (closed) return;
-            // CRITICAL security check: only forward events whose
-            // chargeBoxId matches the bound pairing. Null chargeBoxId
-            // (couldn't parse from log line) is dropped so an attacker
-            // can't get a non-bound event through by triggering a tag
-            // scan against a charger whose chargeBoxId we couldn't
-            // extract from logs.
-            if (event.chargeBoxId !== chargeBoxId) return;
-            // Only the reject path is relevant here; start-tx events
-            // are handled by the watchdog, not customer login.
-            if (event.type !== "reject" || !event.idTag) return;
-            emit(event.idTag, event.t);
-          },
-          (err) => {
-            if (closed) return;
-            log.warn("Underlying stream errored", { error: err.message });
+        // Charger-only: subscribe to the docker-log-subscriber for
+        // OCPP log-scraped reject events. Device flow has no log
+        // surface; skip.
+        if (binding.pairableType === "charger") {
+          const sub = await subscribe(
+            (event) => {
+              if (closed) return;
+              // CRITICAL security check: only forward events whose
+              // chargeBoxId matches the bound pairing. Null
+              // chargeBoxId (couldn't parse from log line) is dropped
+              // so an attacker can't get a non-bound event through by
+              // triggering a tag scan against a charger whose
+              // chargeBoxId we couldn't extract from logs.
+              if (event.chargeBoxId !== binding.pairableId) return;
+              // Only the reject path is relevant here; start-tx
+              // events are handled by the watchdog, not customer
+              // login.
+              if (event.type !== "reject" || !event.idTag) return;
+              emit(event.idTag, event.t);
+            },
+            (err) => {
+              if (closed) return;
+              log.warn("Underlying stream errored", { error: err.message });
+              safeEnqueue(
+                _enc.encode(
+                  `event: error\ndata: ${
+                    JSON.stringify({ error: err.message })
+                  }\n\n`,
+                ),
+              );
+              cleanup();
+            },
+          );
+          if (!sub.available) {
+            // Charger flow REQUIRES the docker-log fallback path —
+            // surface the unavailability and close, matching the
+            // pre-Wave-2 behavior so the existing integration test
+            // semantics are preserved.
             safeEnqueue(
               _enc.encode(
                 `event: error\ndata: ${
-                  JSON.stringify({ error: err.message })
+                  JSON.stringify({ error: "docker_unavailable" })
                 }\n\n`,
               ),
             );
             cleanup();
-          },
-        );
+            return;
+          }
+          unsubscribe = sub.unsubscribe;
+        }
 
-        // Parallel subscription to the event bus for pre-auth hook
-        // intercepts (known tags + any tag while an intent is armed).
-        // Filtered by both chargeBoxId AND pairingCode so only THIS
-        // listener's matching scan is delivered, even if multiple
-        // pairings are armed against different chargers in parallel.
+        // Subscribe to the event bus for pre-auth hook intercepts
+        // (charger source) and device-scan-result intercepts (device
+        // source). Filter on `(pairableType, pairableId, pairingCode)`
+        // — the legacy `chargeBoxId` field on the payload was removed
+        // in the Wave 1 Track A generalization.
         unsubBus = eventBus.subscribe(["scan.intercepted"], (delivered) => {
           if (closed) return;
           const p = delivered.payload as {
             idTag: string;
-            chargeBoxId: string;
+            pairableType: "charger" | "device";
+            pairableId: string;
             pairingCode: string;
             purpose?: string;
             t: number;
+            source?: string;
           };
-          if (p.chargeBoxId !== chargeBoxId) return;
-          if (p.pairingCode !== pairingCode) return;
+          if (p.pairableType !== binding.pairableType) return;
+          if (p.pairableId !== binding.pairableId) return;
+          if (p.pairingCode !== binding.pairingCode) return;
           emit(p.idTag, p.t);
         });
 
-        // Replay buffered scan.intercepted events from the last ~5s that
-        // match this binding. Belt-and-braces against the start-callback
-        // race: if the event-bus publish happens between this stream
-        // opening and the subscribe call above, the live subscriber misses
-        // it but the ring buffer caught it.
+        // Replay buffered scan.intercepted events from the last ~5s
+        // that match this binding. Belt-and-braces against the
+        // start-callback race: if the event-bus publish happens
+        // between this stream opening and the subscribe call above,
+        // the live subscriber misses it but the ring buffer caught
+        // it.
         const replayCutoff = Date.now() - 5_000;
         for (
           const delivered of eventBus.replay(0, ["scan.intercepted"])
@@ -277,27 +367,18 @@ export const handler = define.handlers({
           if (delivered.ts <= replayCutoff) continue;
           const p = delivered.payload as {
             idTag: string;
-            chargeBoxId: string;
+            pairableType: "charger" | "device";
+            pairableId: string;
             pairingCode: string;
             purpose?: string;
             t: number;
+            source?: string;
           };
-          if (p.chargeBoxId !== chargeBoxId) continue;
-          if (p.pairingCode !== pairingCode) continue;
+          if (p.pairableType !== binding.pairableType) continue;
+          if (p.pairableId !== binding.pairableId) continue;
+          if (p.pairingCode !== binding.pairingCode) continue;
           emit(p.idTag, p.t);
         }
-        if (!sub.available) {
-          safeEnqueue(
-            _enc.encode(
-              `event: error\ndata: ${
-                JSON.stringify({ error: "docker_unavailable" })
-              }\n\n`,
-            ),
-          );
-          cleanup();
-          return;
-        }
-        unsubscribe = sub.unsubscribe;
 
         // Keep-alive every 15s.
         keepaliveInterval = setInterval(() => {

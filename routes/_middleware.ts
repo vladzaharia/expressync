@@ -42,6 +42,7 @@ import {
   originMismatchResponse,
 } from "../src/lib/origin.ts";
 import { logAuthEvent, logImpersonationStart } from "../src/lib/audit.ts";
+import { resolveBearer } from "../src/lib/devices/bearer-auth.ts";
 
 // Rate-limit ceilings.
 const RATE_LIMIT_GENERAL_MAX = 100;
@@ -206,6 +207,69 @@ async function applyRateLimits(
 }
 
 /**
+ * ExpresScan / Wave 1 Track A — auth-scheme classifier.
+ *
+ * Single source of truth for which auth scheme is accepted on a route AND
+ * (derived from that) whether the same-origin / Origin-header check is
+ * enforced. The middleware MUST NOT maintain a parallel allow-list — the
+ * origin exemption is `selectAuth(pathname) === "bearer"`, period.
+ *
+ * Schemes:
+ *   - `bearer`           — `Authorization: Bearer dev_…` only. Cookie
+ *                          fallback is rejected. Used by the iOS app's
+ *                          device endpoints.
+ *   - `cookie`           — `ev_billing_session` cookie only. Bearer
+ *                          headers are ignored / rejected. Used for all
+ *                          admin + customer + the device-register entry
+ *                          point (which mints a bearer token from a
+ *                          cookie session + PKCE one-time code).
+ *   - `ocpp-hmac`        — HMAC-signed SteVe webhook. Existing behavior;
+ *                          unchanged.
+ *   - `public-or-cookie` — public routes (login, scan-pair, health,
+ *                          webhook receivers, asset paths). The classifier
+ *                          plus `route-classifier.ts` already gate these.
+ *
+ * The bearer-only `/api/devices/*` paths are listed explicitly because the
+ * single exception (`/api/devices/register`) sits in the same prefix —
+ * we can't `startsWith("/api/devices/")` and call it bearer.
+ */
+export type AuthScheme = "bearer" | "cookie" | "ocpp-hmac" | "public-or-cookie";
+
+export function selectAuth(pathname: string): AuthScheme {
+  // SteVe → ExpresSync hooks. HMAC-signed; no session.
+  if (pathname.startsWith("/api/ocpp/")) return "ocpp-hmac";
+
+  // Device register is the cookie+PKCE entry point — the bearer token is
+  // minted FROM this call, so the request itself can't carry one.
+  if (pathname === "/api/devices/register") return "cookie";
+
+  // Bearer-only device routes. The set is exhaustive because future
+  // additions go through this function — we'd rather reject an unknown
+  // /api/devices/x than silently let it fall through to cookie.
+  if (
+    pathname === "/api/devices/heartbeat" ||
+    pathname === "/api/devices/me" ||
+    pathname === "/api/devices/scan-stream" ||
+    pathname === "/api/devices/scan-result" ||
+    pathname.startsWith("/api/devices/scan-result/")
+  ) {
+    return "bearer";
+  }
+  // /api/devices/{deviceId} (DELETE) and /api/devices/{deviceId}/push-token (PUT).
+  // These have a UUID-shaped middle segment; we can't enumerate them, so
+  // any other /api/devices/* path is bearer.
+  if (pathname.startsWith("/api/devices/")) return "bearer";
+
+  // Cookie surfaces.
+  if (pathname.startsWith("/api/admin/")) return "cookie";
+  if (pathname.startsWith("/api/customer/")) return "cookie";
+
+  // Everything else (UI pages, /api/auth, /api/health, webhooks) is
+  // public-or-cookie — the route classifier decides per-route.
+  return "public-or-cookie";
+}
+
+/**
  * Polaris Track A — root middleware.
  *
  * See module docstring for the full step-by-step.
@@ -251,6 +315,32 @@ export const handler = define.middleware(async (ctx) => {
     pathname.startsWith("/api/customer/") && surface !== "customer"
   ) {
     return applySecurityHeaders(notFoundResponse());
+  }
+
+  // 5b. ExpresScan / Wave 1 Track A — bearer-auth branch.
+  //
+  // Runs BEFORE cookie session resolution: bearer-only routes never
+  // touch the session machinery. Origin / CSRF check is also skipped
+  // (mobile clients don't send Origin and bearer auth is CSRF-immune by
+  // design). Critically: `/api/admin/*` is `cookie`, NOT `bearer`, so a
+  // valid bearer header on an admin route is REJECTED at step 9 below
+  // — the unit test `rejects bearer on admin` locks this in.
+  const authScheme = selectAuth(pathname);
+  if (authScheme === "bearer") {
+    const ctxDevice = await resolveBearer(ctx.req, {
+      ip: clientIp,
+      ua: ctx.req.headers.get("user-agent"),
+      route: pathname,
+    });
+    if (!ctxDevice) {
+      return applySecurityHeaders(unauthorizedResponse());
+    }
+    ctx.state.device = ctxDevice;
+    // Bearer routes skip cookie session, TTL ceiling, surface-vs-role,
+    // impersonation, and Origin checks — they're all cookie-flow
+    // properties. Hand off to the route handler directly.
+    const response = await ctx.next();
+    return applySecurityHeaders(response);
   }
 
   // 6. Session resolution.

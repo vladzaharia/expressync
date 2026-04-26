@@ -162,6 +162,49 @@ export const config = {
   /** mailto: target shown to inactive customers + on hard error pages. */
   OPERATOR_CONTACT_EMAIL: Deno.env.get("OPERATOR_CONTACT_EMAIL") ||
     "support@polaris.express",
+
+  // ===========================================================================
+  // ExpresScan / Wave 1 Track A — Pocket ID OIDC for admins.
+  //
+  // When `ADMIN_OIDC_ISSUER` is set, the admin login UI presents the OIDC
+  // button and BetterAuth loads the generic-OIDC plugin (`auth-oidc.ts`).
+  // When unset, login falls back to the existing email/password form.
+  // `ADMIN_AUTH_SHOW_FALLBACK=true` keeps the email/password form
+  // visible alongside OIDC as a break-glass.
+  // ===========================================================================
+
+  /** Pocket ID issuer URL (e.g. `https://pocket-id.example.com`). Empty disables OIDC. */
+  ADMIN_OIDC_ISSUER: stripTrailingSlash(
+    Deno.env.get("ADMIN_OIDC_ISSUER") || "",
+  ),
+  /** OAuth client ID issued by Pocket ID. Required when `ADMIN_OIDC_ISSUER` is set. */
+  ADMIN_OIDC_CLIENT_ID: Deno.env.get("ADMIN_OIDC_CLIENT_ID") || "",
+  /** OAuth client secret. Optional for public clients; required for confidential. */
+  ADMIN_OIDC_CLIENT_SECRET: Deno.env.get("ADMIN_OIDC_CLIENT_SECRET") || "",
+  /** Pocket ID group name that grants `role='admin'` on JIT provision. */
+  ADMIN_OIDC_ADMIN_GROUP: Deno.env.get("ADMIN_OIDC_ADMIN_GROUP") || "",
+  /** "true" to render the email/password form as a fallback below the OIDC button. */
+  ADMIN_AUTH_SHOW_FALLBACK: (Deno.env.get("ADMIN_AUTH_SHOW_FALLBACK") || "")
+    .toLowerCase() === "true",
+  // ===========================================================================
+  // === APNs (filled by C-apns) ===
+  //
+  // Token-based JWT (ES256) auth against `api.push.apple.com` /
+  // `api.sandbox.push.apple.com`. The signer in `src/lib/apns.ts` reads the
+  // four values below; missing values cause `signApnsJwt` to throw, which
+  // the caller surfaces as `ApnsResult { ok: false, reason: "JwtSignFailed" }`
+  // — i.e. a misconfigured deploy fails loudly per push send rather than at
+  // boot, matching the existing STEVE_PREAUTH_HMAC_KEY pattern.
+  // ===========================================================================
+
+  /** 10-char Apple-issued key ID (kid claim in the APNs JWT header). */
+  APNS_KEY_ID: Deno.env.get("APNS_KEY_ID") || "",
+  /** 10-char Apple Team ID (iss claim in the APNs JWT). */
+  APNS_TEAM_ID: Deno.env.get("APNS_TEAM_ID") || "",
+  /** Base64-encoded P8 (PKCS8 PEM) private key — full file contents, base64'd. */
+  APNS_KEY_BASE64: Deno.env.get("APNS_KEY_BASE64") || "",
+  /** Bundle ID used as the apns-topic header. */
+  APNS_TOPIC: Deno.env.get("APNS_TOPIC") || "gg.vlad.expresscan",
 } as const;
 
 /**

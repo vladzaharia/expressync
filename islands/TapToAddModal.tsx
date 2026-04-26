@@ -45,6 +45,8 @@ import {
 import { ManualEntryForm } from "@/components/scan/ManualEntryForm.tsx";
 import { TagChip } from "@/components/tags/TagChip.tsx";
 import { clientNavigate } from "@/src/lib/nav.ts";
+import type { TapTargetEntry } from "@/src/lib/types/devices.ts";
+import { stepsForTarget } from "@/components/scan/scan-steps.ts";
 
 interface Props {
   open: boolean;
@@ -76,14 +78,35 @@ interface Props {
    * Arm-intent endpoint. Defaults to `/api/admin/tag/scan-arm` so all
    * admin scan UIs use the pre-Authorize hook pipeline (works for known
    * AND unknown tags). Pass an explicit value (or `undefined`) only if
-   * you need the legacy log-scrape path for diagnostics.
+   * you need the legacy log-scrape path for diagnostics. The phone /
+   * laptop branch always dispatches to
+   * `/api/admin/devices/{deviceId}/scan-arm` regardless of this opt.
    */
   armEndpoint?: string;
   /**
-   * Optional fixed chargeBoxId to arm against. When omitted the hook
-   * auto-discovers the first online charger via `/api/auth/scan-charger-list`.
+   * Optional fixed tap-target to arm against. For phones / laptops this
+   * is the device UUID; for chargers it's the chargeBoxId. When omitted
+   * the hook auto-discovers via `/api/auth/scan-tap-targets` (preferring
+   * the operator's own phone when exactly one is online; otherwise the
+   * first online charger).
+   */
+  deviceId?: string;
+  /**
+   * Pairable type of `deviceId`. Required when `deviceId` is a phone
+   * UUID; defaults to `'charger'` so pre-D3 callers keep working.
+   */
+  pairableType?: TapTargetEntry["pairableType"];
+  /**
+   * Backward-compat alias for `deviceId` (with `pairableType: 'charger'`).
+   *
+   * @deprecated Use `deviceId` + `pairableType: 'charger'`.
    */
   chargeBoxId?: string;
+  /**
+   * Free-text shown in the iOS push notification when the device branch
+   * is taken (e.g. "Front desk"). Ignored for charger arms.
+   */
+  hintLabel?: string;
 }
 
 /** Countdown thresholds we announce via the `aria-live` region. */
@@ -97,11 +120,14 @@ export default function TapToAddModal({
   allowManualEntry = true,
   accent = "cyan",
   panelTitle = "Scan a tag to add",
-  panelSubtitle = "Tap an RFID card on any online charger.",
+  panelSubtitle = "Tap an RFID card on any online tap-target.",
   onDetected,
   onTagDetected,
   armEndpoint = "/api/admin/tag/scan-arm",
+  deviceId,
+  pairableType,
   chargeBoxId,
+  hintLabel,
 }: Props) {
   const handleDetected = async (r: ScanResult) => {
     if (onDetected) {
@@ -118,12 +144,23 @@ export default function TapToAddModal({
     clientNavigate(dest);
   };
 
+  // The hook resolves a tap-target (either supplied via `deviceId` or
+  // auto-discovered from /api/auth/scan-tap-targets) and reports it back
+  // here so the panel can swap to per-kind copy ("Tap your card on Aisha's
+  // iPhone" vs. "Tap it on Garage").
+  const resolvedTarget = useSignal<TapTargetEntry | null>(null);
+
   const hook = useScanTag({
     timeoutSeconds,
     confirmMode,
     onDetected: handleDetected,
     armEndpoint,
-    chargeBoxId,
+    deviceId: deviceId ?? chargeBoxId,
+    pairableType: pairableType ?? (deviceId ? undefined : "charger"),
+    hintLabel,
+    onTargetResolved: (target) => {
+      resolvedTarget.value = target;
+    },
   });
 
   const state = hook.state.value;
@@ -149,7 +186,7 @@ export default function TapToAddModal({
   useEffect(() => {
     if (!open) return;
     if (state.kind === "connecting") {
-      announceMessage.value = "Connecting to charger log stream";
+      announceMessage.value = "Connecting…";
     }
   }, [state.kind, open]);
 
@@ -216,9 +253,16 @@ export default function TapToAddModal({
     onOpenChange(false);
   };
 
-  const panelState = adaptScanTagState(state, {
+  const target = resolvedTarget.value;
+  const basePanelState = adaptScanTagState(state, {
     total: timeoutSeconds,
+    readerName: target?.label ?? null,
   });
+  // Decorate the `armed` state with per-kind step copy now that we know
+  // the resolved target's `kind`. Other states pass through unchanged.
+  const panelState = basePanelState.kind === "armed"
+    ? { ...basePanelState, steps: stepsForTarget(target) }
+    : basePanelState;
   const showBeam = shouldRenderBeam(panelState);
   const beam = borderBeamColors[accent];
 

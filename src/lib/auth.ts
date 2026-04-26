@@ -7,6 +7,14 @@ import { config } from "./config.ts";
 import { sendCustomerMagicLink } from "./email.ts";
 import { hashEmail, logAuthEvent, logMagicLinkRequested } from "./audit.ts";
 import { polarisCustomerSessionPlugin } from "./auth-helpers.ts";
+import { isAdminOidcEnabled, makeAdminOidcPlugin } from "./auth-oidc.ts";
+
+// ExpresScan / Wave 1 Track A: conditionally include the Pocket ID OIDC
+// plugin. Building the plugin list here (rather than inline in the
+// `plugins:` array) keeps the conditional logic single-evaluation and
+// auditable. Email/password + magic-link + customer-session ALWAYS load
+// — OIDC is purely additive.
+const adminOidcPlugin = makeAdminOidcPlugin();
 
 /**
  * BetterAuth instance
@@ -188,8 +196,21 @@ export const auth = betterAuth({
      * implementation + security model.
      */
     polarisCustomerSessionPlugin(),
+
+    // ExpresScan / Wave 1 Track A — Pocket ID OIDC for admins.
+    //
+    // Only loaded when `ADMIN_OIDC_ISSUER` is set. Email/password stays
+    // available as a break-glass under `ADMIN_AUTH_SHOW_FALLBACK=true`.
+    // The mapper in `auth-oidc.ts` enforces group membership before
+    // creating the user; failures throw which BetterAuth surfaces as
+    // an auth-error redirect.
+    ...(adminOidcPlugin ? [adminOidcPlugin] : []),
   ],
 });
+
+/** True when the admin OIDC plugin is loaded. Used by the login UI to
+ *  decide between the 3 modes. */
+export const adminOidcEnabled = isAdminOidcEnabled();
 
 /**
  * Type for the authenticated user
