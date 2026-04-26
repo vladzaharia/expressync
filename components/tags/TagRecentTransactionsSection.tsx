@@ -10,7 +10,7 @@ import { ExternalLink, Zap } from "lucide-preact";
 import { Badge } from "@/components/ui/badge.tsx";
 import { SectionCard } from "@/components/shared/SectionCard.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
-import { formatRelative } from "@/islands/shared/charger-visuals.ts";
+import { formatRelative } from "@/islands/shared/device-visuals.ts";
 
 export interface RecentTransactionRow {
   steveTransactionId: number;

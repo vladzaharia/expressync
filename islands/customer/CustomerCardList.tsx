@@ -19,7 +19,7 @@
 import { CreditCard } from "lucide-preact";
 import { CardStatusBadge } from "@/components/shared/index.ts";
 import { SectionCard } from "@/components/shared/SectionCard.tsx";
-import { formatRelative } from "@/islands/shared/charger-visuals.ts";
+import { formatRelative } from "@/islands/shared/device-visuals.ts";
 
 export interface CustomerCard {
   id: number;
