@@ -172,6 +172,78 @@ interface ClaimedRow {
 }
 
 // ============================================================================
+// Test seams. The atomic-claim UPDATE and enrichment lookup both speak to
+// the live Postgres in production; the e2e integration test (Wave 4 Track
+// C-e2e) exercises the full arm → scan → modal-intercept flow without a
+// live DB by swapping these for in-memory fakes. Mirrors the seam pattern
+// established by `scan-arm.ts` (`_setApnsSenderForTests` etc.).
+//
+// Each setter takes `null` to restore the default. The defaults call the
+// real `db` / `enrichByIdTag` so production paths are unchanged. Don't
+// import these from non-test code.
+// ============================================================================
+
+type PairingClaimer = (
+  identifier: string,
+  idTag: string,
+) => Promise<ClaimedRow | null>;
+
+type Enricher = (idTag: string) => Promise<{
+  found: boolean;
+  tag: EnrichedScanResult["tag"];
+  customer: EnrichedScanResult["customer"];
+  subscription: EnrichedScanResult["subscription"];
+}>;
+
+const defaultPairingClaimer: PairingClaimer = async (identifier, idTag) => {
+  const result = await db.execute<{ id: string; value: unknown }>(sql`
+    UPDATE verifications
+    SET value = jsonb_set(
+          jsonb_set(value::jsonb, '{status}', '"consumed"'),
+          '{matchedIdTag}',
+          to_jsonb(${idTag}::text)
+        )::text,
+        updated_at = now()
+    WHERE identifier = ${identifier}
+      AND expires_at > now()
+      AND value::jsonb->>'status' = 'armed'
+    RETURNING id, value::jsonb AS value
+  `);
+  const rows =
+    (Array.isArray(result)
+      ? result
+      : (result as { rows?: { id: string; value: unknown }[] }).rows ?? []) as {
+        id: string;
+        value: unknown;
+      }[];
+  if (rows.length !== 1) return null;
+  const v = rows[0].value as { purpose?: unknown } | null;
+  const purpose = typeof v?.purpose === "string" ? v.purpose : "login";
+  return { id: rows[0].id, purpose };
+};
+
+const defaultEnricher: Enricher = (idTag) => enrichByIdTag(idTag);
+
+let pairingClaimer: PairingClaimer = defaultPairingClaimer;
+let enricher: Enricher = defaultEnricher;
+
+/** Test-only — install a fake pairing claimer. Pass `null` to restore. */
+export function _setPairingClaimerForTests(fn: PairingClaimer | null): void {
+  pairingClaimer = fn ?? defaultPairingClaimer;
+}
+
+/** Test-only — install a fake enricher. Pass `null` to restore. */
+export function _setEnricherForTests(fn: Enricher | null): void {
+  enricher = fn ?? defaultEnricher;
+}
+
+/** Test-only — restore every seam in one call. */
+export function _resetScanResultTestSeams(): void {
+  pairingClaimer = defaultPairingClaimer;
+  enricher = defaultEnricher;
+}
+
+// ============================================================================
 // Handler
 // ============================================================================
 
@@ -282,28 +354,7 @@ export const handler = define.handlers({
       const identifier = `device-scan:${deviceId}:${pairingCode}`;
       let claimed: ClaimedRow | null = null;
       try {
-        const result = await db.execute<{ id: string; value: unknown }>(sql`
-          UPDATE verifications
-          SET value = jsonb_set(
-                jsonb_set(value::jsonb, '{status}', '"consumed"'),
-                '{matchedIdTag}',
-                to_jsonb(${idTag}::text)
-              )::text,
-              updated_at = now()
-          WHERE identifier = ${identifier}
-            AND expires_at > now()
-            AND value::jsonb->>'status' = 'armed'
-          RETURNING id, value::jsonb AS value
-        `);
-        const rows = (Array.isArray(result)
-          ? result
-          : (result as { rows?: { id: string; value: unknown }[] }).rows ??
-            []) as { id: string; value: unknown }[];
-        if (rows.length === 1) {
-          const v = rows[0].value as { purpose?: unknown } | null;
-          const purpose = typeof v?.purpose === "string" ? v.purpose : "login";
-          claimed = { id: rows[0].id, purpose };
-        }
+        claimed = await pairingClaimer(identifier, idTag);
       } catch (err) {
         log.error("Atomic claim failed", {
           deviceId,
@@ -357,7 +408,7 @@ export const handler = define.handlers({
       //    not-found shape, which the contract surfaces as `found:
       //    false` + null tag/customer/subscription blocks. The pairing
       //    is already consumed at this point — there's no path back.
-      const enriched = await enrichByIdTag(idTag);
+      const enriched = await enricher(idTag);
 
       const latencyMs = Math.round(performance.now() - t0);
 
