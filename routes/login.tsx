@@ -40,9 +40,13 @@ export const handler = define.handlers({
     const chargerParam = url.searchParams.get("chargeBoxId");
     const emailParam = url.searchParams.get("email") ?? "";
 
-    // Scan-to-login only makes sense when at least one charger has been
-    // heard from in the last 10 minutes. Otherwise a tap-to-scan CTA fires
-    // into the void.
+    // Scan-to-login only makes sense when at least one charger has sent a
+    // real OCPP StatusNotification in the last 10 minutes. Otherwise a
+    // tap-to-scan CTA fires into the void.
+    //
+    // Use `lastStatusAt`, not `lastSeenAt`: the latter is bumped for every
+    // registered charger on every sync run regardless of connectivity, so
+    // it would always be "fresh" and never gate the CTA.
     let hasOnlineCharger = false;
     try {
       const { db } = await import("../src/db/index.ts");
@@ -52,7 +56,7 @@ export const handler = define.handlers({
       const [row] = await db
         .select({ c: sql<number>`count(*)::int` })
         .from(schema.chargersCache)
-        .where(gte(schema.chargersCache.lastSeenAt, cutoff));
+        .where(gte(schema.chargersCache.lastStatusAt, cutoff));
       hasOnlineCharger = Number(row?.c ?? 0) > 0;
     } catch {
       hasOnlineCharger = false;
