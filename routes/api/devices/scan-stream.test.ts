@@ -28,7 +28,7 @@ interface FakeCtx {
       id: string;
       ownerUserId: string;
       capabilities: string[];
-      secretHash: string;
+      secret: string;
       tokenId: string;
     };
   };
@@ -39,7 +39,7 @@ function makeFakeDevice(id: string): FakeCtx["state"]["device"] {
     id,
     ownerUserId: "user-test",
     capabilities: ["tap"],
-    secretHash: "deadbeef",
+    secret: "deadbeef",
     tokenId: `token-for-${id}`,
   };
 }

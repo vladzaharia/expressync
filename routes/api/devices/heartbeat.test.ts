@@ -22,7 +22,7 @@ interface MockState {
     id: string;
     ownerUserId: string;
     capabilities: string[];
-    secretHash: string;
+    secret: string;
     tokenId: string;
   };
 }
@@ -51,7 +51,7 @@ function deviceState(): MockState {
       id: "11111111-2222-3333-4444-555555555555",
       ownerUserId: "admin-1",
       capabilities: ["tap"],
-      secretHash: "deadbeef".repeat(8),
+      secret: "deadbeef".repeat(8),
       tokenId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
     },
   };

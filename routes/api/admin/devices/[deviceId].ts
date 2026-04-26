@@ -12,7 +12,7 @@
  *   - `pushToken` is masked to its last 8 characters only (never the full
  *     APNs token). Returned as `pushTokenLast8` so a UI can render
  *     "••••12345678" without ever holding the raw value.
- *   - `secret_hash` is never read from this endpoint at all.
+ *   - The device's HMAC `secret` is never read from this endpoint at all.
  *
  * Token metadata (`tokenCount`, `activeTokenExpiresAt`, `revokedAt`) is
  * folded in via a sub-select on `device_tokens` — admins want to know

@@ -208,7 +208,9 @@ async function runRegister(
       .values({
         deviceId: inserted.id,
         tokenHash: creds.deviceTokenHash,
-        secretHash: creds.deviceSecretHash,
+        // Raw HMAC key — symmetric, must be retrievable for scan-result
+        // nonce verification. iOS app holds the matching value in Keychain.
+        secret: creds.deviceSecret,
         expiresAt,
       })
       .returning();

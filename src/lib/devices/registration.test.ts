@@ -194,20 +194,20 @@ Deno.test({
     assertNotEquals(a.deviceToken, b.deviceToken);
     assertNotEquals(a.deviceSecret, b.deviceSecret);
     assertNotEquals(a.deviceTokenHash, b.deviceTokenHash);
-    assertNotEquals(a.deviceSecretHash, b.deviceSecretHash);
   },
 });
 
 Deno.test({
-  name: "generateDeviceCredentials — hashes are 64-hex (sha256)",
+  name: "generateDeviceCredentials — token hash is 64-hex (sha256), secret is base64url",
   sanitizeResources: false,
   sanitizeOps: false,
   fn: async () => {
     const c = await generateDeviceCredentials();
     assertEquals(c.deviceTokenHash.length, 64);
-    assertEquals(c.deviceSecretHash.length, 64);
     assert(/^[0-9a-f]{64}$/.test(c.deviceTokenHash));
-    assert(/^[0-9a-f]{64}$/.test(c.deviceSecretHash));
+    // deviceSecret is raw 32 bytes base64url-encoded (no padding) → 43 chars.
+    assertEquals(c.deviceSecret.length, 43);
+    assert(/^[A-Za-z0-9_-]{43}$/.test(c.deviceSecret));
   },
 });
 

@@ -1409,8 +1409,15 @@ export const deviceTokens = pgTable("device_tokens", {
     .references(() => devices.id, { onDelete: "cascade" }),
   /** sha256(rawToken) — the raw token only ever leaves on the register response. */
   tokenHash: text("token_hash").notNull().unique(),
-  /** sha256(rawSecret) — used for HMAC-verify on scan-result. */
-  secretHash: text("secret_hash").notNull(),
+  /**
+   * Raw HMAC key (base64url, 32 random bytes). HMAC is symmetric; the server
+   * must hold the raw key to verify scan-result nonces. Same threat model as
+   * `STEVE_PREAUTH_HMAC_KEY` (server-resident HMAC key) — DB exfil exposes
+   * forging capability per device, mitigated by per-device + per-rotation
+   * scope. Migration to per-device Ed25519 (Secure-Enclave-held private key,
+   * `device_pubkey` on `devices`) is the planned v2 path.
+   */
+  secret: text("secret").notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
   lastUsedAt: timestamp("last_used_at", { withTimezone: true }),

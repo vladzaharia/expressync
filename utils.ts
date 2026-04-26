@@ -99,8 +99,11 @@ export interface State {
     ownerUserId: string;
     /** Granted capabilities ("tap", "ev", ...). */
     capabilities: string[];
-    /** sha256 of the device's HMAC secret — used by scan-result for nonce verify. */
-    secretHash: string;
+    /**
+     * Raw HMAC secret (base64url) — used by scan-result for nonce verify.
+     * HMAC is symmetric; the iOS app holds this same key in Keychain.
+     */
+    secret: string;
     /** UUID of the active `device_tokens` row. Used for revocation events. */
     tokenId: string;
   };

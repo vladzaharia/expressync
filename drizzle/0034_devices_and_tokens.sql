@@ -71,7 +71,12 @@ CREATE TABLE IF NOT EXISTS "device_tokens" (
   "id"           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "device_id"    UUID NOT NULL REFERENCES "devices"("id") ON DELETE CASCADE,
   "token_hash"   TEXT NOT NULL UNIQUE,
-  "secret_hash"  TEXT NOT NULL,
+  -- Raw HMAC key (base64url, 32 random bytes) — symmetric, must be retrievable
+  -- to verify scan-result nonces. Same threat model as STEVE_PREAUTH_HMAC_KEY
+  -- (server-resident HMAC key); single-purpose, single-device, single-rotation.
+  -- Per-device asymmetric (Ed25519) is the planned v2 migration; the
+  -- `device_pubkey` column on `devices` is reserved for that path.
+  "secret"       TEXT NOT NULL,
   "expires_at"   TIMESTAMPTZ NOT NULL,
   "revoked_at"   TIMESTAMPTZ,
   "last_used_at" TIMESTAMPTZ,
