@@ -286,22 +286,32 @@ export async function claimOneTimeCode(
 // Bearer + secret minting
 // ---------------------------------------------------------------------------
 
-/** Both sides of the credential pair, raw + hashed. */
+/**
+ * Both sides of the credential pair.
+ *
+ * `deviceToken` is the bearer credential — sent in `Authorization` header,
+ * stored hashed at rest (verification = re-hash incoming → DB compare).
+ *
+ * `deviceSecret` is the per-device HMAC key for scan-result nonces. HMAC is
+ * symmetric so the server MUST keep the raw value; the iOS app holds the
+ * same value in its Keychain. Same threat model as `STEVE_PREAUTH_HMAC_KEY`
+ * (server-resident HMAC key); a DB exfil exposes per-device forging
+ * capability bounded by per-device + per-rotation scope.
+ */
 export interface DeviceCredentials {
   /** Wire format: `dev_<32 random bytes base64url>`. */
   deviceToken: string;
   deviceTokenHash: string;
-  /** 32 random bytes base64url-encoded. */
+  /** 32 random bytes base64url-encoded — stored RAW in `device_tokens.secret`. */
   deviceSecret: string;
-  deviceSecretHash: string;
 }
 
 /**
  * Generate a fresh `(deviceToken, deviceSecret)` pair.
  *
- * The returned `*Hash` values are what gets persisted in `device_tokens`; the
- * raw values must NEVER hit the DB or any log line — they leave only on the
- * `POST /api/devices/register` response body.
+ * `deviceTokenHash` is what gets persisted; the raw token leaves only on the
+ * `POST /api/devices/register` response body. `deviceSecret` is persisted RAW
+ * (HMAC requires symmetric key access on both sides).
  */
 export async function generateDeviceCredentials(): Promise<DeviceCredentials> {
   const tokenBytes = new Uint8Array(32);
@@ -312,12 +322,10 @@ export async function generateDeviceCredentials(): Promise<DeviceCredentials> {
   const secretBytes = new Uint8Array(32);
   crypto.getRandomValues(secretBytes);
   const deviceSecret = base64UrlEncode(secretBytes);
-  const deviceSecretHash = await sha256Hex(deviceSecret);
 
   return {
     deviceToken,
     deviceTokenHash,
     deviceSecret,
-    deviceSecretHash,
   };
 }
