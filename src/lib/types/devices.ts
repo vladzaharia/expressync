@@ -35,7 +35,7 @@ export type ScanPurpose = typeof SCAN_PURPOSES[number];
 
 /**
  * Trimmed admin-list / detail view of a device row. Wire shape only —
- * never includes `pushToken`, raw bearer, or `secret_hash`.
+ * never includes `pushToken`, raw bearer, or the device's HMAC `secret`.
  */
 export interface DeviceSummary {
   deviceId: string;

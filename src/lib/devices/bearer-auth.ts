@@ -32,7 +32,7 @@ export interface DeviceContext {
   id: string;
   ownerUserId: string;
   capabilities: string[];
-  secretHash: string;
+  secret: string;
   tokenId: string;
 }
 
@@ -82,7 +82,7 @@ export async function resolveBearer(
       deviceId: string;
       ownerUserId: string;
       capabilities: string[] | null;
-      secretHash: string;
+      secret: string;
     }
     | undefined;
   try {
@@ -92,7 +92,7 @@ export async function resolveBearer(
         deviceId: devices.id,
         ownerUserId: devices.ownerUserId,
         capabilities: devices.capabilities,
-        secretHash: deviceTokens.secretHash,
+        secret: deviceTokens.secret,
       })
       .from(deviceTokens)
       .innerJoin(devices, eq(deviceTokens.deviceId, devices.id))
@@ -140,7 +140,7 @@ export async function resolveBearer(
     id: row.deviceId,
     ownerUserId: row.ownerUserId,
     capabilities: row.capabilities ?? [],
-    secretHash: row.secretHash,
+    secret: row.secret,
     tokenId: row.tokenId,
   };
 }
