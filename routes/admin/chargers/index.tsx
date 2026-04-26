@@ -10,7 +10,7 @@ import ChargerCard, {
 } from "../../../islands/ChargerCard.tsx";
 import { ChargersStatStrip } from "../../../components/chargers/ChargersStatStrip.tsx";
 import { ChargersEmptyState } from "../../../components/chargers/ChargersEmptyState.tsx";
-import { normalizeStatus } from "../../../islands/shared/charger-visuals.ts";
+import { normalizeStatus } from "../../../islands/shared/device-visuals.ts";
 import { config } from "../../../src/lib/config.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
 
