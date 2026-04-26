@@ -80,7 +80,7 @@ export default function ScanTagPaletteHost() {
 
   const subtitle = label.value
     ? `Tap an RFID/NFC card on ${label.value} to look it up or add it to inventory.`
-    : "Tap an RFID/NFC card on the chosen tap-target to look it up or add it to inventory.";
+    : "Tap an RFID/NFC card on the chosen scanner to look it up or add it to inventory.";
 
   return (
     <TapToAddModal

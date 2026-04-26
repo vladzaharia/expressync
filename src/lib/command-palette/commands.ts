@@ -100,7 +100,7 @@ export function buildActionCommands(env: ActionEnv): PaletteCommand[] {
       kind: "action",
       group: "actions",
       title: "Scan Tag",
-      subtitle: "Pick a tap-target, then scan a card",
+      subtitle: "Pick a scanner, then scan a card",
       icon: Radio,
       accent: "cyan",
       keywords: [

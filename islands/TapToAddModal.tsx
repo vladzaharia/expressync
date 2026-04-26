@@ -120,7 +120,7 @@ export default function TapToAddModal({
   allowManualEntry = true,
   accent = "cyan",
   panelTitle = "Scan a tag to add",
-  panelSubtitle = "Tap an RFID card on any online tap-target.",
+  panelSubtitle = "Tap an RFID card on any online scanner.",
   onDetected,
   onTagDetected,
   armEndpoint = "/api/admin/tag/scan-arm",
