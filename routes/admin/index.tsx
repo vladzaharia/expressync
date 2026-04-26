@@ -77,11 +77,23 @@ export default define.page<typeof handler>(
   function DashboardPage({ data, url, state }) {
     const { overview, isFirstRun } = data;
 
+    // The page is locked to the available viewport (minus the SidebarLayout
+    // top bar) on `lg+`, so the dashboard never scrolls the whole window.
+    // SectionCard bodies scroll internally via `overflow-auto` if their
+    // content exceeds the row height.
+    const sectionContent = "flex h-full min-h-0 flex-col overflow-auto p-4";
+
+    // When the welcome banner is showing, let the page scroll naturally —
+    // the locked-viewport layout would push the PageCard below the fold.
+    const wrapperClass = isFirstRun
+      ? "flex min-h-0 flex-col gap-3"
+      : "flex h-full min-h-0 flex-col gap-3 lg:h-[calc(100vh-6.5rem)] lg:overflow-hidden";
+
     return (
       <SidebarLayout currentPath={url.pathname} user={state.user}>
-        {isFirstRun
-          ? (
-            <div class="mb-3">
+        <div class={wrapperClass}>
+          {isFirstRun
+            ? (
               <EmptyState
                 icon={Zap}
                 title="Welcome to ExpresSync"
@@ -99,111 +111,122 @@ export default define.page<typeof handler>(
                 accent="cyan"
                 size="lg"
               />
+            )
+            : null}
+
+          <PageCard
+            title="ExpresSync"
+            description="System pulse, live sessions, and fleet health."
+            colorScheme="cyan"
+            outerClassName="flex min-h-0 flex-1 flex-col"
+            className="flex min-h-0 flex-1 flex-col"
+            cardClassName="flex h-full min-h-0 flex-col"
+            contentClassName="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4 sm:p-5"
+          >
+            <DashboardHeaderStrip
+              syncTier={overview.pulse.syncTier}
+              nextRunAt={overview.pulse.nextRunAt}
+              inFlightSyncRunId={overview.pulse.inFlightSyncRunId}
+              chargersOnline={overview.pulse.chargersOnline}
+              chargersTotal={overview.pulse.chargersTotal}
+              unreadAlerts={overview.pulse.unreadAlerts}
+            />
+
+            <DashboardStatStrip
+              kwhToday={overview.stats.kwhToday}
+              activeSessions={overview.stats.activeSessions}
+              chargersOnline={overview.stats.chargersOnline}
+              chargersOffline={overview.stats.chargersOffline}
+              pendingReservations={overview.stats.pendingReservations}
+              syncSuccess7d={overview.stats.syncSuccess7d}
+            />
+
+            <div class="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-2 lg:grid-rows-2">
+              <SectionCard
+                title="Live now"
+                description="Active charging sessions"
+                icon={Activity}
+                accent="emerald"
+                borderBeam
+                className="h-full min-h-0"
+                contentClassName={sectionContent}
+              >
+                <LiveSessionsList />
+              </SectionCard>
+
+              <SectionCard
+                title={overview.inFlightSync
+                  ? "Active sync run"
+                  : "Sync schedule"}
+                description={overview.inFlightSync
+                  ? "Live segment progress"
+                  : `Tier: ${overview.schedule.currentTier}`}
+                icon={Layers}
+                accent="blue"
+                borderBeam={!!overview.inFlightSync}
+                className="h-full min-h-0"
+                contentClassName={sectionContent}
+              >
+                <SyncRunProgressCard
+                  inFlight={overview.inFlightSync}
+                  schedule={overview.schedule}
+                />
+              </SectionCard>
+
+              <SectionCard
+                title="Health"
+                description="Operational warning rollups"
+                icon={HeartPulse}
+                accent="cyan"
+                className="h-full min-h-0"
+                contentClassName={sectionContent}
+              >
+                <HealthSection initial={overview.health} />
+              </SectionCard>
+
+              <SectionCard
+                title="This week"
+                description="Last 7 days"
+                icon={TrendingUp}
+                accent="cyan"
+                className="h-full min-h-0"
+                contentClassName={sectionContent}
+              >
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <MetricTile
+                    icon={Zap}
+                    label="kWh delivered"
+                    value={formatKwh(overview.weekly.kwhWeek)}
+                    sublabel={deltaLabel(
+                      overview.weekly.kwhWeek,
+                      overview.weekly.kwhWeekPrior,
+                    )}
+                    accent="emerald"
+                  />
+                  <MetricTile
+                    icon={Layers}
+                    label="Sync runs"
+                    value={overview.weekly.syncRunsWeek}
+                    sublabel={`${overview.weekly.syncSuccessWeek}% success`}
+                    accent="blue"
+                  />
+                  <MetricTile
+                    icon={Tag}
+                    label="Tags activated"
+                    value={overview.weekly.tagsActivatedWeek}
+                    accent="violet"
+                  />
+                  <MetricTile
+                    icon={Calendar}
+                    label="Reservations completed"
+                    value={overview.weekly.reservationsCompletedWeek}
+                    accent="cyan"
+                  />
+                </div>
+              </SectionCard>
             </div>
-          )
-          : null}
-
-        <PageCard
-          title="ExpresSync"
-          description="System pulse, live sessions, and fleet health."
-          colorScheme="cyan"
-          contentClassName="flex flex-col gap-4 p-4 sm:p-5"
-        >
-          <DashboardHeaderStrip
-            syncTier={overview.pulse.syncTier}
-            nextRunAt={overview.pulse.nextRunAt}
-            inFlightSyncRunId={overview.pulse.inFlightSyncRunId}
-            chargersOnline={overview.pulse.chargersOnline}
-            chargersTotal={overview.pulse.chargersTotal}
-            unreadAlerts={overview.pulse.unreadAlerts}
-          />
-
-          <DashboardStatStrip
-            kwhToday={overview.stats.kwhToday}
-            activeSessions={overview.stats.activeSessions}
-            chargersOnline={overview.stats.chargersOnline}
-            chargersOffline={overview.stats.chargersOffline}
-            pendingReservations={overview.stats.pendingReservations}
-            syncSuccess7d={overview.stats.syncSuccess7d}
-          />
-
-          <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <SectionCard
-              title="Live now"
-              description="Active charging sessions"
-              icon={Activity}
-              accent="emerald"
-              borderBeam
-            >
-              <LiveSessionsList />
-            </SectionCard>
-
-            <SectionCard
-              title={overview.inFlightSync
-                ? "Active sync run"
-                : "Sync schedule"}
-              description={overview.inFlightSync
-                ? "Live segment progress"
-                : `Tier: ${overview.schedule.currentTier}`}
-              icon={Layers}
-              accent="blue"
-              borderBeam={!!overview.inFlightSync}
-            >
-              <SyncRunProgressCard
-                inFlight={overview.inFlightSync}
-                schedule={overview.schedule}
-              />
-            </SectionCard>
-
-            <SectionCard
-              title="Health"
-              description="Operational warning rollups"
-              icon={HeartPulse}
-              accent="cyan"
-            >
-              <HealthSection initial={overview.health} />
-            </SectionCard>
-
-            <SectionCard
-              title="This week"
-              description="Last 7 days"
-              icon={TrendingUp}
-              accent="cyan"
-            >
-              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <MetricTile
-                  icon={Zap}
-                  label="kWh delivered"
-                  value={formatKwh(overview.weekly.kwhWeek)}
-                  sublabel={deltaLabel(
-                    overview.weekly.kwhWeek,
-                    overview.weekly.kwhWeekPrior,
-                  )}
-                  accent="emerald"
-                />
-                <MetricTile
-                  icon={Layers}
-                  label="Sync runs"
-                  value={overview.weekly.syncRunsWeek}
-                  sublabel={`${overview.weekly.syncSuccessWeek}% success`}
-                  accent="blue"
-                />
-                <MetricTile
-                  icon={Tag}
-                  label="Tags activated"
-                  value={overview.weekly.tagsActivatedWeek}
-                  accent="violet"
-                />
-                <MetricTile
-                  icon={Calendar}
-                  label="Reservations completed"
-                  value={overview.weekly.reservationsCompletedWeek}
-                  accent="cyan"
-                />
-              </div>
-            </SectionCard>
-          </div>
-        </PageCard>
+          </PageCard>
+        </div>
       </SidebarLayout>
     );
   },

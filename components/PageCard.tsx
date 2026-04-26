@@ -22,6 +22,15 @@ interface PageCardProps {
   className?: string;
   headerClassName?: string;
   contentClassName?: string;
+  /**
+   * Applied to PageCard's outermost wrapper (and the BlurFade root when
+   * animation is enabled). Use `flex h-full min-h-0 flex-col` to let the
+   * card fill a height-locked parent without scrolling the page.
+   */
+  outerClassName?: string;
+  /** Applied to the inner shadcn `<Card>` element. Use to make the card
+   * fill its wrapper (e.g. `flex h-full flex-col`). */
+  cardClassName?: string;
   showGridPattern?: boolean;
   headerActions?: ComponentChildren;
   /** Animation delay in seconds */
@@ -42,6 +51,8 @@ export function PageCard({
   className,
   headerClassName,
   contentClassName,
+  outerClassName,
+  cardClassName,
   showGridPattern = true,
   headerActions,
   animationDelay = 0,
@@ -50,7 +61,7 @@ export function PageCard({
   const colors = borderBeamColors[colorScheme];
 
   const content = (
-    <div className="relative">
+    <div className={cn("relative", outerClassName)}>
       {showGridPattern && (
         <GridPattern
           width={30}
@@ -61,7 +72,7 @@ export function PageCard({
       )}
 
       <div className={cn("relative overflow-hidden rounded-xl", className)}>
-        <Card>
+        <Card className={cardClassName}>
           {(title || description || headerActions) && (
             <CardHeader
               className={cn("border-b border-border/50", headerClassName)}
@@ -98,7 +109,12 @@ export function PageCard({
   }
 
   return (
-    <BlurFade delay={animationDelay} duration={0.4} direction="up">
+    <BlurFade
+      delay={animationDelay}
+      duration={0.4}
+      direction="up"
+      className={outerClassName}
+    >
       {content}
     </BlurFade>
   );
