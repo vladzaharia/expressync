@@ -111,6 +111,12 @@ const RULES: readonly RouteRule[] = [
   { prefix: "/_fresh", classification: "PUBLIC" },
   { prefix: "/static", classification: "PUBLIC" },
   { prefix: "/assets", classification: "PUBLIC" },
+  // Apple Universal Links manifest. Apple's CDN validator
+  // (`https://app-site-association.cdn-apple.com/a/v1/<host>`) fetches
+  // `/.well-known/apple-app-site-association` (or `.json`) WITHOUT auth,
+  // expecting `Content-Type: application/json` and no redirects. The
+  // manifest must be PUBLIC so the validator can reach it.
+  { prefix: "/.well-known", classification: "PUBLIC" },
   { prefix: "/favicon.ico", classification: "PUBLIC" },
   { prefix: "/favicon-16.png", classification: "PUBLIC" },
   { prefix: "/favicon-32.png", classification: "PUBLIC" },
