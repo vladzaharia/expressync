@@ -30,7 +30,7 @@ import {
 import InactiveAccountHero from "@/islands/customer/InactiveAccountHero.tsx";
 import OnboardingTour from "@/islands/customer/OnboardingTour.tsx";
 import { subscribeSse } from "@/islands/shared/SseProvider.tsx";
-import { formatRelative } from "@/islands/shared/charger-visuals.ts";
+import { formatRelative } from "@/islands/shared/device-visuals.ts";
 import type { FormFactor } from "@/src/lib/types/steve.ts";
 import type { ChargerPickerCharger } from "@/components/customer/ChargerPickerInline.tsx";
 import CustomerChargersSection, {

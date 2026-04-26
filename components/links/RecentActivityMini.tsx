@@ -10,7 +10,7 @@
 import { Activity, ArrowRight, Zap } from "lucide-preact";
 import { SectionCard } from "@/components/shared/SectionCard.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
-import { formatRelative } from "@/islands/shared/charger-visuals.ts";
+import { formatRelative } from "@/islands/shared/device-visuals.ts";
 
 export interface RecentActivityRow {
   id: number;

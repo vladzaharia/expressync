@@ -16,7 +16,7 @@ import {
   GenericChargerIcon,
 } from "@/components/brand/chargers/index.ts";
 import { cn } from "@/src/lib/utils/cn.ts";
-import { STATUS_HALO, type UiStatus } from "./shared/charger-visuals.ts";
+import { STATUS_HALO, type UiStatus } from "./shared/device-visuals.ts";
 
 interface Props {
   chargeBoxId: string;
