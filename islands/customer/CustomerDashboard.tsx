@@ -32,7 +32,21 @@ import OnboardingTour from "@/islands/customer/OnboardingTour.tsx";
 import { subscribeSse } from "@/islands/shared/SseProvider.tsx";
 import { formatRelative } from "@/islands/shared/device-visuals.ts";
 import type { FormFactor } from "@/src/lib/types/steve.ts";
-import type { ChargerPickerCharger } from "@/components/customer/ChargerPickerInline.tsx";
+/**
+ * Local charger-picker shape — used as the prop type for `chargerOptions`
+ * carried via the dashboard loader to the (lazily mounted) Start
+ * Charging sheet. Pre-D3 this shape was re-exported from a shared
+ * picker component that was removed in Wave 4 D3; it now lives here so
+ * the dashboard can keep its loader prop typed without depending on
+ * scan-modal internals. Fields mirror what the loader actually
+ * populates from `chargers_cache` — no behavior change.
+ */
+interface ChargerPickerCharger {
+  chargeBoxId: string;
+  friendlyName: string | null;
+  status: string | null;
+  online: boolean;
+}
 import CustomerChargersSection, {
   type CustomerChargerCardDto,
 } from "@/islands/customer/CustomerChargersSection.tsx";

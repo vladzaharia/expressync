@@ -55,6 +55,8 @@ import { CommandGroup } from "@/components/command-palette/CommandGroup.tsx";
 import { CommandItem } from "@/components/command-palette/CommandItem.tsx";
 import type { CommandSearchResponse } from "@/routes/api/admin/command-palette/search.ts";
 import { clientNavigate } from "@/src/lib/nav.ts";
+import type { TapTargetEntry } from "@/src/lib/types/devices.ts";
+import { DevicePickerInline } from "@/components/scan/DevicePickerInline.tsx";
 
 /**
  * Polaris Track H — surface the palette is mounted in. Customer surface
@@ -164,12 +166,6 @@ function pushRecent(entry: RecentEntry) {
   }
 }
 
-interface ScanPickerCharger {
-  chargeBoxId: string;
-  friendlyName: string | null;
-  status: string | null;
-}
-
 export default function CommandPalette(
   { surface = "admin" }: CommandPaletteProps = {},
 ) {
@@ -179,13 +175,14 @@ export default function CommandPalette(
   const searchLoading = useSignal(false);
   const recent = useSignal<RecentEntry[]>([]);
   const triggeringElement = useRef<Element | null>(null);
-  // Sub-page state for the "Scan EV Card" two-step flow. When non-null,
-  // the palette body switches from search results to a charger picker.
+  // Sub-page state for the "Scan Tag" two-step flow. When non-null, the
+  // palette body switches from search results to a tap-target picker.
   // `loading=true` while the GET /api/auth/scan-tap-targets call is in
-  // flight; `chargers` is the filtered (online-only) list when present.
+  // flight; `targets` is the filtered (online-only) unified list when
+  // present (chargers + phones).
   const scanPicker = useSignal<
-    | { loading: true; chargers: null }
-    | { loading: false; chargers: ScanPickerCharger[] }
+    | { loading: true; targets: null }
+    | { loading: false; targets: TapTargetEntry[] }
     | null
   >(null);
 
@@ -290,14 +287,15 @@ export default function CommandPalette(
     return () => globalThis.removeEventListener("beforeunload", onBeforeUnload);
   }, []);
 
-  // -- Scan EV Card flow: action dispatches `cmdk:scan-picker:open`; we
-  //    fetch the online charger roster and either auto-arm (1 online) or
-  //    switch to the inline picker subview (>1 online).
+  // -- Scan Tag flow: action dispatches `cmdk:scan-picker:open`; we fetch
+  //    the unified tap-target roster and either auto-arm (operator's own
+  //    phone is the only online target) or switch to the inline picker
+  //    subview when multiple options exist.
   useEffect(() => {
     const onScanPickerOpen = async () => {
       // Skip on customer surface — admin scan inventory only.
       if (isCustomer) return;
-      scanPicker.value = { loading: true, chargers: null };
+      scanPicker.value = { loading: true, targets: null };
       try {
         const res = await fetch("/api/auth/scan-tap-targets", {
           method: "GET",
@@ -306,59 +304,66 @@ export default function CommandPalette(
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}`);
         }
-        // Wave 2 response shape: `{ devices: TapTargetEntry[] }`. The
-        // palette's "Scan EV Card" flow only knows how to arm at a charger,
-        // so we filter to `pairableType === 'charger'` rows and map them
-        // back to the legacy ScanPickerCharger fields. D3 (Wave 4) extends
-        // this surface to surface phone targets too.
-        const data = await res.json() as {
-          devices: Array<{
-            deviceId: string;
-            pairableType: "device" | "charger";
-            kind: "charger" | "phone_nfc" | "laptop_nfc";
-            label: string;
-            isOnline: boolean;
-          }>;
-        };
-        const online = (data.devices ?? []).filter(
-          (d) => d.pairableType === "charger" && d.isOnline,
-        );
+        // Wave 2 response shape: `{ devices: TapTargetEntry[] }` — note
+        // the field name carries chargers AND phones (`pairableType` is
+        // the discriminator).
+        const data = await res.json() as { devices?: TapTargetEntry[] };
+        const all = (data.devices ?? []) as TapTargetEntry[];
+        const online = all.filter((d) => d.isOnline);
         if (online.length === 0) {
           scanPicker.value = null;
-          toast.error("No chargers online", {
+          toast.error("No tap-targets online", {
             description:
-              "Wait for a charger to come back online and try again.",
+              "Wait for a charger or phone to come back online and try again.",
           });
           return;
         }
-        if (online.length === 1) {
-          // Single charger — skip the picker and go straight to scan UX.
-          const c = online[0];
+        // D3 auto-arm rule: the operator's own phone, when it's the only
+        // online tap-target with `isOwnDevice`, is the fastest path —
+        // skip the picker.
+        const ownPhones = online.filter((d) => d.isOwnDevice === true);
+        if (ownPhones.length === 1 && online.length === 1) {
+          const t = ownPhones[0];
           scanPicker.value = null;
           close();
           globalThis.dispatchEvent(
             new CustomEvent("evcard:scan-open", {
-              detail: { chargeBoxId: c.deviceId },
+              detail: {
+                deviceId: t.deviceId,
+                pairableType: t.pairableType,
+                label: t.label,
+              },
             }),
           );
           return;
         }
-        // Multiple chargers — switch the palette body to the picker subview.
-        scanPicker.value = {
-          loading: false,
-          chargers: online.map((c) => ({
-            chargeBoxId: c.deviceId,
-            friendlyName: c.label,
-            status: null,
-          })),
-        };
+        if (online.length === 1) {
+          // Single online target (charger). Skip the picker.
+          const t = online[0];
+          scanPicker.value = null;
+          close();
+          globalThis.dispatchEvent(
+            new CustomEvent("evcard:scan-open", {
+              detail: {
+                deviceId: t.deviceId,
+                pairableType: t.pairableType,
+                label: t.label,
+              },
+            }),
+          );
+          return;
+        }
+        // Multiple targets — switch to the picker subview. We pass the
+        // full roster (including offline rows) so the picker can render
+        // them grayed-out per the design.
+        scanPicker.value = { loading: false, targets: all };
         // Reset query so the picker isn't pre-filtered by whatever the
         // user typed before invoking the action.
         query.value = "";
       } catch (err) {
         scanPicker.value = null;
         console.warn("[cmdk] scan-picker fetch failed", err);
-        toast.error("Couldn't load charger list");
+        toast.error("Couldn't load tap-target list");
       }
     };
     globalThis.addEventListener(
@@ -372,12 +377,18 @@ export default function CommandPalette(
       );
   }, [isCustomer]);
 
-  /** Close + dispatch scan-open with a chosen charger. */
-  const armScanAt = (chargeBoxId: string) => {
+  /** Close + dispatch scan-open with a chosen tap-target. */
+  const armScanAt = (target: TapTargetEntry) => {
     scanPicker.value = null;
     close();
     globalThis.dispatchEvent(
-      new CustomEvent("evcard:scan-open", { detail: { chargeBoxId } }),
+      new CustomEvent("evcard:scan-open", {
+        detail: {
+          deviceId: target.deviceId,
+          pairableType: target.pairableType,
+          label: target.label,
+        },
+      }),
     );
   };
 
@@ -545,7 +556,7 @@ export default function CommandPalette(
               value={query.value}
               onValueChange={(v: string) => (query.value = v)}
               placeholder={scanPicker.value
-                ? "Search chargers..."
+                ? "Pick a tap-target..."
                 : "Type exact tag names, charger IDs, or action names..."}
               className="flex-1 bg-transparent outline-none text-sm py-2 placeholder:text-muted-foreground"
               role="combobox"
@@ -584,30 +595,30 @@ export default function CommandPalette(
           >
             <Command.Empty className="px-4 py-6 text-sm text-muted-foreground text-center">
               {scanPicker.value
-                ? "No matching chargers online."
+                ? "No matching tap-targets online."
                 : `No matches. Try a charger ID, tag name, or "sync".`}
             </Command.Empty>
 
             {
-              /* Scan EV Card subview — when active, replaces the normal
-                results stack with a charger picker. Selecting a charger
-                closes the palette and arms the TapToAddModal at it. */
+              /* Scan Tag subview — when active, replaces the normal
+                results stack with a unified tap-target picker (chargers +
+                phones). Selecting a row closes the palette and arms the
+                TapToAddModal at it. We render `DevicePickerInline`
+                directly so the grouped layout / auto-pick logic stay in
+                one place. */
             }
             {scanPicker.value && !scanPicker.value.loading &&
-              scanPicker.value.chargers && (
-              <CommandGroup heading="Pick a charger to scan at">
-                {scanPicker.value.chargers.map((c) => (
-                  <CommandItem
-                    key={`scan-pick:${c.chargeBoxId}`}
-                    value={`scan-pick:${c.chargeBoxId}:${c.friendlyName ?? ""}`}
-                    icon={Radio}
-                    accent="cyan"
-                    title={c.friendlyName?.trim() || c.chargeBoxId}
-                    subtitle={c.friendlyName ? c.chargeBoxId : (c.status ?? "")}
-                    onSelect={() => armScanAt(c.chargeBoxId)}
-                  />
-                ))}
-              </CommandGroup>
+              scanPicker.value.targets && (
+              <div class="px-3 py-2">
+                <p class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                  Pick a tap-target
+                </p>
+                <DevicePickerInline
+                  devices={scanPicker.value.targets}
+                  selectedDeviceId={null}
+                  onSelect={armScanAt}
+                />
+              </div>
             )}
 
             {/* Recent — only on empty query */}
