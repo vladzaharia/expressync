@@ -12,7 +12,7 @@
 import { Badge } from "@/components/ui/badge.tsx";
 import { TagChip } from "@/components/tags/TagChip.tsx";
 import { Activity, Calendar, Hash, Zap } from "lucide-preact";
-import { formatRelative } from "./shared/charger-visuals.ts";
+import { formatRelative } from "./shared/device-visuals.ts";
 
 export interface ChargerRecentTxRow {
   steveTransactionId: number;

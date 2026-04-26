@@ -16,7 +16,7 @@
  */
 
 import { type Pill, StatusPillRow } from "@/components/tags/StatusPillRow.tsx";
-import { formatRelative } from "@/islands/shared/charger-visuals.ts";
+import { formatRelative } from "@/islands/shared/device-visuals.ts";
 
 interface ConnectorSummary {
   uiStatus: string; // we only need the label; already normalized server-side
