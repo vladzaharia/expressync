@@ -189,14 +189,22 @@ export const config = {
   // ===========================================================================
   // === APNs (filled by C-apns) ===
   //
-  // Reserved block. Track A does NOT add APNs env vars — that belongs to
-  // Wave 2's C-apns track (token-based JWT, ES256 signer, HTTP/2 client to
-  // `api.push.apple.com` / `api.sandbox.push.apple.com`). C-apns appends:
-  //
-  //   APNS_KEY_ID, APNS_TEAM_ID, APNS_KEY_BASE64, APNS_TOPIC
-  //
-  // TODO(C-apns): hydrate this block when Wave 2 lands.
+  // Token-based JWT (ES256) auth against `api.push.apple.com` /
+  // `api.sandbox.push.apple.com`. The signer in `src/lib/apns.ts` reads the
+  // four values below; missing values cause `signApnsJwt` to throw, which
+  // the caller surfaces as `ApnsResult { ok: false, reason: "JwtSignFailed" }`
+  // — i.e. a misconfigured deploy fails loudly per push send rather than at
+  // boot, matching the existing STEVE_PREAUTH_HMAC_KEY pattern.
   // ===========================================================================
+
+  /** 10-char Apple-issued key ID (kid claim in the APNs JWT header). */
+  APNS_KEY_ID: Deno.env.get("APNS_KEY_ID") || "",
+  /** 10-char Apple Team ID (iss claim in the APNs JWT). */
+  APNS_TEAM_ID: Deno.env.get("APNS_TEAM_ID") || "",
+  /** Base64-encoded P8 (PKCS8 PEM) private key — full file contents, base64'd. */
+  APNS_KEY_BASE64: Deno.env.get("APNS_KEY_BASE64") || "",
+  /** Bundle ID used as the apns-topic header. */
+  APNS_TOPIC: Deno.env.get("APNS_TOPIC") || "gg.vlad.expresscan",
 } as const;
 
 /**
