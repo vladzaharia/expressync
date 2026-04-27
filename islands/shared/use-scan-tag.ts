@@ -53,6 +53,15 @@ export type ScanTagState =
   | { kind: "unavailable"; reason: "docker" | "detect_503" }
   | { kind: "network_error"; phase: "connect" | "stream" }
   | { kind: "lookup_failed"; idTag: string; status: number }
+  /**
+   * Scan was cancelled remotely — either by the iOS app's "Cancel"
+   * button (POST /api/devices/scan-cancel) or by another admin tab
+   * closing the same arm. Distinct from `dismissed` (which is the
+   * user dismissing the local modal) so the panel can render a
+   * "Scan was cancelled — try again?" message instead of falling
+   * through to the idle "Getting ready…" copy.
+   */
+  | { kind: "cancelled"; source: "remote" }
   | { kind: "dismissed" };
 
 export interface ScanResult {
@@ -362,6 +371,10 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
         pairableType: fixedPairableType,
         kind: fixedPairableType === "charger" ? "charger" : "phone_nfc",
         label: fixedDeviceId,
+        // Synthesised target — we don't know the human label here, so
+        // leave `friendlyName` null and let the picker / step copy
+        // fall back to the kind-prefixed display via `tapTargetDisplayName`.
+        friendlyName: null,
         capabilities: ["tap"],
         isOnline: true,
       };
@@ -563,7 +576,11 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
       closeEventSource();
       clearTick();
       clearAutoConfirm();
-      setState({ kind: "dismissed" });
+      // Use the dedicated `cancelled` terminal so the panel renders
+      // "Scan was cancelled — try again?" with a Retry CTA, instead
+      // of falling through to the `dismissed` → idle → "Getting
+      // ready…" path that left the modal looking stuck.
+      setState({ kind: "cancelled", source: "remote" });
       dispatch("scan-tag:cancelled", { source: "remote" });
     });
 
@@ -609,6 +626,19 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
       // EventSource fires `error` on normal reconnect attempts too. Treat
       // as fatal only when the underlying connection is closed.
       if (refs.eventSource && refs.eventSource.readyState !== 2) return;
+      // Don't clobber a terminal we just reached intentionally. The
+      // `cancelled` / `dismissed` / `detected` handlers all call
+      // `closeEventSource()` which nulls `refs.eventSource`, after
+      // which the natural ES close fires this `onerror`. Without this
+      // guard we'd transition cancelled → network_error.
+      const cur = state.value.kind;
+      if (
+        cur === "cancelled" || cur === "dismissed" || cur === "detected" ||
+        cur === "resolving" || cur === "routing" || cur === "timeout" ||
+        cur === "unavailable" || cur === "lookup_failed"
+      ) {
+        return;
+      }
       const phase: "connect" | "stream" = state.value.kind === "connecting"
         ? "connect"
         : "stream";

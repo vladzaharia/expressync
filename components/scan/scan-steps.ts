@@ -21,6 +21,7 @@
  */
 
 import type { TapTargetEntry } from "@/src/lib/types/devices.ts";
+import { tapTargetDisplayName } from "@/components/scan/display-name.ts";
 
 const FALLBACK_LABEL = "the reader";
 const TRAILING = "We'll handle the rest";
@@ -34,7 +35,7 @@ const TRAILING = "We'll handle the rest";
 export function stepsForTarget(
   target: TapTargetEntry | null,
 ): string[] {
-  const label = target?.label?.trim() || FALLBACK_LABEL;
+  const label = tapTargetDisplayName(target) || FALLBACK_LABEL;
   const kind = target?.kind ?? "charger";
   if (kind === "phone_nfc") {
     return [

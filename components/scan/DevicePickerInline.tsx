@@ -31,11 +31,12 @@
  * to use their own phone.
  */
 
-import { useEffect, useMemo, useRef } from "preact/hooks";
+import { useMemo } from "preact/hooks";
 import { BatteryCharging, Smartphone } from "lucide-preact";
 import type { TapTargetEntry } from "@/src/lib/types/devices.ts";
 import type { AccentColor } from "@/src/lib/colors.ts";
 import { cn } from "@/src/lib/utils/cn.ts";
+import { tapTargetDisplayName } from "@/components/scan/display-name.ts";
 
 export interface DevicePickerInlineProps {
   /** Roster from `GET /api/auth/scan-tap-targets`. */
@@ -47,10 +48,21 @@ export interface DevicePickerInlineProps {
    * persistence — the parent owns it.
    */
   selectedDeviceId: string | null;
-  /** Fired once the operator picks (or auto-picked) a row. */
+  /** Fired once the operator picks a row. */
   onSelect: (target: TapTargetEntry) => void;
   /** When true, all rows render in a non-interactive state. */
   disabled?: boolean;
+  /**
+   * Audience the picker is rendering for. Drives offline-row visibility:
+   *   - `"admin"` (default) shows every tap target regardless of
+   *     online state — admins need to see offline devices to reason
+   *     about fleet health and to deregister.
+   *   - `"customer"` always shows chargers (offline rows dimmed +
+   *     unclickable) but hides offline non-charger scanners entirely
+   *     — customers can't act on a phone they can't see, and surfacing
+   *     dimmed phone rows reads like a fleet-health view they don't own.
+   */
+  mode?: "admin" | "customer";
   /** Page accent (cyan / orange / teal / …). Defaults to cyan. */
   accent?: AccentColor;
   class?: string;
@@ -122,58 +134,23 @@ export function DevicePickerInline({
   selectedDeviceId,
   onSelect,
   disabled = false,
+  mode = "admin",
   accent: _accent = "cyan",
   class: className,
 }: DevicePickerInlineProps) {
-  // Compute auto-pick eligibility on every render but only fire `onSelect`
-  // once per unique target. The parent's `selectedDeviceId` becoming non-
-  // null after our call doesn't re-trigger us; mounting with an already-
-  // qualifying roster fires once.
-  const autoPickTarget = useMemo<TapTargetEntry | null>(() => {
-    const onlineOwn = devices.filter((d) =>
-      d.isOwnDevice === true && d.isOnline
-    );
-    return onlineOwn.length === 1 ? onlineOwn[0] : null;
-  }, [devices]);
+  // Audience-driven roster filter (see `mode` prop docs). We compute
+  // this once per `devices` change so the grouping below operates on
+  // the already-filtered list.
+  const visibleDevices = useMemo<TapTargetEntry[]>(() => {
+    if (mode === "admin") return devices;
+    return devices.filter((d) => {
+      if (d.kind === "charger") return true;
+      return d.isOnline;
+    });
+  }, [devices, mode]);
 
-  const autoPickedRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (disabled) return;
-    if (!autoPickTarget) return;
-    if (autoPickedRef.current === autoPickTarget.deviceId) return;
-    if (selectedDeviceId === autoPickTarget.deviceId) {
-      // Already selected — record it so we don't re-fire.
-      autoPickedRef.current = autoPickTarget.deviceId;
-      return;
-    }
-    autoPickedRef.current = autoPickTarget.deviceId;
-    onSelect(autoPickTarget);
-    // selectedDeviceId is intentionally excluded — we want auto-pick to
-    // fire once even if the parent's selection lags by a render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPickTarget, disabled]);
-
-  // Auto-pick mode: render a minimal status row instead of a grouped list.
-  if (autoPickTarget) {
-    return (
-      <div
-        class={cn(
-          "flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-4 py-3",
-          className,
-        )}
-        aria-live="polite"
-      >
-        <Smartphone aria-hidden class="size-4 text-cyan-500" />
-        <span class="text-sm text-foreground">
-          Using <span class="font-medium">{autoPickTarget.label}</span> to scan…
-        </span>
-      </div>
-    );
-  }
-
-  if (devices.length === 0) return null;
-  const groups = partition(devices);
+  if (visibleDevices.length === 0) return null;
+  const groups = partition(visibleDevices);
   if (groups.length === 0) return null;
 
   return (
@@ -278,7 +255,7 @@ function DeviceRow({
         />
         <span class="flex flex-col min-w-0">
           <span class="text-sm font-semibold text-foreground truncate">
-            {entry.label}
+            {tapTargetDisplayName(entry)}
             {ownSuffix}
           </span>
           {offline && (

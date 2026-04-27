@@ -63,7 +63,23 @@ export interface TapTargetEntry {
   deviceId: string;
   pairableType: "device" | "charger";
   kind: "charger" | "phone_nfc" | "laptop_nfc";
+  /**
+   * Always-displayable label. For chargers this is
+   * `COALESCE(friendly_name, charge_box_id)`; for devices it's
+   * `devices.label`. The picker should prefer `friendlyName` for
+   * heading display (so unnamed targets render with a kind-prefixed
+   * fallback rather than the raw ID), and use `label` only when a
+   * single string is needed.
+   */
   label: string;
+  /**
+   * Admin-set human name. `null` when the row has no friendly name
+   * and the picker should fall back to a generic display like
+   * "Charger {short id}" / "iPhone" / "Laptop". Distinguishing
+   * this from `label` lets the UI avoid surfacing the raw ID as
+   * the visible name when no human-readable name exists.
+   */
+  friendlyName: string | null;
   capabilities: DeviceCapability[];
   isOnline: boolean;
   /** Hint to the frontend picker for grouping ("My phone" vs "Other"). */

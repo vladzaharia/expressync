@@ -40,34 +40,54 @@ export const handler = define.handlers({
     const chargerParam = url.searchParams.get("chargeBoxId");
     const emailParam = url.searchParams.get("email") ?? "";
 
-    // Scan-to-login only makes sense when at least one charger has sent a
-    // real OCPP StatusNotification in the last 10 minutes. Otherwise a
-    // tap-to-scan CTA fires into the void.
+    // Scan-to-login is reachable whenever ANY tap-enabled target is
+    // online — chargers AND ExpresScan phone/laptop scanners both
+    // count. The CTA is data-driven, not feature-flagged: hiding it
+    // when nothing's listening prevents firing the modal into the void.
     //
-    // Use `lastStatusAt`, not `lastSeenAt`: the latter is bumped for every
-    // registered charger on every sync run regardless of connectivity, so
-    // it would always be "fresh" and never gate the CTA.
-    let hasOnlineCharger = false;
+    // Per-kind freshness windows mirror the picker / scan-arm logic:
+    //   - chargers: `lastStatusAt` within 10 min (the only column that
+    //     reflects real OCPP connectivity; `lastSeenAt` is bumped by
+    //     every sync run regardless).
+    //   - phone / laptop scanners: `devices.lastSeenAt` within 90 s
+    //     (heartbeat-driven, with `tap` capability + not soft-deleted /
+    //     revoked).
+    let hasOnlineTapTarget = false;
     try {
       const { db } = await import("../src/db/index.ts");
       const schema = await import("../src/db/schema.ts");
-      const { gte, sql } = await import("drizzle-orm");
-      const cutoff = new Date(Date.now() - 10 * 60 * 1000);
-      const [row] = await db
+      const { and, gte, isNull, sql } = await import("drizzle-orm");
+      const chargerCutoff = new Date(Date.now() - 10 * 60 * 1000);
+      const phoneCutoff = new Date(Date.now() - 90 * 1000);
+      const [chargerRow] = await db
         .select({ c: sql<number>`count(*)::int` })
         .from(schema.chargersCache)
-        .where(gte(schema.chargersCache.lastStatusAt, cutoff));
-      hasOnlineCharger = Number(row?.c ?? 0) > 0;
+        .where(gte(schema.chargersCache.lastStatusAt, chargerCutoff));
+      if (Number(chargerRow?.c ?? 0) > 0) {
+        hasOnlineTapTarget = true;
+      } else {
+        const [deviceRow] = await db
+          .select({ c: sql<number>`count(*)::int` })
+          .from(schema.devices)
+          .where(and(
+            isNull(schema.devices.deletedAt),
+            isNull(schema.devices.revokedAt),
+            sql`'tap' = ANY(${schema.devices.capabilities})`,
+            gte(schema.devices.lastSeenAt, phoneCutoff),
+          ));
+        hasOnlineTapTarget = Number(deviceRow?.c ?? 0) > 0;
+      }
     } catch {
-      hasOnlineCharger = false;
+      hasOnlineTapTarget = false;
     }
 
     return {
       data: {
         operatorEmail: config.OPERATOR_CONTACT_EMAIL,
-        // Scan only renders when at least one charger is online — otherwise
+        // Scan only renders when at least one tap-enabled target
+        // (charger OR phone/laptop scanner) is online — otherwise
         // the CTA is a dead end (data-driven, not a feature flag).
-        scanLoginEnabled: hasOnlineCharger,
+        scanLoginEnabled: hasOnlineTapTarget,
         // Hide the magic-link UI when the email worker isn't configured.
         // Without it, customers would submit "email me a link" → see
         // "check your email" → wait forever for an email that can never
