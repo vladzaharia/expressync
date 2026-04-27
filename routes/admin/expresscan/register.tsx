@@ -23,15 +23,17 @@
  *      same URL.
  *
  *   4. POST validates the body, calls `mintOneTimeCode(userId, codeChallenge,
- *      label, capabilities)` to insert the `verifications` row, and 302s
- *      to the Universal-Link callback target —
- *      `{ADMIN_BASE_URL}/expresscan/register/callback?code={oneTimeCode}`.
+ *      label, capabilities)` to insert the `verifications` row, and returns
+ *      a 200 HTML page that drives a top-level client-side navigation to
+ *      `expresscan://register/callback?code={oneTimeCode}`. We can't 302
+ *      directly: `ASWebAuthenticationSession` drops a cross-scheme redirect
+ *      from a POST silently (see body comment).
  *
- *   5. iOS's app-association manifest claims the `/expresscan/register/*`
- *      path family, so the OS hands the URL to the app instead of opening
- *      it in Safari. The app reads `?code=…`, drops the
- *      `ASWebAuthenticationSession`, and POSTs `/api/devices/register`
- *      with `{oneTimeCode, codeVerifier, …}`.
+ *   5. The in-session `WKWebView`'s navigation to the custom scheme is
+ *      observed by the auth-session policy delegate, matched against
+ *      `callbackURLScheme: "expresscan"`, and the completion handler fires.
+ *      The app reads `?code=…`, drops the `ASWebAuthenticationSession`, and
+ *      POSTs `/api/devices/register` with `{oneTimeCode, codeVerifier, …}`.
  *
  *   6. `/api/devices/register` atomically claims the row + mints
  *      `(deviceToken, deviceSecret)`.
@@ -154,30 +156,52 @@ export const handler = define.handlers({
       };
     }
 
-    // 302 to a custom-scheme URL that the iOS app's
-    // ASWebAuthenticationSession is registered to intercept (via its
-    // `callbackURLScheme`). The session dismisses immediately when the
-    // in-session web view tries to follow this redirect and delivers
-    // the URL to the app's completion handler — works reliably across
-    // iOS versions, no AASA validation in the hot path. The HTTPS
-    // Universal Link target still exists in the AASA manifest as a
-    // belt-and-braces path for users who somehow encounter a stale
-    // callback URL outside the auth session.
+    // Return a 200 HTML page that performs a top-level client-side
+    // navigation to the custom-scheme callback URL. We do NOT 302
+    // directly — `ASWebAuthenticationSession`'s in-session `WKWebView`
+    // silently drops the cross-scheme leg of a POST→3xx→`expresscan://`
+    // redirect (same family of failure as the Universal-Link silent
+    // fail handled in commit cf03887, just for a different navigation
+    // type). A top-level GET to the custom scheme, driven by
+    // `location.replace` / `<meta http-equiv="refresh">`, IS observed
+    // by the navigation policy delegate and matched against
+    // `callbackURLScheme: "expresscan"`, so the auth sheet dismisses
+    // and the completion handler fires.
     //
     // The raw oneTimeCode is single-use, 60s-TTL, hashed at rest —
-    // short-lived URL exposure is acceptable per the design.
+    // emitting it in inline HTML for one navigation tick is no worse
+    // than emitting it in a `Location` header.
     const callback = new URL("expresscan://register/callback");
     callback.searchParams.set("code", oneTimeCode);
-
-    const response = new Response(null, {
-      status: 302,
+    const callbackUrl = callback.toString();
+    const callbackJson = JSON.stringify(callbackUrl);
+    // Both the URL parameter and the HTML attribute escape rules
+    // disallow `"`, `<`, `>`, `&`, and whitespace; the URL is built by
+    // `URL` so it can only contain those characters via the percent-
+    // encoded `oneTimeCode` (base64url, A–Z / a–z / 0–9 / `_` / `-`).
+    // No additional escaping needed.
+    const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Returning to ExpresScan…</title>
+<meta http-equiv="refresh" content="0;url=${callbackUrl}">
+<script>location.replace(${callbackJson});</script>
+<style>body{font:14px -apple-system,BlinkMacSystemFont,sans-serif;text-align:center;margin-top:40vh;color:#666}</style>
+</head>
+<body>
+<p>Returning to ExpresScan…</p>
+<p><a href="${callbackUrl}">Tap here if you're not redirected automatically.</a></p>
+</body>
+</html>`;
+    return new Response(html, {
+      status: 200,
       headers: {
-        Location: callback.toString(),
+        "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "no-store",
         Pragma: "no-cache",
       },
     });
-    return response;
   },
 });
 
@@ -197,6 +221,34 @@ export default define.page<typeof handler>(function ExpresScanRegister(
     );
   }
 
+  // Without a valid PKCE codeChallenge we can't generate a usable one-time
+  // code (the iOS app's verifier wouldn't match). This page is reached by
+  // the iOS app's `ASWebAuthenticationSession` opening a deep link with the
+  // challenge as a query param — a plain browser visit lands here too.
+  // Surface a loud explanation rather than rendering a submit button that
+  // would just bounce off `isValidChallenge`.
+  if (!CODE_CHALLENGE_RE.test(data.codeChallenge)) {
+    return (
+      <div class="min-h-screen flex items-center justify-center bg-background p-4">
+        <div class="w-full max-w-md rounded-lg border border-amber-500/40 bg-amber-500/5 p-6 text-sm">
+          <h1 class="mb-2 text-xl font-semibold text-amber-700 dark:text-amber-300">
+            Open this page from the ExpresScan app
+          </h1>
+          <p class="text-muted-foreground">
+            This URL is the registration callback for the iOS ExpresScan app.
+            Tap "Register iPhone" inside the app to start the flow — it will
+            open this page with a one-time PKCE challenge attached.
+          </p>
+          <p class="mt-3 text-xs text-muted-foreground">
+            If you got here via a stale bookmark, return to the app and
+            re-trigger registration; the URL you land on will include a{" "}
+            <code class="font-mono">codeChallenge</code> parameter.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div class="min-h-screen flex items-center justify-center bg-background p-4">
       <div class="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-sm">
@@ -207,12 +259,19 @@ export default define.page<typeof handler>(function ExpresScanRegister(
         </p>
 
         {data.error && (
-          <p class="mb-4 rounded-md bg-destructive/10 border border-destructive/40 px-3 py-2 text-sm text-destructive">
+          <p
+            role="alert"
+            class="mb-4 rounded-md bg-destructive/10 border border-destructive/40 px-3 py-2 text-sm text-destructive"
+          >
             {data.error}
           </p>
         )}
 
-        <form method="POST" class="space-y-4">
+        <form
+          method="POST"
+          action="/expresscan/register"
+          class="space-y-4"
+        >
           <input
             type="hidden"
             name="codeChallenge"
@@ -247,7 +306,7 @@ export default define.page<typeof handler>(function ExpresScanRegister(
           </button>
 
           <p class="text-xs text-muted-foreground text-center">
-            One-time code expires in 60 seconds.
+            You'll be returned to the ExpresScan app on your iPhone.
           </p>
         </form>
       </div>
