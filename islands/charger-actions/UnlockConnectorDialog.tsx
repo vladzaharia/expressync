@@ -16,7 +16,8 @@ import {
 } from "./types.ts";
 
 export default function UnlockConnectorDialog(props: PerDialogProps) {
-  const { chargeBoxId, isOpen, onClose, onResult } = props;
+  const { chargeBoxId, friendlyName, isOpen, onClose, onResult } = props;
+  const displayName = friendlyName?.trim() || chargeBoxId;
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,7 +57,9 @@ export default function UnlockConnectorDialog(props: PerDialogProps) {
     >
       <p class="text-xs text-muted-foreground">
         This will unlock connector 1 on{" "}
-        <span class="font-mono">{chargeBoxId}</span>.
+        <span class={friendlyName ? "font-medium" : "font-mono"}>
+          {displayName}
+        </span>.
       </p>
     </ActionDialog>
   );

@@ -550,6 +550,7 @@ export default define.page<typeof handler>(
             {data.isAdmin && (
               <RemoteActionsPanel
                 chargeBoxId={charger.chargeBoxId}
+                friendlyName={charger.friendlyName}
                 activeSessions={data.activeSessions.map((s) => ({
                   connectorId: s.connectorId,
                   transactionId: s.transactionId,

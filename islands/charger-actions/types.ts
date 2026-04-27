@@ -18,12 +18,18 @@ export interface ActiveSessionContext {
 
 export interface PanelProps {
   chargeBoxId: string;
+  /** Admin-set human label; preferred over `chargeBoxId` in any
+   *  user-visible text inside the panel and its child dialogs. */
+  friendlyName?: string | null;
   activeSessions?: ActiveSessionContext[];
   steveBaseUrl?: string;
 }
 
 export interface PerDialogProps {
   chargeBoxId: string;
+  /** Admin-set human label; used in dialog body text in preference
+   *  to the chargeBoxId when present. */
+  friendlyName?: string | null;
   activeSessions: ActiveSessionContext[];
   prefill: Record<string, unknown>;
   isOpen: boolean;
