@@ -27,6 +27,7 @@ import {
   type SseTransport,
 } from "../lib/sse-transport.ts";
 import type {
+  DeviceScanCancelledPayload,
   DeviceScanCompletedPayload,
   DeviceScanRequestedPayload,
   DeviceSessionReplacedPayload,
@@ -55,6 +56,7 @@ export type EventBusEventType =
   // ExpresScan / Wave 1 Track A — device lifecycle events.
   | "device.scan.requested"
   | "device.scan.completed"
+  | "device.scan.cancelled"
   | "device.session.replaced"
   | "device.token.revoked";
 
@@ -226,6 +228,7 @@ export type EventBusEvent =
   // ExpresScan / Wave 1 Track A — device lifecycle events.
   | { type: "device.scan.requested"; payload: DeviceScanRequestedPayload }
   | { type: "device.scan.completed"; payload: DeviceScanCompletedPayload }
+  | { type: "device.scan.cancelled"; payload: DeviceScanCancelledPayload }
   | { type: "device.session.replaced"; payload: DeviceSessionReplacedPayload }
   | { type: "device.token.revoked"; payload: DeviceTokenRevokedPayload };
 
