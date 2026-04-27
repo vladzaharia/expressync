@@ -180,18 +180,109 @@ export const handler = define.handlers({
     // `URL` so it can only contain those characters via the percent-
     // encoded `oneTimeCode` (base64url, A–Z / a–z / 0–9 / `_` / `-`).
     // No additional escaping needed.
+    // Self-contained styled HTML — this Response bypasses the Fresh
+    // island/component pipeline (we want zero hydration delay before
+    // the navigation fires), so we inline brand styling instead of
+    // pulling shared components. Colors / squircle radius / Zap glyph
+    // mirror `static/logo.svg` and `components/brand/ExpresSyncBrand`.
     const html = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#06b6d4">
 <title>Returning to ExpresScan…</title>
 <meta http-equiv="refresh" content="0;url=${callbackUrl}">
 <script>location.replace(${callbackJson});</script>
-<style>body{font:14px -apple-system,BlinkMacSystemFont,sans-serif;text-align:center;margin-top:40vh;color:#666}</style>
+<style>
+:root {
+  color-scheme: dark light;
+  --bg: #0a0a0a;
+  --fg: #fafafa;
+  --muted: #a1a1aa;
+  --border: #27272a;
+  --accent: #06b6d4;
+}
+@media (prefers-color-scheme: light) {
+  :root { --bg: #ffffff; --fg: #0a0a0a; --muted: #71717a; --border: #e4e4e7; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  background: radial-gradient(ellipse at top, color-mix(in oklab, var(--accent) 12%, var(--bg)) 0%, var(--bg) 60%);
+  color: var(--fg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  max-width: 360px;
+  text-align: center;
+}
+.logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #06b6d4 0%, #22c55e 55%, #06b6d4 100%);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 10px 40px -12px color-mix(in oklab, var(--accent) 50%, transparent);
+}
+.logo svg { width: 38px; height: 38px; }
+h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.muted { color: var(--muted); font-size: 13px; margin: 0; }
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid color-mix(in oklab, var(--accent) 30%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.row { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+.fallback {
+  margin-top: 6px;
+  display: inline-block;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--fg);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  background: color-mix(in oklab, var(--accent) 4%, transparent);
+}
+.fallback:hover { background: color-mix(in oklab, var(--accent) 10%, transparent); }
+</style>
 </head>
 <body>
-<p>Returning to ExpresScan…</p>
-<p><a href="${callbackUrl}">Tap here if you're not redirected automatically.</a></p>
+<div class="card">
+  <div class="logo" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="#fff" stroke="#fff" stroke-width="0.6" stroke-linejoin="round">
+      <path d="M13 2 L3 14 h9 l-1 8 L21 10 h-9 l1 -8 z" />
+    </svg>
+  </div>
+  <h1>Returning to ExpresScan…</h1>
+  <div class="row"><span class="spinner" aria-hidden="true"></span><span>Finishing up</span></div>
+  <p class="muted">You can close this window once the app reopens.</p>
+  <a class="fallback" href="${callbackUrl}">Open ExpresScan manually</a>
+</div>
 </body>
 </html>`;
     return new Response(html, {
