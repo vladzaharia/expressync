@@ -165,11 +165,16 @@ export const handler = define.handlers({
       return jsonResponse(429, { error: "too_many_concurrent_streams" });
     }
 
-    // Verify the pairing is armed and not expired.
-    let armed = false;
+    // Verify the pairing is armed and not expired. Also pull
+    // `expires_at` so the connected event can broadcast the canonical
+    // server-stamped expiry; the iOS app's SSE stream and the admin
+    // browser both drive their countdowns from this single source so
+    // the two never disagree (was the cause of the 20 s vs 90 s desync
+    // before this change).
+    let armedExpiresAt: Date | null = null;
     try {
-      const result = await db.execute<{ id: string }>(sql`
-        SELECT id FROM verifications
+      const result = await db.execute<{ id: string; expires_at: string }>(sql`
+        SELECT id, expires_at FROM verifications
         WHERE identifier = ${binding.identifier}
           AND expires_at > now()
           AND value::jsonb->>'status' = 'armed'
@@ -177,8 +182,12 @@ export const handler = define.handlers({
       `);
       const list = Array.isArray(result)
         ? result
-        : (result as { rows?: unknown[] }).rows ?? [];
-      armed = list.length > 0;
+        : (result as { rows?: { id: string; expires_at: string }[] }).rows ??
+          [];
+      const row = list[0] as { expires_at?: string } | undefined;
+      if (row?.expires_at) {
+        armedExpiresAt = new Date(row.expires_at);
+      }
     } catch (err) {
       log.error("Failed pairing lookup", {
         pairableType: binding.pairableType,
@@ -186,11 +195,22 @@ export const handler = define.handlers({
       });
       return jsonResponse(500, { error: "internal" });
     }
-    if (!armed) {
+    if (!armedExpiresAt) {
       // Generic 404 — never tell the caller WHY (expired vs unknown vs
       // consumed) so they can't enumerate codes.
       return jsonResponse(404, { error: "pairing_not_found" });
     }
+    // Snapshot at SSE-open time. The verification row's TTL is a
+    // server-stamped absolute, so re-reads aren't needed; an
+    // admin-cancel between this point and the connected-event flush
+    // produces a `device.scan.cancelled` event, which the live
+    // subscription below will translate into a `cancelled` SSE event
+    // on this very stream.
+    const expiresAtEpochMs = armedExpiresAt.getTime();
+    const expiresInSec = Math.max(
+      0,
+      Math.ceil((expiresAtEpochMs - Date.now()) / 1000),
+    );
 
     // Reserve a slot for this IP. Released in the cleanup path below.
     concurrentByIp.set(ip, cur + 1);
@@ -241,7 +261,16 @@ export const handler = define.handlers({
               JSON.stringify({
                 pairableType: binding.pairableType,
                 pairableId: binding.pairableId,
-                expiresInSec: TIMEOUT_MS / 1000,
+                // Canonical server-stamped expiry; the browser computes
+                // its countdown ring from this so it agrees with the
+                // iOS active-scan screen down to the second.
+                expiresAtEpochMs,
+                // Convenience derivation; clients without clock-sync
+                // worries can prefer this. Note this is the
+                // VERIFICATION row's TTL (90 s typical) — NOT this SSE
+                // stream's hard cap (`TIMEOUT_MS`, 60 s), which is
+                // about slow-loris guarding, not the pairing.
+                expiresInSec,
                 // Legacy field for backwards compat with the existing
                 // customer login flow (`CustomerScanLoginIsland.tsx`).
                 ...(binding.pairableType === "charger"
@@ -331,27 +360,64 @@ export const handler = define.handlers({
           unsubscribe = sub.unsubscribe;
         }
 
-        // Subscribe to the event bus for pre-auth hook intercepts
-        // (charger source) and device-scan-result intercepts (device
-        // source). Filter on `(pairableType, pairableId, pairingCode)`
-        // — the legacy `chargeBoxId` field on the payload was removed
-        // in the Wave 1 Track A generalization.
-        unsubBus = eventBus.subscribe(["scan.intercepted"], (delivered) => {
-          if (closed) return;
-          const p = delivered.payload as {
-            idTag: string;
-            pairableType: "charger" | "device";
-            pairableId: string;
-            pairingCode: string;
-            purpose?: string;
-            t: number;
-            source?: string;
-          };
-          if (p.pairableType !== binding.pairableType) return;
-          if (p.pairableId !== binding.pairableId) return;
-          if (p.pairingCode !== binding.pairingCode) return;
-          emit(p.idTag, p.t);
-        });
+        // Subscribe to the event bus for:
+        //   - `scan.intercepted` — pre-auth hook intercepts (charger
+        //     source) and device-scan-result intercepts (device source).
+        //     Filter on `(pairableType, pairableId, pairingCode)` — the
+        //     legacy `chargeBoxId` field on the payload was removed in
+        //     the Wave 1 Track A generalization.
+        //   - `device.scan.cancelled` — bidirectional cancel sync. When
+        //     the iOS app POSTs `/api/devices/scan-cancel` (or another
+        //     admin's DELETE `/scan-arm` lands), this stream forwards a
+        //     `cancelled` SSE event so the in-flight TapToAddModal can
+        //     close. Only relevant for the device pair-type — charger
+        //     pairings don't have a "remote cancel" surface.
+        unsubBus = eventBus.subscribe(
+          ["scan.intercepted", "device.scan.cancelled"],
+          (delivered) => {
+            if (closed) return;
+            if (delivered.type === "scan.intercepted") {
+              const p = delivered.payload as {
+                idTag: string;
+                pairableType: "charger" | "device";
+                pairableId: string;
+                pairingCode: string;
+                purpose?: string;
+                t: number;
+                source?: string;
+              };
+              if (p.pairableType !== binding.pairableType) return;
+              if (p.pairableId !== binding.pairableId) return;
+              if (p.pairingCode !== binding.pairingCode) return;
+              emit(p.idTag, p.t);
+              return;
+            }
+            if (delivered.type === "device.scan.cancelled") {
+              if (binding.pairableType !== "device") return;
+              const p = delivered.payload as {
+                deviceId: string;
+                pairingCode: string;
+                cancelledAt: number;
+                source: "admin" | "device";
+              };
+              if (p.deviceId !== binding.pairableId) return;
+              if (p.pairingCode !== binding.pairingCode) return;
+              safeEnqueue(
+                _enc.encode(
+                  `event: cancelled\ndata: ${
+                    JSON.stringify({
+                      pairingCode: p.pairingCode,
+                      cancelledAt: p.cancelledAt,
+                      source: p.source,
+                    })
+                  }\n\n`,
+                ),
+              );
+              cleanup();
+              return;
+            }
+          },
+        );
 
         // Replay buffered scan.intercepted events from the last ~5s
         // that match this binding. Belt-and-braces against the

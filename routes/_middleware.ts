@@ -277,6 +277,7 @@ export function selectAuth(pathname: string): AuthScheme {
     pathname === "/api/devices/me" ||
     pathname === "/api/devices/scan-stream" ||
     pathname === "/api/devices/scan-result" ||
+    pathname === "/api/devices/scan-cancel" ||
     pathname.startsWith("/api/devices/scan-result/")
   ) {
     return "bearer";
