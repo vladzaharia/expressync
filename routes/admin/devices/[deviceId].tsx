@@ -36,11 +36,11 @@ import { logger } from "../../../src/lib/utils/logger.ts";
 import { SidebarLayout } from "../../../components/SidebarLayout.tsx";
 import { PageCard } from "../../../components/PageCard.tsx";
 import { SectionCard } from "../../../components/shared/SectionCard.tsx";
-import { Button } from "../../../components/ui/button.tsx";
-import { Activity, ScanLine } from "lucide-preact";
+import { Activity } from "lucide-preact";
 import { DeviceIdentityCard } from "../../../components/devices/DeviceIdentityCard.tsx";
 import { DeviceHeaderStrip } from "../../../components/devices/DeviceHeaderStrip.tsx";
 import DeviceActionsMenu from "../../../islands/devices/DeviceActionsMenu.tsx";
+import TriggerScanButton from "../../../islands/devices/TriggerScanButton.tsx";
 
 const log = logger.child("AdminDeviceDetailPage");
 
@@ -238,6 +238,18 @@ export default define.page<typeof handler>(
 
     const isDeregistered = device.deletedAtIso !== null;
 
+    // Heartbeat freshness — same 90s window as the listing page's
+    // online filter. Derived once at the top of the render so the
+    // header-actions slot AND the in-page header strip / identity
+    // card all agree on liveness.
+    let isOnline = false;
+    if (device.lastSeenAtIso) {
+      const ms = Date.parse(device.lastSeenAtIso);
+      if (Number.isFinite(ms)) {
+        isOnline = Date.now() - ms <= 90 * 1000;
+      }
+    }
+
     return (
       <SidebarLayout
         currentPath={url.pathname}
@@ -256,22 +268,13 @@ export default define.page<typeof handler>(
           colorScheme="teal"
           headerActions={
             <div class="flex items-center gap-2">
-              {
-                /*
-                TODO(D3): Wire `Trigger scan` to the unified scan modal once
-                D3 lands the picker. For v1 this is a stub button; the modal
-                + scan-arm dispatch are owned by Track D3.
-              */
-              }
-              <Button
-                size="sm"
-                variant="outline"
-                title="Wired up by Track D3 (scan modal picker swap)."
-                disabled
-              >
-                <ScanLine class="size-4" />
-                Trigger scan
-              </Button>
+              {!isDeregistered && (
+                <TriggerScanButton
+                  deviceId={device.deviceId}
+                  label={device.label}
+                  isOnline={isOnline}
+                />
+              )}
               {!isDeregistered && (
                 <DeviceActionsMenu
                   deviceId={device.deviceId}
@@ -283,52 +286,35 @@ export default define.page<typeof handler>(
           }
         >
           <div class="flex flex-col gap-6">
-            {(() => {
-              // Heartbeat freshness — same 90s window as the listing
-              // page's online filter, derived once and shared between
-              // the header strip and the identity card so both surfaces
-              // agree.
-              let isOnline = false;
-              if (device.lastSeenAtIso) {
-                const ms = Date.parse(device.lastSeenAtIso);
-                if (Number.isFinite(ms)) {
-                  isOnline = Date.now() - ms <= 90 * 1000;
-                }
-              }
-              return (
-                <>
-                  <DeviceHeaderStrip
-                    deviceId={device.deviceId}
-                    label={device.label}
-                    kind={device.kind}
-                    isOnline={isOnline}
-                    lastSeenAtIso={device.lastSeenAtIso}
-                    capabilities={device.capabilities}
-                    ownerEmail={device.ownerEmail}
-                    isDeregistered={isDeregistered}
-                    isRevoked={device.revokedAtIso !== null}
-                  />
+            <DeviceHeaderStrip
+              deviceId={device.deviceId}
+              label={device.label}
+              kind={device.kind}
+              isOnline={isOnline}
+              lastSeenAtIso={device.lastSeenAtIso}
+              capabilities={device.capabilities}
+              ownerEmail={device.ownerEmail}
+              isDeregistered={isDeregistered}
+              isRevoked={device.revokedAtIso !== null}
+            />
 
-                  <DeviceIdentityCard
-                    deviceId={device.deviceId}
-                    kind={device.kind}
-                    label={device.label}
-                    platform={device.platform}
-                    model={device.model}
-                    osVersion={device.osVersion}
-                    appVersion={device.appVersion}
-                    ownerUserId={device.ownerUserId}
-                    ownerEmail={device.ownerEmail}
-                    capabilities={device.capabilities}
-                    pushTokenLast8={device.pushTokenLast8}
-                    apnsEnvironment={device.apnsEnvironment}
-                    isOnline={isOnline}
-                    lastSeenAtIso={device.lastSeenAtIso}
-                    registeredAtIso={device.registeredAtIso}
-                  />
-                </>
-              );
-            })()}
+            <DeviceIdentityCard
+              deviceId={device.deviceId}
+              kind={device.kind}
+              label={device.label}
+              platform={device.platform}
+              model={device.model}
+              osVersion={device.osVersion}
+              appVersion={device.appVersion}
+              ownerUserId={device.ownerUserId}
+              ownerEmail={device.ownerEmail}
+              capabilities={device.capabilities}
+              pushTokenLast8={device.pushTokenLast8}
+              apnsEnvironment={device.apnsEnvironment}
+              isOnline={isOnline}
+              lastSeenAtIso={device.lastSeenAtIso}
+              registeredAtIso={device.registeredAtIso}
+            />
 
             <SectionCard
               title="Recent Scans"
