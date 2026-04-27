@@ -45,8 +45,16 @@ import {
 const log = logger.child("ScanTapTargets");
 
 const RATE_LIMIT_PER_IP = 30;
-/** Online cutoff for chargers — matches scan-charger-list's legacy 10-minute window. */
-const CHARGER_ONLINE_WINDOW_MS = 10 * 60 * 1000;
+/**
+ * Online cutoff for chargers — matches `OFFLINE_AFTER_MS` in
+ * `islands/shared/device-visuals.ts` so the picker, the chargers grid,
+ * and the charger detail page agree on what "Offline" means. The
+ * timestamp consulted is `chargers_cache.last_status_at` (the OCPP status
+ * timestamp), NOT `last_seen_at` — the latter is bumped by hourly sync
+ * polls regardless of charger connectivity, which used to make the
+ * picker present a stale charger as online.
+ */
+const CHARGER_ONLINE_WINDOW_MS = 60 * 60 * 1000;
 /** Online cutoff for phones — heartbeats are short, so this is tight. */
 const PHONE_ONLINE_WINDOW_MS = 90 * 1000;
 
@@ -57,6 +65,10 @@ type ViewRow = {
   capabilities: string[];
   owner_user_id: string | null;
   last_seen_at: string | Date | null;
+  /** Charger-only: timestamp of the last OCPP status change. NULL for scanners. */
+  last_status_at: string | Date | null;
+  /** Charger-only: most recent OCPP status string. NULL for scanners. */
+  last_status: string | null;
   // Index signature required by Drizzle's `db.execute<T>` generic
   // (T extends Record<string, unknown>). Doesn't change runtime behavior.
   [key: string]: unknown;
@@ -89,12 +101,36 @@ function toMs(v: string | Date | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function isOnline(kind: string, lastSeenAtMs: number | null): boolean {
+/**
+ * Online check.
+ *
+ * Chargers: "online" means `last_status_at` is fresh AND `last_status` is
+ * not a soft-offline string ("Offline", "Faulted", "Unavailable") — this
+ * matches `normalizeStatus` in `islands/shared/device-visuals.ts` so
+ * every surface agrees. A charger that hasn't reported a status in
+ * `CHARGER_ONLINE_WINDOW_MS` is offline regardless of `last_seen_at`.
+ *
+ * Scanners (phones / laptops): "online" means a heartbeat in the last
+ * `PHONE_ONLINE_WINDOW_MS` (no status concept).
+ */
+function isOnline(
+  kind: string,
+  lastSeenAtMs: number | null,
+  lastStatusAtMs: number | null,
+  lastStatus: string | null,
+): boolean {
+  if (kind === "charger") {
+    if (lastStatusAtMs === null) return false;
+    if ((Date.now() - lastStatusAtMs) > CHARGER_ONLINE_WINDOW_MS) return false;
+    if (!lastStatus) return false;
+    const s = lastStatus.toLowerCase();
+    if (s.includes("offline")) return false;
+    if (s.includes("fault") || s.includes("error")) return false;
+    if (s.includes("unavail")) return false;
+    return true;
+  }
   if (lastSeenAtMs === null) return false;
-  const window = kind === "charger"
-    ? CHARGER_ONLINE_WINDOW_MS
-    : PHONE_ONLINE_WINDOW_MS;
-  return (Date.now() - lastSeenAtMs) <= window;
+  return (Date.now() - lastSeenAtMs) <= PHONE_ONLINE_WINDOW_MS;
 }
 
 export const handler = define.handlers({
@@ -111,18 +147,26 @@ export const handler = define.handlers({
       // side. The view already excludes soft-deleted devices via its WHERE
       // clause (see migration 0035), but we keep the redundant guard so a
       // future view rewrite can't accidentally surface revoked rows.
+      // Left-join chargers_cache to surface `last_status_at` + `last_status`
+      // for charger rows; scanner rows get NULL for both columns and fall
+      // through to the heartbeat-based online check. The join key is the
+      // view's id (== chargers_cache.charge_box_id for charger rows).
       const result = await db.execute<ViewRow>(sql`
         SELECT
-          id,
-          kind,
-          label,
-          capabilities,
-          owner_user_id,
-          last_seen_at
-        FROM tappable_devices
-        WHERE 'tap' = ANY(capabilities)
-          AND deleted_at IS NULL
-        ORDER BY last_seen_at DESC NULLS LAST
+          tv.id,
+          tv.kind,
+          tv.label,
+          tv.capabilities,
+          tv.owner_user_id,
+          tv.last_seen_at,
+          cc.last_status_at,
+          cc.last_status
+        FROM tappable_devices tv
+        LEFT JOIN chargers_cache cc
+          ON tv.kind = 'charger' AND cc.charge_box_id = tv.id
+        WHERE 'tap' = ANY(tv.capabilities)
+          AND tv.deleted_at IS NULL
+        ORDER BY tv.last_seen_at DESC NULLS LAST
       `);
 
       const rows: ViewRow[] = Array.isArray(result)
@@ -131,7 +175,8 @@ export const handler = define.handlers({
 
       const targets: TapTargetEntry[] = rows.map((r): TapTargetEntry => {
         const lastMs = toMs(r.last_seen_at);
-        const online = isOnline(r.kind, lastMs);
+        const lastStatusMs = toMs(r.last_status_at);
+        const online = isOnline(r.kind, lastMs, lastStatusMs, r.last_status);
         const pairableType: TapTargetEntry["pairableType"] =
           r.kind === "charger" ? "charger" : "device";
         const filteredCaps: DeviceCapability[] = (r.capabilities ?? []).filter(

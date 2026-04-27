@@ -120,6 +120,7 @@ type PairingInserter = (row: {
   expiresAt: Date;
 }) => Promise<void>;
 type PairingDeleter = (identifier: string) => Promise<void>;
+type PushTokenClearer = (deviceId: string) => Promise<void>;
 
 const defaultDeviceLoader: DeviceLoader = async (deviceId) => {
   const [row] = await db
@@ -187,11 +188,19 @@ const defaultPairingDeleter: PairingDeleter = async (identifier) => {
   );
 };
 
+const defaultPushTokenClearer: PushTokenClearer = async (deviceId) => {
+  await db
+    .update(devices)
+    .set({ pushToken: null, apnsEnvironment: null })
+    .where(eq(devices.id, deviceId));
+};
+
 let apnsSender: ApnsSender = sendApns;
 let deviceLoader: DeviceLoader = defaultDeviceLoader;
 let armedPairingFinder: ArmedPairingFinder = defaultArmedPairingFinder;
 let pairingInserter: PairingInserter = defaultPairingInserter;
 let pairingDeleter: PairingDeleter = defaultPairingDeleter;
+let pushTokenClearer: PushTokenClearer = defaultPushTokenClearer;
 
 /** Test-only — install a fake sender. Pass `null` to restore the real one. */
 export function _setApnsSenderForTests(fn: ApnsSender | null): void {
@@ -220,6 +229,13 @@ export function _setPairingDeleterForTests(fn: PairingDeleter | null): void {
   pairingDeleter = fn ?? defaultPairingDeleter;
 }
 
+/** Test-only — install a fake push-token clearer. Pass `null` to restore. */
+export function _setPushTokenClearerForTests(
+  fn: PushTokenClearer | null,
+): void {
+  pushTokenClearer = fn ?? defaultPushTokenClearer;
+}
+
 /** Test-only — restore every seam in one call. */
 export function _resetScanArmTestSeams(): void {
   apnsSender = sendApns;
@@ -227,6 +243,7 @@ export function _resetScanArmTestSeams(): void {
   armedPairingFinder = defaultArmedPairingFinder;
   pairingInserter = defaultPairingInserter;
   pairingDeleter = defaultPairingDeleter;
+  pushTokenClearer = defaultPushTokenClearer;
 }
 
 // ===========================================================================
@@ -518,13 +535,33 @@ export const handler = define.handlers({
         const sendPromise = apnsSender(apnsTarget, apnsPayload);
         // Attach a logger so a rejected push never bubbles to the runtime.
         sendPromise
-          .then((result) => {
-            if (!result.ok) {
-              log.warn("APNs send rejected", {
+          .then(async (result) => {
+            if (result.ok) return;
+            log.warn("APNs send rejected", {
+              deviceId,
+              pairingCode,
+              status: result.status,
+              reason: result.reason,
+            });
+            // Apple's "this token is dead" responses (HTTP 410 or
+            // BadDeviceToken / Unregistered on 400) — clear push_token so we
+            // stop probing a stale token on every subsequent arm. The next
+            // PUT /api/devices/{id}/push-token call from the iOS app will
+            // re-populate it.
+            const dead = result.status === 410 ||
+              result.reason === "Unregistered" ||
+              result.reason === "BadDeviceToken";
+            if (!dead) return;
+            try {
+              await pushTokenClearer(deviceId);
+              log.info("APNs token cleared after dead-token response", {
                 deviceId,
-                pairingCode,
-                status: result.status,
                 reason: result.reason,
+              });
+            } catch (err) {
+              log.warn("APNs dead-token clear failed", {
+                deviceId,
+                error: err instanceof Error ? err.message : String(err),
               });
             }
           })

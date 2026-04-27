@@ -42,10 +42,27 @@ interface LoginPageData {
   /** Hide the forgot-password trigger when the email worker isn't
    *  configured — admins can't receive a reset link otherwise. */
   forgotPasswordEnabled: boolean;
+  /**
+   * Sanitised `?next=<path>` value plumbed through from the middleware
+   * (e.g. iOS ExpresScan deep-link returns the admin to
+   * `/expresscan/register?codeChallenge=…`). Always begins with "/" and
+   * never "//"; defaults to "/".
+   */
+  next: string;
+}
+
+function sanitizeNext(raw: string | null): string {
+  if (!raw) return "/";
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "/";
+  if (raw.startsWith("/login")) return "/";
+  return raw;
 }
 
 export const handler = define.handlers({
-  GET(_ctx) {
+  GET(ctx) {
+    const url = new URL(ctx.req.url);
+    const next = sanitizeNext(url.searchParams.get("next"));
+
     const oidcEnabled = config.ADMIN_OIDC_ISSUER.length > 0 &&
       config.ADMIN_OIDC_CLIENT_ID.length > 0;
 
@@ -54,6 +71,7 @@ export const handler = define.handlers({
         data: {
           mode: "oidc-only" as const,
           forgotPasswordEnabled: false,
+          next,
         } satisfies LoginPageData,
       };
     }
@@ -62,6 +80,7 @@ export const handler = define.handlers({
         data: {
           mode: "oidc-with-fallback" as const,
           forgotPasswordEnabled: isEmailEnabled(),
+          next,
         } satisfies LoginPageData,
       };
     }
@@ -69,6 +88,7 @@ export const handler = define.handlers({
       data: {
         mode: "password" as const,
         forgotPasswordEnabled: isEmailEnabled(),
+        next,
       } satisfies LoginPageData,
     };
   },
@@ -139,7 +159,7 @@ export default define.page<typeof handler>(function LoginPage({ data }) {
                   <p class="text-sm text-center text-muted-foreground mb-5">
                     Redirecting you to your single sign-on provider…
                   </p>
-                  <OidcAutoSubmit>
+                  <OidcAutoSubmit callbackURL={data.next}>
                     <OidcSignInButton label="Continue with Pocket ID" />
                   </OidcAutoSubmit>
                   <noscript>
@@ -167,12 +187,18 @@ export default define.page<typeof handler>(function LoginPage({ data }) {
                       name="providerId"
                       value="pocket-id"
                     />
-                    <input type="hidden" name="callbackURL" value="/" />
+                    <input
+                      type="hidden"
+                      name="callbackURL"
+                      value={data.next}
+                    />
                     <OidcSignInButton label="Continue with Pocket ID" />
                   </form>
                   <div class="pt-1 text-center">
                     <a
-                      href="/login/email"
+                      href={data.next === "/"
+                        ? "/login/email"
+                        : `/login/email?next=${encodeURIComponent(data.next)}`}
                       class="text-xs text-muted-foreground underline-offset-4 hover:underline"
                     >
                       Sign in with email instead

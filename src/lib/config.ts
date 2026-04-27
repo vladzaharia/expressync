@@ -181,8 +181,6 @@ export const config = {
   ADMIN_OIDC_CLIENT_ID: Deno.env.get("ADMIN_OIDC_CLIENT_ID") || "",
   /** OAuth client secret. Optional for public clients; required for confidential. */
   ADMIN_OIDC_CLIENT_SECRET: Deno.env.get("ADMIN_OIDC_CLIENT_SECRET") || "",
-  /** Pocket ID group name that grants `role='admin'` on JIT provision. */
-  ADMIN_OIDC_ADMIN_GROUP: Deno.env.get("ADMIN_OIDC_ADMIN_GROUP") || "",
   /** "true" to render the email/password form as a fallback below the OIDC button. */
   ADMIN_AUTH_SHOW_FALLBACK: (Deno.env.get("ADMIN_AUTH_SHOW_FALLBACK") || "")
     .toLowerCase() === "true",

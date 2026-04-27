@@ -580,7 +580,8 @@ function StepCharger(
     return (
       <div class="rounded-md border border-dashed bg-muted/20 px-6 py-8 text-center text-sm text-muted-foreground">
         No chargers known yet. Add one via{" "}
-        <a href="/chargers" class="underline">Chargers</a> and return here.
+        <a href="/devices?type=charger" class="underline">Devices</a>{" "}
+        and return here.
       </div>
     );
   }
