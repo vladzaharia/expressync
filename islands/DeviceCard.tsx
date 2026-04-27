@@ -112,11 +112,27 @@ export default function DeviceCard(
         )}
 
         <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+          {/* "Last seen" is meaningful only when the device isn't
+              currently reachable. The Online pill in the top row
+              already conveys liveness when isOnline=true. */}
           <div>
-            <span class="text-muted-foreground">Last seen:</span>{" "}
-            <span class="font-medium">
-              {formatRelative(device.lastSeenAtIso)}
-            </span>
+            {device.isOnline
+              ? (
+                <>
+                  <span class="text-muted-foreground">Status:</span>{" "}
+                  <span class="font-medium text-emerald-600 dark:text-emerald-400">
+                    Online now
+                  </span>
+                </>
+              )
+              : (
+                <>
+                  <span class="text-muted-foreground">Last seen:</span>{" "}
+                  <span class="font-medium">
+                    {formatRelative(device.lastSeenAtIso)}
+                  </span>
+                </>
+              )}
           </div>
           <div class="truncate">
             <span class="text-muted-foreground">Owner:</span>{" "}

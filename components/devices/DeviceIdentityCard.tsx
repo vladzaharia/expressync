@@ -49,6 +49,9 @@ export interface DeviceIdentityCardProps {
   pushTokenLast8: string | null;
   /** "production" | "sandbox" — surfaced as small chip next to the push token presence pill. */
   apnsEnvironment: string | null;
+  /** When true the "Last seen" tile renders "Online now" — the relative
+   *  time would be redundant with the live pill in the header strip. */
+  isOnline: boolean;
   lastSeenAtIso: string | null;
   registeredAtIso: string;
   class?: string;
@@ -95,7 +98,7 @@ function PushTokenPill(
 }
 
 export function DeviceIdentityCard({
-  deviceId,
+  deviceId: _deviceId,
   kind,
   label,
   platform,
@@ -107,6 +110,7 @@ export function DeviceIdentityCard({
   capabilities,
   pushTokenLast8,
   apnsEnvironment,
+  isOnline,
   lastSeenAtIso,
   registeredAtIso,
   class: className,
@@ -121,10 +125,19 @@ export function DeviceIdentityCard({
 
   const ownerDisplay = ownerEmail ?? ownerUserId ?? "—";
 
+  // Description: form-factor + model when present. The technical
+  // `deviceId` lives only as the page URL — surfacing it inline here
+  // doubled up with the device label in the title.
+  const description = modelDisplay && modelDisplay !== "—"
+    ? `${kind === "phone_nfc" ? "Phone" : "Laptop"} · ${modelDisplay}`
+    : kind === "phone_nfc"
+    ? "Phone"
+    : "Laptop";
+
   return (
     <SectionCard
       title={label}
-      description={`${kind === "phone_nfc" ? "Phone" : "Laptop"} · ${deviceId}`}
+      description={description}
       icon={Smartphone}
       accent="teal"
       className={cn(className)}
@@ -186,9 +199,13 @@ export function DeviceIdentityCard({
           />
           <MetricTile
             icon={Clock}
-            label="Last seen"
-            value={formatRelative(lastSeenAtIso)}
-            sublabel={lastSeenAtIso ? formatAbs(lastSeenAtIso) : undefined}
+            label={isOnline ? "Status" : "Last seen"}
+            value={isOnline ? "Online now" : formatRelative(lastSeenAtIso)}
+            sublabel={isOnline
+              ? undefined
+              : lastSeenAtIso
+              ? formatAbs(lastSeenAtIso)
+              : undefined}
             accent="teal"
           />
           <MetricTile

@@ -296,38 +296,52 @@ export default define.page<typeof handler>(
           }
         >
           <div class="flex flex-col gap-6">
-            <DeviceHeaderStrip
-              deviceId={device.deviceId}
-              kind={device.kind}
-              isOnline={(() => {
-                if (!device.lastSeenAtIso) return false;
+            {(() => {
+              // Heartbeat freshness — same 90s window as the listing
+              // page's online filter, derived once and shared between
+              // the header strip and the identity card so both surfaces
+              // agree.
+              let isOnline = false;
+              if (device.lastSeenAtIso) {
                 const ms = Date.parse(device.lastSeenAtIso);
-                if (!Number.isFinite(ms)) return false;
-                return Date.now() - ms <= 90 * 1000;
-              })()}
-              lastSeenAtIso={device.lastSeenAtIso}
-              capabilities={device.capabilities}
-              ownerEmail={device.ownerEmail}
-              isDeregistered={isDeregistered}
-              isRevoked={device.revokedAtIso !== null}
-            />
+                if (Number.isFinite(ms)) {
+                  isOnline = Date.now() - ms <= 90 * 1000;
+                }
+              }
+              return (
+                <>
+                  <DeviceHeaderStrip
+                    deviceId={device.deviceId}
+                    label={device.label}
+                    kind={device.kind}
+                    isOnline={isOnline}
+                    lastSeenAtIso={device.lastSeenAtIso}
+                    capabilities={device.capabilities}
+                    ownerEmail={device.ownerEmail}
+                    isDeregistered={isDeregistered}
+                    isRevoked={device.revokedAtIso !== null}
+                  />
 
-            <DeviceIdentityCard
-              deviceId={device.deviceId}
-              kind={device.kind}
-              label={device.label}
-              platform={device.platform}
-              model={device.model}
-              osVersion={device.osVersion}
-              appVersion={device.appVersion}
-              ownerUserId={device.ownerUserId}
-              ownerEmail={device.ownerEmail}
-              capabilities={device.capabilities}
-              pushTokenLast8={device.pushTokenLast8}
-              apnsEnvironment={device.apnsEnvironment}
-              lastSeenAtIso={device.lastSeenAtIso}
-              registeredAtIso={device.registeredAtIso}
-            />
+                  <DeviceIdentityCard
+                    deviceId={device.deviceId}
+                    kind={device.kind}
+                    label={device.label}
+                    platform={device.platform}
+                    model={device.model}
+                    osVersion={device.osVersion}
+                    appVersion={device.appVersion}
+                    ownerUserId={device.ownerUserId}
+                    ownerEmail={device.ownerEmail}
+                    capabilities={device.capabilities}
+                    pushTokenLast8={device.pushTokenLast8}
+                    apnsEnvironment={device.apnsEnvironment}
+                    isOnline={isOnline}
+                    lastSeenAtIso={device.lastSeenAtIso}
+                    registeredAtIso={device.registeredAtIso}
+                  />
+                </>
+              );
+            })()}
 
             <SectionCard
               title="Capabilities"
