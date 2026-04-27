@@ -154,6 +154,7 @@ export const handler = define.handlers({
       return jsonResponse(401, { error: "unauthorized" });
     }
     const deviceId = device.id;
+    const connectionTokenId = device.tokenId;
 
     // 2. Per-IP cap. Cheapest-disqualification first — a spammer
     //    hitting from one IP doesn't get to burn DB lookups before
@@ -320,8 +321,18 @@ export const handler = define.handlers({
           const buffered = eventBus.replay(lastEventId, [...replayTypes]);
           for (const ev of buffered) {
             if (closed) break;
-            const p = ev.payload as { deviceId?: string };
+            const p = ev.payload as { deviceId?: string; tokenId?: string };
             if (p.deviceId !== deviceId) continue;
+            // Token revocations only close THIS stream when they target the
+            // exact tokenId we authenticated with — a re-issued token's
+            // revocation event must not tear down a stream using its
+            // successor.
+            if (
+              ev.type === "device.token.revoked" &&
+              p.tokenId !== connectionTokenId
+            ) {
+              continue;
+            }
             if (ev.type === "device.scan.requested") {
               safeEnqueue(formatEvent("scan.requested", ev.seq, p));
             } else if (ev.type === "device.session.replaced") {
@@ -347,8 +358,19 @@ export const handler = define.handlers({
           ],
           (delivered) => {
             if (closed) return;
-            const p = delivered.payload as { deviceId?: string };
+            const p = delivered.payload as {
+              deviceId?: string;
+              tokenId?: string;
+            };
             if (p.deviceId !== deviceId) return;
+            // Same tokenId guard as the buffered-replay path — a revocation
+            // event for a different tokenId must not close this stream.
+            if (
+              delivered.type === "device.token.revoked" &&
+              p.tokenId !== connectionTokenId
+            ) {
+              return;
+            }
 
             if (delivered.type === "device.scan.requested") {
               if (!isMatchingScanRequest(delivered, deviceId)) return;

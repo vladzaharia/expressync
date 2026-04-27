@@ -168,7 +168,7 @@ Deno.test("signApnsJwt — signature verifies against matching public key", asyn
   const ok = await crypto.subtle.verify(
     { name: "ECDSA", hash: "SHA-256" },
     pub,
-    base64UrlDecode(sigSeg),
+    base64UrlDecode(sigSeg) as BufferSource,
     new TextEncoder().encode(`${headerSeg}.${claimsSeg}`),
   );
   assert(ok, "ES256 signature must verify against the matching public key");

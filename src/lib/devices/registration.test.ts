@@ -198,7 +198,8 @@ Deno.test({
 });
 
 Deno.test({
-  name: "generateDeviceCredentials — token hash is 64-hex (sha256), secret is base64url",
+  name:
+    "generateDeviceCredentials — token hash is 64-hex (sha256), secret is base64url",
   sanitizeResources: false,
   sanitizeOps: false,
   fn: async () => {
