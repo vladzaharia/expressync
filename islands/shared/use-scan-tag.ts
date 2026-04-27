@@ -513,14 +513,58 @@ export function useScanTag(opts?: UseScanTagOptions): UseScanTagApi {
     }
     refs.eventSource = es;
 
-    es.addEventListener("connected", () => {
+    es.addEventListener("connected", (event: MessageEvent) => {
       if (mySession !== refs.sessionId) return;
+      // Honour the canonical server-stamped expiry from the SSE payload
+      // when present — it agrees with the iOS active-scan screen down to
+      // the second. Falls back to the caller's `timeoutSeconds` only when
+      // the server didn't include either field (legacy server build).
+      let remaining = timeoutSeconds;
+      try {
+        const data = JSON.parse(event.data ?? "{}") as {
+          expiresAtEpochMs?: number;
+          expiresInSec?: number;
+        };
+        if (typeof data.expiresAtEpochMs === "number") {
+          remaining = Math.max(
+            1,
+            Math.ceil((data.expiresAtEpochMs - Date.now()) / 1000),
+          );
+        } else if (typeof data.expiresInSec === "number") {
+          remaining = Math.max(1, Math.floor(data.expiresInSec));
+        }
+      } catch {
+        // Bad JSON on `connected` payload — keep the default. Not worth
+        // surfacing as an error; the worst case is a slightly off
+        // countdown.
+      }
       setState({
         kind: "waiting",
-        remaining: timeoutSeconds,
+        remaining,
         extended: false,
       });
       startTick();
+    });
+
+    // Bidirectional cancel sync. The server forwards
+    // `device.scan.cancelled` events as `event: cancelled` SSE frames
+    // when either:
+    //   - the iOS app POSTs `/api/devices/scan-cancel` (user dismissed
+    //     the active-scan screen), or
+    //   - another admin tab closed the same scan (DELETE
+    //     `/api/admin/devices/{id}/scan-arm`).
+    // In both cases the modal closes via the `dismissed` terminal — the
+    // arm row is already gone server-side, so no DELETE/cleanup fires.
+    es.addEventListener("cancelled", () => {
+      if (mySession !== refs.sessionId) return;
+      // Forget the active arm so `cleanup()` doesn't fire a redundant
+      // DELETE for a row the server already removed.
+      refs.arm = null;
+      closeEventSource();
+      clearTick();
+      clearAutoConfirm();
+      setState({ kind: "dismissed" });
+      dispatch("scan-tag:cancelled", { source: "remote" });
     });
 
     // scan-detect emits anonymous `data:` events (no event-type line) for

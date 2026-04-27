@@ -132,6 +132,28 @@ export interface DeviceScanCompletedPayload {
 }
 
 /**
+ * Body of the `device.scan.cancelled` event. Fired when an in-flight
+ * scan-arm intent is dropped by either side before a tag is read.
+ *
+ * Sources:
+ *   - `"admin"` — admin invoked DELETE `/api/admin/devices/{id}/scan-arm`,
+ *     i.e. closed the TapToAddModal.
+ *   - `"device"` — iOS app POSTed `/api/devices/scan-cancel` after the
+ *     user dismissed the active-scan screen.
+ *
+ * Both sides (admin SSE stream + device SSE stream) consume this event
+ * so cancellation propagates bidirectionally — matching the live-status
+ * contract documented in `30-backend.md` § "Scan-arm bidirectional sync".
+ */
+export interface DeviceScanCancelledPayload {
+  deviceId: string;
+  pairingCode: string;
+  /** ms since epoch. */
+  cancelledAt: number;
+  source: "admin" | "device";
+}
+
+/**
  * Body of the `device.session.replaced` event. Fired when a second SSE
  * stream connects for the same device — the old stream receives this and
  * closes.

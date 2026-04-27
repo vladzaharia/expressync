@@ -315,6 +315,7 @@ export const handler = define.handlers({
         if (lastEventId > 0) {
           const replayTypes = [
             "device.scan.requested",
+            "device.scan.cancelled",
             "device.session.replaced",
             "device.token.revoked",
           ] as const;
@@ -335,6 +336,11 @@ export const handler = define.handlers({
             }
             if (ev.type === "device.scan.requested") {
               safeEnqueue(formatEvent("scan.requested", ev.seq, p));
+            } else if (ev.type === "device.scan.cancelled") {
+              // Replay-only path: an admin cancel that landed during a
+              // brief disconnect needs to reach the iOS active-scan
+              // screen so the spinner dismisses on resume.
+              safeEnqueue(formatEvent("scan.cancelled", ev.seq, p));
             } else if (ev.type === "device.session.replaced") {
               // A buffered session.replaced means we already lost the
               // race. Emit + close.
@@ -353,6 +359,7 @@ export const handler = define.handlers({
         unsubBus = eventBus.subscribe(
           [
             "device.scan.requested",
+            "device.scan.cancelled",
             "device.session.replaced",
             "device.token.revoked",
           ],
@@ -376,6 +383,17 @@ export const handler = define.handlers({
               if (!isMatchingScanRequest(delivered, deviceId)) return;
               safeEnqueue(
                 formatEvent("scan.requested", delivered.seq, p),
+              );
+              return;
+            }
+
+            if (delivered.type === "device.scan.cancelled") {
+              // Bidirectional sync — admin closed the scan modal, so
+              // dismiss the iOS active-scan screen. The payload carries
+              // pairingCode so the iOS handler can guard against stale
+              // cancellations.
+              safeEnqueue(
+                formatEvent("scan.cancelled", delivered.seq, p),
               );
               return;
             }

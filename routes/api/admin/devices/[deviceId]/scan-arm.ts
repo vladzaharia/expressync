@@ -655,6 +655,28 @@ export const handler = define.handlers({
         });
       }
 
+      // Notify both the in-flight admin SSE consumer (so the
+      // TapToAddModal closes) and the device's SSE stream (so the
+      // active-scan screen dismisses on the iPhone). Source `"admin"`
+      // disambiguates from device-initiated cancels in the audit
+      // trail.
+      try {
+        eventBus.publish({
+          type: "device.scan.cancelled",
+          payload: {
+            deviceId,
+            pairingCode,
+            cancelledAt: Date.now(),
+            source: "admin",
+          },
+        });
+      } catch (err) {
+        log.warn("Event-bus publish failed (non-fatal)", {
+          deviceId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+
       void logDeviceScanReleased({
         userId: adminUserId,
         ip: getClientIp(ctx.req),
