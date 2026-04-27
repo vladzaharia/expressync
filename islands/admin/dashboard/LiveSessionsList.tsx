@@ -187,9 +187,8 @@ export default function LiveSessionsList({ emptyMessage }: Props) {
                             {labels.value[r.chargeBoxId]}
                           </span>
                         )
-                        : (
-                          <span class="font-mono text-xs">{r.chargeBoxId}</span>
-                        )}
+                        : <span class="font-mono text-xs">{r.chargeBoxId}
+                        </span>}
                     </a>
                   )
                   : <span class="text-muted-foreground text-xs">—</span>}

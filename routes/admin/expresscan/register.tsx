@@ -281,10 +281,10 @@ export default define.page<typeof handler>(function ExpresScanRegister(
             Open this page from the ExpresScan app
           </h1>
           <p class="text-muted-foreground">
-            This URL is the registration entry point for the iOS ExpresScan
-            app. Tap "Sign in" inside the app to start the flow — it will
-            open this page with a one-time PKCE challenge attached and
-            send you straight back to the app.
+            This URL is the registration entry point for the iOS ExpresScan app.
+            Tap "Sign in" inside the app to start the flow — it will open this
+            page with a one-time PKCE challenge attached and send you straight
+            back to the app.
           </p>
           <p class="mt-3 text-xs text-muted-foreground">
             If you got here via a stale bookmark, return to the app and

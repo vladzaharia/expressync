@@ -5,7 +5,7 @@
  *   - Fetch `/api/admin/tag` (all OCPP tags in StEvE) and `/api/admin/tag/link` (existing
  *     user_mappings) so we can annotate availability.
  *   - Render three entry points for creating/finding a tag:
- *       1. Tap to add (opens the shared `TapToAddModal` island — NFC path).
+ *       1. Tap to add (opens the unified `<ScanModal>` — NFC path).
  *       2. A scrollable chip grid of unlinked tags (click-to-select).
  *       3. An external link to `/tags/new` for operator-driven creation.
  *   - Emit `onChange(idTag, ocppTagPk)` whenever the selection changes.
@@ -31,7 +31,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
-import TapToAddModal from "@/islands/TapToAddModal.tsx";
+import ScanModal from "@/islands/shared/ScanModal.tsx";
 import { isMetaTag } from "@/src/lib/tag-hierarchy.ts";
 import { tagTypeIcons } from "@/components/brand/tags/index.ts";
 import { type TagType, tagTypeLabels } from "@/src/lib/types/tags.ts";
@@ -352,19 +352,28 @@ export default function TagPicker(props: Props) {
         )}
 
       {allowTap && (
-        <TapToAddModal
+        <ScanModal
           open={showTapToAdd.value}
           onOpenChange={(open) => (showTapToAdd.value = open)}
-          onTagDetected={(tagId) => {
-            const existing = ocppTags.value.find((t) => t.id === tagId);
-            if (existing) {
-              onChange(existing.id, existing.ocppTagPk);
-            } else {
-              // Tag doesn't exist yet — send the operator to /tags/new with
-              // the scanned idTag prefilled. The plan forbids inline create
-              // on /links/new; /tags/new owns tag creation.
-              clientNavigate(`/tags/new?idTag=${encodeURIComponent(tagId)}`);
-            }
+          mode="admin"
+          purpose="lookup-tag"
+          modalTitle="Tap a tag to link"
+          subtitle="Tap the card on any online tappable device."
+          resolve={{
+            kind: "callback",
+            fn: (r) => {
+              const existing = ocppTags.value.find((t) => t.id === r.idTag);
+              if (existing) {
+                onChange(existing.id, existing.ocppTagPk);
+              } else {
+                // Tag doesn't exist yet — send the operator to /tags/new
+                // with the scanned idTag prefilled. /tags/new owns tag
+                // creation; /links/new only links existing tags.
+                clientNavigate(
+                  `/tags/new?idTag=${encodeURIComponent(r.idTag)}`,
+                );
+              }
+            },
           }}
         />
       )}
