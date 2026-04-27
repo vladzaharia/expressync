@@ -147,9 +147,12 @@ const SECONDARY_TILES: TileSpec[] = [
   },
 ];
 
-const DIALOG_COMPONENTS: Record<
-  OcppOperationName,
-  (p: PerDialogProps) => preact.JSX.Element
+// Partial: not every `OcppOperationName` has a confirm dialog wired up
+// yet (e.g. `ChangeConfiguration` is only reachable via the StEvE UI
+// today). Operations without an entry here fall through to the fallback
+// branch in the action grid below — no dialog, no submit.
+const DIALOG_COMPONENTS: Partial<
+  Record<OcppOperationName, (p: PerDialogProps) => preact.JSX.Element>
 > = {
   RemoteStartTransaction: RemoteStartDialog,
   RemoteStopTransaction: RemoteStopDialog,
@@ -167,7 +170,7 @@ const DIALOG_COMPONENTS: Record<
 };
 
 export default function RemoteActionsPanel(
-  { chargeBoxId, activeSessions = [] }: PanelProps,
+  { chargeBoxId, friendlyName = null, activeSessions = [] }: PanelProps,
 ) {
   const [activeOp, setActiveOp] = useState<OcppOperationName | null>(null);
   const [prefill, setPrefill] = useState<Record<string, unknown>>({});
@@ -290,6 +293,7 @@ export default function RemoteActionsPanel(
         <ActiveDialog
           key={`${activeOp}-${JSON.stringify(prefill)}`}
           chargeBoxId={chargeBoxId}
+          friendlyName={friendlyName}
           activeSessions={activeSessions}
           prefill={prefill}
           isOpen

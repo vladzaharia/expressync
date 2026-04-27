@@ -52,7 +52,35 @@ interface Props {
 
 export default function LiveSessionsList({ emptyMessage }: Props) {
   const rows = useSignal<SessionEntry[]>([]);
+  const labels = useSignal<Record<string, string>>({});
   const _tick = useSignal(0);
+
+  // Fetch the chargeBoxId → friendlyName map once on mount so the
+  // table can render human labels next to the live meter feed. The
+  // SSE meter payload doesn't carry the friendlyName itself; this
+  // lookup is the cheapest way to plug that gap without forcing
+  // every emitter to embed a label.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/charger/labels", {
+          credentials: "same-origin",
+        });
+        if (!res.ok) return;
+        const body = await res.json();
+        if (cancelled) return;
+        if (body && typeof body.labels === "object" && body.labels !== null) {
+          labels.value = body.labels as Record<string, string>;
+        }
+      } catch {
+        // Best-effort — fall back to chargeBoxId if the fetch fails.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const map = new Map<string, SessionEntry>();
@@ -148,11 +176,20 @@ export default function LiveSessionsList({ emptyMessage }: Props) {
                     <a
                       href={`/chargers/${r.chargeBoxId}`}
                       class={cn(
-                        "font-mono text-xs hover:underline",
+                        "hover:underline",
                         "text-emerald-700 dark:text-emerald-300",
                       )}
+                      title={r.chargeBoxId}
                     >
-                      {r.chargeBoxId}
+                      {labels.value[r.chargeBoxId]
+                        ? (
+                          <span class="text-xs font-medium">
+                            {labels.value[r.chargeBoxId]}
+                          </span>
+                        )
+                        : (
+                          <span class="font-mono text-xs">{r.chargeBoxId}</span>
+                        )}
                     </a>
                   )
                   : <span class="text-muted-foreground text-xs">—</span>}
