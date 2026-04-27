@@ -170,6 +170,12 @@ export function adaptScanTagState(
         kind: "error",
         message: `Couldn't look up ${s.idTag}.`,
       };
+    case "cancelled":
+      return {
+        kind: "error",
+        message:
+          "Scan was cancelled on the device. Try again to scan your card.",
+      };
     case "dismissed":
       return { kind: "idle" };
   }
