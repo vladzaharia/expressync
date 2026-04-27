@@ -272,6 +272,19 @@ async function runRegister(
 
 export const handler = define.handlers({
   async POST(ctx) {
+    // One log line on every POST, regardless of outcome. Lets us answer
+    // "did the iOS app's request even reach the server?" without needing
+    // Xcode/Console.app on the phone. Logs IP + UA + content-length only
+    // — never logs the body (would leak the one-time code + PKCE
+    // verifier even on a successful call).
+    log.info("Register hit", {
+      ip: getClientIp(ctx.req),
+      ua: ctx.req.headers.get("user-agent"),
+      contentLength: ctx.req.headers.get("content-length"),
+      contentType: ctx.req.headers.get("content-type"),
+      idempotencyKey: ctx.req.headers.get("idempotency-key"),
+    });
+
     return await withIdempotency(ctx, REGISTER_ROUTE, async () => {
       // Latency-floor jitter — see module docstring. Mirrors `auth.ts:154`.
       // We start the timer FIRST so even an early-return (e.g. body validation
@@ -293,13 +306,23 @@ export const handler = define.handlers({
       try {
         raw = await ctx.req.json();
       } catch {
+        log.warn("Register reject — body not JSON", {
+          ip: getClientIp(ctx.req),
+        });
         await jitterPromise;
         return jsonResponse(400, { error: "invalid_body" });
       }
       const parsed = registerBodySchema.safeParse(raw);
       if (!parsed.success) {
+        const reason = zodReason(parsed.error);
+        log.warn("Register reject — schema fail", {
+          ip: getClientIp(ctx.req),
+          reason,
+          // Path of the first failing field — safe to log (no values).
+          firstFailPath: parsed.error.issues[0]?.path.join(".") ?? "",
+        });
         await jitterPromise;
-        return jsonResponse(400, { error: zodReason(parsed.error) });
+        return jsonResponse(400, { error: reason });
       }
 
       const reqCtx: RequestContext = {
@@ -314,6 +337,10 @@ export const handler = define.handlers({
         runRegister(parsed.data, reqCtx),
         jitterPromise,
       ]);
+      log.info("Register done", {
+        ip: getClientIp(ctx.req),
+        status: response.status,
+      });
       return response;
     });
   },
