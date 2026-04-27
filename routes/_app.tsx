@@ -5,7 +5,7 @@ import { define } from "../utils.ts";
 import { Partial } from "fresh/runtime";
 import { Toaster } from "sonner";
 import CommandPalette from "../islands/CommandPalette.tsx";
-import ScanTagPaletteHost from "../islands/ScanTagPaletteHost.tsx";
+import ScanModalHost from "../islands/shared/ScanModalHost.tsx";
 import SseProvider from "../islands/shared/SseProvider.tsx";
 
 /**
@@ -148,7 +148,7 @@ export default define.page(function App({ Component, state }) {
             action opens. Mounting it once at the root means the action
             works from any page, not only /admin/tags. */
         }
-        {isAdmin && <ScanTagPaletteHost />}
+        {isAdmin && <ScanModalHost />}
         <SseProvider />
       </body>
     </html>

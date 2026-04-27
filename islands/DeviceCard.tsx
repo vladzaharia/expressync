@@ -112,9 +112,11 @@ export default function DeviceCard(
         )}
 
         <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-          {/* "Last seen" is meaningful only when the device isn't
+          {
+            /* "Last seen" is meaningful only when the device isn't
               currently reachable. The Online pill in the top row
-              already conveys liveness when isOnline=true. */}
+              already conveys liveness when isOnline=true. */
+          }
           <div>
             {device.isOnline
               ? (

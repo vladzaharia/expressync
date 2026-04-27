@@ -1,114 +1,32 @@
-import { useSignal } from "@preact/signals";
+/**
+ * ScanTagAction — header-action button on /tags. Dispatches the global
+ * `evcard:scan-open` CustomEvent so the modal is opened by the single
+ * `<ScanModalHost>` mounted in `_app.tsx`. The host handles routing on
+ * detection.
+ */
+
 import { Radio } from "lucide-preact";
 import { Button } from "@/components/ui/button.tsx";
-import TapToAddModal from "./TapToAddModal.tsx";
-import type { ScanResult } from "@/islands/shared/use-scan-tag.ts";
-import type { TapTargetEntry } from "@/src/lib/types/devices.ts";
-import type { AccentColor } from "@/src/lib/colors.ts";
-import { clientNavigate } from "@/src/lib/nav.ts";
+import {
+  SCAN_OPEN_EVENT,
+  type ScanOpenDetail,
+} from "@/islands/shared/ScanModalHost.tsx";
 
-/**
- * Header-action island on /tags (and any other page that wants a
- * "scan a tag" affordance). Opens the `TapToAddModal`; on successful
- * detection either forwards the `ScanResult` to the caller-supplied
- * `onDetected`, or falls back to the default routing:
- *   - existing tag → `/tags/{tagPk}`
- *   - unknown tag  → `/tags/new?idTag=<scanned>`
- *
- * When `onDetected` is set the caller owns routing entirely; this island
- * just closes the modal after the callback resolves.
- */
 interface Props {
-  /**
-   * Caller-supplied handler. When set, the default routing is suppressed
-   * and the caller is responsible for navigation / UI follow-up.
-   */
-  onDetected?: (r: ScanResult) => void | Promise<void>;
   /** Override the button caption. Defaults to "Scan Tag". */
   buttonLabel?: string;
-  /** Hand through to `TapToAddModal`. */
-  confirmMode?: "auto" | "manual";
-  timeoutSeconds?: number;
-  /** Themes the modal BorderBeam / countdown ring. Defaults to cyan. */
-  accent?: AccentColor;
-  /** Heading rendered inside the shared `ScanPanel`. */
-  panelTitle?: string;
-  /** Helper line under the panel title. */
-  panelSubtitle?: string;
-  /** Override the arm-intent endpoint (defaults to admin scan-arm). */
-  armEndpoint?: string;
-  /** Optional fixed tap-target to arm at; auto-discovered when omitted.
-   *  For phones this is the device UUID; for chargers, the chargeBoxId. */
-  deviceId?: string;
-  /** Pairable kind of `deviceId`. Defaults to `'charger'` when absent. */
-  pairableType?: TapTargetEntry["pairableType"];
-  /**
-   * Backward-compat alias for `deviceId` (with `pairableType: 'charger'`).
-   *
-   * @deprecated Use `deviceId` + `pairableType: 'charger'`.
-   */
-  chargeBoxId?: string;
 }
 
-export default function ScanTagAction(
-  {
-    onDetected,
-    buttonLabel = "Scan Tag",
-    confirmMode,
-    timeoutSeconds,
-    accent,
-    panelTitle,
-    panelSubtitle,
-    armEndpoint,
-    deviceId,
-    pairableType,
-    chargeBoxId,
-  }: Props,
-) {
-  const open = useSignal(false);
-
-  const handleDetected = async (r: ScanResult) => {
-    if (onDetected) {
-      try {
-        await onDetected(r);
-      } finally {
-        open.value = false;
-      }
-      return;
-    }
-    // Default behavior: route to the tag page (if known) or the new-tag
-    // creation flow. We intentionally do NOT fall through to the new-tag
-    // page on transient errors anymore — the modal's `lookup_failed`
-    // state owns that recovery so the operator sees what failed.
-    const dest = r.exists && typeof r.tagPk === "number"
-      ? `/tags/${r.tagPk}`
-      : `/tags/new?idTag=${encodeURIComponent(r.idTag)}`;
-    clientNavigate(dest);
+export default function ScanTagAction({ buttonLabel = "Scan Tag" }: Props) {
+  const handleClick = () => {
+    const detail: ScanOpenDetail = { mode: "admin", purpose: "lookup-tag" };
+    globalThis.dispatchEvent(new CustomEvent(SCAN_OPEN_EVENT, { detail }));
   };
 
   return (
-    <>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => (open.value = true)}
-      >
-        <Radio class="mr-2 h-4 w-4" />
-        {buttonLabel}
-      </Button>
-      <TapToAddModal
-        open={open.value}
-        onOpenChange={(next) => (open.value = next)}
-        onDetected={handleDetected}
-        confirmMode={confirmMode}
-        timeoutSeconds={timeoutSeconds}
-        accent={accent}
-        panelTitle={panelTitle}
-        panelSubtitle={panelSubtitle}
-        armEndpoint={armEndpoint}
-        deviceId={deviceId ?? chargeBoxId}
-        pairableType={pairableType ?? (deviceId ? undefined : "charger")}
-      />
-    </>
+    <Button variant="outline" size="sm" onClick={handleClick}>
+      <Radio class="mr-2 h-4 w-4" />
+      {buttonLabel}
+    </Button>
   );
 }

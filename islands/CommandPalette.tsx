@@ -53,8 +53,7 @@ import { CommandGroup } from "@/components/command-palette/CommandGroup.tsx";
 import { CommandItem } from "@/components/command-palette/CommandItem.tsx";
 import type { CommandSearchResponse } from "@/routes/api/admin/command-palette/search.ts";
 import { clientNavigate } from "@/src/lib/nav.ts";
-import type { TapTargetEntry } from "@/src/lib/types/devices.ts";
-import { DevicePickerInline } from "@/components/scan/DevicePickerInline.tsx";
+import ScanFlow from "@/islands/shared/ScanFlow.tsx";
 
 /**
  * Polaris Track H — surface the palette is mounted in. Customer surface
@@ -87,16 +86,12 @@ export default function CommandPalette(
   const searchLoading = useSignal(false);
   const triggeringElement = useRef<Element | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  // Sub-page state for the "Scan Tag" two-step flow. When non-null, the
-  // palette body switches from search results to a tap-target picker.
-  // `loading=true` while the GET /api/auth/scan-tap-targets call is in
-  // flight; `targets` is the filtered (online-only) unified list when
-  // present (chargers + phones).
-  const scanPicker = useSignal<
-    | { loading: true; targets: null }
-    | { loading: false; targets: TapTargetEntry[] }
-    | null
-  >(null);
+  // Sub-page state for the "Scan Tag" flow. When true, the palette body
+  // switches from search results to a fully-embedded `<ScanFlow>` (picker
+  // → armed → result). The flow loads the roster, owns the picker, arms,
+  // counts down, and resolves all in-place. We just close the palette
+  // when it signals success.
+  const scanMode = useSignal(false);
 
   const isCustomer = surface === "customer";
 
@@ -207,91 +202,16 @@ export default function CommandPalette(
     return () => globalThis.removeEventListener("beforeunload", onBeforeUnload);
   }, []);
 
-  // -- Scan Tag flow: action dispatches `cmdk:scan-picker:open`; we fetch
-  //    the unified tap-target roster and either auto-arm (operator's own
-  //    phone is the only online target) or switch to the inline picker
-  //    subview when multiple options exist.
+  // -- Scan Tag flow: action dispatches `cmdk:scan-picker:open`; we just
+  //    flip the palette body into scan mode. The embedded `<ScanFlow>`
+  //    handles the roster, picker, arming, countdown, and resolution
+  //    end-to-end. No auto-pick — the picker always shows so the operator
+  //    explicitly chooses where to scan.
   useEffect(() => {
-    const onScanPickerOpen = async () => {
-      // Skip on customer surface — admin scan inventory only.
-      if (isCustomer) return;
-      // Fetch BEFORE switching to the scan subview. Pre-2026-04 we flipped
-      // `scanPicker` to a loading subview and back if no targets were
-      // online, which made the palette flash main→subview→main with the
-      // toast trailing. Ordering: fetch silently from the main view, then
-      // commit to a single final state (close-and-toast OR auto-arm OR
-      // subview with targets). The roster endpoint is fast in practice
-      // (~50–150 ms); a longer wait is signalled by the input row's
-      // existing `searchLoading` indicator if we ever need it.
-      try {
-        const res = await fetch("/api/auth/scan-tap-targets", {
-          method: "GET",
-          credentials: "same-origin",
-        });
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
-        // Wave 2 response shape: `{ devices: TapTargetEntry[] }` — note
-        // the field name carries chargers AND phones (`pairableType` is
-        // the discriminator).
-        const data = await res.json() as { devices?: TapTargetEntry[] };
-        const all = (data.devices ?? []) as TapTargetEntry[];
-        const online = all.filter((d) => d.isOnline);
-        if (online.length === 0) {
-          // Switch into the subview with the offline-only roster so the
-          // operator sees an explicit "No scanners available" line item
-          // (rendered below) rather than the palette closing silently.
-          scanPicker.value = { loading: false, targets: all };
-          query.value = "";
-          return;
-        }
-        // D3 auto-arm rule: the operator's own phone, when it's the only
-        // online tap-target with `isOwnDevice`, is the fastest path —
-        // skip the picker.
-        const ownPhones = online.filter((d) => d.isOwnDevice === true);
-        if (ownPhones.length === 1 && online.length === 1) {
-          const t = ownPhones[0];
-          scanPicker.value = null;
-          close();
-          globalThis.dispatchEvent(
-            new CustomEvent("evcard:scan-open", {
-              detail: {
-                deviceId: t.deviceId,
-                pairableType: t.pairableType,
-                label: t.label,
-              },
-            }),
-          );
-          return;
-        }
-        if (online.length === 1) {
-          // Single online target (charger). Skip the picker.
-          const t = online[0];
-          scanPicker.value = null;
-          close();
-          globalThis.dispatchEvent(
-            new CustomEvent("evcard:scan-open", {
-              detail: {
-                deviceId: t.deviceId,
-                pairableType: t.pairableType,
-                label: t.label,
-              },
-            }),
-          );
-          return;
-        }
-        // Multiple targets — switch to the picker subview. We pass the
-        // full roster (including offline rows) so the picker can render
-        // them grayed-out per the design.
-        scanPicker.value = { loading: false, targets: all };
-        // Reset query so the picker isn't pre-filtered by whatever the
-        // user typed before invoking the action.
-        query.value = "";
-      } catch (err) {
-        scanPicker.value = null;
-        console.warn("[cmdk] scan-picker fetch failed", err);
-        toast.error("Couldn't load scanners");
-      }
+    const onScanPickerOpen = () => {
+      if (isCustomer) return; // admin-only entry point
+      query.value = "";
+      scanMode.value = true;
     };
     globalThis.addEventListener(
       "cmdk:scan-picker:open",
@@ -303,21 +223,6 @@ export default function CommandPalette(
         onScanPickerOpen as EventListener,
       );
   }, [isCustomer]);
-
-  /** Close + dispatch scan-open with a chosen tap-target. */
-  const armScanAt = (target: TapTargetEntry) => {
-    scanPicker.value = null;
-    close();
-    globalThis.dispatchEvent(
-      new CustomEvent("evcard:scan-open", {
-        detail: {
-          deviceId: target.deviceId,
-          pairableType: target.pairableType,
-          label: target.label,
-        },
-      }),
-    );
-  };
 
   // -- Debounced search --------------------------------------------------
   useEffect(() => {
@@ -367,7 +272,7 @@ export default function CommandPalette(
     open.value = false;
     query.value = "";
     searchResults.value = null;
-    scanPicker.value = null;
+    scanMode.value = false;
     const el = triggeringElement.current;
     if (
       el && "focus" in el && typeof (el as HTMLElement).focus === "function"
@@ -376,9 +281,9 @@ export default function CommandPalette(
     }
   };
 
-  /** Drop the scan-picker subview without closing the palette. */
+  /** Drop the scan-mode subview without closing the palette. */
   const dismissScanPicker = () => {
-    scanPicker.value = null;
+    scanMode.value = false;
   };
 
   // -- Execute a command (navigate or action) ---------------------------
@@ -444,7 +349,7 @@ export default function CommandPalette(
           className="flex flex-col flex-1 min-h-0"
         >
           <div class="flex items-center gap-2 px-3 py-2 border-b border-border">
-            {scanPicker.value && (
+            {scanMode.value && (
               <span class="inline-flex items-center gap-1.5 rounded-md border border-cyan-500/40 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-medium text-cyan-700 dark:text-cyan-300 shrink-0">
                 <Radio class="size-3" aria-hidden="true" />
                 Scan
@@ -455,8 +360,8 @@ export default function CommandPalette(
               autoFocus
               value={query.value}
               onValueChange={(v: string) => (query.value = v)}
-              placeholder={scanPicker.value
-                ? "Pick a scanner..."
+              placeholder={scanMode.value
+                ? "Pick a tappable device..."
                 : "Type exact tag names, charger IDs, or action names..."}
               className="flex-1 bg-transparent outline-none text-sm py-2 placeholder:text-muted-foreground"
               role="combobox"
@@ -468,7 +373,7 @@ export default function CommandPalette(
                   // Esc backs out of the scan-picker subview before closing
                   // the whole palette — gives the user a way to bail without
                   // losing context.
-                  if (scanPicker.value) {
+                  if (scanMode.value) {
                     dismissScanPicker();
                   } else {
                     close();
@@ -476,7 +381,7 @@ export default function CommandPalette(
                 }
               }}
             />
-            {(searchLoading.value || scanPicker.value?.loading) && (
+            {searchLoading.value && (
               <span class="text-xs text-muted-foreground shrink-0">...</span>
             )}
             <kbd class="hidden sm:inline-flex items-center text-[10px] px-1.5 py-0.5 border border-border rounded text-muted-foreground shrink-0">
@@ -493,52 +398,42 @@ export default function CommandPalette(
             role="listbox"
             className="flex-1 overflow-y-auto py-1"
           >
-            {!scanPicker.value && (
+            {!scanMode.value && (
               <Command.Empty className="px-4 py-6 text-sm text-muted-foreground text-center">
                 No matches. Try a charger ID, tag name, or "sync".
               </Command.Empty>
             )}
 
             {
-              /* Scan Tag subview — when active, replaces the normal
-                results stack with a unified tap-target picker (chargers +
-                phones). Selecting a row closes the palette and arms the
-                TapToAddModal at it. We render `DevicePickerInline`
-                directly so the grouped layout / auto-pick logic stay in
-                one place. */
+              /* Scan Tag subview — when active, the palette body is
+                handed to `<ScanFlow>` which renders the picker → armed →
+                result phases inline. The flow loads the roster, owns the
+                picker (no auto-pick), arms, and resolves; we just close
+                the palette when it's done. */
             }
-            {scanPicker.value && !scanPicker.value.loading &&
-              scanPicker.value.targets &&
-              scanPicker.value.targets.some((t) => t.isOnline) && (
-              <div class="px-3 py-2">
-                <DevicePickerInline
-                  devices={scanPicker.value.targets}
-                  selectedDeviceId={null}
-                  onSelect={armScanAt}
+            {scanMode.value && (
+              <div class="px-3 py-3">
+                <ScanFlow
+                  mode="admin"
+                  purpose="lookup-tag"
+                  resolve={{
+                    kind: "route",
+                    build: (r) =>
+                      r.exists && typeof r.tagPk === "number"
+                        ? `/tags/${r.tagPk}`
+                        : `/tags/new?idTag=${encodeURIComponent(r.idTag)}`,
+                  }}
+                  onResolved={() => close()}
                 />
-              </div>
-            )}
-            {scanPicker.value && !scanPicker.value.loading &&
-              scanPicker.value.targets &&
-              !scanPicker.value.targets.some((t) => t.isOnline) && (
-              <div
-                class="mx-3 my-2 px-3 py-2 rounded-md border border-border bg-muted/40 text-sm text-muted-foreground flex items-center gap-2"
-                role="status"
-                aria-live="polite"
-              >
-                <Radio class="size-4 opacity-60" aria-hidden="true" />
-                <span class="font-medium text-foreground">
-                  No scanners available
-                </span>
               </div>
             )}
 
             {
               /* Navigate + Actions + dynamic results — hidden while the
                 Scan EV Card subview is open so the operator only sees
-                charger options during that flow. */
+                tappable devices during that flow. */
             }
-            {!scanPicker.value && (
+            {!scanMode.value && (
               <>
                 <CommandGroup heading="Navigate">
                   {navigateCommands.map((c) => (
@@ -573,7 +468,7 @@ export default function CommandPalette(
             )}
 
             {/* Dynamic entities — only when there's a query */}
-            {!scanPicker.value && hasQuery && results && (
+            {!scanMode.value && hasQuery && results && (
               <>
                 {results.chargers.length > 0 && (
                   <CommandGroup heading="Chargers">

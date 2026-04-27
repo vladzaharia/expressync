@@ -605,12 +605,13 @@ function StepCharger(
               {c.friendlyName ?? c.chargeBoxId}
             </div>
             <div class="truncate text-xs text-muted-foreground">
-              {/* Only repeat the chargeBoxId when a friendlyName is set
+              {
+                /* Only repeat the chargeBoxId when a friendlyName is set
                   above; otherwise the line above already showed it and
-                  echoing it here is just visual noise. */}
+                  echoing it here is just visual noise. */
+              }
               {c.friendlyName ? `${c.chargeBoxId} · ` : ""}
-              {c.connectorCount}{" "}
-              connector{c.connectorCount !== 1 ? "s" : ""}
+              {c.connectorCount} connector{c.connectorCount !== 1 ? "s" : ""}
               {c.lastStatus ? ` · ${c.lastStatus}` : ""}
             </div>
           </div>

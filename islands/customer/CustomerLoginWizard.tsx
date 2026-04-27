@@ -3,19 +3,19 @@
  *
  * Step flow:
  *   1. "choose"  — two big square buttons: Scan Card / Email Link
- *   2a. "scan"   — inline scan flow (CustomerScanLoginIsland with inline)
+ *   2a. "scan"   — inline scan flow via the unified `<ScanFlow>` (replaces
+ *                  the legacy CustomerScanLoginIsland)
  *   2b. "email"  — the magic-link form
  *
  * When only one method is enabled server-side, step 1 is skipped and the
  * user lands directly on the available step. A "Back" button on step 2
- * only renders when both methods are available (otherwise there's nowhere
- * to go back to).
+ * only renders when both methods are available.
  */
 
 import { useSignal } from "@preact/signals";
 import { ChevronLeft, IdCard, Mail } from "lucide-preact";
 import { cn } from "@/src/lib/utils/cn.ts";
-import CustomerScanLoginIsland from "@/islands/customer/CustomerScanLoginIsland.tsx";
+import ScanFlow from "@/islands/shared/ScanFlow.tsx";
 import CustomerLoginForm from "@/islands/customer/CustomerLoginForm.tsx";
 
 type Step = "choose" | "scan" | "email";
@@ -78,30 +78,31 @@ export default function CustomerLoginWizard(
   }
 
   const backPill = bothAvailable
-    ? (
-      <BackPill
-        onClick={() => {
-          // Fire the release-signal synchronously so the scan island's
-          // listener runs BEFORE we trigger its unmount by flipping step.
-          // Without this, the wizard's tab-close / back-click races the
-          // DELETE fetch and the charger stays armed.
-          if (step.value === "scan" && typeof globalThis !== "undefined") {
-            globalThis.dispatchEvent(new Event("scan:release"));
-          }
-          step.value = "choose";
-        }}
-      />
-    )
+    ? <BackPill onClick={() => (step.value = "choose")} />
     : null;
 
   if (step.value === "scan") {
+    const preselected = initialChargeBoxId
+      ? {
+        deviceId: initialChargeBoxId,
+        pairableType: "charger" as const,
+      }
+      : undefined;
     return (
       <>
         {backPill}
-        <CustomerScanLoginIsland
-          inline
-          initialChargeBoxId={initialChargeBoxId}
-          onExit={bothAvailable ? () => (step.value = "choose") : undefined}
+        <ScanFlow
+          mode="customer"
+          purpose="login"
+          preselectedId={preselected}
+          accent="cyan"
+          resolve={{ kind: "customer-login" }}
+          secondaryAction={bothAvailable
+            ? {
+              label: "Use email instead",
+              onClick: () => (step.value = "email"),
+            }
+            : undefined}
         />
       </>
     );
@@ -118,10 +119,7 @@ export default function CustomerLoginWizard(
 
 /**
  * Pill anchored to the top-left edge of the login card — mirrors the
- * "Admin login →" pill on the opposite corner. Rendered inside the card
- * but positioned absolute; binds to `ShineBorder` which is the nearest
- * position-relative ancestor, so the pill visually sits on the card's
- * top border.
+ * "Admin login →" pill on the opposite corner.
  */
 function BackPill({ onClick }: { onClick: () => void }) {
   return (
