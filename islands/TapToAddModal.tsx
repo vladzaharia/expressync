@@ -47,6 +47,7 @@ import { TagChip } from "@/components/tags/TagChip.tsx";
 import { clientNavigate } from "@/src/lib/nav.ts";
 import type { TapTargetEntry } from "@/src/lib/types/devices.ts";
 import { stepsForTarget } from "@/components/scan/scan-steps.ts";
+import { tapTargetDisplayName } from "@/components/scan/display-name.ts";
 
 interface Props {
   open: boolean;
@@ -226,7 +227,8 @@ export default function TapToAddModal({
       } else if (
         (e.key === "r" || e.key === "R") && !inEditable &&
         (state.kind === "timeout" || state.kind === "unavailable" ||
-          state.kind === "network_error" || state.kind === "lookup_failed")
+          state.kind === "network_error" || state.kind === "lookup_failed" ||
+          state.kind === "cancelled")
       ) {
         e.preventDefault();
         hook.retry();
@@ -242,7 +244,8 @@ export default function TapToAddModal({
       primaryCtaRef.current.focus();
     } else if (
       (state.kind === "timeout" || state.kind === "unavailable" ||
-        state.kind === "network_error" || state.kind === "lookup_failed") &&
+        state.kind === "network_error" || state.kind === "lookup_failed" ||
+        state.kind === "cancelled") &&
       retryCtaRef.current
     ) {
       retryCtaRef.current.focus();
@@ -256,7 +259,7 @@ export default function TapToAddModal({
   const target = resolvedTarget.value;
   const basePanelState = adaptScanTagState(state, {
     total: timeoutSeconds,
-    readerName: target?.label ?? null,
+    readerName: tapTargetDisplayName(target) || null,
   });
   // Decorate the `armed` state with per-kind step copy now that we know
   // the resolved target's `kind`. Other states pass through unchanged.
@@ -294,7 +297,8 @@ export default function TapToAddModal({
               helpText={state.kind === "timeout" ||
                   state.kind === "unavailable" ||
                   state.kind === "network_error" ||
-                  state.kind === "lookup_failed"
+                  state.kind === "lookup_failed" ||
+                  state.kind === "cancelled"
                 ? "Press R to retry"
                 : state.kind === "detected"
                 ? (confirmMode === "auto"
@@ -491,6 +495,7 @@ function ScanModalActions({
     case "timeout":
     case "unavailable":
     case "network_error":
+    case "cancelled":
       return (
         <>
           <Button
@@ -499,6 +504,9 @@ function ScanModalActions({
             onClick={onRetry}
           >
             Try again
+          </Button>
+          <Button variant="outline" size="sm" onClick={onClose}>
+            Close
           </Button>
           {manualBtn}
         </>

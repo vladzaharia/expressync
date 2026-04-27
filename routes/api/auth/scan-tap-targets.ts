@@ -69,6 +69,17 @@ type ViewRow = {
   last_status_at: string | Date | null;
   /** Charger-only: most recent OCPP status string. NULL for scanners. */
   last_status: string | null;
+  /**
+   * Charger-only: the truly admin-set friendly name from
+   * `chargers_cache.friendly_name`. The view's `label` already
+   * COALESCEs to `chargeBoxId` when this is null, but the picker
+   * needs the unCOALESCEd value so it can distinguish "no name set"
+   * (render kind-prefixed fallback) from "name happens to equal the
+   * id" (rare but legal). NULL for scanners — in that case the API
+   * surfaces `devices.label` here, which is non-null by registration
+   * constraint.
+   */
+  friendly_name: string | null;
   // Index signature required by Drizzle's `db.execute<T>` generic
   // (T extends Record<string, unknown>). Doesn't change runtime behavior.
   [key: string]: unknown;
@@ -151,6 +162,12 @@ export const handler = define.handlers({
       // for charger rows; scanner rows get NULL for both columns and fall
       // through to the heartbeat-based online check. The join key is the
       // view's id (== chargers_cache.charge_box_id for charger rows).
+      // The view's `label` column COALESCEs charger friendly_name to
+      // chargeBoxId, which loses the "no name set" signal. We re-derive
+      // the truly admin-set friendly name client-side: for chargers,
+      // it's `cc.friendly_name` (already left-joined); for scanners,
+      // `devices.label` (non-null by registration constraint, so it's
+      // always a real human label).
       const result = await db.execute<ViewRow>(sql`
         SELECT
           tv.id,
@@ -160,7 +177,11 @@ export const handler = define.handlers({
           tv.owner_user_id,
           tv.last_seen_at,
           cc.last_status_at,
-          cc.last_status
+          cc.last_status,
+          CASE
+            WHEN tv.kind = 'charger' THEN cc.friendly_name
+            ELSE tv.label
+          END AS friendly_name
         FROM tappable_devices tv
         LEFT JOIN chargers_cache cc
           ON tv.kind = 'charger' AND cc.charge_box_id = tv.id
@@ -183,6 +204,10 @@ export const handler = define.handlers({
           (c): c is DeviceCapability =>
             (DEVICE_CAPABILITIES as readonly string[]).includes(c),
         );
+        // Trim + null-collapse the friendly name so the picker can
+        // distinguish "no name set" (null) from "named identically to
+        // the id" (a non-null match) for unambiguous fallback rendering.
+        const friendlyName = r.friendly_name?.trim() || null;
         const entry: TapTargetEntry = {
           deviceId: r.id,
           pairableType,
@@ -190,6 +215,7 @@ export const handler = define.handlers({
           // which is exactly what `TapTargetEntry.kind` accepts.
           kind: r.kind as TapTargetEntry["kind"],
           label: r.label,
+          friendlyName,
           capabilities: filteredCaps,
           isOnline: online,
         };

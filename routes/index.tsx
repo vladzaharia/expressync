@@ -520,9 +520,14 @@ export const handler = define.handlers({
     if (
       ctx.state.user.role === "admin" && !ctx.state.actingAs
     ) {
+      // Cross-host redirect: admins hitting the customer root land on
+      // the admin surface, NOT a same-host `/admin` path. The customer
+      // host's middleware classifies `/admin/*` as ADMIN_ONLY → 404,
+      // which is what was happening before this fix (admins saw a
+      // bare 404 page after the implicit follow-up redirect).
       return new Response(null, {
         status: 302,
-        headers: { Location: "/admin" },
+        headers: { Location: `${config.ADMIN_BASE_URL}/` },
       });
     }
 
