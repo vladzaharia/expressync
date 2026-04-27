@@ -226,9 +226,11 @@ export default function ChargerCard(
                       "shrink-0 transition-opacity",
                       isStale && "opacity-60",
                     )}
-                    aria-label={`${status} — last seen ${
-                      formatRelative(charger.lastStatusAtIso)
-                    }`}
+                    aria-label={status === "Offline" || isStale
+                      ? `${status} — last seen ${
+                        formatRelative(charger.lastStatusAtIso)
+                      }`
+                      : status}
                   >
                     <span
                       role="status"
@@ -244,9 +246,11 @@ export default function ChargerCard(
                 <TooltipContent side="right">
                   <div class="flex flex-col gap-0.5">
                     <span class="font-medium">{status}</span>
-                    <span class="opacity-80">
-                      Last seen {formatRelative(charger.lastStatusAtIso)}
-                    </span>
+                    {(status === "Offline" || isStale) && (
+                      <span class="opacity-80">
+                        Last seen {formatRelative(charger.lastStatusAtIso)}
+                      </span>
+                    )}
                   </div>
                 </TooltipContent>
               </Tooltip>

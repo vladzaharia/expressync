@@ -477,6 +477,7 @@ export default define.page<typeof handler>(
             {/* Header strip — identity + status pills */}
             <ChargerHeaderStrip
               chargeBoxId={charger.chargeBoxId}
+              friendlyName={charger.friendlyName}
               registrationStatus={charger.registrationStatus}
               uiStatus={charger.uiStatus}
               isStale={charger.isStale}
