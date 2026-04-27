@@ -13,11 +13,10 @@
  *     PageCard
  *       headerActions: Trigger scan (stub) · Force deregister
  *       DeviceIdentityCard   — model, OS, app version, owner, last seen,
- *                              push-token presence, registered date
- *       SectionCard "Capabilities"
+ *                              push-token presence, registered date,
+ *                              capabilities (already covered there).
  *       SectionCard "Recent Scans" — empty placeholder until we ship a
  *                                    `device_scan_audit` table
- *       SectionCard "Heartbeat"   — placeholder for a future feature
  *
  * Loader strategy:
  *   1. First probe the `tappable_devices` view by id. Charger? → 307.
@@ -38,10 +37,9 @@ import { SidebarLayout } from "../../../components/SidebarLayout.tsx";
 import { PageCard } from "../../../components/PageCard.tsx";
 import { SectionCard } from "../../../components/shared/SectionCard.tsx";
 import { Button } from "../../../components/ui/button.tsx";
-import { Activity, Heart, ScanLine, Smartphone } from "lucide-preact";
+import { Activity, ScanLine } from "lucide-preact";
 import { DeviceIdentityCard } from "../../../components/devices/DeviceIdentityCard.tsx";
 import { DeviceHeaderStrip } from "../../../components/devices/DeviceHeaderStrip.tsx";
-import { CapabilityPill } from "../../../components/devices/CapabilityPill.tsx";
 import DeviceActionsMenu from "../../../islands/devices/DeviceActionsMenu.tsx";
 
 const log = logger.child("AdminDeviceDetailPage");
@@ -220,17 +218,6 @@ function RecentScansEmpty() {
   );
 }
 
-function HeartbeatPlaceholder() {
-  return (
-    <div class="flex flex-col items-center gap-1 py-8 text-center">
-      <p class="text-sm font-medium">Heartbeat history coming soon</p>
-      <p class="text-xs text-muted-foreground">
-        Per-minute heartbeats from the device app will surface here.
-      </p>
-    </div>
-  );
-}
-
 export default define.page<typeof handler>(
   function AdminDeviceDetailPage({ data, url, state }) {
     const device = data.device;
@@ -344,42 +331,12 @@ export default define.page<typeof handler>(
             })()}
 
             <SectionCard
-              title="Capabilities"
-              description="Granted at registration time."
-              icon={Smartphone}
-              accent="teal"
-            >
-              {device.capabilities.length === 0
-                ? (
-                  <p class="text-sm text-muted-foreground">
-                    No capabilities granted to this device.
-                  </p>
-                )
-                : (
-                  <div class="flex flex-wrap gap-1.5">
-                    {device.capabilities.map((c) => (
-                      <CapabilityPill key={c} capability={c} />
-                    ))}
-                  </div>
-                )}
-            </SectionCard>
-
-            <SectionCard
               title="Recent Scans"
               description="Last 50 scan events involving this device."
               icon={Activity}
               accent="teal"
             >
               <RecentScansEmpty />
-            </SectionCard>
-
-            <SectionCard
-              title="Heartbeat"
-              description="Per-minute heartbeats from the device app."
-              icon={Heart}
-              accent="teal"
-            >
-              <HeartbeatPlaceholder />
             </SectionCard>
           </div>
         </PageCard>
