@@ -24,6 +24,8 @@ interface ConnectorSummary {
 
 interface Props {
   chargeBoxId: string;
+  /** Admin-set human label; falls back to `chargeBoxId` for display. */
+  friendlyName: string | null;
   registrationStatus: "Accepted" | "Pending" | "Rejected" | null;
   uiStatus:
     | "Available"
@@ -56,6 +58,7 @@ function summarizeConnectors(connectors: ConnectorSummary[]): string {
 
 export function ChargerHeaderStrip({
   chargeBoxId,
+  friendlyName,
   registrationStatus,
   uiStatus,
   isStale,
@@ -65,30 +68,32 @@ export function ChargerHeaderStrip({
 }: Props) {
   const pills: Pill[] = [];
 
-  // Registration status — always shown when StEvE returned one; otherwise the
-  // "registration unknown" pill signals the StEvE fetch failed or the charger
-  // has never fully registered.
-  if (registrationStatus) {
+  // Registration status. If the charger row exists in `chargers_cache`
+  // we treat it as implicitly registered (StEvE is the source of truth
+  // for charger registration — there is no separate ExpresSync flow).
+  // Only surface a pill when StEvE explicitly reported a non-Accepted
+  // state, which is the actionable signal: a "Pending" or "Rejected"
+  // charger needs admin attention. "Accepted" and absent both mean
+  // "fine, nothing to do" — no pill.
+  if (registrationStatus === "Pending") {
     pills.push({
-      label: registrationStatus,
-      tone: registrationStatus === "Accepted"
-        ? "emerald"
-        : registrationStatus === "Pending"
-        ? "amber"
-        : "rose",
-      title: `StEvE registration status: ${registrationStatus}`,
+      label: "Pending registration",
+      tone: "amber",
+      title: "StEvE registration status: Pending",
     });
-  } else {
+  } else if (registrationStatus === "Rejected") {
     pills.push({
-      label: "Registration unknown",
-      tone: "muted",
+      label: "Registration rejected",
+      tone: "rose",
       dashed: true,
-      title: "StEvE did not return a registration status",
+      title: "StEvE registration status: Rejected",
     });
   }
 
   // Online / offline / stale derivation — we key off the normalized UI status
-  // so the pill always agrees with the big live-status card below.
+  // so the pill always agrees with the big live-status card below. When the
+  // charger is currently online we don't append a "last seen" timestamp:
+  // it's online RIGHT NOW, the relative time would just be misleading.
   if (isOffline || uiStatus === "Offline") {
     pills.push({
       label: `Offline — last heard ${formatRelative(lastStatusAtIso)}`,
@@ -106,7 +111,7 @@ export function ChargerHeaderStrip({
     });
   } else {
     pills.push({
-      label: `Online — ${formatRelative(lastStatusAtIso)}`,
+      label: "Online",
       tone: "emerald",
       live: true,
     });
@@ -117,16 +122,22 @@ export function ChargerHeaderStrip({
     tone: "neutral",
   });
 
+  // Display name: prefer the admin-set friendlyName, fall back to the
+  // chargeBoxId. The mono chip below it shows the technical identifier
+  // (still valuable for support / debugging) only when the friendlyName
+  // is set — otherwise the chip would just duplicate the heading.
+  const displayName = friendlyName?.trim() || chargeBoxId;
+  const showIdChip = !!friendlyName?.trim();
+
   return (
     <div class="flex flex-col gap-3">
-      {
-        /* chargeBoxId (mono). Copy control lives on the identity card below so
-       *  this server component stays island-free. */
-      }
-      <div class="flex items-center gap-2">
-        <code class="rounded border bg-muted/40 px-2 py-0.5 font-mono text-xs">
-          {chargeBoxId}
-        </code>
+      <div class="flex items-baseline gap-2">
+        <span class="text-sm font-semibold tracking-tight">{displayName}</span>
+        {showIdChip && (
+          <code class="rounded border bg-muted/40 px-2 py-0.5 font-mono text-xs text-muted-foreground">
+            {chargeBoxId}
+          </code>
+        )}
       </div>
 
       <StatusPillRow pills={pills} />
