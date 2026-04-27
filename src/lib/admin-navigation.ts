@@ -25,7 +25,6 @@
  */
 
 import {
-  BatteryCharging,
   Bell,
   CalendarClock,
   FileText,
@@ -67,24 +66,24 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
     title: "Operations",
     items: [
       {
-        id: "nav:/chargers",
-        title: "Chargers",
-        path: "/chargers",
-        icon: BatteryCharging,
-        accentColor: "orange",
-        keywords: ["charge box", "ocpp"],
-      },
-      {
-        // ExpresScan Wave 4 (D2): admin Devices surface — phones-only listing
-        // for v1; chargers stay on /admin/chargers. Position is between
-        // Chargers and Reservations (per docs/plan/40-frontend.md
-        // § Sidebar nav addition).
+        // Unified Devices surface (April 2026): chargers + scanners share
+        // one listing. The legacy `/admin/chargers` route 302-redirects to
+        // `/admin/devices?type=charger` so old links keep working.
         id: "nav:/admin/devices",
         title: "Devices",
         path: "/admin/devices",
         icon: Smartphone,
         accentColor: "teal",
-        keywords: ["phone", "tap", "nfc", "laptop"],
+        keywords: [
+          "charger",
+          "charge box",
+          "ocpp",
+          "phone",
+          "scanner",
+          "tap",
+          "nfc",
+          "laptop",
+        ],
         adminOnly: true,
       },
       {

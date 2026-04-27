@@ -40,6 +40,7 @@ import { SectionCard } from "../../../components/shared/SectionCard.tsx";
 import { Button } from "../../../components/ui/button.tsx";
 import { Activity, Heart, ScanLine, Smartphone } from "lucide-preact";
 import { DeviceIdentityCard } from "../../../components/devices/DeviceIdentityCard.tsx";
+import { DeviceHeaderStrip } from "../../../components/devices/DeviceHeaderStrip.tsx";
 import { CapabilityPill } from "../../../components/devices/CapabilityPill.tsx";
 import DeviceActionsMenu from "../../../islands/devices/DeviceActionsMenu.tsx";
 
@@ -295,6 +296,22 @@ export default define.page<typeof handler>(
           }
         >
           <div class="flex flex-col gap-6">
+            <DeviceHeaderStrip
+              deviceId={device.deviceId}
+              kind={device.kind}
+              isOnline={(() => {
+                if (!device.lastSeenAtIso) return false;
+                const ms = Date.parse(device.lastSeenAtIso);
+                if (!Number.isFinite(ms)) return false;
+                return Date.now() - ms <= 90 * 1000;
+              })()}
+              lastSeenAtIso={device.lastSeenAtIso}
+              capabilities={device.capabilities}
+              ownerEmail={device.ownerEmail}
+              isDeregistered={isDeregistered}
+              isRevoked={device.revokedAtIso !== null}
+            />
+
             <DeviceIdentityCard
               deviceId={device.deviceId}
               kind={device.kind}

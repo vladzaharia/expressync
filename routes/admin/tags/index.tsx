@@ -20,7 +20,6 @@ import { PageCard } from "../../../components/PageCard.tsx";
 import { steveClient } from "../../../src/lib/steve-client.ts";
 import { isMetaTag } from "../../../src/lib/tag-hierarchy.ts";
 import { isTagType, type TagType } from "../../../src/lib/types/tags.ts";
-import ScanTagAction from "../../../islands/ScanTagAction.tsx";
 import TagsFilterBar, {
   type TagsFilterStateSerialized,
   type TriState,
@@ -36,7 +35,6 @@ import { BlurFade } from "../../../components/magicui/blur-fade.tsx";
 import { GridPattern } from "../../../components/magicui/grid-pattern.tsx";
 import { Card } from "../../../components/ui/card.tsx";
 import { Button } from "../../../components/ui/button.tsx";
-import { CHROME_SIZE } from "../../../components/AppSidebar.tsx";
 
 // ---- Types ------------------------------------------------------------------
 
@@ -239,17 +237,6 @@ export const handler = define.handlers({
 
 // ---- Page -------------------------------------------------------------------
 
-function ScanTagTopAction() {
-  return (
-    <div
-      className="flex items-center px-3"
-      style={{ height: CHROME_SIZE }}
-    >
-      <ScanTagAction />
-    </div>
-  );
-}
-
 function serializeFilter(f: TagsFilterState): TagsFilterStateSerialized {
   return {
     q: f.q,
@@ -285,7 +272,6 @@ function EmptyState() {
             </p>
           </div>
           <div class="flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <ScanTagAction />
             <Button variant="outline" asChild>
               <a href="/tags/new">
                 <Plus class="mr-2 size-4" aria-hidden="true" />
@@ -325,7 +311,6 @@ export default define.page<typeof handler>(
         currentPath={url.pathname}
         user={state.user}
         accentColor="cyan"
-        actions={<ScanTagTopAction />}
       >
         <PageCard
           title="Tags"

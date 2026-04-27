@@ -21,12 +21,14 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 
+export type DeviceTypeFilter = "all" | "charger" | "scanner";
 export type DeviceKindFilter = "all" | "phone_nfc" | "laptop_nfc";
 export type DeviceOnlineFilter = "any" | "online" | "offline";
 
 export interface DeviceFiltersBarProps {
   /** Current filter values (read from the page URL). */
   initial: {
+    type: DeviceTypeFilter;
     kind: DeviceKindFilter;
     online: DeviceOnlineFilter;
     owner: string;
@@ -35,6 +37,13 @@ export interface DeviceFiltersBarProps {
   totalCount?: number;
   class?: string;
 }
+
+const TYPE_OPTIONS: ReadonlyArray<{ value: DeviceTypeFilter; label: string }> =
+  [
+    { value: "all", label: "All types" },
+    { value: "charger", label: "Chargers" },
+    { value: "scanner", label: "Scanners" },
+  ];
 
 const KIND_OPTIONS: ReadonlyArray<{ value: DeviceKindFilter; label: string }> =
   [
@@ -54,8 +63,8 @@ const ONLINE_OPTIONS: ReadonlyArray<
 export function DeviceFiltersBar(
   { initial, totalCount, class: className }: DeviceFiltersBarProps,
 ) {
-  const hasActive = initial.kind !== "all" || initial.online !== "any" ||
-    initial.owner.trim().length > 0;
+  const hasActive = initial.type !== "all" || initial.kind !== "all" ||
+    initial.online !== "any" || initial.owner.trim().length > 0;
 
   return (
     <form
@@ -70,6 +79,24 @@ export function DeviceFiltersBar(
         <Filter class="size-3.5" aria-hidden="true" />
         Filters
       </span>
+
+      <label class="inline-flex items-center gap-1.5 text-sm">
+        <span class="sr-only">Type</span>
+        <select
+          name="type"
+          class="h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-xs focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+        >
+          {TYPE_OPTIONS.map((opt) => (
+            <option
+              key={opt.value}
+              value={opt.value}
+              selected={opt.value === initial.type}
+            >
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <label class="inline-flex items-center gap-1.5 text-sm">
         <span class="sr-only">Kind</span>

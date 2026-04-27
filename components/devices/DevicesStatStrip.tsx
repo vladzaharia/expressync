@@ -1,11 +1,11 @@
 /**
- * DevicesStatStrip — devices listing stat strip.
+ * DevicesStatStrip — unified devices listing stat strip.
  *
- * Five teal-accented cells. The Offline cell upgrades to an amber warning
- * tone when any devices are offline (mirroring `ChargersStatStrip`'s pattern).
- * Phones cell goes muted when zero (admin's first-run state — no phones yet).
- * Chargers cell is informational and links across to `/admin/chargers` so the
- * sidebar entry isn't the only path between the two surfaces.
+ * Five teal-accented cells covering the merged charger + scanner fleet. The
+ * "Chargers" and "Scanners" cells double as filter shortcuts (clicking applies
+ * `?type=charger` / `?type=scanner` on the same page) and render the
+ * `aria-current="true"` ring when their type filter is active. The Offline
+ * cell upgrades to amber when any device in the visible set is offline.
  *
  * Thin wrapper over the shared `StatStrip` primitive.
  */
@@ -26,18 +26,21 @@ interface Totals {
   total: number;
   online: number;
   offline: number;
-  phones: number;
+  scanners: number;
   chargers: number;
 }
 
 interface Props {
   totals: Totals;
+  /** Active type filter, drives the `active` ring on Chargers/Scanners cells. */
+  activeType?: "all" | "charger" | "scanner";
   class?: string;
 }
 
-export function DevicesStatStrip({ totals, class: className }: Props) {
+export function DevicesStatStrip(
+  { totals, activeType = "all", class: className }: Props,
+) {
   const offlineWarning = totals.offline > 0;
-  const phonesZero = totals.phones === 0;
 
   const items: StatStripItem[] = [
     {
@@ -60,21 +63,24 @@ export function DevicesStatStrip({ totals, class: className }: Props) {
       tone: offlineWarning ? "amber" : "muted",
     },
     {
-      key: "phones",
-      label: "Phones",
-      value: totals.phones,
-      icon: Smartphone,
-      tone: "muted",
-      disabledWhenZero: phonesZero,
-    },
-    {
       key: "chargers",
       label: "Chargers",
       value: totals.chargers,
       icon: BatteryCharging,
-      tone: "muted",
-      href: "/admin/chargers",
-      title: "View chargers — managed on the Chargers page",
+      href: "/admin/devices?type=charger",
+      active: activeType === "charger",
+      disabledWhenZero: totals.chargers === 0,
+      title: "Filter to chargers",
+    },
+    {
+      key: "scanners",
+      label: "Scanners",
+      value: totals.scanners,
+      icon: Smartphone,
+      href: "/admin/devices?type=scanner",
+      active: activeType === "scanner",
+      disabledWhenZero: totals.scanners === 0,
+      title: "Filter to scanners (phones / laptops)",
     },
   ];
 

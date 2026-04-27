@@ -32,19 +32,13 @@
  */
 
 import { define } from "../../utils.ts";
+import manifest from "./apple-app-site-association.json" with { type: "json" };
 
-// Read the manifest at module-load — Deno caches the file in memory so
-// subsequent requests are zero-IO. If the file is malformed or missing,
-// the import-time read throws and the route surface fails loudly during
-// boot rather than silently 404'ing.
-const MANIFEST_TEXT = await (async (): Promise<string> => {
-  const url = new URL("./apple-app-site-association.json", import.meta.url);
-  const text = await Deno.readTextFile(url);
-  // Validate JSON eagerly — a malformed manifest is a deploy bug, not
-  // something to discover via Apple's validator.
-  JSON.parse(text);
-  return text;
-})();
+// Inline-imported via Vite's JSON loader so the manifest ships inside the
+// route bundle (Vite does NOT copy arbitrary sibling `.json` files into
+// `_fresh/server/assets/`, so a `Deno.readTextFile()` at runtime fails in
+// the production container).
+const MANIFEST_TEXT = JSON.stringify(manifest);
 
 export const handler = define.handlers({
   GET(_ctx): Response {

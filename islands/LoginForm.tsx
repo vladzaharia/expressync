@@ -36,7 +36,16 @@ export default function LoginForm() {
       const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
-        clientNavigate("/");
+        // Honor `?next=<path>` from the URL so we return the user to a deep
+        // link they were trying to reach when middleware bounced them
+        // through /login. Restrict to same-origin path-only values to
+        // prevent open-redirect (must start with "/" but not "//").
+        const params = new URLSearchParams(globalThis.location.search);
+        const next = params.get("next") ?? "/";
+        const safe = next.startsWith("/") && !next.startsWith("//")
+          ? next
+          : "/";
+        clientNavigate(safe);
       } else {
         error.value = data.error?.message || data.message ||
           `Login failed (${res.status}). Please check your credentials.`;

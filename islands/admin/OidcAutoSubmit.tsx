@@ -14,9 +14,15 @@ import type { JSX } from "preact";
 interface Props {
   /** Children rendered inside the form (the button). */
   children: JSX.Element | JSX.Element[];
+  /**
+   * Path to return the user to after BetterAuth completes the OIDC
+   * round-trip. Defaults to "/". Caller must pre-sanitise; we forward
+   * verbatim into BetterAuth's `callbackURL`.
+   */
+  callbackURL?: string;
 }
 
-export default function OidcAutoSubmit({ children }: Props) {
+export default function OidcAutoSubmit({ children, callbackURL = "/" }: Props) {
   const formRef = useRef<HTMLFormElement | null>(null);
 
   useEffect(() => {
@@ -42,7 +48,7 @@ export default function OidcAutoSubmit({ children }: Props) {
       class="space-y-3"
     >
       <input type="hidden" name="providerId" value="pocket-id" />
-      <input type="hidden" name="callbackURL" value="/" />
+      <input type="hidden" name="callbackURL" value={callbackURL} />
       {children}
     </form>
   );

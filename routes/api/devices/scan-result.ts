@@ -132,7 +132,7 @@ async function signNonce(
   const keyBytes = base64UrlDecode(rawSecret);
   const key = await crypto.subtle.importKey(
     "raw",
-    keyBytes,
+    keyBytes as BufferSource,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],

@@ -439,7 +439,7 @@ export default define.page<typeof handler>(
             <div class="py-8 text-center text-muted-foreground">
               This charger isn't in our cache yet.{" "}
               <a
-                href="/chargers"
+                href="/devices?type=charger"
                 class="text-primary underline-offset-4 hover:underline"
               >
                 Back to chargers
