@@ -1,13 +1,12 @@
 /**
  * TriggerScanButton — `headerActions`-slot button on the device detail
- * page. Dispatches the global `evcard:scan-open` CustomEvent (handled
- * by `ScanTagPaletteHost` mounted in `_app.tsx`) with this device as
- * the pre-selected tap-target. The host opens the unified scan modal,
- * which arms `/api/admin/devices/{deviceId}/scan-arm` and subscribes
- * to the per-device scan-detect SSE stream.
+ * page. Dispatches `evcard:scan-open` with this device pre-selected.
+ * The shared `<ScanModalHost>` opens the unified modal which arms
+ * `/api/admin/devices/{deviceId}/scan-arm` and listens on the per-device
+ * scan-detect SSE stream.
  *
- * Disabled while the device isn't currently online — `scan-arm` rejects
- * stale heartbeats and the modal would just bounce off `503`.
+ * Disabled while the device isn't currently online — scan-arm rejects
+ * stale heartbeats.
  */
 
 import { Button } from "@/components/ui/button.tsx";
@@ -15,7 +14,7 @@ import { ScanLine } from "lucide-preact";
 import {
   SCAN_OPEN_EVENT,
   type ScanOpenDetail,
-} from "@/islands/ScanTagPaletteHost.tsx";
+} from "@/islands/shared/ScanModalHost.tsx";
 
 export interface TriggerScanButtonProps {
   deviceId: string;
@@ -31,8 +30,9 @@ export default function TriggerScanButton(
 ) {
   const handleClick = () => {
     const detail: ScanOpenDetail = {
-      deviceId,
-      pairableType: "device",
+      mode: "admin",
+      purpose: "lookup-tag",
+      preselected: { deviceId, pairableType: "device" },
       label,
     };
     globalThis.dispatchEvent(

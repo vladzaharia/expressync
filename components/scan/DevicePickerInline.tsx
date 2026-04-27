@@ -1,34 +1,24 @@
 /**
- * DevicePickerInline — unified tap-target picker for the scan-modal.
+ * DevicePickerInline — unified tap-target picker.
  *
- * Replaces the legacy `components/customer/ChargerPickerInline.tsx`. The
- * legacy picker only knew about chargers (status string from OCPP, single
- * flat list). After Wave 2 the backend returns `TapTargetEntry` rows that
- * include phones AND chargers in one roster — this picker handles both,
- * groups them, and auto-picks the operator's own phone when that's the
- * only online tap-target.
+ * One flat list of "tappable devices" — chargers and phones treated as
+ * equals. The card chrome is identical; the only per-row differentiator
+ * is a kind icon (a charger looks different from a phone, and that
+ * recognition aid is worth keeping). Online state drives both row
+ * tone (foreground vs muted) and clickability (offline rows are
+ * disabled and aria-disabled).
  *
- * Behavior summary:
- *   - **Auto-pick.** If exactly one online tap-target is `isOwnDevice`
- *     (the admin's phone), `onSelect` fires immediately on mount and the
- *     body collapses to a single "Using your phone to scan…" line. We do
- *     NOT auto-pick chargers — picking a random charger the operator
- *     happens to be near would be the wrong default.
- *   - **Grouped list.** Otherwise we render up to three groups in this
- *     order: "Chargers" (orange BatteryCharging icon), "Your phone"
- *     (Smartphone icon, "(this device)" suffix on the row), "Other
- *     devices" (Smartphone icon). Empty groups are omitted.
- *   - **Server order respected.** The scan-tap-targets endpoint already
- *     sorts by `last_seen_at DESC NULLS LAST`. We leave that order intact
- *     within each group so online rows naturally come first.
- *   - **Offline rows.** Disabled, dimmed, with `aria-disabled`. Click
- *     does nothing. Surfaces the row but communicates it isn't selectable.
+ * Audience filter (the only mode-driven difference):
+ *   - "admin"    — every tappable device, including offline. Admins need
+ *                  to see fleet health and pick offline devices for
+ *                  diagnostics.
+ *   - "customer" — chargers (any state, offline dimmed) plus online
+ *                  non-charger devices. Offline non-chargers are filtered
+ *                  out so customers don't see stale phones; online
+ *                  admin phones remain visible so a customer can be
+ *                  signed in remotely on an admin's device.
  *
- * Why not a flat list? The unified roster mixes "tap your card on this
- * charger over there" with "tap your card on the phone in your hand" — two
- * very different physical actions. Grouping makes the choice obvious and
- * keeps the operator from accidentally arming a charger when they meant
- * to use their own phone.
+ * No auto-pick. The picker always renders, even with one online device.
  */
 
 import { useMemo } from "preact/hooks";
@@ -41,92 +31,34 @@ import { tapTargetDisplayName } from "@/components/scan/display-name.ts";
 export interface DevicePickerInlineProps {
   /** Roster from `GET /api/auth/scan-tap-targets`. */
   devices: TapTargetEntry[];
-  /**
-   * The currently-selected tap target, if any. Used to highlight the
-   * matching row when the picker is shown alongside a downstream pairing
-   * UI (e.g. while arming). The picker itself doesn't drive selection
-   * persistence — the parent owns it.
-   */
+  /** Currently-selected target id (highlighted row). Null for none. */
   selectedDeviceId: string | null;
-  /** Fired once the operator picks a row. */
+  /** Fired once the operator picks an online row. */
   onSelect: (target: TapTargetEntry) => void;
   /** When true, all rows render in a non-interactive state. */
   disabled?: boolean;
-  /**
-   * Audience the picker is rendering for. Drives offline-row visibility:
-   *   - `"admin"` (default) shows every tap target regardless of
-   *     online state — admins need to see offline devices to reason
-   *     about fleet health and to deregister.
-   *   - `"customer"` always shows chargers (offline rows dimmed +
-   *     unclickable) but hides offline non-charger scanners entirely
-   *     — customers can't act on a phone they can't see, and surfacing
-   *     dimmed phone rows reads like a fleet-health view they don't own.
-   */
+  /** Audience the picker is rendering for — drives offline-row visibility. */
   mode?: "admin" | "customer";
-  /** Page accent (cyan / orange / teal / …). Defaults to cyan. */
+  /** Page accent. Used for the selected-row highlight ring. */
   accent?: AccentColor;
   class?: string;
 }
 
-interface GroupSpec {
-  key: "chargers" | "own" | "other";
-  heading: string;
-  icon: typeof BatteryCharging;
-  iconClass: string;
-  items: TapTargetEntry[];
+function rowIcon(entry: TapTargetEntry) {
+  return entry.kind === "charger" ? BatteryCharging : Smartphone;
 }
 
-function partition(devices: TapTargetEntry[]): GroupSpec[] {
-  const chargers: TapTargetEntry[] = [];
-  const own: TapTargetEntry[] = [];
-  const other: TapTargetEntry[] = [];
-  for (const d of devices) {
-    if (d.kind === "charger") {
-      chargers.push(d);
-    } else if (d.isOwnDevice) {
-      own.push(d);
-    } else {
-      other.push(d);
-    }
-  }
-  const groups: GroupSpec[] = [];
-  if (chargers.length > 0) {
-    groups.push({
-      key: "chargers",
-      heading: "Chargers",
-      icon: BatteryCharging,
-      iconClass: "text-orange-500",
-      items: chargers,
-    });
-  }
-  if (own.length > 0) {
-    groups.push({
-      key: "own",
-      heading: "Your phone",
-      icon: Smartphone,
-      iconClass: "text-cyan-500",
-      items: own,
-    });
-  }
-  if (other.length > 0) {
-    groups.push({
-      key: "other",
-      heading: "Other devices",
-      icon: Smartphone,
-      iconClass: "text-muted-foreground",
-      items: other,
-    });
-  }
-  return groups;
+function ownSuffix(entry: TapTargetEntry): string {
+  return entry.isOwnDevice ? " (this device)" : "";
 }
 
-/**
- * Title for an offline row's secondary line. We don't have a `lastSeenAt`
- * on `TapTargetEntry` (the API trims it), so the row just says "Offline".
- * If we extend the contract later, switch to "Offline — last seen Xm ago".
- */
-function offlineSubtitle(): string {
-  return "Offline";
+function sortDevices(list: TapTargetEntry[]): TapTargetEntry[] {
+  // Online first, then alphabetical by display name. Stable across renders
+  // so the picker doesn't reorder while a roster refetch is in flight.
+  return [...list].sort((a, b) => {
+    if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1;
+    return tapTargetDisplayName(a).localeCompare(tapTargetDisplayName(b));
+  });
 }
 
 export function DevicePickerInline({
@@ -138,96 +70,45 @@ export function DevicePickerInline({
   accent: _accent = "cyan",
   class: className,
 }: DevicePickerInlineProps) {
-  // Audience-driven roster filter (see `mode` prop docs). We compute
-  // this once per `devices` change so the grouping below operates on
-  // the already-filtered list.
-  const visibleDevices = useMemo<TapTargetEntry[]>(() => {
-    if (mode === "admin") return devices;
-    return devices.filter((d) => {
-      if (d.kind === "charger") return true;
-      return d.isOnline;
-    });
+  const visible = useMemo(() => {
+    const filtered = mode === "admin"
+      ? devices
+      : devices.filter((d) => d.kind === "charger" || d.isOnline);
+    return sortDevices(filtered);
   }, [devices, mode]);
 
-  if (visibleDevices.length === 0) return null;
-  const groups = partition(visibleDevices);
-  if (groups.length === 0) return null;
+  if (visible.length === 0) return null;
 
   return (
-    <div class={cn("flex flex-col gap-3", className)}>
-      {groups.map((group) => (
-        <DeviceGroup
-          key={group.key}
-          group={group}
-          selectedDeviceId={selectedDeviceId}
-          disabled={disabled}
-          onSelect={onSelect}
-        />
+    <ul class={cn("flex flex-col gap-2", className)}>
+      {visible.map((entry) => (
+        <li key={entry.deviceId}>
+          <DeviceRow
+            entry={entry}
+            selected={selectedDeviceId === entry.deviceId}
+            disabled={disabled}
+            onSelect={onSelect}
+          />
+        </li>
       ))}
-    </div>
-  );
-}
-
-function DeviceGroup({
-  group,
-  selectedDeviceId,
-  disabled,
-  onSelect,
-}: {
-  group: GroupSpec;
-  selectedDeviceId: string | null;
-  disabled: boolean;
-  onSelect: (target: TapTargetEntry) => void;
-}) {
-  const HeadingIcon = group.icon;
-  return (
-    <section class="flex flex-col gap-1.5">
-      <header class="flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        <HeadingIcon
-          class={cn("size-3.5", group.iconClass)}
-          aria-hidden="true"
-        />
-        <span>{group.heading}</span>
-      </header>
-      <ul class="flex flex-col gap-1.5">
-        {group.items.map((item) => (
-          <li key={item.deviceId}>
-            <DeviceRow
-              entry={item}
-              groupKey={group.key}
-              selected={selectedDeviceId === item.deviceId}
-              disabled={disabled}
-              onSelect={onSelect}
-            />
-          </li>
-        ))}
-      </ul>
-    </section>
+    </ul>
   );
 }
 
 function DeviceRow({
   entry,
-  groupKey,
   selected,
   disabled,
   onSelect,
 }: {
   entry: TapTargetEntry;
-  groupKey: GroupSpec["key"];
   selected: boolean;
   disabled: boolean;
   onSelect: (target: TapTargetEntry) => void;
 }) {
   const offline = !entry.isOnline;
   const interactionDisabled = disabled || offline;
-  const RowIcon = entry.kind === "charger" ? BatteryCharging : Smartphone;
-  const iconTone = entry.kind === "charger"
-    ? "text-orange-500"
-    : groupKey === "own"
-    ? "text-cyan-500"
-    : "text-muted-foreground";
-  const ownSuffix = groupKey === "own" ? " (this device)" : "";
+  const RowIcon = rowIcon(entry);
 
   return (
     <button
@@ -239,10 +120,10 @@ function DeviceRow({
         if (!interactionDisabled) onSelect(entry);
       }}
       class={cn(
-        "group w-full flex items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3 text-left transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "group w-full flex items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 text-left transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         selected
-          ? "border-primary/50 bg-primary/5"
+          ? "border-primary/60 bg-primary/5 ring-2 ring-primary/40"
           : "border-border hover:border-primary/40 hover:bg-accent/40",
         interactionDisabled &&
           "cursor-not-allowed opacity-50 hover:border-border hover:bg-card",
@@ -250,42 +131,26 @@ function DeviceRow({
     >
       <span class="flex items-center gap-3 min-w-0">
         <RowIcon
-          class={cn("size-4 shrink-0", iconTone)}
+          class={cn(
+            "size-5 shrink-0",
+            offline ? "text-muted-foreground" : "text-foreground",
+          )}
           aria-hidden="true"
         />
-        <span class="flex flex-col min-w-0">
-          <span class="text-sm font-semibold text-foreground truncate">
-            {tapTargetDisplayName(entry)}
-            {ownSuffix}
-          </span>
-          {offline && (
-            <span class="text-xs text-muted-foreground truncate">
-              {offlineSubtitle()}
-            </span>
-          )}
+        <span class="text-sm font-semibold text-foreground truncate">
+          {tapTargetDisplayName(entry)}
+          {ownSuffix(entry)}
         </span>
       </span>
-      <span class="flex items-center gap-2 shrink-0">
-        {entry.capabilities.length > 0 && !offline && (
-          <span class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
-            {entry.capabilities.join(" · ")}
-          </span>
+      <span
+        class={cn(
+          "shrink-0 inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-medium uppercase tracking-wide",
+          offline
+            ? "bg-muted text-muted-foreground border-border"
+            : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
         )}
-        <span
-          class={cn(
-            "inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-medium uppercase tracking-wide",
-            offline
-              ? "bg-muted text-muted-foreground border-border"
-              : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
-          )}
-        >
-          {offline ? "Offline" : "Online"}
-        </span>
-        {!offline && (
-          <span class="inline-flex items-center px-3 h-7 rounded-md border border-input bg-background text-xs font-medium text-foreground">
-            Select
-          </span>
-        )}
+      >
+        {offline ? "Offline" : "Online"}
       </span>
     </button>
   );
