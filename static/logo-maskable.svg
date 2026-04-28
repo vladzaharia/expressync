@@ -35,8 +35,8 @@
        centred). 24x24 source path → 320px box, offset (512-320)/2 = 96. -->
   <g
     transform="translate(96 96) scale(13.333)"
-    fill="#FFFFFF"
-    stroke="#FFFFFF"
+    fill="#0b1b3d"
+    stroke="#0b1b3d"
     stroke-width="0.6"
     stroke-linejoin="round"
   >
