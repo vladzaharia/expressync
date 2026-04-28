@@ -29,7 +29,6 @@ import {
   Calendar,
   HeartPulse,
   Layers,
-  Link2,
   Tag,
   TrendingUp,
   Zap,
@@ -99,14 +98,9 @@ export default define.page<typeof handler>(
                 title="Welcome to ExpressCharge"
                 description="Register a charge point in StEvE and scan a tag to get started. Link your first tag to a Lago customer to start billing."
                 primaryAction={{
-                  label: "Register a tag",
+                  label: "Register an EV card",
                   href: "/tags/new",
                   icon: Tag,
-                }}
-                secondaryAction={{
-                  label: "Link a tag to a customer",
-                  href: "/links/new",
-                  icon: Link2,
                 }}
                 accent="cyan"
                 size="lg"

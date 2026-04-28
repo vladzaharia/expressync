@@ -9,7 +9,7 @@
  *        violet well with `<Layers />` for meta-tags).
  *      - Column with uppercase type label + mono idTag (truncated).
  *      - Right-aligned quick-action icon link, visible on hover/focus.
- *        Unlinked tags get `<Link2 />` → `/links/new?tagPk=:pk`.
+ *        Unlinked tags get `<Link2 />` → `/tags/:pk/link`.
  *        Linked tags have no quick-action (the linking flow auto-manages
  *        the OCPP-{externalId} parent — no per-tag card issuance).
  *
@@ -226,7 +226,7 @@ function buildQuickAction(
   if (isMeta || !isActive || hasLagoCustomer) return null;
 
   const label = "Link to customer";
-  const href = `/links/new?tagPk=${ocppTagPk}`;
+  const href = `/tags/${ocppTagPk}/link`;
   const Icon = Link2;
 
   // `relative z-10 pointer-events-auto` puts this quick-action above the

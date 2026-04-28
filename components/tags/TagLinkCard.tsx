@@ -313,7 +313,7 @@ function LinkedBody(
       {/* CTAs */}
       <div class="flex flex-wrap gap-2 pt-1">
         <a
-          href={`/links/${linking.mappingId}`}
+          href={`/tags/${tagPk}/link`}
           class="inline-flex h-8 flex-1 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Pencil class="size-3.5" aria-hidden="true" />
@@ -395,7 +395,7 @@ function UnlinkedBody(
           </p>
         </div>
         <a
-          href={`/links/new?tagPk=${tagPk}`}
+          href={`/tags/${tagPk}/link`}
           class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <Link2 class="h-4 w-4" aria-hidden="true" />

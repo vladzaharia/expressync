@@ -376,7 +376,7 @@ export default function ProfileEditor(
             asChild
             className="w-full"
           >
-            <a href="/links">Cancel</a>
+            <a href="/tags">Cancel</a>
           </Button>
         </div>
 

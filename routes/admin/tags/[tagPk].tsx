@@ -411,6 +411,14 @@ export default define.page<typeof handler>(
                 icon={FileText}
                 accent="cyan"
                 className="lg:col-span-2"
+                actions={
+                  <a
+                    href={`/tags/${tagPk}/edit`}
+                    class="text-xs text-muted-foreground hover:text-foreground underline"
+                  >
+                    Open full edit page
+                  </a>
+                }
               >
                 <TagMetadataForm
                   ocppTagPk={tagPk}

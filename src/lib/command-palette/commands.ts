@@ -184,17 +184,6 @@ export function buildActionCommands(env: ActionEnv): PaletteCommand[] {
       run: () => env.navigate("/reservations/new"),
     },
     {
-      id: "action:create-link",
-      kind: "action",
-      group: "actions",
-      title: "Create tag link",
-      subtitle: "Map an OCPP tag to a subscription",
-      icon: Plus,
-      accent: "violet",
-      keywords: ["mapping", "user", "add"],
-      run: () => env.navigate("/links/new"),
-    },
-    {
       id: "action:notifications",
       kind: "action",
       group: "actions",

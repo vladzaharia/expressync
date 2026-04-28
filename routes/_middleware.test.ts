@@ -166,7 +166,6 @@ Deno.test("hostname fixture — manage host paths rewrite to /admin/*", () => {
     ["https://manage.example.com/", "/admin"],
     ["https://manage.example.com/sync", "/admin/sync"],
     ["https://manage.example.com/users/abc", "/admin/users/abc"],
-    ["https://manage.example.com/links/42", "/admin/links/42"],
   ];
   for (const [input, expected] of cases) {
     const url = new URL(input);
