@@ -362,7 +362,7 @@ export default function CommandPalette(
               onValueChange={(v: string) => (query.value = v)}
               placeholder={scanMode.value
                 ? "Pick a tappable device..."
-                : "Type exact tag names, charger IDs, or action names..."}
+                : "Type exact EV Card names, charger IDs, or action names..."}
               className="flex-1 bg-transparent outline-none text-sm py-2 placeholder:text-muted-foreground"
               role="combobox"
               aria-expanded
@@ -486,7 +486,7 @@ export default function CommandPalette(
                   </CommandGroup>
                 )}
                 {results.tags.length > 0 && (
-                  <CommandGroup heading="Tags">
+                  <CommandGroup heading="EV Cards">
                     {results.tags.map((h) => (
                       <CommandItem
                         key={`tag:${h.id}`}

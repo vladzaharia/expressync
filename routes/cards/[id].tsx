@@ -201,7 +201,7 @@ export default define.page<typeof handler>(
                   />
                   <MetricTile
                     icon={TagIcon}
-                    label="Tag id"
+                    label="Card ID"
                     value={
                       <span class="font-mono text-sm">{card.ocppTagId}</span>
                     }

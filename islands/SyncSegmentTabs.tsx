@@ -190,7 +190,7 @@ export default function SyncSegmentTabs(
   }> = [
     {
       key: "tag_linking",
-      label: "Tag Linking",
+      label: "EV Card Linking",
       icon: Link2,
       status: run.tagLinkingStatus,
       logs: tagLinkingLogs,

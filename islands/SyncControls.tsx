@@ -62,7 +62,7 @@ const TIER_STYLES: Record<
     badge:
       "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30",
     reason:
-      "No active sessions but recent tag/transaction activity — syncing hourly.",
+      "No active sessions but recent EV Card/transaction activity — syncing hourly.",
   },
   dormant: {
     label: "Dormant",

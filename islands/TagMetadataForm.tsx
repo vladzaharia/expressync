@@ -100,17 +100,17 @@ export default function TagMetadataForm({
       {/* OCPP id + meta-tag badge */}
       <div class="flex items-center gap-3 rounded-md border bg-muted/30 px-3 py-2">
         <Label class="text-xs uppercase text-muted-foreground">
-          OCPP tag
+          OCPP EV Card
         </Label>
         <code class="font-mono text-sm">{ocppIdTag}</code>
         {meta
           ? (
             <span
               class="ml-auto flex items-center gap-1.5 rounded-md border border-dashed border-input bg-background px-2 py-1 text-xs text-muted-foreground"
-              title="OCPP-* tags are hierarchy rollups, not physical cards."
+              title="OCPP-* EV Cards are hierarchy rollups, not physical cards."
             >
               <Layers class="h-3.5 w-3.5" />
-              Meta-tag
+              Meta-EV Card
             </span>
           )
           : null}
@@ -138,12 +138,12 @@ export default function TagMetadataForm({
 
       {/* Tag type — disabled for meta-tags */}
       <div class="space-y-1">
-        <Label>Tag type</Label>
+        <Label>EV Card type</Label>
         {meta
           ? (
             <div class="flex items-center gap-3 rounded-md border border-dashed border-input bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
               <Layers class="h-4 w-4" />
-              <span>Auto-classified as Meta-tag (OCPP-* prefix)</span>
+              <span>Auto-classified as Meta-EV Card (OCPP-* prefix)</span>
             </div>
           )
           : (
@@ -205,7 +205,7 @@ export default function TagMetadataForm({
           disabled={saving.value}
         />
         <Label for="tm-is-active" class="text-sm font-normal">
-          Active (tag may authorize at a charger)
+          Active (EV Card may authorize at a charger)
         </Label>
       </div>
 

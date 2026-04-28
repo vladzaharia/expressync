@@ -193,7 +193,7 @@ const columns: PaginatedTableColumn<TransactionEventWithTag>[] = [
   },
   {
     key: "ocppTag",
-    header: "OCPP Tag",
+    header: "OCPP EV Card",
     className: "font-mono text-sm",
     render: (event) => (
       <div className="flex items-center gap-2">

@@ -65,7 +65,7 @@ export default function ScanModal(props: ScanModalProps) {
             id="scan-modal-title"
             className="flex items-center gap-2"
           >
-            {modalTitle ?? "Scan Tag"}
+            {modalTitle ?? "Scan Card"}
           </DialogTitle>
         </DialogHeader>
 

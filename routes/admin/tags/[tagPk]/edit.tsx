@@ -122,8 +122,8 @@ export default define.page<typeof handler>(function EditTagPage(
       actions={<BackAction href={`/tags/${tag.ocppTagPk}`} />}
     >
       <PageCard
-        title="Edit tag"
-        description="Update the tag's metadata. The OCPP tag ID can't be renamed."
+        title="Edit EV Card"
+        description="Update the EV Card's metadata. The OCPP EV Card ID can't be renamed."
         colorScheme="cyan"
       >
         <TagFormWrapper

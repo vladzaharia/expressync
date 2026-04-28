@@ -45,7 +45,7 @@ const columns: PaginatedTableColumn<SyncRun>[] = [
   },
   {
     key: "tagLinking",
-    header: "Tag Linking",
+    header: "EV Card Linking",
     hideOnMobile: true,
     render: (run) => {
       const isCompleted = run.status === "completed" || run.status === "failed";

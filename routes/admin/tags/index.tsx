@@ -271,7 +271,7 @@ function EmptyState() {
             <Nfc class="h-7 w-7 text-cyan-500" />
           </div>
           <div>
-            <h2 class="text-lg font-semibold">No tags yet</h2>
+            <h2 class="text-lg font-semibold">No EV Cards yet</h2>
             <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
               Scan a card at any charger to auto-import it, or create one
               manually.
@@ -281,7 +281,7 @@ function EmptyState() {
             <Button variant="outline" asChild>
               <a href="/tags/new">
                 <Plus class="mr-2 size-4" aria-hidden="true" />
-                New tag
+                New EV Card
               </a>
             </Button>
           </div>
@@ -294,7 +294,7 @@ function EmptyState() {
 function FilteredEmptyState() {
   return (
     <div class="col-span-full rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-      No tags match —{" "}
+      No EV Cards match —{" "}
       <a href="/tags" class="underline hover:text-foreground">
         Clear filter
       </a>
@@ -319,10 +319,10 @@ export default define.page<typeof handler>(
         accentColor="cyan"
       >
         <PageCard
-          title="Tags"
-          description={`${data.totals.all} OCPP tag${
+          title="EV Cards"
+          description={`${data.totals.all} OCPP EV Card${
             data.totals.all === 1 ? "" : "s"
-          } known to StEvE. Edit display name, type, notes, and active flag per tag. Use the Tag Linking page to attach a tag to a Lago customer.`}
+          } known to StEvE. Edit display name, type, notes, and active flag per card. Use the EV Card Linking page to attach a card to a Lago customer.`}
           colorScheme="cyan"
           headerActions={
             <a
@@ -330,7 +330,7 @@ export default define.page<typeof handler>(
               class="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
             >
               <Plus class="h-4 w-4" />
-              New tag
+              New EV Card
             </a>
           }
         >

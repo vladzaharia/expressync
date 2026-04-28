@@ -42,8 +42,8 @@ export default define.page<typeof handler>(
         actions={<BackAction href="/tags" />}
       >
         <PageCard
-          title="New tag"
-          description="Register a new OCPP tag in StEvE. After saving, you can optionally link it to a customer."
+          title="New EV Card"
+          description="Register a new OCPP EV Card in StEvE. After saving, you can optionally link it to a customer."
           colorScheme="cyan"
         >
           <TagFormWrapper

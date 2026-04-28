@@ -131,7 +131,7 @@ export default function SyncEventsTable({ syncRuns }: Props) {
           <TableHead>Started</TableHead>
           <TableHead>Duration</TableHead>
           <TableHead>Status</TableHead>
-          <TableHead>Tag Linking</TableHead>
+          <TableHead>EV Card Linking</TableHead>
           <TableHead>Transaction Sync</TableHead>
         </TableRow>
       </TableHeader>

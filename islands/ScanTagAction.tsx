@@ -17,7 +17,7 @@ interface Props {
   buttonLabel?: string;
 }
 
-export default function ScanTagAction({ buttonLabel = "Scan Tag" }: Props) {
+export default function ScanTagAction({ buttonLabel = "Scan Card" }: Props) {
   const handleClick = () => {
     const detail: ScanOpenDetail = { mode: "admin", purpose: "lookup-tag" };
     globalThis.dispatchEvent(new CustomEvent(SCAN_OPEN_EVENT, { detail }));

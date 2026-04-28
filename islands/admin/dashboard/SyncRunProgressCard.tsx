@@ -166,7 +166,7 @@ export default function SyncRunProgressCard(
   const segments = [
     {
       key: "tag_linking",
-      label: "Tag linking",
+      label: "EV Card linking",
       status: inFlight.value.tagLinkingStatus,
     },
     {

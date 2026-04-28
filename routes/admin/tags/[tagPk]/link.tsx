@@ -128,10 +128,10 @@ export default define.page<typeof handler>(function LinkPage(
     preselectedCustomerId,
     lagoDashboardUrl,
   } = data;
-  const title = mode === "edit" ? "Edit linking" : "Link tag";
+  const title = mode === "edit" ? "Edit linking" : "Link EV Card";
   const description = mode === "edit"
-    ? "Update the customer or subscription billing this tag."
-    : "Connect this OCPP tag to a Lago customer and subscription so charging sessions get billed.";
+    ? "Update the customer or subscription billing this EV Card."
+    : "Connect this OCPP EV Card to a Lago customer and subscription so charging sessions get billed.";
 
   return (
     <SidebarLayout

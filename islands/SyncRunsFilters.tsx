@@ -79,7 +79,7 @@ export default function SyncRunsFilters({ initial }: Props) {
             class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             <option value="">Any segment</option>
-            <option value="tag_linking">Tag Linking (non-success)</option>
+            <option value="tag_linking">EV Card Linking (non-success)</option>
             <option value="transaction_sync">
               Transaction Sync (non-success)
             </option>

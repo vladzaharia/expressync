@@ -74,7 +74,7 @@ export default function ScanModalHost() {
       mode="admin"
       purpose={purpose.value}
       preselectedId={preselected.value}
-      modalTitle={purpose.value === "add-tag" ? "Add a tag" : "Scan Tag"}
+      modalTitle={purpose.value === "add-tag" ? "Add an EV Card" : "Scan Card"}
       subtitle={label.value ? `Tap a card on ${label.value}.` : undefined}
       resolve={{
         kind: "route",

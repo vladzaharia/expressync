@@ -232,7 +232,7 @@ export default function ConnectorCard(
         ? (
           <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
             <div class="col-span-2 flex items-center justify-between">
-              <dt class="text-muted-foreground">Tag</dt>
+              <dt class="text-muted-foreground">EV Card</dt>
               <dd>
                 {connector.activeTagTagPk && connector.activeTagIdTag
                   ? (

@@ -233,7 +233,7 @@ export default define.page<typeof handler>(function TransactionDetailsPage({
             />
             <MetricTile
               icon={Tag}
-              label="OCPP Tag"
+              label="OCPP EV Card"
               value={ocppTagPk && resolvedOcppTagId
                 ? (
                   <a

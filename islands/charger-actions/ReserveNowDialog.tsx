@@ -39,7 +39,7 @@ export default function ReserveNowDialog(props: PerDialogProps) {
 
   const handleConfirm = async () => {
     if (!idTag) {
-      setError("Select an OCPP tag.");
+      setError("Select an OCPP EV Card.");
       return;
     }
     if (!expiry) {
@@ -76,7 +76,7 @@ export default function ReserveNowDialog(props: PerDialogProps) {
     <ActionDialog
       icon={Timer}
       title="Reserve connector"
-      description="Reserve the connector for a specific OCPP tag until a future time."
+      description="Reserve the connector for a specific OCPP EV Card until a future time."
       isOpen={isOpen}
       onClose={onClose}
       onConfirm={handleConfirm}
