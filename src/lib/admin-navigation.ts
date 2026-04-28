@@ -25,7 +25,6 @@
  */
 
 import {
-  Bell,
   CalendarClock,
   FileText,
   Link2,
@@ -62,8 +61,8 @@ export interface NavSection {
 
 export const ADMIN_NAV_SECTIONS: NavSection[] = [
   {
-    id: "operations",
-    title: "Operations",
+    id: "devices",
+    title: "Devices",
     items: [
       {
         // Unified Devices surface (April 2026): chargers + scanners share
@@ -86,27 +85,11 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
         ],
         adminOnly: true,
       },
-      {
-        id: "nav:/reservations",
-        title: "Reservations",
-        path: "/reservations",
-        icon: CalendarClock,
-        accentColor: "indigo",
-        keywords: ["booking"],
-      },
-      {
-        id: "nav:/sync",
-        title: "Sync",
-        path: "/sync",
-        icon: RefreshCw,
-        accentColor: "blue",
-        keywords: ["sync run", "history"],
-      },
     ],
   },
   {
-    id: "billing",
-    title: "Billing",
+    id: "sessions",
+    title: "Sessions",
     items: [
       {
         id: "nav:/transactions",
@@ -117,6 +100,20 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
         keywords: ["transactions", "sessions", "kwh"],
       },
       {
+        id: "nav:/reservations",
+        title: "Reservations",
+        path: "/reservations",
+        icon: CalendarClock,
+        accentColor: "indigo",
+        keywords: ["booking"],
+      },
+    ],
+  },
+  {
+    id: "billing",
+    title: "Billing & Customers",
+    items: [
+      {
         id: "nav:/invoices",
         title: "Invoices",
         path: "/invoices",
@@ -124,12 +121,14 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
         accentColor: "teal",
         keywords: ["lago", "bill"],
       },
-    ],
-  },
-  {
-    id: "identity",
-    title: "Identity",
-    items: [
+      {
+        id: "nav:/users",
+        title: "Users",
+        path: "/users",
+        icon: Users,
+        accentColor: "amber",
+        keywords: ["admin"],
+      },
       {
         id: "nav:/tags",
         title: "Tags",
@@ -146,28 +145,20 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
         accentColor: "violet",
         keywords: ["mapping"],
       },
-      {
-        id: "nav:/users",
-        title: "Users",
-        path: "/users",
-        icon: Users,
-        accentColor: "amber",
-        keywords: ["admin"],
-      },
     ],
   },
   {
-    id: "admin",
-    title: "Admin",
+    id: "system",
+    title: "System",
     adminOnly: true,
     items: [
       {
-        id: "nav:/notifications",
-        title: "Notifications",
-        path: "/notifications",
-        icon: Bell,
-        accentColor: "sky",
-        adminOnly: true,
+        id: "nav:/sync",
+        title: "Sync",
+        path: "/sync",
+        icon: RefreshCw,
+        accentColor: "blue",
+        keywords: ["sync run", "history"],
       },
       {
         id: "nav:/admin/webhook-events",
