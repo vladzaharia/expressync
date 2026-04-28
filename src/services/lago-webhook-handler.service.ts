@@ -51,6 +51,7 @@ import {
   stopActiveTransactionsForSubscription,
 } from "./auto-stop.service.ts";
 import { syncSingleTagToSteve } from "./tag-sync.service.ts";
+import { ensureCustomerMetaTag } from "../lib/customer-meta-tags.ts";
 import {
   handleCustomerWebhook,
   handleInvoiceWebhook,
@@ -804,6 +805,27 @@ async function reactTo(payload: LagoWebhook, rowId: number): Promise<boolean> {
       return true;
     }
 
+    case "customer.created": {
+      const customer = pickCustomer(payload);
+      if (!customer?.external_id) {
+        log.debug("customer.created without external_id", { rowId });
+        return false;
+      }
+      // Fire-and-forget meta-tag materialization. ensureCustomerMetaTag
+      // is idempotent + best-effort; we don't gate the webhook ack on
+      // StEvE availability.
+      void ensureCustomerMetaTag(
+        customer.external_id,
+        customer.name ?? customer.external_id,
+      ).catch((err) => {
+        log.warn("ensureCustomerMetaTag from customer.created failed", {
+          externalId: customer.external_id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+      return false;
+    }
+
     case "customer.updated": {
       const customer = pickCustomer(payload);
       if (!customer?.external_id) {
@@ -814,6 +836,14 @@ async function reactTo(payload: LagoWebhook, rowId: number): Promise<boolean> {
         externalCustomerId: customer.external_id,
         lagoEmail: customer.email ?? null,
         rowId,
+      });
+      // Defensively re-resolve the meta-tag in case the customer was
+      // created before this feature shipped.
+      void ensureCustomerMetaTag(customer.external_id).catch((err) => {
+        log.warn("ensureCustomerMetaTag from customer.updated failed", {
+          externalId: customer.external_id,
+          error: err instanceof Error ? err.message : String(err),
+        });
       });
       // We may not always emit a notification (only on drift) — the
       // helper returns true when a row was inserted.
@@ -958,10 +988,14 @@ function pickEnforceStopFlag(payload: LagoWebhook): boolean {
  */
 function pickCustomer(
   payload: LagoWebhook,
-): { external_id?: string; email?: string | null } | null {
+): {
+  external_id?: string;
+  email?: string | null;
+  name?: string | null;
+} | null {
   const p = payload as unknown as Record<string, unknown>;
   const customer = p.customer as
-    | { external_id?: string; email?: string | null }
+    | { external_id?: string; email?: string | null; name?: string | null }
     | undefined;
   return customer ?? null;
 }
@@ -1034,6 +1068,22 @@ async function handleSubscriptionStateChange(args: {
     void syncSingleTagToSteve(m).catch((err) => {
       log.error("syncSingleTagToSteve threw unexpectedly (caught)", {
         mappingId: m.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+  }
+
+  // Refresh each affected customer's meta-tag so its StEvE active state
+  // tracks "first active subscription". One refresh per unique customer
+  // is enough.
+  const refreshedCustomers = new Set<string>();
+  for (const m of updated) {
+    const customerExt = m.lagoCustomerExternalId;
+    if (!customerExt || refreshedCustomers.has(customerExt)) continue;
+    refreshedCustomers.add(customerExt);
+    void ensureCustomerMetaTag(customerExt).catch((err) => {
+      log.warn("Subscription-driven meta-tag refresh failed", {
+        externalCustomerId: customerExt,
         error: err instanceof Error ? err.message : String(err),
       });
     });

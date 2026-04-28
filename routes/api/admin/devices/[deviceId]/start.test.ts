@@ -95,7 +95,12 @@ function offlineLoader(stale: Date) {
 /** Stub `ensureCustomerMetaTag` so the handler doesn't try to talk to StEvE. */
 function stubMetaEnsurer() {
   _setMetaTagEnsurerForTests((extId) =>
-    Promise.resolve({ idTag: `OCPP-${extId}`, ocppTagPk: 999 })
+    Promise.resolve({
+      idTag: `OCPP-${extId}`,
+      ocppTagPk: 999,
+      isActive: true,
+      lagoSubscriptionExternalId: null,
+    })
   );
 }
 
