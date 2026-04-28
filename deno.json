@@ -2,7 +2,7 @@
   "nodeModulesDir": "manual",
   "tasks": {
     "check": "deno fmt --check . && deno lint . && deno check",
-    "test": "deno test --allow-read --allow-env",
+    "test": "deno test --allow-read --allow-env --allow-net src/ routes/ components/ tests/integration/devices/",
     "dev": "vite",
     "build": "vite build",
     "start": "deno serve -A prod-server.ts",

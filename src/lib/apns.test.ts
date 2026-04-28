@@ -502,8 +502,6 @@ Deno.test("sendApns — reuses JWT across sends inside the 50-min window", async
 
 Deno.test({
   name: "sendApns — live Deno.serve listener round-trip",
-  // Requires --allow-net for both serve + fetch. Skipped if not granted.
-  ignore: !(await hasNetPermission()),
   fn: async () => {
     await withApnsEnv(
       {
@@ -582,12 +580,3 @@ Deno.test({
     );
   },
 });
-
-async function hasNetPermission(): Promise<boolean> {
-  try {
-    const status = await Deno.permissions.query({ name: "net" });
-    return status.state === "granted";
-  } catch {
-    return false;
-  }
-}

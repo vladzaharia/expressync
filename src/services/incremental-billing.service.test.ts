@@ -52,6 +52,8 @@ Deno.test({
       meterTimestamp: new Date().toISOString(),
       isFinal: false,
     });
+    // Suppress flush triggers — this test only validates in-memory accumulation.
+    _internal.state.get(200)!.lastFlushAt = Date.now();
     enqueueMeterSample({
       steveTransactionId: 200,
       chargeBoxId: "EVSE-B",
@@ -86,6 +88,7 @@ Deno.test({
       meterTimestamp: new Date().toISOString(),
       isFinal: false,
     });
+    _internal.state.get(300)!.lastFlushAt = Date.now();
     enqueueMeterSample({
       steveTransactionId: 300,
       chargeBoxId: "EVSE-C",
