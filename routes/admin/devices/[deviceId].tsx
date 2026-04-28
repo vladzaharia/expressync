@@ -36,20 +36,18 @@ import { logger } from "../../../src/lib/utils/logger.ts";
 import { SidebarLayout } from "../../../components/SidebarLayout.tsx";
 import { PageCard } from "../../../components/PageCard.tsx";
 import { SectionCard } from "../../../components/shared/SectionCard.tsx";
-import { StatStrip } from "../../../components/shared/StatStrip.tsx";
-import { Activity, AppWindow, Calendar, Clock, Layers } from "lucide-preact";
+import { Activity } from "lucide-preact";
 import { DeviceIdentityCard } from "../../../components/devices/DeviceIdentityCard.tsx";
 import { DeviceHeaderStrip } from "../../../components/devices/DeviceHeaderStrip.tsx";
 import DeviceActionsMenu from "../../../islands/devices/DeviceActionsMenu.tsx";
 import TriggerScanButton from "../../../islands/devices/TriggerScanButton.tsx";
-import { DeviceDiagnosticsCard } from "../../../components/devices/DeviceDiagnosticsCard.tsx";
-import type { DeviceDiagnostics } from "../../../components/devices/DeviceDiagnosticsCard.tsx";
+import { DeviceLiveStatusCard } from "../../../components/devices/DeviceLiveStatusCard.tsx";
+import type { DeviceLiveStatus } from "../../../components/devices/DeviceLiveStatusCard.tsx";
 import { DeviceStateSyncList } from "../../../components/devices/DeviceStateSyncList.tsx";
 import type { DeviceSyncEntry } from "../../../components/devices/DeviceStateSyncList.tsx";
 import CapabilityPicker from "../../../islands/devices/CapabilityPicker.tsx";
 import DeviceSettingsForm from "../../../islands/devices/DeviceSettingsForm.tsx";
-import { formatRelative } from "../../../islands/shared/device-visuals.ts";
-import { History as HistoryIcon, Settings2, Stethoscope } from "lucide-preact";
+import { History as HistoryIcon, Settings2 } from "lucide-preact";
 import { deviceSettings as deviceSettingsTable } from "../../../src/db/schema.ts";
 import { pickerOptionsForKind } from "../../../src/lib/devices/capability-metadata.ts";
 import type { DeviceCapability } from "../../../src/lib/types/devices.ts";
@@ -338,12 +336,15 @@ export default define.page<typeof handler>(
           }
         >
           {(() => {
-            // Slice P — visual redesign mirroring the charger detail page's
-            // column treatment. One PageCard root → HeaderStrip → StatStrip →
-            // 1+2 grid (identity + diagnostics) → App Configuration full-width
-            // → 1+1 grid (recent syncs + recent scans). All sections inherit
-            // the page's `teal` accent.
-            const diagnostics: DeviceDiagnostics = {
+            // Visual layout mirrors `/admin/chargers/:id`: HeaderStrip →
+            // 1+2 grid (identity + live-status hero) → App Configuration →
+            // 1+1 grid (recent syncs + recent scans). The hero card is
+            // the analogue of `ChargerLiveStatusCard` — big status pill,
+            // last-sync timestamp, permission row, and the diagnostic
+            // counters that used to live in the (now-folded) Diagnostics
+            // card.
+            const liveStatus: DeviceLiveStatus = {
+              isOnline,
               lastSeenAtIso: device.lastSeenAtIso,
               reconnectCount: typeof device.lastStatus?.reconnectCount ===
                     "number" && device.lastStatus.reconnectCount >= 0
@@ -374,52 +375,6 @@ export default define.page<typeof handler>(
             };
             const recentSyncs: DeviceSyncEntry[] = [];
 
-            // Headline stats — last seen / registered / app / OS — laid out
-            // as a `StatStrip` so the device page reads as parallel to the
-            // charger page's connector/state strip. Tones override to
-            // `muted` when there's no value (so the stat reads as inactive
-            // rather than warning).
-            const statItems = [
-              {
-                key: "last-seen",
-                label: "Last seen",
-                value: isOnline
-                  ? "Online now"
-                  : formatRelative(device.lastSeenAtIso),
-                icon: Clock,
-                tone: (isOnline
-                  ? "emerald"
-                  : device.lastSeenAtIso
-                  ? undefined
-                  : "muted") as "emerald" | "muted" | undefined,
-              },
-              {
-                key: "registered",
-                label: "Registered",
-                value: formatRelative(device.registeredAtIso),
-                icon: Calendar,
-                title: device.registeredAtIso,
-              },
-              {
-                key: "app-version",
-                label: "App version",
-                value: device.appVersion ?? "—",
-                icon: AppWindow,
-                tone: (device.appVersion ? undefined : "muted") as
-                  | "muted"
-                  | undefined,
-              },
-              {
-                key: "os-version",
-                label: "OS",
-                value: device.osVersion ?? "—",
-                icon: Layers,
-                tone: (device.osVersion ? undefined : "muted") as
-                  | "muted"
-                  | undefined,
-              },
-            ];
-
             return (
               <div class="flex flex-col gap-6">
                 {/* Header strip — identity + status pills */}
@@ -435,10 +390,7 @@ export default define.page<typeof handler>(
                   isRevoked={device.revokedAtIso !== null}
                 />
 
-                {/* Headline stats — parallel to the charger page's strip */}
-                <StatStrip items={statItems} accent="teal" />
-
-                {/* Row 1: identity + diagnostics, 1+2 split at lg: */}
+                {/* Row 1: identity + live status hero, 1+2 split at lg: */}
                 <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
                   <DeviceIdentityCard
                     class="lg:col-span-1"
@@ -458,15 +410,10 @@ export default define.page<typeof handler>(
                     lastSeenAtIso={device.lastSeenAtIso}
                     registeredAtIso={device.registeredAtIso}
                   />
-                  <SectionCard
-                    className="lg:col-span-2"
-                    title="Diagnostics"
-                    description="Most recent device-reported diagnostic envelope."
-                    icon={Stethoscope}
-                    accent="teal"
-                  >
-                    <DeviceDiagnosticsCard diagnostics={diagnostics} />
-                  </SectionCard>
+                  <DeviceLiveStatusCard
+                    class="lg:col-span-2"
+                    status={liveStatus}
+                  />
                 </div>
 
                 {/* Row 2: App Configuration full-width */}
