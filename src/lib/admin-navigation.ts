@@ -232,10 +232,9 @@ export function findSectionByPath(
  * both highlight correctly.
  */
 export function isPathActive(itemPath: string, currentPath: string): boolean {
-  const stripped =
-    currentPath.startsWith("/admin/") || currentPath === "/admin"
-      ? currentPath.slice("/admin".length) || "/"
-      : currentPath;
+  const stripped = currentPath.startsWith("/admin/") || currentPath === "/admin"
+    ? currentPath.slice("/admin".length) || "/"
+    : currentPath;
   const matches = (path: string) =>
     itemPath === "/"
       ? path === "/"

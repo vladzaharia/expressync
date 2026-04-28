@@ -189,8 +189,9 @@ export const handler = define.handlers({
     let resolvedTagPk: number;
     let resolvedIdTag: string;
     if (
-      (typeof steveOcppTagPk !== "number" || !Number.isInteger(steveOcppTagPk))
-      && (typeof steveOcppIdTag !== "string" || steveOcppIdTag.length === 0)
+      (typeof steveOcppTagPk !== "number" ||
+        !Number.isInteger(steveOcppTagPk)) &&
+      (typeof steveOcppIdTag !== "string" || steveOcppIdTag.length === 0)
     ) {
       // Both omitted → server-default from the creator's mappings.
       const adminUserId = ctx.state.user?.id ?? null;
