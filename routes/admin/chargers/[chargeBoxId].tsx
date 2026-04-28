@@ -50,7 +50,7 @@ import ChargerOperationLogTable, {
 import RemoteActionsPanel from "../../../islands/charger-actions/RemoteActionsPanel.tsx";
 import { SectionCard } from "../../../components/shared/SectionCard.tsx";
 import { ClipboardList, Settings2 } from "lucide-preact";
-import CapabilityPicker from "../../../islands/devices/CapabilityPicker.tsx";
+import AppConfigurationForm from "../../../islands/devices/AppConfigurationForm.tsx";
 import type { DeviceCapability } from "../../../src/lib/types/devices.ts";
 
 // ---------------------------------------------------------------------------
@@ -578,16 +578,11 @@ export default define.page<typeof handler>(
                 icon={Settings2}
                 accent="orange"
               >
-                <div class="flex flex-col gap-3">
-                  <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Capabilities
-                  </h3>
-                  <CapabilityPicker
-                    deviceId={charger.chargeBoxId}
-                    current={charger.capabilities}
-                    kind="charger"
-                  />
-                </div>
+                <AppConfigurationForm
+                  deviceId={charger.chargeBoxId}
+                  kind="charger"
+                  current={charger.capabilities}
+                />
               </SectionCard>
             )}
 

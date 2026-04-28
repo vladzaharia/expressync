@@ -11,7 +11,7 @@
  *
  *   SidebarLayout accentColor="teal"
  *     PageCard
- *       headerActions: Trigger scan (stub) · Force deregister
+ *       headerActions: Trigger scan (stub) · Deregister
  *       DeviceIdentityCard   — model, OS, app version, owner, last seen,
  *                              push-token presence, registered date,
  *                              capabilities (already covered there).
@@ -45,8 +45,7 @@ import { DeviceLiveStatusCard } from "../../../components/devices/DeviceLiveStat
 import type { DeviceLiveStatus } from "../../../components/devices/DeviceLiveStatusCard.tsx";
 import { DeviceStateSyncList } from "../../../components/devices/DeviceStateSyncList.tsx";
 import type { DeviceSyncEntry } from "../../../components/devices/DeviceStateSyncList.tsx";
-import CapabilityPicker from "../../../islands/devices/CapabilityPicker.tsx";
-import DeviceSettingsForm from "../../../islands/devices/DeviceSettingsForm.tsx";
+import AppConfigurationForm from "../../../islands/devices/AppConfigurationForm.tsx";
 import { History as HistoryIcon, Settings2 } from "lucide-preact";
 import { deviceSettings as deviceSettingsTable } from "../../../src/db/schema.ts";
 import { pickerOptionsForKind } from "../../../src/lib/devices/capability-metadata.ts";
@@ -259,9 +258,10 @@ function NotFoundBody() {
 
 function RecentScansEmpty() {
   return (
-    <div class="flex flex-col items-center gap-1 py-8 text-center">
+    <div class="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
+      <Activity aria-hidden class="size-8 opacity-40" />
       <p class="text-sm font-medium">No recent scans</p>
-      <p class="text-xs text-muted-foreground">
+      <p class="text-xs">
         Scan history will appear here once a tap pairing completes.
       </p>
     </div>
@@ -404,8 +404,6 @@ export default define.page<typeof handler>(
                     ownerUserId={device.ownerUserId}
                     ownerEmail={device.ownerEmail}
                     capabilities={device.capabilities}
-                    pushTokenLast8={device.pushTokenLast8}
-                    apnsEnvironment={device.apnsEnvironment}
                     isOnline={isOnline}
                     lastSeenAtIso={device.lastSeenAtIso}
                     registeredAtIso={device.registeredAtIso}
@@ -416,35 +414,19 @@ export default define.page<typeof handler>(
                   />
                 </div>
 
-                {/* Row 2: App Configuration full-width */}
+                {/* Row 2: App Configuration full-width — single Save covers both halves. */}
                 <SectionCard
                   title="App Configuration"
                   description="Capabilities and settings for this app device."
                   icon={Settings2}
                   accent="teal"
                 >
-                  <div class="flex flex-col gap-6">
-                    <div class="flex flex-col gap-3">
-                      <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Capabilities
-                      </h3>
-                      <CapabilityPicker
-                        deviceId={device.deviceId}
-                        current={device.capabilities as DeviceCapability[]}
-                        editable={device.pickerEditable}
-                        readOnly={device.pickerReadOnly}
-                      />
-                    </div>
-                    <div class="flex flex-col gap-3">
-                      <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Settings
-                      </h3>
-                      <DeviceSettingsForm
-                        deviceId={device.deviceId}
-                        settings={device.appConfigSettings}
-                      />
-                    </div>
-                  </div>
+                  <AppConfigurationForm
+                    deviceId={device.deviceId}
+                    kind={device.kind}
+                    current={device.capabilities as DeviceCapability[]}
+                    settings={device.appConfigSettings}
+                  />
                 </SectionCard>
 
                 {/* Row 3: recent syncs + recent scans, side-by-side at xl: */}

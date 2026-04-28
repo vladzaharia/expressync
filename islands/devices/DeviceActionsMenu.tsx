@@ -182,7 +182,7 @@ export default function DeviceActionsMenu(
     <ConfirmDialog
       open={confirmOpen}
       onOpenChange={setConfirmOpen}
-      title="Force deregister device?"
+      title="Deregister device?"
       description={
         <>
           This soft-deletes <strong>{label}</strong>{" "}
@@ -191,7 +191,7 @@ export default function DeviceActionsMenu(
           must re-register. This cannot be undone via the admin UI.
         </>
       }
-      confirmLabel={deregisterLoading ? "Deregistering…" : "Force deregister"}
+      confirmLabel={deregisterLoading ? "Deregistering…" : "Deregister"}
       cancelLabel="Cancel"
       variant="destructive"
       icon={<ShieldOff class="size-4 text-rose-500" aria-hidden="true" />}
@@ -240,7 +240,7 @@ export default function DeviceActionsMenu(
               onSelect={() => setConfirmOpen(true)}
             >
               <Trash2 class="size-4" />
-              Force deregister
+              Deregister
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -273,7 +273,7 @@ export default function DeviceActionsMenu(
           onClick={() => setConfirmOpen(true)}
         >
           <ShieldOff class="size-4" />
-          Force deregister
+          Deregister
         </Button>
       </div>
       {renameDialog}

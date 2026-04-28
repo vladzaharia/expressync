@@ -835,7 +835,7 @@ function ScannerBody(
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title="Force deregister device?"
+        title="Deregister device?"
         description={
           <>
             This soft-deletes <strong>{device.label}</strong>{" "}
@@ -848,7 +848,7 @@ function ScannerBody(
             must re-register. This cannot be undone via the admin UI.
           </>
         }
-        confirmLabel={deregisterLoading ? "Deregistering…" : "Force deregister"}
+        confirmLabel={deregisterLoading ? "Deregistering…" : "Deregister"}
         cancelLabel="Cancel"
         variant="destructive"
         icon={<ShieldOff class="size-4 text-rose-500" aria-hidden="true" />}
