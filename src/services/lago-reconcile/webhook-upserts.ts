@@ -13,7 +13,6 @@ import {
   softDeleteCustomer,
   softDeleteInvoice,
   softDeleteSubscription,
-  softDeleteWallet,
   upsertCustomer,
   upsertInvoice,
   upsertPlan,

@@ -326,7 +326,7 @@ export async function reconcileTransaction(args: {
 
 function createState(
   sample: MeterSample,
-  meterValueWh: number,
+  _meterValueWh: number,
   now: number,
 ): TxBillingState {
   return {
