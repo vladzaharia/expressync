@@ -19,9 +19,9 @@ import {
   BatteryCharging,
   Loader2,
   Lock,
-  Plug,
   Save,
   Smartphone,
+  User,
 } from "lucide-preact";
 import { Button } from "@/components/ui/button.tsx";
 import { CapabilityPill } from "@/components/devices/CapabilityPill.tsx";
@@ -59,7 +59,7 @@ function iconFor(c: DeviceCapability) {
     case "charger":
       return BatteryCharging;
     case "user":
-      return Plug;
+      return User;
     case "kiosk":
       return Lock;
   }

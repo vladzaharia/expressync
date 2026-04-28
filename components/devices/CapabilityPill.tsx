@@ -17,7 +17,7 @@
  * The pill is decorative (no interactive affordances). Pass `class` to
  * override spacing in dense rows.
  */
-import { BatteryCharging, Lock, Plug, Smartphone } from "lucide-preact";
+import { BatteryCharging, Lock, Smartphone, User } from "lucide-preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 
 /** Known capabilities. Adding a new one: extend this union, the
@@ -39,7 +39,7 @@ function renderIcon(capability: Capability) {
     case "charger":
       return <BatteryCharging aria-hidden class="size-3" />;
     case "user":
-      return <Plug aria-hidden class="size-3" />;
+      return <User aria-hidden class="size-3" />;
     case "kiosk":
       return <Lock aria-hidden class="size-3" />;
   }
