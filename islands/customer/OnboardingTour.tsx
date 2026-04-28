@@ -36,7 +36,7 @@ const LOCAL_STORAGE_KEY = "polaris.onboarded";
 
 const STEPS = [
   {
-    title: "Welcome to Polaris Express",
+    title: "Welcome to ExpressCharge",
     body:
       "Your account is ready. Let's quickly walk through what you can do here.",
   },
@@ -55,7 +55,7 @@ const STEPS = [
   {
     title: "Tap your card",
     body:
-      "Tap a linked card on any Polaris charger to start. Your sessions and invoices land here automatically.",
+      "Tap a linked card on any ExpressCharge charger to start. Your sessions and invoices land here automatically.",
     targetSelector: '[data-tour="cards"]',
   },
 ] as const;

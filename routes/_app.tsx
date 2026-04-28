@@ -28,7 +28,7 @@ export default define.page(function App({ Component, state }) {
   // Unified ExpresSync brand glyph (squircle + thunderbolt) — both surfaces
   // share the same favicon set and match the gradient in the React glyph.
   const themeColor = "#06b6d4";
-  const title = isAdmin ? "ExpresSync" : "Polaris Express";
+  const title = "ExpressCharge";
   // Both surfaces default to dark; the bootstrap script reads the
   // per-host localStorage key and overrides if the user picked light.
   const htmlClass = "dark";

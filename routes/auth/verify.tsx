@@ -209,7 +209,7 @@ export default define.page<typeof handler>(function VerifyPage({ data }) {
       <div class="w-full max-w-md p-6 rounded-lg border border-border bg-card">
         <h1 class="text-xl font-semibold mb-2">Confirm sign-in</h1>
         <p class="text-sm text-muted-foreground mb-6">
-          Click the button below to finish signing in to Polaris Express.
+          Click the button below to finish signing in to ExpressCharge.
         </p>
         <form method="POST" action="/auth/verify" class="space-y-3">
           <input type="hidden" name="token" value={token} />
