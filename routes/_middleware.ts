@@ -288,6 +288,19 @@ export function selectAuth(pathname: string): AuthScheme {
   // any other /api/devices/* path is bearer.
   if (pathname.startsWith("/api/devices/")) return "bearer";
 
+  // ExpresScan v2 / Wave 6 Slice J — admin charger-control endpoints
+  // are bearer-authenticated. They live under `/api/admin/devices/{id}/…`
+  // for URL-shape consistency with the slice-C/D admin device surface,
+  // but are called by iOS devices (with the `user` capability) — not by
+  // a logged-in admin in a browser. The route handler asserts
+  // `requireCapability(ctx, "user")` against `ctx.state.device`.
+  if (
+    /^\/api\/admin\/devices\/[^/]+\/(start|stop|cancel-reservation|session|tags|reservations)$/
+      .test(pathname)
+  ) {
+    return "bearer";
+  }
+
   // Cookie surfaces.
   if (pathname.startsWith("/api/admin/")) return "cookie";
   if (pathname.startsWith("/api/customer/")) return "cookie";

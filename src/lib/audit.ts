@@ -74,7 +74,15 @@ export type AuthAuditEvent =
   | "device.capability.denied"
   // ExpresScan v2 / Wave 6 Slice D — admin App Configuration writes.
   | "device.capability.changed"
-  | "device.settings.updated";
+  | "device.settings.updated"
+  // ExpresScan v2 / Wave 6 Slice J — admin charger remote-control.
+  // Emitted by `/api/admin/devices/{id}/{start,stop,cancel-reservation}`
+  // when an iOS device with the `user` capability invokes the charger
+  // control surface. `metadata.deviceId` is the *caller* device id;
+  // `metadata.chargerId` is the target `chargers_cache.charge_box_id`.
+  | "device.user.start_charge"
+  | "device.user.stop_charge"
+  | "device.user.cancel_reservation";
 
 export interface AuthEventPayload {
   /** Optional user reference (set on success; omit on failed-pre-resolve flows). */
@@ -216,3 +224,13 @@ export const logDeviceCapabilityChanged = (p: AuthEventPayload) =>
   logAuthEvent("device.capability.changed", p);
 export const logDeviceSettingsUpdated = (p: AuthEventPayload) =>
   logAuthEvent("device.settings.updated", p);
+
+// ExpresScan v2 / Wave 6 Slice J — admin charger remote-control shims.
+// `metadata.chargerId` is the target charge_box_id; `metadata.deviceId` is
+// the caller's iOS device row.
+export const logDeviceUserStartCharge = (p: AuthEventPayload) =>
+  logAuthEvent("device.user.start_charge", p);
+export const logDeviceUserStopCharge = (p: AuthEventPayload) =>
+  logAuthEvent("device.user.stop_charge", p);
+export const logDeviceUserCancelReservation = (p: AuthEventPayload) =>
+  logAuthEvent("device.user.cancel_reservation", p);
