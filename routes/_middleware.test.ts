@@ -242,6 +242,8 @@ Deno.test("selectAuth — rejects bearer on admin paths", () => {
 });
 
 Deno.test("selectAuth — bearer for /api/devices/* lifecycle routes", () => {
+  // Wave 6 Slice I — chargers list (no trailing slash) is bearer.
+  assertEquals(selectAuth("/api/devices"), "bearer");
   assertEquals(selectAuth("/api/devices/me/state"), "bearer");
   assertEquals(selectAuth("/api/devices/me/state/sync"), "bearer");
   assertEquals(selectAuth("/api/devices/me"), "bearer");
