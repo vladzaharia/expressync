@@ -39,8 +39,8 @@
   <!-- Lucide Zap glyph, scaled and centered. 24x24 path → 144px box, offset 56px. -->
   <g
     transform="translate(56 56) scale(6)"
-    fill="#FFFFFF"
-    stroke="#FFFFFF"
+    fill="#0b1b3d"
+    stroke="#0b1b3d"
     stroke-width="0.6"
     stroke-linejoin="round"
   >
