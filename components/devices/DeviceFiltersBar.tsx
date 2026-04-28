@@ -22,7 +22,11 @@ import { Input } from "@/components/ui/input.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 
 export type DeviceTypeFilter = "all" | "charger" | "scanner";
-export type DeviceKindFilter = "all" | "phone_nfc" | "laptop_nfc";
+export type DeviceKindFilter =
+  | "all"
+  | "phone_nfc"
+  | "tablet_nfc"
+  | "laptop_nfc";
 export type DeviceOnlineFilter = "any" | "online" | "offline";
 
 export interface DeviceFiltersBarProps {
@@ -49,6 +53,7 @@ const KIND_OPTIONS: ReadonlyArray<{ value: DeviceKindFilter; label: string }> =
   [
     { value: "all", label: "All kinds" },
     { value: "phone_nfc", label: "Phones" },
+    { value: "tablet_nfc", label: "Tablets" },
     { value: "laptop_nfc", label: "Laptops" },
   ];
 

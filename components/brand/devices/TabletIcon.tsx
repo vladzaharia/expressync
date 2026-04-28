@@ -8,17 +8,17 @@ function resolveSize(size: DeviceIconProps["size"]): number {
 }
 
 /**
- * Phone tap-target icon — used as the device card's primary status indicator
- * for `kind === "phone_nfc"` rows.
+ * Tablet tap-target icon — used as the device card's primary status indicator
+ * for `kind === "tablet_nfc"` rows.
  *
- * Visually identical to `WallboxIcon`, just narrower:
- *   - Same body fill, same highlight edge, same halo ring + glow widths
- *     (5px main / 2px glow), same recessed dark face.
- *   - Phone is a 44×84 portrait inside the 100×100 viewBox; tablet is 68×84;
- *     wallbox is 84×84. No notch / camera / speaker ornaments — keeps the
- *     icon family coherent and lets the status halo dominate.
+ * Sits between `IPhoneIcon` (44×84 portrait) and `WallboxIcon` (84×84 square)
+ * in the icon family. Same body fill, highlight, halo, and recessed face as
+ * both — only the aspect ratio differs (68×84 portrait, slightly chubby).
+ *
+ * `tablet_nfc` is a reserved kind: only iPhones can register today, but the
+ * icon ships now so the UI is ready when iPad registration lands.
  */
-export function IPhoneIcon(
+export function TabletIcon(
   { size = "md", haloColor = "oklch(0.72 0.14 196)", className }:
     DeviceIconProps,
 ) {
@@ -32,14 +32,11 @@ export function IPhoneIcon(
       aria-hidden="true"
       class={cn("inline-block", className)}
     >
-      {
-        /* Halo outer diffuse glow (LED bleed) — drawn first so the body
-          covers the inner edge */
-      }
+      {/* Halo outer diffuse glow. */}
       <rect
-        x="26"
+        x="14"
         y="6"
-        width="48"
+        width="72"
         height="88"
         rx="14"
         ry="14"
@@ -48,24 +45,21 @@ export function IPhoneIcon(
         stroke-width="2"
         opacity="0.4"
       />
-      {
-        /* Body — rounded rectangle, fixed dark grey so the halo color is
-          always legible */
-      }
+      {/* Body — wider portrait rectangle. */}
       <rect
-        x="28"
+        x="16"
         y="8"
-        width="44"
+        width="68"
         height="84"
         rx="12"
         ry="12"
         fill="oklch(0.28 0.01 250)"
       />
-      {/* Subtle highlight edge for a bit of dimension */}
+      {/* Highlight edge. */}
       <rect
-        x="29"
+        x="17"
         y="9"
-        width="42"
+        width="66"
         height="82"
         rx="11"
         ry="11"
@@ -73,11 +67,11 @@ export function IPhoneIcon(
         stroke="oklch(0.42 0.01 250)"
         stroke-width="0.6"
       />
-      {/* Halo ring — the status-bearing LED, traced just inside the body */}
+      {/* Halo ring — status-bearing LED. */}
       <rect
-        x="31"
+        x="19"
         y="11"
-        width="38"
+        width="62"
         height="78"
         rx="10"
         ry="10"
@@ -86,11 +80,11 @@ export function IPhoneIcon(
         stroke-width="5"
         opacity="0.95"
       />
-      {/* Screen — darker recessed panel */}
+      {/* Recessed face. */}
       <rect
-        x="34"
+        x="22"
         y="16"
-        width="32"
+        width="56"
         height="68"
         rx="6"
         ry="6"
