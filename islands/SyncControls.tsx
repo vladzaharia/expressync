@@ -8,7 +8,6 @@ import {
   RefreshCw,
   ShieldCheck,
 } from "lucide-preact";
-import { CHROME_SIZE } from "@/components/AppSidebar.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {
   Dialog,
@@ -181,10 +180,11 @@ export default function SyncControls({ isAdmin = false }: SyncControlsProps) {
   }
 
   return (
-    <div className="flex items-stretch gap-1" style={{ height: CHROME_SIZE }}>
-      {/* Tier badge + countdown */}
+    <div className="flex items-center gap-2">
+      {/* 1. Status pill — tier badge + countdown. Self-contained card so the
+          whole strip reads as three separate widgets, not one band. */}
       <div
-        className="flex items-center gap-2 px-3 border-l border-border/50"
+        className="flex h-9 items-center gap-2 rounded-md border border-border bg-card/50 px-2.5"
         title={tierStyle.value.reason}
       >
         <span
@@ -193,7 +193,7 @@ export default function SyncControls({ isAdmin = false }: SyncControlsProps) {
         />
         <div className="flex flex-col leading-tight">
           <span
-            className={`text-xs font-medium px-1.5 py-0.5 rounded border ${tierStyle.value.badge}`}
+            className={`text-[11px] font-medium px-1.5 py-0.5 rounded border ${tierStyle.value.badge} self-start`}
           >
             {tierStyle.value.label}
             {pinActive.value && (
@@ -204,29 +204,26 @@ export default function SyncControls({ isAdmin = false }: SyncControlsProps) {
             next in {nextRunLabel.value}
           </span>
         </div>
-        <span
-          title={tierStyle.value.reason}
-          className="text-muted-foreground hidden md:inline"
-        >
-          <Info className="size-3.5" />
-        </span>
+        <Info
+          className="size-3.5 text-muted-foreground hidden md:inline"
+          aria-hidden="true"
+        />
       </div>
 
-      {/* Reset cadence / trigger sync */}
+      {/* 2. Trigger sync — icon-only square button. Distinct from the status
+          pill (no border-l attached) and from the admin button (different
+          accent colour, no chevron). */}
       <button
         type="button"
         onClick={handleResetCadence}
         disabled={loading.value}
-        className="flex items-center justify-center gap-2 px-4 transition-colors disabled:opacity-50 hover:bg-muted/50"
-        style={{ height: CHROME_SIZE }}
-        title="Trigger a manual sync now and reset cadence to Active"
+        className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card/50 text-cyan-600 dark:text-cyan-400 transition-colors hover:bg-cyan-500/10 hover:border-cyan-500/40 disabled:opacity-50"
+        title="Trigger a manual sync now"
+        aria-label="Trigger a manual sync now"
       >
         {loading.value
-          ? <Loader2 className="size-5 animate-spin" />
-          : <RefreshCw className="size-5" />}
-        <span className="text-sm font-medium hidden sm:inline">
-          {loading.value ? "Syncing..." : "Reset cadence"}
-        </span>
+          ? <Loader2 className="size-4 animate-spin" />
+          : <RefreshCw className="size-4" />}
       </button>
 
       {/* Accessible confirm replacing browser confirm() */}
@@ -258,7 +255,8 @@ export default function SyncControls({ isAdmin = false }: SyncControlsProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Admin pin dropdown */}
+      {/* 3. Admin pin dropdown — amber-tinted to flag "destructive-ish admin
+          override" vs the neutral trigger button to its left. */}
       {isAdmin && (
         <div className="relative">
           <button
@@ -266,12 +264,12 @@ export default function SyncControls({ isAdmin = false }: SyncControlsProps) {
             onClick={() => {
               menuOpen.value = !menuOpen.value;
             }}
-            className="flex items-center justify-center gap-1 px-3 transition-colors hover:bg-muted/50 border-l border-border/50"
-            style={{ height: CHROME_SIZE }}
+            className="flex h-9 items-center gap-1 rounded-md border border-border bg-card/50 px-2 text-amber-600 dark:text-amber-400 transition-colors hover:bg-amber-500/10 hover:border-amber-500/40"
             title="Admin: pin scheduler tier"
+            aria-label="Admin: pin scheduler tier"
           >
             <ShieldCheck className="size-4" />
-            <ChevronDown className="size-3.5" />
+            <ChevronDown className="size-3.5 opacity-70" />
           </button>
           {menuOpen.value && (
             <div className="absolute right-0 top-full mt-1 w-56 rounded-md border border-border bg-card shadow-lg z-50 p-1 text-sm">
