@@ -20,7 +20,7 @@
 import { eq } from "drizzle-orm";
 import { define } from "../../../utils.ts";
 import { db } from "../../../src/db/index.ts";
-import { devices, deviceTokens } from "../../../src/db/schema.ts";
+import { devices, deviceTokens, users } from "../../../src/db/schema.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
 
 const log = logger.child("DeviceMe");
@@ -48,6 +48,8 @@ export const handler = define.handlers({
         registeredAt: Date | string | null;
         deletedAt: Date | string | null;
         tokenExpiresAt: Date | string | null;
+        ownerName: string | null;
+        ownerEmail: string | null;
       }
       | undefined;
     try {
@@ -60,9 +62,17 @@ export const handler = define.handlers({
           registeredAt: devices.registeredAt,
           deletedAt: devices.deletedAt,
           tokenExpiresAt: deviceTokens.expiresAt,
+          // The owner is always an admin user (devices_owner_must_be_admin
+          // trigger enforces it). Pull the rendered identity bits so the
+          // iOS Diagnostics → Account section can show name/email instead
+          // of the raw user-id. `users` table doesn't carry a separate
+          // `displayName`; we synthesize one server-side below.
+          ownerName: users.name,
+          ownerEmail: users.email,
         })
         .from(devices)
         .innerJoin(deviceTokens, eq(deviceTokens.id, device.tokenId))
+        .innerJoin(users, eq(users.id, devices.ownerUserId))
         .where(eq(devices.id, device.id))
         .limit(1);
       row = rows[0];
@@ -85,12 +95,28 @@ export const handler = define.handlers({
       ? row.tokenExpiresAt.toISOString()
       : new Date(row.tokenExpiresAt as string).toISOString();
 
+    // Render-friendly identity for the iOS Diagnostics → Account
+    // section. Priority: name → email → user id. The user-id is the
+    // last-resort fallback when the BetterAuth user record carries
+    // neither name nor email (rare but possible for auto-provisioned
+    // rows). Never returns null.
+    const ownerDisplayName: string = row.ownerName ??
+      row.ownerEmail ??
+      row.ownerUserId;
+
     return jsonResponse(200, {
       ok: true,
       deviceId: row.id,
       ownerUserId: row.ownerUserId,
+      ownerDisplayName,
+      ownerName: row.ownerName,
+      ownerEmail: row.ownerEmail,
       capabilities: row.capabilities ?? [],
       label: row.label,
+      registeredAtIso,
+      // Legacy alias — iOS clients keyed on the old name during the
+      // slice C → slice O transition. Remove once TestFlight build N
+      // is rolled out everywhere.
       createdAtIso: registeredAtIso,
       expiresAtIso,
     });
