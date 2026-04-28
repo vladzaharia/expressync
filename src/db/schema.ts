@@ -8,6 +8,7 @@ import {
   jsonb,
   numeric,
   pgTable,
+  primaryKey,
   serial,
   text,
   timestamp,
@@ -1435,3 +1436,38 @@ export type Device = typeof devices.$inferSelect;
 export type NewDevice = typeof devices.$inferInsert;
 export type DeviceToken = typeof deviceTokens.$inferSelect;
 export type NewDeviceToken = typeof deviceTokens.$inferInsert;
+
+// === ExpresScan v2 / Wave 6 Slice B: device_settings (per-key LWW) ===
+//
+// Per-device key-value settings with last-writer-wins per-key timestamps.
+// Mirrors `drizzle/0037_settings_and_capability_invariants.sql`.
+//
+// Composite primary key on (device_id, key) — one row per key per device.
+// `value_json` is JSONB so values can be primitives, objects, or arrays
+// (the per-key Zod registry in `src/lib/devices/settings-keys.ts`
+// constrains the wire shape per key).
+//
+// `updated_at` and `updated_by` together identify which side's write
+// won the LWW race for this key. `updated_by` is a stable string
+// identifier — `device:{deviceId}` for client writes,
+// `admin:{userId}` for web-admin writes.
+export const deviceSettings = pgTable("device_settings", {
+  deviceId: uuid("device_id")
+    .notNull()
+    .references(() => devices.id, { onDelete: "cascade" }),
+  key: text("key").notNull(),
+  valueJson: jsonb("value_json").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedBy: text("updated_by").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.deviceId, table.key] }),
+  index("idx_device_settings_updated_at").on(
+    table.deviceId,
+    table.updatedAt.desc(),
+  ),
+]);
+
+export type DeviceSetting = typeof deviceSettings.$inferSelect;
+export type NewDeviceSetting = typeof deviceSettings.$inferInsert;
