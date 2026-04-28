@@ -21,7 +21,6 @@
 import { assert, assertEquals } from "@std/assert";
 import {
   type ComposeContext,
-  execInService,
   getHostPort,
   recreateService as composeRecreate,
   streamLogs,
@@ -29,11 +28,7 @@ import {
 import { Cpsim } from "./harness/cpsim.ts";
 import { mysqlQuery, pgQuery, pgQueryJson } from "./harness/db.ts";
 import { openSse } from "./harness/sse.ts";
-import {
-  assertEventually,
-  assertWithinMs,
-  hmacHexSign,
-} from "./harness/assert.ts";
+import { assertEventually, hmacHexSign } from "./harness/assert.ts";
 
 function envOrThrow(k: string): string {
   const v = Deno.env.get(k);

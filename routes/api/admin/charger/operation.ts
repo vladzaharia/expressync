@@ -37,6 +37,7 @@ const OPERATION_DISPATCHERS: Record<
   DataTransfer: (p) => steveClient.operations.dataTransfer(p),
   SetChargingProfile: (p) => steveClient.operations.setChargingProfile(p),
   ChangeAvailability: (p) => steveClient.operations.changeAvailability(p),
+  ChangeConfiguration: (p) => steveClient.operations.changeConfiguration(p),
 };
 
 /**

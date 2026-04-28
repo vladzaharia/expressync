@@ -250,9 +250,6 @@ export function AppSidebar({
     }))
     .filter((s) => s.items.length > 0);
 
-  // Flat list (used by the mobile horizontal bar fallback).
-  const flatNavItems: NavItem[] = visibleSections.flatMap((s) => s.items);
-
   const handleSignOut = async () => {
     await fetch("/api/auth/sign-out", { method: "POST" });
     clientNavigate("/login");
