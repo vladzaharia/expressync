@@ -19,15 +19,15 @@ export function buildMagicLinkEmail(inputs: MagicLinkInputs): EmailTemplate {
   return {
     brand: "polaris",
     category: "magic-link",
-    subject: "Sign in to Polaris Express",
+    subject: "Sign in to ExpressCharge",
     preheader:
       "Tap the button below to sign in. This link expires in 15 minutes.",
-    title: "Sign in to Polaris Express",
+    title: "Sign in to ExpressCharge",
     body: [
       {
         type: "paragraph",
         text:
-          "Use the button below to finish signing in to your Polaris Express account.",
+          "Use the button below to finish signing in to your ExpressCharge account.",
       },
       {
         type: "highlight",

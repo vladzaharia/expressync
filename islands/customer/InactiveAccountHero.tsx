@@ -24,7 +24,7 @@ export default function InactiveAccountHero(
 ) {
   const mailto = operatorEmail
     ? `mailto:${operatorEmail}?subject=${
-      encodeURIComponent("Polaris Express — account access")
+      encodeURIComponent("ExpressCharge — account access")
     }`
     : "mailto:";
 

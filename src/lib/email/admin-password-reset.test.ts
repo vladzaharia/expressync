@@ -44,10 +44,10 @@ Deno.test("admin-password-reset: rendered email uses expressync sender + brand",
   );
   assertEquals(
     rendered.fromHeader,
-    "ExpresSync Operator <admin-noreply@example.com>",
+    "ExpressCharge Operator <admin-noreply@example.com>",
   );
   assertEquals(rendered.replyTo, "support@example.com");
-  assertStringIncludes(rendered.html, "ExpresSync");
+  assertStringIncludes(rendered.html, "ExpressCharge");
   assertStringIncludes(rendered.text, URL);
 });
 
