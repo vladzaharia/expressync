@@ -28,15 +28,28 @@ import { CapabilityPill } from "@/components/devices/CapabilityPill.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { toast } from "sonner";
 import type { DeviceCapability } from "@/src/lib/types/devices.ts";
-import { CAPABILITY_METADATA } from "@/src/lib/devices/capability-metadata.ts";
+import {
+  CAPABILITY_METADATA,
+  pickerOptionsForKind,
+} from "@/src/lib/devices/capability-metadata.ts";
+import type { DeviceKind } from "@/src/lib/types/devices.ts";
 
 interface Props {
   deviceId: string;
   /** Capabilities currently assigned to the device. */
   current: DeviceCapability[];
-  /** Editable + read-only options from `pickerOptionsForKind`. */
-  editable: DeviceCapability[];
-  readOnly: DeviceCapability[];
+  /**
+   * Kind-aware option derivation. When provided, `editable` / `readOnly`
+   * are derived from `pickerOptionsForKind(kind)` and any explicit
+   * `editable` / `readOnly` props are ignored. Slice O passes
+   * `kind="charger"` from the chargers admin page; the devices page
+   * passes the explicit arrays for backwards compatibility.
+   */
+  kind?: DeviceKind | "charger";
+  /** Editable options from `pickerOptionsForKind`. Optional when `kind` is set. */
+  editable?: DeviceCapability[];
+  /** Read-only chips. Optional when `kind` is set. */
+  readOnly?: DeviceCapability[];
 }
 
 function iconFor(c: DeviceCapability) {
@@ -53,8 +66,18 @@ function iconFor(c: DeviceCapability) {
 }
 
 export default function CapabilityPicker(
-  { deviceId, current, editable, readOnly }: Props,
+  { deviceId, current, kind, editable, readOnly }: Props,
 ) {
+  // Kind-aware derivation. `kind` overrides explicit arrays so the
+  // picker stays kind-correct even if a stale prop slips through.
+  const derived = kind ? pickerOptionsForKind(kind) : null;
+  const editableList: DeviceCapability[] = derived
+    ? [...derived.editable] as DeviceCapability[]
+    : editable ?? [];
+  const readOnlyList: DeviceCapability[] = derived
+    ? [...derived.readOnly] as DeviceCapability[]
+    : readOnly ?? [];
+
   const [selected, setSelected] = useState<Set<DeviceCapability>>(
     new Set(current),
   );
@@ -84,7 +107,7 @@ export default function CapabilityPicker(
       // present in `current` but not toggleable; the server expects the
       // FULL desired set.
       const next = new Set(selected);
-      for (const c of readOnly) {
+      for (const c of readOnlyList) {
         if (current.includes(c)) next.add(c);
       }
       const res = await fetch(
@@ -117,7 +140,7 @@ export default function CapabilityPicker(
   return (
     <div class="flex flex-col gap-4">
       <ul class="flex flex-col gap-2">
-        {editable.map((c) => {
+        {editableList.map((c) => {
           const meta = CAPABILITY_METADATA[c];
           const Icon = iconFor(c);
           const checked = selected.has(c);
@@ -162,7 +185,7 @@ export default function CapabilityPicker(
             </li>
           );
         })}
-        {readOnly.map((c) => (
+        {readOnlyList.map((c) => (
           <li
             key={c}
             class="flex items-center gap-3 rounded-md border border-border bg-muted/30 p-3 opacity-80"

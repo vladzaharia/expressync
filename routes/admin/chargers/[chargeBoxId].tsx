@@ -49,7 +49,9 @@ import ChargerOperationLogTable, {
 } from "../../../islands/ChargerOperationLogTable.tsx";
 import RemoteActionsPanel from "../../../islands/charger-actions/RemoteActionsPanel.tsx";
 import { SectionCard } from "../../../components/shared/SectionCard.tsx";
-import { ClipboardList } from "lucide-preact";
+import { ClipboardList, Settings2 } from "lucide-preact";
+import CapabilityPicker from "../../../islands/devices/CapabilityPicker.tsx";
+import type { DeviceCapability } from "../../../src/lib/types/devices.ts";
 
 // ---------------------------------------------------------------------------
 // Loader DTO
@@ -85,6 +87,10 @@ interface ChargerDetailLoaderData {
     uiStatus: UiStatus;
     isStale: boolean;
     isOffline: boolean;
+
+    // Wave 6 Slice O — admin-editable capability set. Always contains
+    // `'charger'` (auto-on); admin may toggle `'scanner'`.
+    capabilities: DeviceCapability[];
   };
   connectors: ConnectorDto[];
   recentTransactions: ChargerRecentTxRow[];
@@ -385,12 +391,22 @@ export const handler = define.handlers({
       activeSessions.length > 0,
     );
 
+    // Slice O — sanitize the persisted capability set to the typed union
+    // before sending it across the SSR boundary. The DB CHECK guarantees
+    // `'charger'` is present and the forbidden tokens are absent, but
+    // the typed array still needs an explicit cast.
+    const capabilities = (cacheRow.capabilities ?? ["charger"]).filter(
+      (c): c is DeviceCapability =>
+        c === "charger" || c === "scanner" || c === "user" || c === "kiosk",
+    );
+
     const data: ChargerDetailLoaderData = {
       charger: {
         chargeBoxId: cacheRow.chargeBoxId,
         chargeBoxPk: cacheRow.chargeBoxPk,
         friendlyName: cacheRow.friendlyName,
         formFactor: cacheRow.formFactor,
+        capabilities,
         firstSeenAtIso: (cacheRow.firstSeenAt ?? new Date()).toISOString(),
         lastSeenAtIso: (cacheRow.lastSeenAt ?? new Date()).toISOString(),
         lastStatus: cacheRow.lastStatus,
@@ -545,6 +561,35 @@ export default define.page<typeof handler>(
                 />
               </SectionCard>
             </div>
+
+            {
+              /* Slice O — Charger Configuration (admin-only). Mirrors the
+                "App Configuration" tab on the devices page, but the only
+                editable capability for a charger is `'scanner'` —
+                `'charger'` is auto-on and rendered as a read-only chip.
+                Settings + state-sync sections are intentionally absent
+                (chargers don't carry per-key device_settings; the model
+                is app-scoped). */
+            }
+            {data.isAdmin && (
+              <SectionCard
+                title="Charger Configuration"
+                description="Admin-editable capabilities for this charger."
+                icon={Settings2}
+                accent="orange"
+              >
+                <div class="flex flex-col gap-3">
+                  <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Capabilities
+                  </h3>
+                  <CapabilityPicker
+                    deviceId={charger.chargeBoxId}
+                    current={charger.capabilities}
+                    kind="charger"
+                  />
+                </div>
+              </SectionCard>
+            )}
 
             {/* Row 4: admin-only actions palette */}
             {data.isAdmin && (
