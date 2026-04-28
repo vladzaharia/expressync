@@ -15,7 +15,7 @@ import ProfileEditor from "../../../../islands/charging-profile/ProfileEditor.ts
 export const handler = define.handlers({
   async GET(ctx) {
     const externalId = ctx.params.externalId;
-    if (!externalId) return ctx.redirect("/links");
+    if (!externalId) return ctx.redirect("/tags");
     const profile = await getProfile(externalId);
     return { data: { externalId, profile } };
   },
@@ -28,7 +28,7 @@ export default define.page<typeof handler>(
         currentPath={url.pathname}
         user={state.user}
         accentColor="emerald"
-        actions={<BackAction href="/links" />}
+        actions={<BackAction href="/tags" />}
       >
         <PageCard
           title="Charging Profile"

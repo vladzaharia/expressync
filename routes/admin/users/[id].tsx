@@ -7,9 +7,9 @@
  * affordances live on the index page's UsersTable for now; this page
  * is read-only.
  *
- * Customer-role detail also includes a deep link to the existing
- * /admin/links UI scoped to the customer's Lago id, plus a button that
- * navigates the admin into customer-impersonation mode (`?as=<id>`).
+ * Customer-role detail also includes a deep link to the EV-card listing
+ * filtered to the customer's Lago id, plus a button that navigates the
+ * admin into customer-impersonation mode (`?as=<id>`).
  */
 
 import { eq } from "drizzle-orm";
@@ -193,11 +193,11 @@ export default define.page<typeof handler>(
                   ? (
                     <Button variant="outline" size="sm" asChild>
                       <a
-                        href={`/links?customerId=${
+                        href={`/tags?linked=1&q=${
                           encodeURIComponent(u.lagoCustomerExternalId)
                         }`}
                       >
-                        Manage links
+                        Manage EV cards
                       </a>
                     </Button>
                   )

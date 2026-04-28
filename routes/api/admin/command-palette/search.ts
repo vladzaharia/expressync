@@ -268,7 +268,7 @@ async function searchCustomers(like: string): Promise<CommandSearchHit[]> {
       subtitle: r.subscriptionId ?? r.id,
       href: r.subscriptionId
         ? `/subscriptions/${encodeURIComponent(r.subscriptionId)}/profile`
-        : `/links?customerId=${encodeURIComponent(r.id)}`,
+        : `/tags?linked=1&q=${encodeURIComponent(r.id)}`,
     }));
 }
 

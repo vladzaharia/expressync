@@ -156,9 +156,12 @@ export function resolveSourceUrl(
     case "webhook_event":
       return `/admin/webhook-events/${sourceId}`;
     case "subscription":
-      return `/links?subscriptionId=${encodeURIComponent(sourceId)}`;
+      return `/tags?linked=1`;
     case "mapping":
-      return `/links/${sourceId}`;
+      // Mapping source IDs are user_mappings.id, not tag PKs — surface
+      // the listing so the operator can pick it up. A future emitter
+      // pass should switch to carrying tagPk directly.
+      return `/tags?linked=1`;
     case "charger":
       return `/chargers/${encodeURIComponent(sourceId)}`;
     case "reservation":
