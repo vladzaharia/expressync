@@ -12,7 +12,7 @@ function resolveSize(size: DeviceIconProps["size"]): number {
  *
  * Literal copy of `WallboxIcon` (same fills, same y/height, same rx/ry,
  * same halo + highlight stroke widths) — only the body width is reduced.
- * Wallbox is 84 wide centred at x=8; phone is 44 wide centred at x=28.
+ * Wallbox is 84 wide centred at x=8; phone is 52 wide centred at x=24.
  * Each layer keeps the Wallbox inset from the body edge:
  *   - highlight: +1 inset
  *   - halo glow: +10 inset (stroke-width 2, opacity 0.4)
@@ -35,9 +35,9 @@ export function IPhoneIcon(
     >
       {/* Body — narrower than Wallbox; otherwise identical fill + rx. */}
       <rect
-        x="28"
+        x="24"
         y="8"
-        width="44"
+        width="52"
         height="84"
         rx="19"
         ry="19"
@@ -45,9 +45,9 @@ export function IPhoneIcon(
       />
       {/* Highlight edge. */}
       <rect
-        x="29"
+        x="25"
         y="9"
-        width="42"
+        width="50"
         height="82"
         rx="18"
         ry="18"
@@ -57,9 +57,9 @@ export function IPhoneIcon(
       />
       {/* Halo ring — status-bearing LED. */}
       <rect
-        x="39"
+        x="35"
         y="19"
-        width="22"
+        width="30"
         height="62"
         rx="13"
         ry="13"
@@ -70,9 +70,9 @@ export function IPhoneIcon(
       />
       {/* Halo outer diffuse glow. */}
       <rect
-        x="38"
+        x="34"
         y="18"
-        width="24"
+        width="32"
         height="64"
         rx="14"
         ry="14"
@@ -83,9 +83,9 @@ export function IPhoneIcon(
       />
       {/* Central recessed face. */}
       <rect
-        x="44"
+        x="40"
         y="24"
-        width="12"
+        width="20"
         height="52"
         rx="10"
         ry="10"
