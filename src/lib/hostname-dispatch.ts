@@ -104,10 +104,13 @@ export function isShellOrApiPath(pathname: string): boolean {
     pathname.startsWith("/static") ||
     pathname.startsWith("/assets") ||
     pathname === "/favicon.ico" ||
+    pathname === "/favicon.svg" ||
     pathname === "/manifest.json" ||
     pathname === "/manifest.admin.json" ||
     pathname === "/robots.txt" ||
     pathname === "/apple-touch-icon.png" ||
-    /^\/favicon-(16|32|48|180|192|512)\.png$/.test(pathname)
+    /^\/favicon-(16|32|48|96)\.png$/.test(pathname) ||
+    /^\/icon-(192|512)\.png$/.test(pathname) ||
+    /^\/icon-maskable-(192|512)\.png$/.test(pathname)
   );
 }
