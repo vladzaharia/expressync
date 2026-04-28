@@ -28,7 +28,6 @@
 
 import { Check, Copy, Smartphone } from "lucide-preact";
 import { useState } from "preact/hooks";
-import DeviceLabelInput from "@/islands/devices/DeviceLabelInput.tsx";
 import { CapabilityPill } from "@/components/devices/CapabilityPill.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 
@@ -149,15 +148,6 @@ export function DeviceIdentityCard({
       </div>
 
       <dl class="grid grid-cols-1 gap-y-2 text-sm">
-        <div class="flex items-center justify-between gap-2">
-          <dt class="text-muted-foreground">Label</dt>
-          <dd>
-            {isAdmin
-              ? <DeviceLabelInput deviceId={deviceId} value={label} />
-              : <span class="font-medium">{label}</span>}
-          </dd>
-        </div>
-
         <div class="flex items-center justify-between gap-2">
           <dt class="text-muted-foreground">Kind</dt>
           <dd class="font-medium">{kindLabel(kind)}</dd>
