@@ -42,10 +42,10 @@ import type {
   DeviceTypeFilter,
 } from "../../../components/devices/DeviceFiltersBar.tsx";
 import UnifiedDeviceCard, {
+  type ChargerCardDto,
+  type DeviceCardDto,
   type UnifiedDeviceEntry,
 } from "../../../islands/devices/UnifiedDeviceCard.tsx";
-import type { ChargerCardDto } from "../../../islands/ChargerCard.tsx";
-import type { DeviceCardDto } from "../../../islands/DeviceCard.tsx";
 import { normalizeStatus } from "../../../islands/shared/device-visuals.ts";
 
 const log = logger.child("AdminDevicesPage");

@@ -17,7 +17,12 @@ function resolveSize(size: ChargerIconProps["size"]): number {
  * narrower 40×100 effective footprint inside the 100×100 viewBox.
  */
 export function CommanderIcon(
-  { size = "md", class: classProp, className }: ChargerIconProps,
+  {
+    size = "md",
+    class: classProp,
+    className,
+    haloColor = "oklch(0.78 0.12 195)",
+  }: ChargerIconProps,
 ) {
   const px = resolveSize(size);
   const gradientId = "commander-gradient";
@@ -36,6 +41,14 @@ export function CommanderIcon(
           <stop offset="100%" stop-color="oklch(0.60 0.25 275)" />
         </linearGradient>
       </defs>
+      {/* Halo outer diffuse glow — outlines the silhouette */}
+      <path
+        d="M 22 80 L 22 94 L 78 94 L 78 80 L 68 80 L 68 22 Q 68 8 58 8 L 42 8 Q 32 8 32 22 L 32 80 Z"
+        fill="none"
+        stroke={haloColor}
+        stroke-width="1"
+        opacity="0.4"
+      />
       {/* Base plinth — wider, slight bevel */}
       <rect
         x="24"
@@ -45,6 +58,14 @@ export function CommanderIcon(
         rx="2"
         ry="2"
         fill={`url(#${gradientId})`}
+      />
+      {/* Halo ring — status-bearing LED, traced inside the silhouette */}
+      <path
+        d="M 26 80 L 26 90 L 74 90 L 74 80 L 65 80 L 65 22 Q 65 11 41 11 L 59 11 Q 35 11 35 22 L 35 80 Z"
+        fill="none"
+        stroke={haloColor}
+        stroke-width="2.5"
+        opacity="0.95"
       />
       {/* Main column — tall pedestal body */}
       <path
