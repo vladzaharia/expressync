@@ -4,7 +4,7 @@
  * ExpresScan / Wave 2 Track B-lifecycle — bearer-only "the active scan
  * was dismissed on the device" notification. The iOS app POSTs this when
  * the user taps Cancel on the active-scan screen so the admin's
- * TapToAddModal can dismiss in real time, instead of waiting for the
+ * unified `<ScanModal>` can dismiss in real time, instead of waiting for the
  * 90 s pairing TTL to lapse.
  *
  * Body:

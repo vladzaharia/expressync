@@ -153,9 +153,12 @@ export interface DeviceScanCompletedPayload {
  *
  * Sources:
  *   - `"admin"` — admin invoked DELETE `/api/admin/devices/{id}/scan-arm`,
- *     i.e. closed the TapToAddModal.
+ *     i.e. closed the unified `<ScanModal>`.
  *   - `"device"` — iOS app POSTed `/api/devices/scan-cancel` after the
  *     user dismissed the active-scan screen.
+ *   - `"customer"` — a customer dismissed an in-flight remote-login scan
+ *     they initiated against an admin's online phone via
+ *     `DELETE /api/auth/scan-pair` (pairableType=device path).
  *
  * Both sides (admin SSE stream + device SSE stream) consume this event
  * so cancellation propagates bidirectionally — matching the live-status
@@ -166,7 +169,7 @@ export interface DeviceScanCancelledPayload {
   pairingCode: string;
   /** ms since epoch. */
   cancelledAt: number;
-  source: "admin" | "device";
+  source: "admin" | "device" | "customer";
 }
 
 /**
