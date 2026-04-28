@@ -117,7 +117,7 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
         title: "Invoices",
         path: "/invoices",
         icon: FileText,
-        accentColor: "teal",
+        accentColor: "violet",
         keywords: ["lago", "bill"],
       },
       {

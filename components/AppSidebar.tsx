@@ -143,6 +143,9 @@ function AdminNavSheet(
                 const Icon = item.icon;
                 const accent = accentClasses[item.accentColor];
                 const active = isActive(item.path);
+                const activeText = item.path === "/admin/devices"
+                  ? "text-foreground dark:text-foreground"
+                  : accent.text;
                 return (
                   <a
                     key={item.id}
@@ -150,7 +153,7 @@ function AdminNavSheet(
                     onClick={() => setOpen(false)}
                     className={cn(
                       "flex items-center gap-3 px-4 border-b transition-colors shrink-0",
-                      active ? cn(accent.bg, accent.text) : cn(
+                      active ? cn(accent.bg, activeText) : cn(
                         "text-muted-foreground hover:text-foreground",
                         accent.bgHover,
                       ),
@@ -188,6 +191,16 @@ function NavSectionLink({
 }) {
   const accent = accentClasses[accentColor];
 
+  // Per user direction: when /admin/devices is active, the title +
+  // icon should sit in black against the translucent teal wash so it
+  // reads against the dark sidebar without leaning on the (faded)
+  // teal-400 default. Overrides the accent's text class only for
+  // this one item — the rest of the nav keeps its accent text.
+  const isDevices = href === "/admin/devices";
+  const activeTextClass = isDevices
+    ? "text-foreground dark:text-foreground"
+    : accent.text;
+
   const content = (
     <a
       href={href}
@@ -195,7 +208,7 @@ function NavSectionLink({
         "flex items-center border-b transition-colors shrink-0 cursor-pointer",
         isCollapsed ? "justify-center" : "justify-start gap-3 px-4",
         isActive
-          ? cn(accent.bg, accent.text)
+          ? cn(accent.bg, activeTextClass)
           : cn("text-muted-foreground hover:text-foreground", accent.bgHover),
       )}
       style={{ height: CHROME_SIZE, minHeight: CHROME_SIZE }}
