@@ -24,6 +24,7 @@
 import {
   classifyAdminHostname,
   classifyCustomerHostname,
+  isShellOrApiPath,
   rewriteRequestForSurface,
 } from "./src/lib/hostname-dispatch.ts";
 
@@ -45,19 +46,11 @@ const freshBuild =
  * shared API paths. Mirrors the same predicate `main.ts` uses for dev.
  */
 function shouldRewriteAdminPath(pathname: string): boolean {
-  if (pathname.startsWith("/api/")) return false;
-  if (pathname.startsWith("/_fresh")) return false;
-  if (pathname.startsWith("/static")) return false;
-  if (pathname.startsWith("/assets")) return false;
-  if (pathname === "/favicon.ico") return false;
-  if (pathname === "/manifest.json") return false;
-  if (pathname === "/manifest.admin.json") return false;
-  if (pathname === "/robots.txt") return false;
-  if (/^\/favicon-(16|32|48|180|192|512)\.png$/.test(pathname)) return false;
-  if (pathname === "/apple-touch-icon.png") return false;
-  // ExpresScan / Wave 4 — Apple Universal Links manifest is fetched WITHOUT
-  // auth from the registered domain root (no /admin prefix), so the rewrite
-  // must skip it. Must mirror `main.ts`.
+  // Shared with main.ts via isShellOrApiPath — single source of truth for
+  // the static/shell whitelist.
+  if (isShellOrApiPath(pathname)) return false;
+  // Apple Universal Links manifest is fetched WITHOUT auth from the
+  // registered domain root (no /admin prefix), so the rewrite must skip it.
   if (pathname.startsWith("/.well-known/")) return false;
   if (pathname === "/admin" || pathname.startsWith("/admin/")) return false;
   return true;
