@@ -50,7 +50,7 @@ export function WallMountIcon(
         ry="6"
         fill="none"
         stroke={haloColor}
-        stroke-width="1"
+        stroke-width="2"
         opacity="0.4"
       />
       {/* Body — wide flat horizontal bar */}
@@ -73,7 +73,7 @@ export function WallMountIcon(
         ry="3"
         fill="none"
         stroke={haloColor}
-        stroke-width="2.5"
+        stroke-width="5"
         opacity="0.95"
       />
       {/* LED strip */}

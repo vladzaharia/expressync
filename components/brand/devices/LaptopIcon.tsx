@@ -45,7 +45,7 @@ export function LaptopIcon(
         ry="6"
         fill="none"
         stroke={haloColor}
-        stroke-width="1"
+        stroke-width="2"
         opacity="0.4"
       />
       {/* Lid body — rounded rectangle, fixed dark grey */}
@@ -80,7 +80,7 @@ export function LaptopIcon(
         ry="3.5"
         fill="none"
         stroke={haloColor}
-        stroke-width="2.5"
+        stroke-width="5"
         opacity="0.95"
       />
       {/* Screen — darker recessed panel */}

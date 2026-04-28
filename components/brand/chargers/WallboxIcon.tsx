@@ -81,7 +81,7 @@ export function WallboxIcon(
         ry="13"
         fill="none"
         stroke={haloColor}
-        stroke-width="2.5"
+        stroke-width="5"
         opacity="0.95"
       />
       {/* Halo outer diffuse glow (LED bleed) */}
@@ -94,7 +94,7 @@ export function WallboxIcon(
         ry="14"
         fill="none"
         stroke={haloColor}
-        stroke-width="1"
+        stroke-width="2"
         opacity="0.4"
       />
       {/* Central face — darker recessed panel */}

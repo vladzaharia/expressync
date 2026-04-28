@@ -50,7 +50,7 @@ export function PulsarIcon(
         ry="5"
         fill="none"
         stroke={haloColor}
-        stroke-width="1"
+        stroke-width="2"
         opacity="0.4"
       />
       {/* Body — vertical slab, sharp corners */}
@@ -73,7 +73,7 @@ export function PulsarIcon(
         ry="2"
         fill="none"
         stroke={haloColor}
-        stroke-width="2.5"
+        stroke-width="5"
         opacity="0.95"
       />
       {/* Face recess */}
