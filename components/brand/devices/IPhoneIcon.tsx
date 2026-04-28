@@ -46,7 +46,7 @@ export function IPhoneIcon(
         ry="14"
         fill="none"
         stroke={haloColor}
-        stroke-width="1"
+        stroke-width="2"
         opacity="0.4"
       />
       {
@@ -84,7 +84,7 @@ export function IPhoneIcon(
         ry="10"
         fill="none"
         stroke={haloColor}
-        stroke-width="2.5"
+        stroke-width="5"
         opacity="0.95"
       />
       {/* Screen — darker recessed panel */}
