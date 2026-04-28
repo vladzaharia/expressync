@@ -61,7 +61,16 @@ const SYNC_ROUTE = "/api/devices/me/state/sync";
  * field is required; unknown fields are rejected so a misbehaving client
  * can't silently smuggle metadata into `last_status`.
  */
+const PERMISSION_STATES = [
+  "authorized",
+  "denied",
+  "notDetermined",
+  "restricted",
+  "unavailable",
+] as const;
+
 const diagnosticsSchema = z.object({
+  // ---- Core (required) -------------------------------------------------
   appVersion: z.string().min(1).max(64),
   osVersion: z.string().min(1).max(64),
   model: z.string().min(1).max(120),
@@ -70,10 +79,52 @@ const diagnosticsSchema = z.object({
     "denied",
     "notDetermined",
     "provisional",
+    "ephemeral",
   ]),
   nfcAvailable: z.boolean(),
   pendingUploads: z.number().int().nonnegative().max(10_000),
   reconnectCount: z.number().int().nonnegative().max(1_000_000),
+
+  // ---- Identity / locale (optional, additive Wave 6.1) ----------------
+  platform: z.string().min(1).max(64).optional(),
+  localizedModel: z.string().min(1).max(120).optional(),
+  locale: z.string().min(1).max(64).optional(),
+  timezone: z.string().min(1).max(64).optional(),
+  apnsEnvironment: z.string().min(1).max(32).optional(),
+  pushTokenLast8: z.string().min(1).max(16).optional(),
+
+  // ---- Permissions (granular) -----------------------------------------
+  nfcPermission: z.enum(PERMISSION_STATES).optional(),
+  backgroundRefreshStatus: z.enum([
+    "available",
+    "denied",
+    "restricted",
+  ]).optional(),
+  localNetworkPermission: z.enum(PERMISSION_STATES).optional(),
+
+  // ---- Health ----------------------------------------------------------
+  batteryLevel: z.number().min(0).max(1).optional(),
+  batteryState: z.enum([
+    "unknown",
+    "unplugged",
+    "charging",
+    "full",
+  ]).optional(),
+  lowPowerMode: z.boolean().optional(),
+  thermalState: z.enum([
+    "nominal",
+    "fair",
+    "serious",
+    "critical",
+  ]).optional(),
+
+  // ---- Network ---------------------------------------------------------
+  networkInterface: z.string().min(1).max(32).optional(),
+  networkIsConstrained: z.boolean().optional(),
+  networkIsExpensive: z.boolean().optional(),
+
+  // ---- Storage ---------------------------------------------------------
+  diskFreeBytes: z.number().int().nonnegative().optional(),
 }).strict();
 
 const syncBodySchema = z.object({
