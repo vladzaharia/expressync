@@ -70,7 +70,8 @@ export type AuthAuditEvent =
   | "device.scan.released"
   | "device.token.issued"
   | "device.token.revoked"
-  | "device.token.invalid";
+  | "device.token.invalid"
+  | "device.capability.denied";
 
 export interface AuthEventPayload {
   /** Optional user reference (set on success; omit on failed-pre-resolve flows). */
@@ -206,3 +207,5 @@ export const logDeviceTokenRevoked = (p: AuthEventPayload) =>
   logAuthEvent("device.token.revoked", p);
 export const logDeviceTokenInvalid = (p: AuthEventPayload) =>
   logAuthEvent("device.token.invalid", p);
+export const logDeviceCapabilityDenied = (p: AuthEventPayload) =>
+  logAuthEvent("device.capability.denied", p);

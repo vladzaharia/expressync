@@ -260,6 +260,20 @@
       "when": 1777912240000,
       "tag": "0036_devices_kind_tablet_nfc",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1777912300000,
+      "tag": "0037_capabilities_rename",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1777912360000,
+      "tag": "0038_settings_and_capability_invariants",
+      "breakpoints": true
     }
   ]
 }
