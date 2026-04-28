@@ -16,7 +16,12 @@ function resolveSize(size: ChargerIconProps["size"]): number {
  * A narrow horizontal LED strip and a small socket at the right end.
  */
 export function WallMountIcon(
-  { size = "md", class: classProp, className }: ChargerIconProps,
+  {
+    size = "md",
+    class: classProp,
+    className,
+    haloColor = "oklch(0.78 0.12 195)",
+  }: ChargerIconProps,
 ) {
   const px = resolveSize(size);
   const gradientId = "wallmount-gradient";
@@ -35,6 +40,19 @@ export function WallMountIcon(
           <stop offset="100%" stop-color="oklch(0.70 0.22 10)" />
         </linearGradient>
       </defs>
+      {/* Halo outer diffuse glow */}
+      <rect
+        x="4"
+        y="36"
+        width="92"
+        height="28"
+        rx="6"
+        ry="6"
+        fill="none"
+        stroke={haloColor}
+        stroke-width="1"
+        opacity="0.4"
+      />
       {/* Body — wide flat horizontal bar */}
       <rect
         x="6"
@@ -44,6 +62,19 @@ export function WallMountIcon(
         rx="4"
         ry="4"
         fill={`url(#${gradientId})`}
+      />
+      {/* Halo ring — status-bearing LED, traced just inside the bar */}
+      <rect
+        x="9"
+        y="41"
+        width="82"
+        height="18"
+        rx="3"
+        ry="3"
+        fill="none"
+        stroke={haloColor}
+        stroke-width="2.5"
+        opacity="0.95"
       />
       {/* LED strip */}
       <rect
