@@ -1,4 +1,9 @@
 /**
+ * @deprecated Slice S — superseded by `/api/admin/devices/{id}/customers`.
+ *   The iOS app no longer calls this endpoint after Slice S; it is kept for
+ *   one rolling-deploy window so older iOS clients in the field don't break.
+ *   Delete in a follow-up once the previous app version is gone.
+ *
  * ExpresScan v2 / Wave 6 Slice J — admin charger tag list.
  *
  * GET /api/admin/devices/{deviceId}/tags
@@ -195,6 +200,10 @@ void desc;
 
 export const handler = define.handlers({
   async GET(ctx) {
+    log.warn(
+      "DEPRECATED Slice S: GET /admin/devices/[id]/tags called — " +
+        "iOS should be using /customers. This handler will be removed.",
+    );
     if (!ctx.state.device) {
       return jsonResponse(401, { error: "unauthorized" });
     }

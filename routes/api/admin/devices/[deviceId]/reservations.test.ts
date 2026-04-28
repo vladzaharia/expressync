@@ -126,8 +126,17 @@ Deno.test({
       ])
     );
     _setCustomerLabelsLoaderForTests((pks) => {
-      const m = new Map<number, string | null>();
-      for (const pk of pks) m.set(pk, pk === 99 ? "Alice" : null);
+      const m = new Map<
+        number,
+        { label: string | null; lagoCustomerExternalId: string | null }
+      >();
+      for (const pk of pks) {
+        if (pk === 99) {
+          m.set(pk, { label: "Alice", lagoCustomerExternalId: "lago-alice" });
+        } else {
+          m.set(pk, { label: null, lagoCustomerExternalId: null });
+        }
+      }
       return Promise.resolve(m);
     });
     const res = await callGet({ state: deviceState(["user"]) });
@@ -136,11 +145,16 @@ Deno.test({
     assertEquals(body.reservations.length, 2);
     assertEquals(body.reservations[0].reservationId, "10");
     assertEquals(body.reservations[0].customerLabel, "Alice");
+    assertEquals(
+      body.reservations[0].lagoCustomerExternalId,
+      "lago-alice",
+    );
     assertEquals(body.reservations[0].isBlackout, false);
     assertEquals(body.reservations[0].idTag, "AAAA0001");
     assertEquals(body.reservations[0].isCancelable, true);
     assertEquals(body.reservations[1].isBlackout, true);
     assertEquals(body.reservations[1].customerLabel, null);
+    assertEquals(body.reservations[1].lagoCustomerExternalId, null);
     assertEquals(body.reservations[1].idTag, null);
     _resetReservationsTestSeams();
   },

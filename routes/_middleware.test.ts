@@ -274,6 +274,8 @@ Deno.test("selectAuth — bearer for admin charger-control endpoints (Wave 6 Sli
   assertEquals(selectAuth(`${dev}/cancel-reservation`), "bearer");
   assertEquals(selectAuth(`${dev}/session`), "bearer");
   assertEquals(selectAuth(`${dev}/tags`), "bearer");
+  // Slice S — customer picker endpoint.
+  assertEquals(selectAuth(`${dev}/customers`), "bearer");
   assertEquals(selectAuth(`${dev}/reservations`), "bearer");
   // Sibling cookie-auth slice-C/D endpoints stay cookie.
   assertEquals(selectAuth(`${dev}/scan-arm`), "cookie");
