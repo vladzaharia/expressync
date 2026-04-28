@@ -256,14 +256,14 @@ export default function ChargerCard(
               </Tooltip>
               <a
                 href={`/chargers/${charger.chargeBoxId}`}
-                class="flex min-w-0 flex-1 items-baseline gap-2 hover:underline"
+                class="flex min-w-0 flex-1 flex-col hover:underline"
               >
                 <span class="truncate text-xl font-semibold tracking-tight">
                   {displayName}
                 </span>
                 {showChargeBoxIdChip
                   ? (
-                    <span class="shrink-0 font-mono text-xs text-muted-foreground">
+                    <span class="truncate font-mono text-xs text-muted-foreground">
                       {charger.chargeBoxId}
                     </span>
                   )
