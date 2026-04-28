@@ -5,6 +5,7 @@ import { startPairIntentWatchdog } from "./src/services/pair-intent-watchdog.ts"
 import {
   classifyAdminHostname,
   classifyCustomerHostname,
+  isShellOrApiPath,
   rewriteRequestForSurface,
 } from "./src/lib/hostname-dispatch.ts";
 
@@ -86,19 +87,10 @@ export function polarisCreateFetchHandler(): (
  * surface gets `/admin` prepended.
  */
 function shouldRewriteAdminPath(pathname: string): boolean {
-  if (pathname.startsWith("/api/")) return false;
-  if (pathname.startsWith("/_fresh")) return false;
-  if (pathname.startsWith("/static")) return false;
-  if (pathname.startsWith("/assets")) return false;
-  if (pathname === "/favicon.ico") return false;
-  if (pathname === "/manifest.json") return false;
-  if (pathname === "/manifest.admin.json") return false;
-  if (pathname === "/robots.txt") return false;
-  // Static favicon PNGs (/favicon-*.png + /apple-touch-icon.png) live at the
-  // URL root. Skip the rewrite so they resolve via Fresh's static-files
-  // middleware instead of being mangled into /admin/favicon-X.png.
-  if (/^\/favicon-(16|32|48|180|192|512)\.png$/.test(pathname)) return false;
-  if (pathname === "/apple-touch-icon.png") return false;
+  // Shell + API + static-asset whitelist is shared with the customer surface
+  // guard in hostname-dispatch.ts. Single source of truth so a new favicon
+  // size only has to be added once.
+  if (isShellOrApiPath(pathname)) return false;
   // ExpresScan / Wave 4 Track C-e2e — Apple Universal Links manifest is
   // fetched WITHOUT auth from the registered domain root (no /admin
   // prefix), so the rewrite must skip it.
