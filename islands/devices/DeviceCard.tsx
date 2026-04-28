@@ -92,6 +92,12 @@ export interface ChargerCardDto {
   lastSeenAtIso: string;
   lastStatus: string | null;
   lastStatusAtIso: string | null;
+  /** Per-row capability set from `chargers_cache.capabilities`. Always
+   *  contains `'charger'` (auto-managed by the StEvE sync); may also
+   *  carry `'scanner'` when the charger has built-in NFC. Surfaced as
+   *  pills so the Devices listing has the same vocabulary on both
+   *  charger and scanner cards. */
+  capabilities: string[];
 }
 
 export interface ActiveSessionDto {
@@ -448,6 +454,9 @@ function ChargerBody(
           <StatusPill tone="slate">
             {formatFormFactor(formFactorLabel)}
           </StatusPill>
+          {charger.capabilities.map((c) => (
+            <CapabilityPill key={c} capability={c} />
+          ))}
         </PillRow>
 
         {/* Primary status line — full-width */}
