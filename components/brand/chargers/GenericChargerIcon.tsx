@@ -47,7 +47,7 @@ export function GenericChargerIcon(
         r="42"
         fill="none"
         stroke={haloColor}
-        stroke-width="1"
+        stroke-width="2"
         opacity="0.4"
       />
       {/* Base circle */}
@@ -59,7 +59,7 @@ export function GenericChargerIcon(
         r="37"
         fill="none"
         stroke={haloColor}
-        stroke-width="2.5"
+        stroke-width="5"
         opacity="0.95"
       />
       {/* Plug body (lucide Plug-style) */}

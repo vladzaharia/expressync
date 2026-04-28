@@ -46,7 +46,7 @@ export function CommanderIcon(
         d="M 22 80 L 22 94 L 78 94 L 78 80 L 68 80 L 68 22 Q 68 8 58 8 L 42 8 Q 32 8 32 22 L 32 80 Z"
         fill="none"
         stroke={haloColor}
-        stroke-width="1"
+        stroke-width="2"
         opacity="0.4"
       />
       {/* Base plinth — wider, slight bevel */}
@@ -64,7 +64,7 @@ export function CommanderIcon(
         d="M 26 80 L 26 90 L 74 90 L 74 80 L 65 80 L 65 22 Q 65 11 41 11 L 59 11 Q 35 11 35 22 L 35 80 Z"
         fill="none"
         stroke={haloColor}
-        stroke-width="2.5"
+        stroke-width="5"
         opacity="0.95"
       />
       {/* Main column — tall pedestal body */}
