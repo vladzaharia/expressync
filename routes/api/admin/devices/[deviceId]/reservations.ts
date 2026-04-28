@@ -19,8 +19,9 @@
  *     startsAt: string;
  *     endsAt: string;
  *     customerLabel: string | null;
+ *     lagoCustomerExternalId: string | null;  // Slice S — null for blackouts
  *     isBlackout: boolean;
- *     idTag: string | null;
+ *     idTag: string | null;                   // legacy; rolling-deploy window
  *     isCancelable: boolean;
  *   };
  */
@@ -57,7 +58,18 @@ export interface ReservationRow {
   startsAt: string;
   endsAt: string;
   customerLabel: string | null;
+  /**
+   * The customer this reservation belongs to (Slice S). The iOS Path-A
+   * start flow uses this to resolve the customer without a separate
+   * lookup. `null` for blackouts (no customer) or reservations whose
+   * mapping has no Lago link yet.
+   */
+  lagoCustomerExternalId: string | null;
   isBlackout: boolean;
+  /**
+   * @deprecated Slice S — retained for one rolling-deploy window so older
+   * iOS clients don't break. Path-A start now uses `lagoCustomerExternalId`.
+   */
   idTag: string | null;
   isCancelable: boolean;
 }
@@ -78,9 +90,15 @@ interface ReservationListRow {
 type ReservationsLoader = (
   chargeBoxId: string,
 ) => Promise<ReservationListRow[]>;
+
+/** Slice S: per-tag info — both display label and Lago external id. */
+export interface CustomerLabelInfo {
+  label: string | null;
+  lagoCustomerExternalId: string | null;
+}
 type CustomerLabelsLoader = (
   ocppTagPks: number[],
-) => Promise<Map<number, string | null>>;
+) => Promise<Map<number, CustomerLabelInfo>>;
 type ChargerLoader = (chargerId: string) => Promise<ChargerRow | null>;
 
 const defaultReservationsLoader: ReservationsLoader = async (chargeBoxId) => {
@@ -102,7 +120,7 @@ const defaultReservationsLoader: ReservationsLoader = async (chargeBoxId) => {
 const defaultCustomerLabelsLoader: CustomerLabelsLoader = async (
   ocppTagPks,
 ) => {
-  const out = new Map<number, string | null>();
+  const out = new Map<number, CustomerLabelInfo>();
   if (ocppTagPks.length === 0) return out;
   const rows = await db
     .select({
@@ -113,7 +131,10 @@ const defaultCustomerLabelsLoader: CustomerLabelsLoader = async (
     .from(userMappings)
     .where(inArray(userMappings.steveOcppTagPk, ocppTagPks));
   for (const r of rows) {
-    out.set(r.tagPk, r.displayName ?? r.lagoId ?? null);
+    out.set(r.tagPk, {
+      label: r.displayName ?? r.lagoId ?? null,
+      lagoCustomerExternalId: r.lagoId ?? null,
+    });
   }
   return out;
 };
@@ -201,11 +222,13 @@ export const handler = define.handlers({
 
     const out: ReservationRow[] = rows.map((r) => {
       const isBlackout = r.steveOcppIdTag === ADMIN_BLACKOUT_ID_TAG;
+      const info = isBlackout ? null : labels.get(r.steveOcppTagPk) ?? null;
       return {
         reservationId: String(r.id),
         startsAt: r.startAt.toISOString(),
         endsAt: r.endAt.toISOString(),
-        customerLabel: isBlackout ? null : labels.get(r.steveOcppTagPk) ?? null,
+        customerLabel: info?.label ?? null,
+        lagoCustomerExternalId: info?.lagoCustomerExternalId ?? null,
         isBlackout,
         idTag: isBlackout ? null : r.steveOcppIdTag,
         // Friends-and-family scope: every upcoming row is cancellable

@@ -1,10 +1,14 @@
 /**
  * POST /api/admin/devices/{deviceId}/start — handler-direct unit tests.
+ *
+ * Slice S: body now carries `lagoCustomerExternalId`; the handler resolves
+ * `OCPP-{externalId}` and dispatches RemoteStart against that parent tag.
  */
 
 import { assert, assertEquals } from "@std/assert";
 import {
   _resetStartTestSeams,
+  _setMetaTagEnsurerForTests,
   _setSteveStarterForTests,
   handler,
 } from "./start.ts";
@@ -88,6 +92,13 @@ function offlineLoader(stale: Date) {
   );
 }
 
+/** Stub `ensureCustomerMetaTag` so the handler doesn't try to talk to StEvE. */
+function stubMetaEnsurer() {
+  _setMetaTagEnsurerForTests((extId) =>
+    Promise.resolve({ idTag: `OCPP-${extId}`, ocppTagPk: 999 })
+  );
+}
+
 Deno.test({
   name: "start-POST — 401 without bearer",
   sanitizeResources: false,
@@ -109,7 +120,7 @@ Deno.test({
     _resetChargerOnlineTestSeams();
     const res = await callPost({
       state: deviceState(["scanner"]),
-      body: { idTag: "AAAA0001", tagPk: 1 },
+      body: { lagoCustomerExternalId: "lago-alice" },
     });
     assertEquals(res.status, 403);
   },
@@ -125,11 +136,28 @@ Deno.test({
     onlineLoader();
     const res = await callPost({
       state: deviceState(["user"]),
-      body: { idTag: "AAAA0001", tagPk: 1, evil: "yes" },
+      body: { lagoCustomerExternalId: "lago-alice", evil: "yes" },
     });
     assertEquals(res.status, 400);
     const body = await res.json();
     assertEquals(body.error, "invalid_body");
+    _resetChargerOnlineTestSeams();
+  },
+});
+
+Deno.test({
+  name: "start-POST — 400 when legacy idTag/tagPk body is sent",
+  sanitizeResources: false,
+  sanitizeOps: false,
+  fn: async () => {
+    _resetStartTestSeams();
+    _resetChargerOnlineTestSeams();
+    onlineLoader();
+    const res = await callPost({
+      state: deviceState(["user"]),
+      body: { idTag: "AAAA0001", tagPk: 1 },
+    });
+    assertEquals(res.status, 400);
     _resetChargerOnlineTestSeams();
   },
 });
@@ -145,7 +173,7 @@ Deno.test({
     offlineLoader(stale);
     const res = await callPost({
       state: deviceState(["user"]),
-      body: { idTag: "AAAA0001", tagPk: 1 },
+      body: { lagoCustomerExternalId: "lago-alice" },
     });
     assertEquals(res.status, 409);
     const body = await res.json();
@@ -157,30 +185,31 @@ Deno.test({
 
 Deno.test({
   name:
-    "start-POST — 200 happy path dispatches RemoteStart (DB-bound — may 500)",
+    "start-POST — 200 happy path resolves OCPP-{extId} and dispatches RemoteStart " +
+    "(DB-bound — may 500)",
   sanitizeResources: false,
   sanitizeOps: false,
   fn: async () => {
     _resetStartTestSeams();
     _resetChargerOnlineTestSeams();
     onlineLoader();
-    let starterCalled = false;
-    _setSteveStarterForTests(() => {
-      starterCalled = true;
+    stubMetaEnsurer();
+    let dispatchedIdTag: string | null = null;
+    _setSteveStarterForTests((params) => {
+      dispatchedIdTag = params.idTag;
       return Promise.resolve({ taskId: 999, succeeded: true });
     });
     const res = await callPost({
       state: deviceState(["user"]),
-      body: { idTag: "AAAA0001", tagPk: 1 },
+      body: { lagoCustomerExternalId: "lago-alice" },
     });
     // DB INSERT against `chargerOperationLog` runs inside the handler;
     // without a live Postgres the insert throws and the handler returns
-    // 500. Either response (200 happy, 500 db-bound) is acceptable here
-    // — what we lock in is the gate ordering: bearer + capability + body
-    // + offline preflight passed, so a starter call is the next step
-    // and would have fired had the DB been live.
+    // 500. Either response (200 happy, 500 db-bound) is acceptable here.
     assert(res.status === 200 || res.status === 500);
-    if (res.status === 200) assertEquals(starterCalled, true);
+    if (res.status === 200) {
+      assertEquals(dispatchedIdTag, "OCPP-lago-alice");
+    }
     _resetStartTestSeams();
     _resetChargerOnlineTestSeams();
   },
@@ -196,7 +225,7 @@ Deno.test({
     _setChargerLoaderForTests(() => Promise.resolve(null));
     const res = await callPost({
       state: deviceState(["user"]),
-      body: { idTag: "AAAA0001", tagPk: 1 },
+      body: { lagoCustomerExternalId: "lago-alice" },
     });
     assertEquals(res.status, 404);
     _resetChargerOnlineTestSeams();

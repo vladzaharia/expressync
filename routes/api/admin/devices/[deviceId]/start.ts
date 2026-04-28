@@ -1,37 +1,32 @@
 /**
- * ExpresScan v2 / Wave 6 Slice J — admin charger remote-start.
+ * ExpresScan v2 / Wave 6 Slice S — admin charger remote-start (customer mode).
  *
  * POST /api/admin/devices/{deviceId}/start
  *
- * Bearer-auth'd device-API endpoint. Mirrors the customer-portal
- * `/api/customer/remote-start` flow but is keyed by chargeBoxId (the
- * charger we want to start) and accepts an explicit `idTag` / `tagPk`
- * picked by the iOS Tag Picker sheet — there is no per-caller "primary
- * card" lookup. Per slice J's friends-and-family scope, any device with
- * the `user` capability can start a charge against any charger; per-row
- * owner gating is a future PR.
+ * Bearer-auth'd device-API endpoint. The iOS picker resolves to a
+ * customer (Lago `external_id`); the server materializes the customer's
+ * managed parent OCPP tag (`OCPP-{externalId}`) and dispatches a StEvE
+ * RemoteStart against that tag. StEvE's tag-hierarchy resolves to
+ * whichever child cards are active under that parent.
  *
- * `[deviceId]` here is the **charger** id, not the caller's app device id.
- * Wire-shape consistency with the rest of the `/api/admin/devices/{id}/*`
- * surface — even though the URL says "devices", chargers and apps both
- * live behind it.
+ * `[deviceId]` is the **charger** id, not the caller's app device id.
  *
  * Body (strict — unknown keys rejected):
- *   { idTag: string, tagPk: number, reservationId?: string | null }
+ *   { lagoCustomerExternalId: string, reservationId?: string | null }
  *
  * Pre-flight rejections:
  *   401 unauthorized        — no bearer / no `ctx.state.device`
  *   403 capability_denied   — caller lacks `user` capability
  *   400 invalid_body        — body fails the strict Zod schema
  *   404 charger_not_found   — `chargeBoxId` not in `chargers_cache`
- *   409 charger_offline     — `lastStatusAt` outside the 90 s window
+ *   409 charger_offline     — `lastStatusAt` outside the 90s window
  *
  * Idempotency: wraps in `withIdempotency`. A retry with the same
  * `Idempotency-Key` returns the cached response without re-firing the
  * StEvE call or audit row.
  *
  * Audit: `device.user.start_charge` with `{ deviceId (caller), chargerId,
- * idTag, reservationId? }`.
+ * lagoCustomerExternalId, idTag, reservationId? }`.
  */
 
 import { eq } from "drizzle-orm";
@@ -52,6 +47,10 @@ import {
 } from "../../../../../src/lib/chargers/online.ts";
 import { withIdempotency } from "../../../../../src/lib/idempotency.ts";
 import { logDeviceUserStartCharge } from "../../../../../src/lib/audit.ts";
+import {
+  ensureCustomerMetaTag,
+  parentIdTagFor,
+} from "../../../../../src/lib/customer-meta-tags.ts";
 import { logger } from "../../../../../src/lib/utils/logger.ts";
 
 const log = logger.child("AdminDeviceChargerStart");
@@ -66,8 +65,7 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 const StartBodySchema = z.object({
-  idTag: z.string().min(1),
-  tagPk: z.number().int().positive(),
+  lagoCustomerExternalId: z.string().min(1),
   reservationId: z.string().min(1).nullable().optional(),
 }).strict();
 
@@ -78,17 +76,25 @@ export type StartBody = z.infer<typeof StartBodySchema>;
 // ---------------------------------------------------------------------------
 
 type SteveStarter = typeof steveClient.operations.remoteStart;
+type MetaTagEnsurer = typeof ensureCustomerMetaTag;
 
 const defaultSteveStarter: SteveStarter = (params) =>
   steveClient.operations.remoteStart(params);
+const defaultMetaTagEnsurer: MetaTagEnsurer = (extId, displayName) =>
+  ensureCustomerMetaTag(extId, displayName);
 
 let steveStarter: SteveStarter = defaultSteveStarter;
+let metaTagEnsurer: MetaTagEnsurer = defaultMetaTagEnsurer;
 
 export function _setSteveStarterForTests(fn: SteveStarter | null): void {
   steveStarter = fn ?? defaultSteveStarter;
 }
+export function _setMetaTagEnsurerForTests(fn: MetaTagEnsurer | null): void {
+  metaTagEnsurer = fn ?? defaultMetaTagEnsurer;
+}
 export function _resetStartTestSeams(): void {
   steveStarter = defaultSteveStarter;
+  metaTagEnsurer = defaultMetaTagEnsurer;
 }
 
 // ---------------------------------------------------------------------------
@@ -158,10 +164,27 @@ export const handler = define.handlers({
         return jsonResponse(500, { error: "internal_error" });
       }
 
+      // ---- resolve customer → parent meta-tag ----
+      // Defensive idempotent ensure — returns silently if the meta-tag
+      // already exists. The downstream RemoteStart references the parent
+      // by idTag so a missing parent will fail at StEvE anyway; we attempt
+      // creation here to make the happy path self-healing.
+      try {
+        await metaTagEnsurer(body.lagoCustomerExternalId, undefined);
+      } catch (err) {
+        // Best-effort — log and proceed. If the parent really is missing
+        // StEvE will reject the RemoteStart and we'll surface a 502 below.
+        log.warn("ensureCustomerMetaTag failed; proceeding", {
+          externalId: body.lagoCustomerExternalId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      const idTag = parentIdTagFor(body.lagoCustomerExternalId);
+
       // ---- StEvE RemoteStart ----
       const validated = RemoteStartTransactionParamsSchema.safeParse({
         chargeBoxId: chargerId,
-        idTag: body.idTag,
+        idTag,
       });
       if (!validated.success) {
         return jsonResponse(400, {
@@ -212,8 +235,8 @@ export const handler = define.handlers({
           metadata: {
             deviceId: callerDeviceId,
             chargerId,
-            idTag: body.idTag,
-            tagPk: body.tagPk,
+            lagoCustomerExternalId: body.lagoCustomerExternalId,
+            idTag,
             reservationId: body.reservationId ?? null,
             operationLogId: updated.id,
           },

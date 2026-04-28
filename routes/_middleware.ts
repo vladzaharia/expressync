@@ -296,7 +296,7 @@ export function selectAuth(pathname: string): AuthScheme {
   // a logged-in admin in a browser. The route handler asserts
   // `requireCapability(ctx, "user")` against `ctx.state.device`.
   if (
-    /^\/api\/admin\/devices\/[^/]+\/(start|stop|cancel-reservation|session|tags|reservations)$/
+    /^\/api\/admin\/devices\/[^/]+\/(start|stop|cancel-reservation|session|tags|customers|reservations)$/
       .test(pathname)
   ) {
     return "bearer";
