@@ -37,6 +37,7 @@ export class Cpsim {
   private enc = new TextEncoder();
   private dec = new TextDecoder();
 
+  // deno-lint-ignore require-await
   static async spawn(binaryPath: string): Promise<Cpsim> {
     const inst = new Cpsim();
     const cmd = new Deno.Command(binaryPath, {

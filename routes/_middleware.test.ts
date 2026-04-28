@@ -260,10 +260,12 @@ Deno.test("selectAuth — bearer for /api/devices/* lifecycle routes", () => {
   );
 });
 
-Deno.test("selectAuth — register is cookie-only", () => {
-  // The register entrypoint mints the bearer token from a cookie session
-  // + PKCE code, so the request itself can't carry a bearer.
-  assertEquals(selectAuth("/api/devices/register"), "cookie");
+Deno.test("selectAuth — register is public-or-cookie (PKCE entry point)", () => {
+  // The register entrypoint authenticates via the one-time PKCE code,
+  // not via the request's cookie/bearer headers. Classified as
+  // `public-or-cookie` so the middleware lets the request through and
+  // the handler validates the PKCE binding itself.
+  assertEquals(selectAuth("/api/devices/register"), "public-or-cookie");
 });
 
 Deno.test("selectAuth — customer + ocpp + public", () => {

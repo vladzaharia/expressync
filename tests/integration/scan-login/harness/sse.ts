@@ -33,9 +33,7 @@ export async function openSse(
     resolve: (m: SseMessage) => void;
     reject: (e: Error) => void;
   }> = [];
-  // deno-lint-ignore no-explicit-any
   let connectedResolve: (m: SseMessage) => void = () => {};
-  // deno-lint-ignore no-explicit-any
   let connectedReject: (e: Error) => void = () => {};
   const connectedPromise = new Promise<SseMessage>((res, rej) => {
     connectedResolve = res;

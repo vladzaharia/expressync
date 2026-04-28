@@ -275,8 +275,9 @@ export function streamLogs(
       child.kill("SIGTERM");
     } catch { /* */ }
   }
-  registerCleanup(async () => {
+  registerCleanup(() => {
     stop();
+    return Promise.resolve();
   });
 
   return {
