@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Android adaptive-icon BACKGROUND layer. 432×432 full-bleed brand
+  gradient — the launcher composites this beneath logo-foreground.svg
+  and applies its own circle/squircle/teardrop mask.
+-->
+<svg
+  width="432"
+  height="432"
+  viewBox="0 0 432 432"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <defs>
+    <linearGradient
+      id="es-bg-android"
+      x1="0"
+      y1="0"
+      x2="432"
+      y2="432"
+      gradientUnits="userSpaceOnUse"
+    >
+      <stop offset="0" stop-color="#06b6d4" />
+      <stop offset="0.55" stop-color="#22c55e" />
+      <stop offset="1" stop-color="#06b6d4" />
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="432" height="432" fill="url(#es-bg-android)" />
+</svg>
