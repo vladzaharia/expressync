@@ -9,8 +9,9 @@
  *        violet well with `<Layers />` for meta-tags).
  *      - Column with uppercase type label + mono idTag (truncated).
  *      - Right-aligned quick-action icon link, visible on hover/focus.
- *        Linked tags get `<CreditCard />` → `#issue-card` on detail page.
  *        Unlinked tags get `<Link2 />` → `/links/new?tagPk=:pk`.
+ *        Linked tags have no quick-action (the linking flow auto-manages
+ *        the OCPP-{externalId} parent — no per-tag card issuance).
  *
  *   2. Middle
  *      - `<p>` display name or italic "No display name".
@@ -31,7 +32,7 @@
  */
 
 import type { ComponentChildren } from "preact";
-import { CornerDownRight, CreditCard, Layers, Link2 } from "lucide-preact";
+import { CornerDownRight, Layers, Link2 } from "lucide-preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { type Pill, StatusPillRow } from "@/components/tags/StatusPillRow.tsx";
 import { tagTypeIcons } from "@/components/brand/tags/index.ts";
@@ -218,15 +219,15 @@ interface QuickActionInput {
 function buildQuickAction(
   { ocppTagPk, hasLagoCustomer, isMeta, isActive }: QuickActionInput,
 ): ComponentChildren {
-  // Meta-tags can't be issued cards against and don't need linking shortcuts.
-  // Inactive tags hide the quick-action to avoid surfacing dead ends.
-  if (isMeta || !isActive) return null;
+  // Meta-tags don't get per-tag shortcuts; inactive tags hide the
+  // quick-action to avoid surfacing dead ends. Linked tags have no
+  // shortcut either — linking is the only adjustment surface and lives on
+  // the detail page.
+  if (isMeta || !isActive || hasLagoCustomer) return null;
 
-  const label = hasLagoCustomer ? "Issue card" : "Link to customer";
-  const href = hasLagoCustomer
-    ? `/tags/${ocppTagPk}#issue-card`
-    : `/links/new?tagPk=${ocppTagPk}`;
-  const Icon = hasLagoCustomer ? CreditCard : Link2;
+  const label = "Link to customer";
+  const href = `/links/new?tagPk=${ocppTagPk}`;
+  const Icon = Link2;
 
   // `relative z-10 pointer-events-auto` puts this quick-action above the
   // stretched primary-link `<a>` so the click lands here instead of
