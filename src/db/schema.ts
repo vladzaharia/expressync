@@ -543,10 +543,28 @@ export const chargersCache = pgTable("chargers_cache", {
     .defaultNow(),
   lastStatus: text("last_status"),
   lastStatusAt: timestamp("last_status_at", { withTimezone: true }),
+  // Wave 6 Slice O — chargers carry their own capability set. `'charger'`
+  // is auto-managed and always present; `'scanner'` is the only admin-
+  // editable token. App-side caps (`user`, `kiosk`, legacy `management`)
+  // and the pre-Slice-A legacy strings (`tap`, `ev`) are forbidden by the
+  // CHECK below. See migration 0039.
+  capabilities: text("capabilities")
+    .array()
+    .notNull()
+    .default(sql`ARRAY['charger']::text[]`),
 }, (table) => [
   check(
     "chargers_cache_form_factor_check",
     sql`${table.formFactor} IN ('wallbox','pulsar','commander','wall_mount','generic')`,
+  ),
+  check(
+    "chargers_cache_capabilities_invariants_check",
+    sql`('charger' = ANY(${table.capabilities}))
+      AND NOT ('user' = ANY(${table.capabilities}))
+      AND NOT ('kiosk' = ANY(${table.capabilities}))
+      AND NOT ('management' = ANY(${table.capabilities}))
+      AND NOT ('tap' = ANY(${table.capabilities}))
+      AND NOT ('ev' = ANY(${table.capabilities}))`,
   ),
   index("idx_chargers_cache_last_seen").on(table.lastSeenAt.desc()),
 ]);

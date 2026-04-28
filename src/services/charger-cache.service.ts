@@ -113,10 +113,17 @@ export async function refreshChargerCache(dbh: Db = defaultDb): Promise<{
     descByChargeBoxId = new Map();
   }
 
+  // Wave 6 Slice O: new charger rows seed `capabilities = ['charger']`
+  // (the column DEFAULT covers the same baseline, but spelling it out
+  // here makes the contract explicit at the call site). Existing rows
+  // are NOT touched — `capabilities` is admin-edited from the charger
+  // detail page (toggling `'scanner'` on/off), and the StEvE sync must
+  // not clobber that decision on every refresh.
   const values: NewChargerCache[] = Array.from(seen.values()).map((row) => ({
     chargeBoxId: row.chargeBoxId,
     chargeBoxPk: row.chargeBoxPk ?? null,
     friendlyName: descByChargeBoxId.get(row.chargeBoxId) ?? null,
+    capabilities: ["charger"],
   }));
 
   await dbh
@@ -133,6 +140,10 @@ export async function refreshChargerCache(dbh: Db = defaultDb): Promise<{
         // SteVe-side description is the source of truth.
         friendlyName: sql`EXCLUDED.friendly_name`,
         lastSeenAt: sql`now()`,
+        // capabilities: intentionally omitted from the UPDATE set so
+        // admin-edited values (e.g. an admin toggled `'scanner'` on)
+        // survive the next sync run. The CHECK constraint preserves
+        // the `'charger'` invariant regardless.
       },
     });
 
