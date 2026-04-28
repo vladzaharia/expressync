@@ -8,8 +8,14 @@
  * See `expresscan/docs/plan/20-contracts.md` for the canonical spec.
  */
 
-/** Form-factor of a registered NFC reader device. */
-export const DEVICE_KINDS = ["phone_nfc", "laptop_nfc"] as const;
+/**
+ * Form-factor of a registered NFC reader device.
+ *
+ * `tablet_nfc` is reserved for future iPadOS support — only iPhones
+ * register today, but the kind is wired through types/UI so adding tablet
+ * registration later doesn't require a UI sweep.
+ */
+export const DEVICE_KINDS = ["phone_nfc", "tablet_nfc", "laptop_nfc"] as const;
 export type DeviceKind = typeof DEVICE_KINDS[number];
 
 /** Capability tokens granted to a device on register. */
@@ -62,7 +68,7 @@ export interface TapTargetEntry {
   /** For phones: device UUID. For chargers: chargeBoxId. */
   deviceId: string;
   pairableType: "device" | "charger";
-  kind: "charger" | "phone_nfc" | "laptop_nfc";
+  kind: "charger" | "phone_nfc" | "tablet_nfc" | "laptop_nfc";
   /**
    * Always-displayable label. For chargers this is
    * `COALESCE(friendly_name, charge_box_id)`; for devices it's

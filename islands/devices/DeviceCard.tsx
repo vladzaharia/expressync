@@ -103,7 +103,7 @@ export interface ActiveSessionDto {
 
 export interface DeviceCardDto {
   deviceId: string;
-  kind: "phone_nfc" | "laptop_nfc";
+  kind: "phone_nfc" | "tablet_nfc" | "laptop_nfc";
   label: string;
   platform: string | null;
   model: string | null;
@@ -221,22 +221,6 @@ const FORM_FACTOR_LABEL: Record<string, string> = {
   generic: "Generic",
 };
 
-const CONNECTOR_STATUS_TONE: Record<
-  string,
-  "slate" | "emerald" | "amber" | "rose" | "cyan"
-> = {
-  Charging: "emerald",
-  Available: "cyan",
-  Preparing: "amber",
-  SuspendedEV: "amber",
-  SuspendedEVSE: "amber",
-  Reserved: "amber",
-  Finishing: "amber",
-  Unavailable: "slate",
-  Faulted: "rose",
-  Offline: "rose",
-};
-
 function ChargerBody(
   { charger, activeSession, isAdmin, onAction }: {
     charger: ChargerCardDto;
@@ -325,7 +309,6 @@ function ChargerBody(
   const isCharging = status === "Charging";
   const formFactorLabel = FORM_FACTOR_LABEL[charger.formFactor] ??
     charger.formFactor;
-  const statusTone = CONNECTOR_STATUS_TONE[status] ?? "slate";
 
   const postOperation = async (
     operation: string,
@@ -456,12 +439,15 @@ function ChargerBody(
 
         <Divider />
 
-        {/* Pills row */}
+        {
+          /* Pills row — form factor only. The icon halo + Activity line
+            already encode connector status; a redundant status pill made the
+            row feel busier than the scanner pills row. */
+        }
         <PillRow>
           <StatusPill tone="slate">
             {formatFormFactor(formFactorLabel)}
           </StatusPill>
-          <StatusPill tone={statusTone}>{status}</StatusPill>
         </PillRow>
 
         {/* Primary status line — full-width */}
@@ -673,7 +659,11 @@ function ScannerBody(
     }
   };
 
-  const kindLabel = device.kind === "phone_nfc" ? "Phone" : "Laptop";
+  const kindLabel = device.kind === "phone_nfc"
+    ? "Phone"
+    : device.kind === "tablet_nfc"
+    ? "Tablet"
+    : "Laptop";
   const activityLine = device.isOnline
     ? "Online now"
     : device.lastSeenAtIso
@@ -838,8 +828,11 @@ function ScannerBody(
           <>
             This soft-deletes <strong>{device.label}</strong>{" "}
             and revokes every active bearer token. The owner will be signed out
-            on next request and the{" "}
-            {device.kind === "phone_nfc" ? "phone" : "laptop"}{" "}
+            on next request and the {device.kind === "phone_nfc"
+              ? "phone"
+              : device.kind === "tablet_nfc"
+              ? "tablet"
+              : "laptop"}{" "}
             must re-register. This cannot be undone via the admin UI.
           </>
         }

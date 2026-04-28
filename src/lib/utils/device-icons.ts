@@ -27,6 +27,7 @@ import {
 } from "../../../components/brand/chargers/index.ts";
 import { IPhoneIcon } from "../../../components/brand/devices/IPhoneIcon.tsx";
 import { LaptopIcon } from "../../../components/brand/devices/LaptopIcon.tsx";
+import { TabletIcon } from "../../../components/brand/devices/TabletIcon.tsx";
 
 /**
  * Shared prop contract for every device-style icon (chargers, phones,
@@ -55,7 +56,7 @@ export interface DeviceIconProps {
  * factors fall back to `GenericChargerIcon` as well.
  */
 export function getDeviceIcon(
-  kind: "charger" | "phone_nfc" | "laptop_nfc",
+  kind: "charger" | "phone_nfc" | "tablet_nfc" | "laptop_nfc",
   formFactor?: string,
 ): ComponentType<DeviceIconProps> {
   if (kind === "charger") {
@@ -65,6 +66,7 @@ export function getDeviceIcon(
     return (icon ?? GenericChargerIcon) as ComponentType<DeviceIconProps>;
   }
   if (kind === "phone_nfc") return IPhoneIcon;
+  if (kind === "tablet_nfc") return TabletIcon;
   if (kind === "laptop_nfc") return LaptopIcon;
   return GenericChargerIcon as ComponentType<DeviceIconProps>;
 }

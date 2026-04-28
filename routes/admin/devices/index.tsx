@@ -111,7 +111,9 @@ function coerceTypeFilter(raw: string | null): DeviceTypeFilter {
 }
 
 function coerceKindFilter(raw: string | null): DeviceKindFilter {
-  if (raw === "phone_nfc" || raw === "laptop_nfc") return raw;
+  if (
+    raw === "phone_nfc" || raw === "tablet_nfc" || raw === "laptop_nfc"
+  ) return raw;
   return "all";
 }
 
@@ -175,14 +177,18 @@ export const handler = define.handlers({
         const conditions = [isNull(devicesTable.deletedAt)];
         if (filters.kind === "phone_nfc") {
           conditions.push(eq(devicesTable.kind, "phone_nfc"));
+        } else if (filters.kind === "tablet_nfc") {
+          conditions.push(eq(devicesTable.kind, "tablet_nfc"));
         } else if (filters.kind === "laptop_nfc") {
           conditions.push(eq(devicesTable.kind, "laptop_nfc"));
         } else {
-          // Any non-charger kind. The check constraint already restricts to
-          // the two phone/laptop kinds, but be explicit.
+          // Any non-charger kind. The check constraint restricts to the
+          // recognised scanner kinds; be explicit so a misconfigured row
+          // doesn't slip into the listing.
           conditions.push(
             or(
               eq(devicesTable.kind, "phone_nfc"),
+              eq(devicesTable.kind, "tablet_nfc"),
               eq(devicesTable.kind, "laptop_nfc"),
             )!,
           );
@@ -214,7 +220,11 @@ export const handler = define.handlers({
 
         scannerEntries = rows.map((r): UnifiedDeviceEntry => {
           const lastSeenIso = isoOrNull(r.lastSeenAt);
-          const kind = (r.kind === "phone_nfc" || r.kind === "laptop_nfc")
+          const kind = (
+              r.kind === "phone_nfc" ||
+              r.kind === "tablet_nfc" ||
+              r.kind === "laptop_nfc"
+            )
             ? r.kind
             : "phone_nfc";
           return {

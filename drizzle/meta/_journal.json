@@ -253,6 +253,13 @@
       "when": 1777912180000,
       "tag": "0035_tappable_devices_view",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1777912240000,
+      "tag": "0036_devices_kind_tablet_nfc",
+      "breakpoints": true
     }
   ]
 }

@@ -1387,7 +1387,7 @@ export const devices = pgTable("devices", {
 }, (table) => [
   check(
     "devices_kind_check",
-    sql`${table.kind} IN ('phone_nfc','laptop_nfc')`,
+    sql`${table.kind} IN ('phone_nfc','tablet_nfc','laptop_nfc')`,
   ),
   check(
     "devices_apns_environment_check",
