@@ -25,13 +25,13 @@ export function buildAdminPasswordResetEmail(
     category: "admin-password-reset",
     subject: "Reset your admin password",
     preheader:
-      "Use the button below to reset your ExpresSync operator password. Link expires in 24 hours.",
+      "Use the button below to reset your ExpressCharge operator password. Link expires in 24 hours.",
     title: "Reset your admin password",
     body: [
       {
         type: "paragraph",
         text:
-          "We received a request to reset the password for your ExpresSync operator account.",
+          "We received a request to reset the password for your ExpressCharge operator account.",
       },
       {
         type: "highlight",

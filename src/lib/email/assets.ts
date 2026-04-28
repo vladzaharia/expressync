@@ -25,23 +25,23 @@ export interface BrandAssets {
 
 export const BRAND_ASSETS: Record<EmailBrand, BrandAssets> = {
   polaris: {
-    name: "Polaris Express",
-    wordmark: "Polaris Express",
+    name: "ExpressCharge",
+    wordmark: "ExpressCharge",
     logoUrl: "https://assets.polaris.express/email/polaris-logo-160.png",
     logoUrl2x: "https://assets.polaris.express/email/polaris-logo-320.png",
     primaryHex: "#0E7C66",
     primaryDark: "#34D399",
-    fromHeader: "Polaris Express <noreply@polaris.express>",
+    fromHeader: "ExpressCharge <noreply@polaris.express>",
     replyTo: "support@polaris.express",
   },
   expressync: {
-    name: "ExpresSync",
-    wordmark: "ExpresSync",
+    name: "ExpressCharge",
+    wordmark: "ExpressCharge",
     logoUrl: "https://assets.polaris.express/email/expressync-logo-160.png",
     logoUrl2x: "https://assets.polaris.express/email/expressync-logo-320.png",
     primaryHex: "#1561C4",
     primaryDark: "#5FB1E8",
-    fromHeader: "ExpresSync Operator <admin-noreply@polaris.express>",
+    fromHeader: "ExpressCharge Operator <admin-noreply@polaris.express>",
     replyTo: "support@polaris.express",
   },
 } as const;

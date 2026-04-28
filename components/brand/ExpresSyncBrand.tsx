@@ -121,7 +121,7 @@ function ExpresSyncWordmark({
   return (
     <span className={cn("font-bold", sizeClasses[size])}>
       <AuroraText colors={brandColors} speed={6}>
-        ExpresSync
+        ExpressCharge
       </AuroraText>
     </span>
   );

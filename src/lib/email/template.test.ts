@@ -31,7 +31,7 @@ Deno.test("renderTemplate produces valid HTML5 with DOCTYPE", async () => {
   assertStringIncludes(out.html, "</html>");
   assertStringIncludes(out.html, "<body");
   assertEquals(out.subject, "Hello there");
-  assertEquals(out.fromHeader, "Polaris Express <noreply@polaris.express>");
+  assertEquals(out.fromHeader, "ExpressCharge <noreply@polaris.express>");
   assertEquals(out.replyTo, "support@polaris.express");
 });
 
@@ -107,14 +107,14 @@ Deno.test("divider block renders a horizontal rule row", async () => {
 
 // ---- Brand variants -------------------------------------------------------
 
-Deno.test("polaris brand emits Polaris Express from-header + accent", async () => {
+Deno.test("polaris brand emits ExpressCharge from-header + accent", async () => {
   const out = await renderTemplate(baseSpec({ brand: "polaris" }));
-  assertEquals(out.fromHeader, "Polaris Express <noreply@polaris.express>");
+  assertEquals(out.fromHeader, "ExpressCharge <noreply@polaris.express>");
   // Polaris primary accent #0E7C66 should appear in inlined styles (button).
   assertStringIncludes(out.html.toLowerCase(), "#0e7c66");
 });
 
-Deno.test("expressync brand emits ExpresSync admin from-header + accent", async () => {
+Deno.test("expressync brand emits ExpressCharge admin from-header + accent", async () => {
   const out = await renderTemplate(
     baseSpec({
       brand: "expressync",
@@ -124,7 +124,7 @@ Deno.test("expressync brand emits ExpresSync admin from-header + accent", async 
   );
   assertEquals(
     out.fromHeader,
-    "ExpresSync Operator <admin-noreply@polaris.express>",
+    "ExpressCharge Operator <admin-noreply@polaris.express>",
   );
   assertStringIncludes(out.html.toLowerCase(), "#1561c4");
 });
@@ -200,7 +200,7 @@ Deno.test("plain-text version includes title + each block + brand wordmark", asy
   assertStringIncludes(out.text, "> H1");
   assertStringIncludes(out.text, "C1");
   assertStringIncludes(out.text, "---");
-  assertStringIncludes(out.text, "Polaris Express");
+  assertStringIncludes(out.text, "ExpressCharge");
 });
 
 Deno.test("plain-text version includes metadata rows", async () => {

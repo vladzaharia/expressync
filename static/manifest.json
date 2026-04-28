@@ -1,6 +1,6 @@
 {
-  "name": "Polaris Express",
-  "short_name": "Polaris",
+  "name": "ExpressCharge",
+  "short_name": "ExpressCharge",
   "description": "Self-service portal for EV charging — sessions, reservations, cards, and billing.",
   "start_url": "/",
   "scope": "/",

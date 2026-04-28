@@ -290,7 +290,7 @@ function validateBody(
 
   const fromHeader = typeof body.from === "string" && body.from.length > 0
     ? body.from
-    : "Polaris Express <noreply@polaris.express>";
+    : "ExpressCharge <noreply@polaris.express>";
   const fromAddr = extractAddress(fromHeader);
   if (!ALLOWED_SENDER_ADDRESSES.has(fromAddr)) {
     return { ok: false, error: `sender ${fromAddr} not allowlisted` };

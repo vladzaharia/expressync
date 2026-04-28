@@ -310,8 +310,8 @@ function DevicesEmptyState({ activeType }: { activeType: DeviceTypeFilter }) {
   const body = activeType === "charger"
     ? "Connect a chargepoint via SteVe — it will appear here once it boots and announces itself over OCPP."
     : activeType === "scanner"
-    ? "Install the ExpresScan iOS app and complete the registration flow — the device will appear here after pairing."
-    : "Connect a chargepoint via SteVe, or pair a phone using the ExpresScan iOS app.";
+    ? "Install the ExpressCharge iOS app and complete the registration flow — the device will appear here after pairing."
+    : "Connect a chargepoint via SteVe, or pair a phone using the ExpressCharge iOS app.";
   return (
     <div class="flex flex-col items-center justify-center gap-2 rounded-xl border bg-card px-6 py-12 text-center">
       <p class="text-base font-medium">{headline}</p>

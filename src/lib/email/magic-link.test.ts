@@ -6,7 +6,7 @@ const URL = "https://polaris.express/auth/verify?token=abc123";
 
 Deno.test("magic-link: subject + brand + category", () => {
   const spec = buildMagicLinkEmail({ to: "alice@example.com", url: URL });
-  assertEquals(spec.subject, "Sign in to Polaris Express");
+  assertEquals(spec.subject, "Sign in to ExpressCharge");
   assertEquals(spec.brand, "polaris");
   assertEquals(spec.category, "magic-link");
 });
@@ -70,6 +70,6 @@ Deno.test("magic-link: no admin-only data leakage", async () => {
   assert(!rendered.text.toLowerCase().includes("expressync"));
   assertEquals(
     rendered.fromHeader,
-    "Polaris Express <noreply@polaris.express>",
+    "ExpressCharge <noreply@polaris.express>",
   );
 });

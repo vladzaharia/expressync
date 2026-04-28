@@ -88,6 +88,6 @@ Deno.test("reservation-cancelled: no admin-only data leakage", async () => {
   assert(!rendered.html.includes("manage.polaris.express"));
   assertEquals(
     rendered.fromHeader,
-    "Polaris Express <noreply@polaris.express>",
+    "ExpressCharge <noreply@polaris.express>",
   );
 });

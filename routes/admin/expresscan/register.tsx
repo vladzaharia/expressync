@@ -109,7 +109,7 @@ function htmlRedirect(oneTimeCode: string): Response {
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#06b6d4">
-<title>Returning to ExpresScan…</title>
+<title>Returning to ExpressCharge…</title>
 <meta http-equiv="refresh" content="0;url=${callbackUrl}">
 <script>location.replace(${callbackJson});</script>
 <style>
@@ -195,10 +195,10 @@ h1 {
       <path d="M13 2 L3 14 h9 l-1 8 L21 10 h-9 l1 -8 z" />
     </svg>
   </div>
-  <h1>Returning to ExpresScan…</h1>
+  <h1>Returning to ExpressCharge…</h1>
   <div class="row"><span class="spinner" aria-hidden="true"></span><span>Finishing up</span></div>
   <p class="muted">You can close this window once the app reopens.</p>
-  <a class="fallback" href="${callbackUrl}">Open ExpresScan manually</a>
+  <a class="fallback" href="${callbackUrl}">Open ExpressCharge manually</a>
 </div>
 </body>
 </html>`;
@@ -278,10 +278,10 @@ export default define.page<typeof handler>(function ExpresScanRegister(
       <div class="min-h-screen flex items-center justify-center bg-background p-4">
         <div class="w-full max-w-md rounded-lg border border-amber-500/40 bg-amber-500/5 p-6 text-sm">
           <h1 class="mb-2 text-xl font-semibold text-amber-700 dark:text-amber-300">
-            Open this page from the ExpresScan app
+            Open this page from the ExpressCharge app
           </h1>
           <p class="text-muted-foreground">
-            This URL is the registration entry point for the iOS ExpresScan app.
+            This URL is the registration entry point for the iOS ExpressCharge app.
             Tap "Sign in" inside the app to start the flow — it will open this
             page with a one-time PKCE challenge attached and send you straight
             back to the app.
@@ -305,7 +305,7 @@ export default define.page<typeof handler>(function ExpresScanRegister(
         </h1>
         <p class="text-muted-foreground">
           Something went wrong generating a registration code. Return to the
-          ExpresScan app and try Sign in again.
+          ExpressCharge app and try Sign in again.
         </p>
       </div>
     </div>

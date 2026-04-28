@@ -170,7 +170,7 @@ function PolarisExpressWordmark({
   return (
     <span className={cn("font-bold whitespace-nowrap", sizeClasses[size])}>
       <AuroraText colors={brandColors} speed={6}>
-        Polaris Express
+        ExpressCharge
       </AuroraText>
     </span>
   );

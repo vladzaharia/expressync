@@ -1,6 +1,6 @@
 {
-  "name": "ExpresSync — EV Charging Admin",
-  "short_name": "ExpresSync",
+  "name": "ExpressCharge — Admin",
+  "short_name": "ExpressCharge",
   "description": "Admin dashboard for EV charging and billing management",
   "start_url": "/",
   "scope": "/",

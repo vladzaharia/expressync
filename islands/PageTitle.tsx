@@ -15,7 +15,7 @@ export default function PageTitle(
   { title, description, image }: PageTitleProps,
 ) {
   useEffect(() => {
-    const fullTitle = `${title} — ExpresSync`;
+    const fullTitle = `${title} — ExpressCharge`;
     document.title = fullTitle;
 
     const setMeta = (

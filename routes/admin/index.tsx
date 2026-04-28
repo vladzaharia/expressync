@@ -96,7 +96,7 @@ export default define.page<typeof handler>(
             ? (
               <EmptyState
                 icon={Zap}
-                title="Welcome to ExpresSync"
+                title="Welcome to ExpressCharge"
                 description="Register a charge point in StEvE and scan a tag to get started. Link your first tag to a Lago customer to start billing."
                 primaryAction={{
                   label: "Register a tag",
@@ -115,7 +115,7 @@ export default define.page<typeof handler>(
             : null}
 
           <PageCard
-            title="ExpresSync"
+            title="ExpressCharge"
             description="System pulse, live sessions, and fleet health."
             colorScheme="cyan"
             outerClassName="flex min-h-0 flex-1 flex-col"

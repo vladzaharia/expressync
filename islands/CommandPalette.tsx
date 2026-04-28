@@ -608,7 +608,7 @@ export default function CommandPalette(
             <span class="inline sm:hidden">Tap to select</span>
             <span class="flex items-center gap-1">
               <Receipt class="size-3" aria-hidden="true" />
-              <span>ExpresSync</span>
+              <span>ExpressCharge</span>
             </span>
           </div>
         </Command>

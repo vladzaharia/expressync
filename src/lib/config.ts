@@ -106,10 +106,10 @@ export const config = {
   CF_EMAIL_WORKER_SECRET: Deno.env.get("CF_EMAIL_WORKER_SECRET") || "",
   /** Default From: header for customer-bound emails. */
   EMAIL_FROM: Deno.env.get("EMAIL_FROM") ||
-    "Polaris Express <noreply@polaris.express>",
+    "ExpressCharge <noreply@polaris.express>",
   /** From: header for admin-bound emails (forgot-password, ops alerts). */
   EMAIL_FROM_ADMIN: Deno.env.get("EMAIL_FROM_ADMIN") ||
-    "ExpresSync Operator <admin-noreply@polaris.express>",
+    "ExpressCharge Operator <admin-noreply@polaris.express>",
   /** Magic-link TTL for the standard "email me a sign-in link" path (seconds). */
   MAGIC_LINK_TTL_SECONDS: (() => {
     const val = parseInt(Deno.env.get("MAGIC_LINK_TTL_SECONDS") || "900");
