@@ -181,8 +181,10 @@ export default function SyncControls({ isAdmin = false }: SyncControlsProps) {
 
   return (
     <div className="flex items-center gap-2">
-      {/* 1. Status pill — tier badge + countdown. Self-contained card so the
-          whole strip reads as three separate widgets, not one band. */}
+      {
+        /* 1. Status pill — tier badge + countdown. Self-contained card so the
+          whole strip reads as three separate widgets, not one band. */
+      }
       <div
         className="flex h-9 items-center gap-2 rounded-md border border-border bg-card/50 px-2.5"
         title={tierStyle.value.reason}
@@ -210,9 +212,11 @@ export default function SyncControls({ isAdmin = false }: SyncControlsProps) {
         />
       </div>
 
-      {/* 2. Trigger sync — icon-only square button. Distinct from the status
+      {
+        /* 2. Trigger sync — icon-only square button. Distinct from the status
           pill (no border-l attached) and from the admin button (different
-          accent colour, no chevron). */}
+          accent colour, no chevron). */
+      }
       <button
         type="button"
         onClick={handleResetCadence}
@@ -255,8 +259,10 @@ export default function SyncControls({ isAdmin = false }: SyncControlsProps) {
         </DialogContent>
       </Dialog>
 
-      {/* 3. Admin pin dropdown — amber-tinted to flag "destructive-ish admin
-          override" vs the neutral trigger button to its left. */}
+      {
+        /* 3. Admin pin dropdown — amber-tinted to flag "destructive-ish admin
+          override" vs the neutral trigger button to its left. */
+      }
       {isAdmin && (
         <div className="relative">
           <button
