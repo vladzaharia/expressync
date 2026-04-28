@@ -36,7 +36,8 @@ import { logger } from "../../../src/lib/utils/logger.ts";
 import { SidebarLayout } from "../../../components/SidebarLayout.tsx";
 import { PageCard } from "../../../components/PageCard.tsx";
 import { SectionCard } from "../../../components/shared/SectionCard.tsx";
-import { Activity } from "lucide-preact";
+import { StatStrip } from "../../../components/shared/StatStrip.tsx";
+import { Activity, AppWindow, Calendar, Clock, Layers } from "lucide-preact";
 import { DeviceIdentityCard } from "../../../components/devices/DeviceIdentityCard.tsx";
 import { DeviceHeaderStrip } from "../../../components/devices/DeviceHeaderStrip.tsx";
 import DeviceActionsMenu from "../../../islands/devices/DeviceActionsMenu.tsx";
@@ -47,6 +48,7 @@ import { DeviceStateSyncList } from "../../../components/devices/DeviceStateSync
 import type { DeviceSyncEntry } from "../../../components/devices/DeviceStateSyncList.tsx";
 import CapabilityPicker from "../../../islands/devices/CapabilityPicker.tsx";
 import DeviceSettingsForm from "../../../islands/devices/DeviceSettingsForm.tsx";
+import { formatRelative } from "../../../islands/shared/device-visuals.ts";
 import { History as HistoryIcon, Settings2, Stethoscope } from "lucide-preact";
 import { deviceSettings as deviceSettingsTable } from "../../../src/db/schema.ts";
 import { pickerOptionsForKind } from "../../../src/lib/devices/capability-metadata.ts";
@@ -335,110 +337,129 @@ export default define.page<typeof handler>(
             </div>
           }
         >
-          <div class="flex flex-col gap-6">
-            <DeviceHeaderStrip
-              deviceId={device.deviceId}
-              label={device.label}
-              kind={device.kind}
-              isOnline={isOnline}
-              lastSeenAtIso={device.lastSeenAtIso}
-              capabilities={device.capabilities}
-              ownerEmail={device.ownerEmail}
-              isDeregistered={isDeregistered}
-              isRevoked={device.revokedAtIso !== null}
-            />
+          {(() => {
+            // Slice P — visual redesign mirroring the charger detail page's
+            // column treatment. One PageCard root → HeaderStrip → StatStrip →
+            // 1+2 grid (identity + diagnostics) → App Configuration full-width
+            // → 1+1 grid (recent syncs + recent scans). All sections inherit
+            // the page's `teal` accent.
+            const diagnostics: DeviceDiagnostics = {
+              lastSeenAtIso: device.lastSeenAtIso,
+              reconnectCount: typeof device.lastStatus?.reconnectCount ===
+                    "number" && device.lastStatus.reconnectCount >= 0
+                ? Math.floor(device.lastStatus.reconnectCount)
+                : 0,
+              pendingUploads: typeof device.lastStatus?.pendingUploads ===
+                    "number" && device.lastStatus.pendingUploads >= 0
+                ? Math.floor(device.lastStatus.pendingUploads)
+                : 0,
+              pushPermission:
+                typeof device.lastStatus?.pushPermission === "boolean"
+                  ? device.lastStatus.pushPermission
+                  : null,
+              nfcPermission:
+                typeof device.lastStatus?.nfcPermission === "boolean"
+                  ? device.lastStatus.nfcPermission
+                  : null,
+              appVersion: device.appVersion,
+              osVersion: device.osVersion,
+              model: device.model,
+              platform: device.platform,
+              pushTokenLast8: device.pushTokenLast8,
+              apnsEnvironment: device.apnsEnvironment,
+              lastErrorMessage:
+                typeof device.lastStatus?.lastErrorMessage === "string"
+                  ? device.lastStatus.lastErrorMessage
+                  : null,
+            };
+            const recentSyncs: DeviceSyncEntry[] = [];
 
-            <DeviceIdentityCard
-              deviceId={device.deviceId}
-              kind={device.kind}
-              label={device.label}
-              platform={device.platform}
-              model={device.model}
-              osVersion={device.osVersion}
-              appVersion={device.appVersion}
-              ownerUserId={device.ownerUserId}
-              ownerEmail={device.ownerEmail}
-              capabilities={device.capabilities}
-              pushTokenLast8={device.pushTokenLast8}
-              apnsEnvironment={device.apnsEnvironment}
-              isOnline={isOnline}
-              lastSeenAtIso={device.lastSeenAtIso}
-              registeredAtIso={device.registeredAtIso}
-            />
+            // Headline stats — last seen / registered / app / OS — laid out
+            // as a `StatStrip` so the device page reads as parallel to the
+            // charger page's connector/state strip. Tones override to
+            // `muted` when there's no value (so the stat reads as inactive
+            // rather than warning).
+            const statItems = [
+              {
+                key: "last-seen",
+                label: "Last seen",
+                value: isOnline
+                  ? "Online now"
+                  : formatRelative(device.lastSeenAtIso),
+                icon: Clock,
+                tone: (isOnline
+                  ? "emerald"
+                  : device.lastSeenAtIso
+                  ? undefined
+                  : "muted") as "emerald" | "muted" | undefined,
+              },
+              {
+                key: "registered",
+                label: "Registered",
+                value: formatRelative(device.registeredAtIso),
+                icon: Calendar,
+                title: device.registeredAtIso,
+              },
+              {
+                key: "app-version",
+                label: "App version",
+                value: device.appVersion ?? "—",
+                icon: AppWindow,
+                tone: (device.appVersion ? undefined : "muted") as
+                  | "muted"
+                  | undefined,
+              },
+              {
+                key: "os-version",
+                label: "OS",
+                value: device.osVersion ?? "—",
+                icon: Layers,
+                tone: (device.osVersion ? undefined : "muted") as
+                  | "muted"
+                  | undefined,
+              },
+            ];
 
-            {(() => {
-              // Wave 6 / Slice D — App Configuration tab. Composed of
-              // CapabilityPicker, DeviceSettingsForm, DeviceDiagnosticsCard,
-              // DeviceStateSyncList. Title adapts per kind.
-              const isCharger = (device.kind as string) === "charger";
-              const tabTitle = isCharger
-                ? "Charger Configuration"
-                : "App Configuration";
-              const diagnostics: DeviceDiagnostics = {
-                lastSeenAtIso: device.lastSeenAtIso,
-                reconnectCount: typeof device.lastStatus?.reconnectCount ===
-                      "number" && device.lastStatus.reconnectCount >= 0
-                  ? Math.floor(device.lastStatus.reconnectCount)
-                  : 0,
-                pendingUploads: typeof device.lastStatus?.pendingUploads ===
-                      "number" && device.lastStatus.pendingUploads >= 0
-                  ? Math.floor(device.lastStatus.pendingUploads)
-                  : 0,
-                pushPermission:
-                  typeof device.lastStatus?.pushPermission === "boolean"
-                    ? device.lastStatus.pushPermission
-                    : null,
-                nfcPermission:
-                  typeof device.lastStatus?.nfcPermission === "boolean"
-                    ? device.lastStatus.nfcPermission
-                    : null,
-                appVersion: device.appVersion,
-                osVersion: device.osVersion,
-                model: device.model,
-                platform: device.platform,
-                pushTokenLast8: device.pushTokenLast8,
-                apnsEnvironment: device.apnsEnvironment,
-                lastErrorMessage:
-                  typeof device.lastStatus?.lastErrorMessage === "string"
-                    ? device.lastStatus.lastErrorMessage
-                    : null,
-              };
-              const recentSyncs: DeviceSyncEntry[] = [];
-              return (
-                <>
+            return (
+              <div class="flex flex-col gap-6">
+                {/* Header strip — identity + status pills */}
+                <DeviceHeaderStrip
+                  deviceId={device.deviceId}
+                  label={device.label}
+                  kind={device.kind}
+                  isOnline={isOnline}
+                  lastSeenAtIso={device.lastSeenAtIso}
+                  capabilities={device.capabilities}
+                  ownerEmail={device.ownerEmail}
+                  isDeregistered={isDeregistered}
+                  isRevoked={device.revokedAtIso !== null}
+                />
+
+                {/* Headline stats — parallel to the charger page's strip */}
+                <StatStrip items={statItems} accent="teal" />
+
+                {/* Row 1: identity + diagnostics, 1+2 split at lg: */}
+                <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                  <DeviceIdentityCard
+                    class="lg:col-span-1"
+                    deviceId={device.deviceId}
+                    kind={device.kind}
+                    label={device.label}
+                    platform={device.platform}
+                    model={device.model}
+                    osVersion={device.osVersion}
+                    appVersion={device.appVersion}
+                    ownerUserId={device.ownerUserId}
+                    ownerEmail={device.ownerEmail}
+                    capabilities={device.capabilities}
+                    pushTokenLast8={device.pushTokenLast8}
+                    apnsEnvironment={device.apnsEnvironment}
+                    isOnline={isOnline}
+                    lastSeenAtIso={device.lastSeenAtIso}
+                    registeredAtIso={device.registeredAtIso}
+                  />
                   <SectionCard
-                    title={tabTitle}
-                    description={isCharger
-                      ? "Capabilities and settings for this charger row."
-                      : "Capabilities and settings for this app device."}
-                    icon={Settings2}
-                    accent="teal"
-                  >
-                    <div class="flex flex-col gap-6">
-                      <div class="flex flex-col gap-3">
-                        <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Capabilities
-                        </h3>
-                        <CapabilityPicker
-                          deviceId={device.deviceId}
-                          current={device.capabilities as DeviceCapability[]}
-                          editable={device.pickerEditable}
-                          readOnly={device.pickerReadOnly}
-                        />
-                      </div>
-                      <div class="flex flex-col gap-3">
-                        <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Settings
-                        </h3>
-                        <DeviceSettingsForm
-                          deviceId={device.deviceId}
-                          settings={device.appConfigSettings}
-                        />
-                      </div>
-                    </div>
-                  </SectionCard>
-
-                  <SectionCard
+                    className="lg:col-span-2"
                     title="Diagnostics"
                     description="Most recent device-reported diagnostic envelope."
                     icon={Stethoscope}
@@ -446,7 +467,41 @@ export default define.page<typeof handler>(
                   >
                     <DeviceDiagnosticsCard diagnostics={diagnostics} />
                   </SectionCard>
+                </div>
 
+                {/* Row 2: App Configuration full-width */}
+                <SectionCard
+                  title="App Configuration"
+                  description="Capabilities and settings for this app device."
+                  icon={Settings2}
+                  accent="teal"
+                >
+                  <div class="flex flex-col gap-6">
+                    <div class="flex flex-col gap-3">
+                      <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Capabilities
+                      </h3>
+                      <CapabilityPicker
+                        deviceId={device.deviceId}
+                        current={device.capabilities as DeviceCapability[]}
+                        editable={device.pickerEditable}
+                        readOnly={device.pickerReadOnly}
+                      />
+                    </div>
+                    <div class="flex flex-col gap-3">
+                      <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Settings
+                      </h3>
+                      <DeviceSettingsForm
+                        deviceId={device.deviceId}
+                        settings={device.appConfigSettings}
+                      />
+                    </div>
+                  </div>
+                </SectionCard>
+
+                {/* Row 3: recent syncs + recent scans, side-by-side at xl: */}
+                <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
                   <SectionCard
                     title="Recent syncs"
                     description="Recent device-state syncs from this device."
@@ -455,19 +510,19 @@ export default define.page<typeof handler>(
                   >
                     <DeviceStateSyncList recentSyncs={recentSyncs} />
                   </SectionCard>
-                </>
-              );
-            })()}
 
-            <SectionCard
-              title="Recent Scans"
-              description="Last 50 scan events involving this device."
-              icon={Activity}
-              accent="teal"
-            >
-              <RecentScansEmpty />
-            </SectionCard>
-          </div>
+                  <SectionCard
+                    title="Recent Scans"
+                    description="Last 50 scan events involving this device."
+                    icon={Activity}
+                    accent="teal"
+                  >
+                    <RecentScansEmpty />
+                  </SectionCard>
+                </div>
+              </div>
+            );
+          })()}
         </PageCard>
       </SidebarLayout>
     );

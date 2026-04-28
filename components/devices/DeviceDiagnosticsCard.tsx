@@ -108,36 +108,42 @@ export function DeviceDiagnosticsCard(
         )}
       </div>
 
-      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <MetricTile
           icon={Plug}
           label="Last sync"
           value={formatAbs(d.lastSeenAtIso)}
+          accent="teal"
         />
         <MetricTile
           icon={Radio}
           label="Reconnects"
           value={String(d.reconnectCount)}
+          accent="teal"
         />
         <MetricTile
           icon={Upload}
           label="Pending uploads"
           value={String(d.pendingUploads)}
+          accent="teal"
         />
         <MetricTile
           icon={AppWindow}
           label="App version"
           value={d.appVersion ?? "—"}
+          accent="teal"
         />
         <MetricTile
           icon={Layers}
           label="OS version"
           value={d.osVersion ?? "—"}
+          accent="teal"
         />
         <MetricTile
           icon={Smartphone}
           label="Model"
           value={d.model ?? d.platform ?? "—"}
+          accent="teal"
         />
       </div>
 
