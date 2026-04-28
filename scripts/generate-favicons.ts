@@ -1,27 +1,35 @@
 #!/usr/bin/env -S deno run --allow-read --allow-write --allow-run
 /**
- * Favicon + app-icon generator for ExpressCharge.
+ * Favicon + native app-icon generator for ExpressCharge.
  *
- * Sources:
- *   static/logo.svg          — primary glyph (squircle bleeds inside its
- *                               own canvas; used for browser favicons,
- *                               apple-touch-icon, "any"-purpose PWA icons).
- *   static/logo-maskable.svg — full-bleed gradient with the glyph in the
- *                               inner 80% safe zone; used for "maskable"-
- *                               purpose PWA icons that Android/iOS clip.
+ * Outputs three families:
  *
- * Outputs (all under static/):
- *   favicon.svg                — copy of logo.svg (modern browsers)
- *   favicon.ico                — multi-size (16/32/48), legacy browsers
- *   favicon-16.png, -32.png,
- *     -48.png                  — classic <link rel="icon"> sizes
- *   favicon-96.png             — Chrome desktop / new-tab page
- *   apple-touch-icon.png       — 180×180, iOS home screen
- *   icon-192.png, icon-512.png — PWA manifest, "any" purpose
- *   icon-maskable-192.png,
- *     icon-maskable-512.png    — PWA manifest, "maskable" purpose
+ *   1. Web favicons (under static/) — see top of `WEB_JOBS`. Powers the
+ *      <link rel="icon"> set in routes/_app.tsx and the PWA manifests.
  *
- * Run whenever logo.svg or logo-maskable.svg changes:
+ *   2. iOS App Icon set (under app-icons/ios/AppIcon.appiconset/) — every
+ *      size Xcode requests for an iPhone + iPad app, plus the 1024×1024
+ *      App Store marketing icon. Drag-drop the generated `.appiconset`
+ *      folder into Xcode's asset catalog.
+ *
+ *   3. Android launcher icons (under app-icons/android/) — both the
+ *      legacy `mipmap-{m,h,xh,xxh,xxxh}dpi/ic_launcher.png` square icons
+ *      and the adaptive-icon foreground/background layers required by
+ *      Android 8+ (`ic_launcher_foreground.png` + `ic_launcher_background.png`
+ *      at the same density buckets), plus the 512×512 Play Store icon.
+ *
+ * Sources (all under static/):
+ *   logo.svg            — primary glyph (squircle bleeds inside its own
+ *                          canvas; web tabs, apple-touch-icon, iOS App
+ *                          Icon, Android legacy launcher).
+ *   logo-maskable.svg   — full-bleed gradient with glyph in 80% safe zone;
+ *                          PWA "maskable" purpose icons.
+ *   logo-foreground.svg — Android adaptive-icon foreground (transparent
+ *                          background, glyph in safe zone).
+ *   logo-background.svg — Android adaptive-icon background (full-bleed
+ *                          gradient, no glyph).
+ *
+ * Run whenever any of the source SVGs change:
  *   deno run --allow-read --allow-write --allow-run \
  *     scripts/generate-favicons.ts
  *
@@ -29,6 +37,8 @@
  */
 
 const STATIC = "static";
+const IOS = "app-icons/ios/AppIcon.appiconset";
+const ANDROID = "app-icons/android";
 
 interface Job {
   src: string;
@@ -36,22 +46,79 @@ interface Job {
   size: number;
 }
 
-const jobs: Job[] = [
-  // --- favicon.svg-derived PNGs (browser tabs, iOS home, manifest "any") ---
-  { src: "logo.svg", out: "favicon-16.png", size: 16 },
-  { src: "logo.svg", out: "favicon-32.png", size: 32 },
-  { src: "logo.svg", out: "favicon-48.png", size: 48 },
-  { src: "logo.svg", out: "favicon-96.png", size: 96 },
-  { src: "logo.svg", out: "apple-touch-icon.png", size: 180 },
-  { src: "logo.svg", out: "icon-192.png", size: 192 },
-  { src: "logo.svg", out: "icon-512.png", size: 512 },
-  // --- maskable-source PNGs (PWA manifest "maskable" purpose) ---
-  { src: "logo-maskable.svg", out: "icon-maskable-192.png", size: 192 },
-  { src: "logo-maskable.svg", out: "icon-maskable-512.png", size: 512 },
+// --- Web favicons ---------------------------------------------------------
+const WEB_JOBS: Job[] = [
+  { src: "logo.svg", out: `${STATIC}/favicon-16.png`, size: 16 },
+  { src: "logo.svg", out: `${STATIC}/favicon-32.png`, size: 32 },
+  { src: "logo.svg", out: `${STATIC}/favicon-48.png`, size: 48 },
+  { src: "logo.svg", out: `${STATIC}/favicon-96.png`, size: 96 },
+  { src: "logo.svg", out: `${STATIC}/apple-touch-icon.png`, size: 180 },
+  { src: "logo.svg", out: `${STATIC}/icon-192.png`, size: 192 },
+  { src: "logo.svg", out: `${STATIC}/icon-512.png`, size: 512 },
+  { src: "logo-maskable.svg", out: `${STATIC}/icon-maskable-192.png`, size: 192 },
+  { src: "logo-maskable.svg", out: `${STATIC}/icon-maskable-512.png`, size: 512 },
 ];
 
+// --- iOS App Icon set -----------------------------------------------------
+// Names match Apple's actool conventions so Xcode's "drag-drop the
+// .appiconset folder" workflow lights them up automatically. The
+// generated Contents.json below maps each filename to its idiom/scale.
+interface IosEntry {
+  size: number;
+  filename: string;
+  // For Contents.json:
+  idiom: "iphone" | "ipad" | "ios-marketing";
+  iconSize: string; // e.g. "20x20"
+  scale: string; // e.g. "2x"
+}
+const IOS_ENTRIES: IosEntry[] = [
+  // iPhone
+  { size: 40, filename: "Icon-20@2x.png", idiom: "iphone", iconSize: "20x20", scale: "2x" },
+  { size: 60, filename: "Icon-20@3x.png", idiom: "iphone", iconSize: "20x20", scale: "3x" },
+  { size: 58, filename: "Icon-29@2x.png", idiom: "iphone", iconSize: "29x29", scale: "2x" },
+  { size: 87, filename: "Icon-29@3x.png", idiom: "iphone", iconSize: "29x29", scale: "3x" },
+  { size: 80, filename: "Icon-40@2x.png", idiom: "iphone", iconSize: "40x40", scale: "2x" },
+  { size: 120, filename: "Icon-40@3x.png", idiom: "iphone", iconSize: "40x40", scale: "3x" },
+  { size: 120, filename: "Icon-60@2x.png", idiom: "iphone", iconSize: "60x60", scale: "2x" },
+  { size: 180, filename: "Icon-60@3x.png", idiom: "iphone", iconSize: "60x60", scale: "3x" },
+  // iPad
+  { size: 20, filename: "Icon-20.png", idiom: "ipad", iconSize: "20x20", scale: "1x" },
+  { size: 40, filename: "Icon-20@2x-ipad.png", idiom: "ipad", iconSize: "20x20", scale: "2x" },
+  { size: 29, filename: "Icon-29.png", idiom: "ipad", iconSize: "29x29", scale: "1x" },
+  { size: 58, filename: "Icon-29@2x-ipad.png", idiom: "ipad", iconSize: "29x29", scale: "2x" },
+  { size: 40, filename: "Icon-40.png", idiom: "ipad", iconSize: "40x40", scale: "1x" },
+  { size: 80, filename: "Icon-40@2x-ipad.png", idiom: "ipad", iconSize: "40x40", scale: "2x" },
+  { size: 152, filename: "Icon-76@2x.png", idiom: "ipad", iconSize: "76x76", scale: "2x" },
+  { size: 167, filename: "Icon-83.5@2x.png", idiom: "ipad", iconSize: "83.5x83.5", scale: "2x" },
+  // App Store
+  { size: 1024, filename: "Icon-1024.png", idiom: "ios-marketing", iconSize: "1024x1024", scale: "1x" },
+];
+
+// --- Android launcher + adaptive icons ------------------------------------
+interface AndroidDensity {
+  // Folder suffix (mdpi / hdpi / etc).
+  density: "mdpi" | "hdpi" | "xhdpi" | "xxhdpi" | "xxxhdpi";
+  // Square legacy launcher icon size in px (48dp baseline × density factor).
+  legacyPx: number;
+  // Adaptive layer size (108dp baseline). Android composites at 108dp; PNG
+  // tools want the full 108dp × density-factor pixels per layer.
+  adaptivePx: number;
+}
+const ANDROID_DENSITIES: AndroidDensity[] = [
+  { density: "mdpi", legacyPx: 48, adaptivePx: 108 },
+  { density: "hdpi", legacyPx: 72, adaptivePx: 162 },
+  { density: "xhdpi", legacyPx: 96, adaptivePx: 216 },
+  { density: "xxhdpi", legacyPx: 144, adaptivePx: 324 },
+  { density: "xxxhdpi", legacyPx: 192, adaptivePx: 432 },
+];
+
+// Helpers ------------------------------------------------------------------
 async function run(cmd: string, args: string[]): Promise<void> {
-  const proc = new Deno.Command(cmd, { args, stdout: "piped", stderr: "piped" });
+  const proc = new Deno.Command(cmd, {
+    args,
+    stdout: "piped",
+    stderr: "piped",
+  });
   const result = await proc.output();
   if (!result.success) {
     const err = new TextDecoder().decode(result.stderr);
@@ -59,22 +126,31 @@ async function run(cmd: string, args: string[]): Promise<void> {
   }
 }
 
-// --- 1. PNGs ---------------------------------------------------------------
-for (const job of jobs) {
+async function rasterise(src: string, out: string, size: number): Promise<void> {
   await run("convert", [
     "-background",
     "none",
     "-density",
     "1024",
-    `${STATIC}/${job.src}`,
+    `${STATIC}/${src}`,
     "-resize",
-    `${job.size}x${job.size}`,
-    `${STATIC}/${job.out}`,
+    `${size}x${size}`,
+    out,
   ]);
-  console.log(`  wrote ${STATIC}/${job.out}`);
+  console.log(`  wrote ${out}`);
 }
 
-// --- 2. favicon.ico (multi-size: 16, 32, 48) -------------------------------
+async function ensureDir(path: string): Promise<void> {
+  await Deno.mkdir(path, { recursive: true });
+}
+
+// =========================================================================
+// 1. Web favicons
+// =========================================================================
+console.log("[web] favicons");
+for (const job of WEB_JOBS) {
+  await rasterise(job.src, job.out, job.size);
+}
 await run("convert", [
   `${STATIC}/favicon-16.png`,
   `${STATIC}/favicon-32.png`,
@@ -82,15 +158,112 @@ await run("convert", [
   `${STATIC}/favicon.ico`,
 ]);
 console.log(`  wrote ${STATIC}/favicon.ico`);
-
-// --- 3. favicon.svg (modern browsers — vector) -----------------------------
 await Deno.copyFile(`${STATIC}/logo.svg`, `${STATIC}/favicon.svg`);
 console.log(`  wrote ${STATIC}/favicon.svg`);
 
-// --- 4. Legacy aliases removed ---------------------------------------------
-// `favicon-192.png` / `favicon-512.png` are the historic names; we now use
-// `icon-192.png` / `icon-512.png` to match the manifest. Drop the old names
-// if they exist so we don't ship stale files.
+// =========================================================================
+// 2. iOS App Icon set
+// =========================================================================
+console.log("[ios] AppIcon.appiconset");
+await ensureDir(IOS);
+// iOS marketing (1024) requires no transparency; render onto a solid
+// background colour the same as the squircle's lightest hue to be safe.
+// All other iOS sizes can keep transparent corners — iOS masks them anyway
+// since iOS 7. We use logo.svg (with built-in squircle) as the source so
+// the visual matches the home-screen icon exactly.
+for (const entry of IOS_ENTRIES) {
+  const out = `${IOS}/${entry.filename}`;
+  if (entry.idiom === "ios-marketing") {
+    // Marketing icon: no alpha allowed by App Store. Flatten on the
+    // gradient's mid-tone so any anti-aliased corner pixels resolve to
+    // brand colour rather than white.
+    await run("convert", [
+      "-background",
+      "#06b6d4",
+      "-density",
+      "1024",
+      `${STATIC}/logo.svg`,
+      "-resize",
+      `${entry.size}x${entry.size}`,
+      "-alpha",
+      "remove",
+      "-alpha",
+      "off",
+      out,
+    ]);
+    console.log(`  wrote ${out}`);
+  } else {
+    await rasterise("logo.svg", out, entry.size);
+  }
+}
+// Contents.json for Xcode.
+const contents = {
+  images: IOS_ENTRIES.map((e) => ({
+    size: e.iconSize,
+    idiom: e.idiom,
+    filename: e.filename,
+    scale: e.scale,
+  })),
+  info: { version: 1, author: "xcode" },
+};
+await Deno.writeTextFile(
+  `${IOS}/Contents.json`,
+  JSON.stringify(contents, null, 2) + "\n",
+);
+console.log(`  wrote ${IOS}/Contents.json`);
+
+// =========================================================================
+// 3. Android launcher + adaptive icons
+// =========================================================================
+console.log("[android] mipmap + adaptive icons");
+for (const d of ANDROID_DENSITIES) {
+  const dir = `${ANDROID}/mipmap-${d.density}`;
+  await ensureDir(dir);
+  // Legacy square launcher icon (pre-Android 8).
+  await rasterise("logo.svg", `${dir}/ic_launcher.png`, d.legacyPx);
+  // Adaptive icon layers (Android 8+). Same density bucket, larger canvas
+  // (108dp instead of 48dp) since the system mask shrinks visible content.
+  await rasterise(
+    "logo-foreground.svg",
+    `${dir}/ic_launcher_foreground.png`,
+    d.adaptivePx,
+  );
+  await rasterise(
+    "logo-background.svg",
+    `${dir}/ic_launcher_background.png`,
+    d.adaptivePx,
+  );
+}
+// Play Store listing icon (512×512, no transparency).
+await ensureDir(ANDROID);
+await run("convert", [
+  "-background",
+  "#06b6d4",
+  "-density",
+  "1024",
+  `${STATIC}/logo.svg`,
+  "-resize",
+  "512x512",
+  "-alpha",
+  "remove",
+  "-alpha",
+  "off",
+  `${ANDROID}/play-store-512.png`,
+]);
+console.log(`  wrote ${ANDROID}/play-store-512.png`);
+// Adaptive-icon XML descriptor — drop into res/mipmap-anydpi-v26/ic_launcher.xml.
+const adaptiveXml = `<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@mipmap/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>
+`;
+const xmlDir = `${ANDROID}/mipmap-anydpi-v26`;
+await ensureDir(xmlDir);
+await Deno.writeTextFile(`${xmlDir}/ic_launcher.xml`, adaptiveXml);
+console.log(`  wrote ${xmlDir}/ic_launcher.xml`);
+
+// --- Cleanup of legacy filenames -----------------------------------------
 for (const stale of ["favicon-192.png", "favicon-512.png"]) {
   try {
     await Deno.remove(`${STATIC}/${stale}`);
