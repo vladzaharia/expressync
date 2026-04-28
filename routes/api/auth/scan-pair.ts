@@ -339,7 +339,7 @@ async function armDevicePath({
   if (device.deletedAt !== null || device.revokedAt !== null) {
     return jsonResponse(410, { error: "device_revoked" });
   }
-  if (!device.capabilities.includes("tap")) {
+  if (!device.capabilities.includes("scanner")) {
     return jsonResponse(400, { error: "capability_missing" });
   }
   if (!isDeviceOnline(device)) {

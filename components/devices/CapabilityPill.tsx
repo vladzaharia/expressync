@@ -3,36 +3,45 @@
  *
  * Used on the Devices admin page (detail "Capabilities" SectionCard) and the
  * Devices listing row to communicate, at a glance, what a given device can
- * do today (`tap`, `ev`, future kinds). Renders one pill per capability so
- * a row can carry many without rebuilding a custom variant each time.
+ * do today (`scanner`, `charger`, `user`, `kiosk`). Renders one pill per
+ * capability so a row can carry many without rebuilding a custom variant
+ * each time.
  *
  * Tone map:
- *   - `tap`  → teal     (matches `accentTeal` on the Devices page)
- *   - `ev`   → orange   (matches the Chargers accent)
- *   - other  → slate    (neutral fallback)
+ *   - `scanner` → teal     (matches `accentTeal` on the Devices page)
+ *   - `charger` → orange   (matches the Chargers accent)
+ *   - `user`    → cyan     (matches the customer "use" surfaces)
+ *   - `kiosk`   → violet   (single-purpose appliance)
+ *   - other     → slate    (neutral fallback)
  *
  * The pill is decorative (no interactive affordances). Pass `class` to
  * override spacing in dense rows.
  */
-import { BatteryCharging, Smartphone } from "lucide-preact";
+import { BatteryCharging, Lock, Plug, Smartphone } from "lucide-preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 
 /** Known capabilities. Adding a new one: extend this union, the
  *  `CAPABILITY_TONE` map, the `CAPABILITY_LABEL` map, and (optionally)
  *  the icon switch in `renderIcon` below. */
-export type Capability = "tap" | "ev";
+export type Capability = "scanner" | "charger" | "user" | "kiosk";
 
 const CAPABILITY_LABEL: Record<Capability, string> = {
-  tap: "Tap",
-  ev: "EV",
+  scanner: "Scanner",
+  charger: "Charger",
+  user: "User",
+  kiosk: "Kiosk",
 };
 
 function renderIcon(capability: Capability) {
   switch (capability) {
-    case "tap":
+    case "scanner":
       return <Smartphone aria-hidden class="size-3" />;
-    case "ev":
+    case "charger":
       return <BatteryCharging aria-hidden class="size-3" />;
+    case "user":
+      return <Plug aria-hidden class="size-3" />;
+    case "kiosk":
+      return <Lock aria-hidden class="size-3" />;
   }
 }
 
@@ -42,12 +51,22 @@ function renderIcon(capability: Capability) {
  * Chargers page (`orange`) read as a family.
  */
 const CAPABILITY_TONE: Record<Capability | "unknown", string> = {
-  tap: "border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300",
-  ev:
+  scanner: "border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300",
+  charger:
     "border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-300",
+  user: "border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300",
+  kiosk:
+    "border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300",
   unknown:
     "border-slate-500/30 bg-slate-500/10 text-slate-700 dark:text-slate-300",
 };
+
+const KNOWN_CAPABILITIES: ReadonlySet<Capability> = new Set([
+  "scanner",
+  "charger",
+  "user",
+  "kiosk",
+]);
 
 interface CapabilityPillProps {
   capability: Capability | string;
@@ -61,7 +80,7 @@ interface CapabilityPillProps {
 export function CapabilityPill(
   { capability, showIcon = true, label, class: className }: CapabilityPillProps,
 ) {
-  const known = capability === "tap" || capability === "ev";
+  const known = KNOWN_CAPABILITIES.has(capability as Capability);
   const tone = known
     ? CAPABILITY_TONE[capability as Capability]
     : CAPABILITY_TONE.unknown;

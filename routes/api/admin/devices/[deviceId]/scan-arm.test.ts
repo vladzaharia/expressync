@@ -23,7 +23,7 @@
  *   403 customer-cookie               — non-admin role
  *   400 invalid_body                  — missing `purpose`
  *   404 device-not-found              — UUID-shaped path, no row
- *   400 capability_missing            — device row lacks `'tap'`
+ *   400 capability_missing            — device row lacks `'scanner'`
  *   403 admin-not-owner               — caller's userId !== owner
  *   410 device_revoked                — soft-deleted row
  *   409 device_offline                — `last_seen_at` > 90 s old
@@ -108,7 +108,7 @@ function makeOnlineDevice(over: Partial<FakeDevice> = {}): FakeDevice {
   return {
     id: DEVICE_UUID,
     ownerUserId: ADMIN_USER_ID,
-    capabilities: ["tap"],
+    capabilities: ["scanner"],
     pushToken: null,
     apnsEnvironment: null,
     lastSeenAt: new Date(Date.now() - 5_000), // 5 s ago → online
@@ -404,12 +404,12 @@ Deno.test({
 
 Deno.test({
   name:
-    "POST scan-arm — capability_missing returns 400 (no 'tap' in capabilities)",
+    "POST scan-arm — capability_missing returns 400 (no 'scanner' in capabilities)",
   sanitizeResources: false,
   sanitizeOps: false,
   fn: async () => {
     installDefaultSeams({
-      device: makeOnlineDevice({ capabilities: ["ev"] }),
+      device: makeOnlineDevice({ capabilities: [] }),
     });
     try {
       const res = await callPost({

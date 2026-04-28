@@ -69,7 +69,7 @@ function deviceState(
       // Use the fixture's deviceId so a matching nonce has the right binding.
       id: "00000000-0000-0000-0000-000000000001",
       ownerUserId: "admin-1",
-      capabilities: ["tap"],
+      capabilities: ["scanner"],
       secret,
       tokenId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
     },

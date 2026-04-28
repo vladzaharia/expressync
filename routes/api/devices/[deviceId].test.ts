@@ -47,7 +47,7 @@ function deviceState(id: string): MockState {
     device: {
       id,
       ownerUserId: "admin-1",
-      capabilities: ["tap"],
+      capabilities: ["scanner"],
       secret: "deadbeef".repeat(8),
       tokenId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
     },

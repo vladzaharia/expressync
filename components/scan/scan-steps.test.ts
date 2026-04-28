@@ -12,7 +12,7 @@ const baseEntry: Omit<TapTargetEntry, "kind" | "label"> = {
   deviceId: "x",
   pairableType: "device",
   friendlyName: null,
-  capabilities: ["tap"],
+  capabilities: ["scanner"],
   isOnline: true,
 };
 

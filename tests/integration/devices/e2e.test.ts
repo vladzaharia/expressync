@@ -131,7 +131,7 @@ function makeOnlineDevice(over: Partial<FakeDevice> = {}): FakeDevice {
   return {
     id: DEVICE_UUID,
     ownerUserId: ADMIN_USER_ID,
-    capabilities: ["tap"],
+    capabilities: ["scanner"],
     pushToken: null,
     apnsEnvironment: null,
     lastSeenAt: new Date(Date.now() - 5_000),
@@ -146,7 +146,7 @@ function deviceState(deviceId: string, secret: string): DeviceState {
     device: {
       id: deviceId,
       ownerUserId: ADMIN_USER_ID,
-      capabilities: ["tap"],
+      capabilities: ["scanner"],
       secret,
       tokenId: `token-for-${deviceId}`,
     },

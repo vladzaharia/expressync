@@ -74,7 +74,7 @@ export const handler = define.handlers({
           .where(and(
             isNull(schema.devices.deletedAt),
             isNull(schema.devices.revokedAt),
-            sql`'tap' = ANY(${schema.devices.capabilities})`,
+            sql`'scanner' = ANY(${schema.devices.capabilities})`,
             gte(schema.devices.lastSeenAt, phoneCutoff),
           ));
         hasOnlineTapTarget = Number(deviceRow?.c ?? 0) > 0;

@@ -38,7 +38,7 @@ function makeFakeDevice(id: string): FakeCtx["state"]["device"] {
   return {
     id,
     ownerUserId: "user-test",
-    capabilities: ["tap"],
+    capabilities: ["scanner"],
     secret: "deadbeef",
     tokenId: `token-for-${id}`,
   };
