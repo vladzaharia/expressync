@@ -596,7 +596,6 @@ function ScannerBody(
   const status = normalizeDeviceStatus(device.lastSeenAtIso, device.isOnline);
   const Icon = getDeviceIcon(device.kind);
   const halo = DEVICE_STATUS_HALO[status];
-  const isOffline = status === "Offline";
   const subtitle = device.model ?? device.platform ?? "Unknown model";
 
   const submitRename = async (e?: Event) => {
@@ -676,10 +675,14 @@ function ScannerBody(
         {/* Header row */}
         <div class="flex items-center gap-3">
           <span
-            class={cn("shrink-0 transition-opacity", isOffline && "opacity-60")}
+            class="shrink-0"
             role="status"
             aria-label={`Status: ${status}`}
           >
+            {
+              /* Halo colour already conveys offline; matches the charger
+                branch which only dims when stale-but-not-offline. */
+            }
             <Icon size="md" haloColor={halo} />
           </span>
           <a
