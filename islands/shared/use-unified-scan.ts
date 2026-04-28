@@ -732,7 +732,7 @@ export function useUnifiedScan(opts: UseUnifiedScanOptions): UseUnifiedScanApi {
         kind: "phone_nfc",
         label: "Manual entry",
         friendlyName: "Manual entry",
-        capabilities: ["tap"],
+        capabilities: ["scanner"],
         isOnline: true,
       },
       "manual",

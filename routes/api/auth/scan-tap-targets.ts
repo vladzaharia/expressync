@@ -8,8 +8,9 @@
  * AND phones from `devices` — so the scan-modal picker (D3 in Wave 4) can
  * present one list instead of two.
  *
- * Pulls from the `tappable_devices` view (migration 0035) and filters to
- * `'tap' = ANY(capabilities) AND deleted_at IS NULL`. Phones whose owner
+ * Pulls from the `tappable_devices` view (migration 0035, renamed in 0036)
+ * and filters to `'scanner' = ANY(capabilities) AND deleted_at IS NULL`.
+ * Phones whose owner
  * matches `ctx.state.user?.id` get `isOwnDevice: true` so the admin
  * surface can group "My phone" vs "Other devices".
  *
@@ -154,7 +155,7 @@ export const handler = define.handlers({
     const sessionUserId = ctx.state.user?.id ?? null;
 
     try {
-      // Filter `'tap' = ANY(capabilities)` and `deleted_at IS NULL` server-
+      // Filter `'scanner' = ANY(capabilities)` and `deleted_at IS NULL` server-
       // side. The view already excludes soft-deleted devices via its WHERE
       // clause (see migration 0035), but we keep the redundant guard so a
       // future view rewrite can't accidentally surface revoked rows.
@@ -185,7 +186,7 @@ export const handler = define.handlers({
         FROM tappable_devices tv
         LEFT JOIN chargers_cache cc
           ON tv.kind = 'charger' AND cc.charge_box_id = tv.id
-        WHERE 'tap' = ANY(tv.capabilities)
+        WHERE 'scanner' = ANY(tv.capabilities)
           AND tv.deleted_at IS NULL
         ORDER BY tv.last_seen_at DESC NULLS LAST
       `);

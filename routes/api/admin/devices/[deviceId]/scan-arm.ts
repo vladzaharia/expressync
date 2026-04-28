@@ -29,7 +29,7 @@
  *   401 unauthorized          — no cookie session
  *   403 forbidden             — logged-in user is not role='admin'
  *   400 invalid_body          — missing/invalid `purpose`
- *   400 capability_missing    — device row lacks `'tap' = ANY(capabilities)`
+ *   400 capability_missing    — device row lacks `'scanner' = ANY(capabilities)`
  *   404 not_found             — no device row with that id
  *   410 device_revoked        — `deleted_at IS NOT NULL` or `revoked_at IS NOT NULL`
  *   403 not_owner             — admin caller is not the device owner
@@ -411,7 +411,7 @@ export const handler = define.handlers({
         // device fleet from this endpoint).
         return forbidden("not_owner");
       }
-      if (!device.capabilities.includes("tap")) {
+      if (!device.capabilities.includes("scanner")) {
         return badRequest("capability_missing");
       }
 

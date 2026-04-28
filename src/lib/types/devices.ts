@@ -18,9 +18,42 @@
 export const DEVICE_KINDS = ["phone_nfc", "tablet_nfc", "laptop_nfc"] as const;
 export type DeviceKind = typeof DEVICE_KINDS[number];
 
-/** Capability tokens granted to a device on register. */
-export const DEVICE_CAPABILITIES = ["tap", "ev"] as const;
+/**
+ * Capability tokens that may appear on a device.
+ *
+ *   - `scanner` (was `tap`): device has an NFC tap reader.
+ *   - `charger` (was `ev`): device IS an EV charging station. Auto-managed
+ *     on `chargers_cache`-derived rows; never editable, never present on
+ *     `devices` rows. Surfaced via the `tappable_devices` view.
+ *   - `user`: app device unlocks the Chargers tab (list + start/stop +
+ *     reservations). Future: customer-role tokens get this with per-row
+ *     owner scoping.
+ *   - `kiosk`: app device runs in single-screen appliance mode. Legal
+ *     only when the set contains exactly one of `{scanner, user}`.
+ *
+ * App-eligible subset (apps may carry any combination, subject to kiosk
+ * legality): `{scanner, user, kiosk}`. The iOS registration picker only
+ * offers these.
+ *
+ * Charger-eligible subset (auto-managed): `{charger, scanner}`.
+ */
+export const DEVICE_CAPABILITIES = [
+  "scanner",
+  "charger",
+  "user",
+  "kiosk",
+] as const;
 export type DeviceCapability = typeof DEVICE_CAPABILITIES[number];
+
+/**
+ * Capabilities the iOS registration picker may offer (apps cannot be
+ * chargers, so `charger` is never selectable from the app side).
+ */
+export const APP_REGISTRATION_CAPABILITIES = [
+  "scanner",
+  "user",
+  "kiosk",
+] as const satisfies readonly DeviceCapability[];
 
 /**
  * What the scan is for. Drives downstream UI + `scan.intercepted` event

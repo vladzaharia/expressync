@@ -65,7 +65,7 @@ const VALID_CHALLENGE_BODY_BASE = {
   osVersion: "18.4.1",
   appVersion: "1.0.0",
   apnsEnvironment: "sandbox" as const,
-  requestedCapabilities: ["tap"],
+  requestedCapabilities: ["scanner"],
 };
 
 function adminState(): MockState {

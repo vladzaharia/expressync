@@ -97,7 +97,7 @@ export interface State {
     id: string;
     /** Owner admin user_id. The trigger guarantees role='admin'. */
     ownerUserId: string;
-    /** Granted capabilities ("tap", "ev", ...). */
+    /** Granted capabilities ("scanner", "user", "kiosk", ...). */
     capabilities: string[];
     /**
      * Raw HMAC secret (base64url) — used by scan-result for nonce verify.

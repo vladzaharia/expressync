@@ -68,7 +68,6 @@
 
 import { define } from "../../../utils.ts";
 import { mintOneTimeCode } from "../../../src/lib/devices/registration.ts";
-import { DEVICE_CAPABILITIES } from "../../../src/lib/types/devices.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
 
 const log = logger.child("ExpresScanRegisterPage");
@@ -235,7 +234,7 @@ export const handler = define.handlers({
         // Default v1 capabilities — admin can pre-approve more from the
         // admin devices page later. The contract `requestedCapabilities`
         // on /api/devices/register must be a non-empty subset of these.
-        ["tap", ...DEVICE_CAPABILITIES.filter((c) => c !== "tap")].slice(0, 1),
+        ["scanner"],
       );
     } catch (err) {
       log.error("mintOneTimeCode failed", {

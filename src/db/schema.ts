@@ -1355,7 +1355,7 @@ export const devices = pgTable("devices", {
   label: text("label").notNull(),
   /** Granted capabilities — see `DEVICE_CAPABILITIES`. */
   capabilities: text("capabilities").array().notNull().default(
-    sql`ARRAY['tap']::text[]`,
+    sql`ARRAY['scanner']::text[]`,
   ),
   /** Admin user that owns / registered the device. Trigger enforces role='admin'. */
   ownerUserId: text("owner_user_id")

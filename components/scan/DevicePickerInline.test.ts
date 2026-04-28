@@ -26,7 +26,7 @@ function charger(
     kind: "charger",
     label,
     friendlyName: label,
-    capabilities: ["tap", "ev"],
+    capabilities: ["scanner", "charger"],
     isOnline,
   };
 }
@@ -42,7 +42,7 @@ function ownPhone(
     kind: "phone_nfc",
     label,
     friendlyName: label,
-    capabilities: ["tap"],
+    capabilities: ["scanner"],
     isOnline,
     isOwnDevice: true,
   };
@@ -59,7 +59,7 @@ function otherPhone(
     kind: "phone_nfc",
     label,
     friendlyName: label,
-    capabilities: ["tap"],
+    capabilities: ["scanner"],
     isOnline,
   };
 }
