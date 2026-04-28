@@ -92,6 +92,24 @@ deno task dev
 
 This will watch the project directory and restart as necessary.
 
+### Pre-commit verification (Wave 6+)
+
+Before every commit:
+
+```bash
+bin/precommit.sh
+```
+
+Runs `deno task check` (fmt + lint + type-check), `deno task test` (units +
+handler-direct integrations), and a schema-migration smoke against an ephemeral
+`postgres:16` docker container. The runner filters the known
+`scan-login HMAC mismatch returns 403` flake from the failure check; everything
+else must pass.
+
+```bash
+PRECOMMIT_FAST=1 bin/precommit.sh   # skips the docker migration smoke
+```
+
 ## Services
 
 ### Web Application
