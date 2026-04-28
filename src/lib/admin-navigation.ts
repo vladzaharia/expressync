@@ -26,12 +26,12 @@
 
 import {
   CalendarClock,
+  CreditCard,
   FileText,
   type LucideIcon,
   Receipt,
   RefreshCw,
   Smartphone,
-  Tag,
   Users,
   Webhook,
 } from "lucide-preact";
@@ -132,7 +132,7 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
         id: "nav:/tags",
         title: "EV Cards",
         path: "/tags",
-        icon: Tag,
+        icon: CreditCard,
         accentColor: "cyan",
         keywords: ["ocpp tag", "ev card", "linking", "mapping"],
       },
