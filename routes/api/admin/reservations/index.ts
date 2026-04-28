@@ -29,6 +29,18 @@ import {
 } from "../../../../src/services/reservation.service.ts";
 import { logger } from "../../../../src/lib/utils/logger.ts";
 
+/**
+ * Wave 6 / Slice D — sentinel idTag/tagPk used when an admin without an
+ * active `user_mappings` row creates a reservation without specifying
+ * `steveOcppIdTag`. The OCPP wire requires *some* idTag on a
+ * RemoteStartTransaction — but a blackout reservation is not startable
+ * anyway (the customer-facing start path filters out blackout rows
+ * by tag), so the sentinel is functionally inert. Keep this in sync
+ * with `src/lib/reservations/blackout.ts` if it ever moves.
+ */
+const ADMIN_BLACKOUT_ID_TAG = "admin-blackout";
+const ADMIN_BLACKOUT_TAG_PK = -1;
+
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -167,13 +179,62 @@ export const handler = define.handlers({
     if (typeof connectorId !== "number" || !Number.isInteger(connectorId)) {
       return jsonResponse(400, { error: "connectorId must be an integer" });
     }
+    // Wave 6 / Slice D — default the bound idTag to the creating admin's
+    // first active user_mapping when the request omits it. iOS's
+    // start-charging-from-reservation path uses this idTag verbatim.
+    // Fallback: if the admin has no mappings (current friends-and-family
+    // path), pin a sentinel `admin-blackout` value so the row is still
+    // valid wire-shape — a blackout reservation isn't startable, which
+    // is the correct semantic.
+    let resolvedTagPk: number;
+    let resolvedIdTag: string;
     if (
-      typeof steveOcppTagPk !== "number" || !Number.isInteger(steveOcppTagPk)
+      (typeof steveOcppTagPk !== "number" || !Number.isInteger(steveOcppTagPk))
+      && (typeof steveOcppIdTag !== "string" || steveOcppIdTag.length === 0)
     ) {
-      return jsonResponse(400, { error: "steveOcppTagPk must be an integer" });
-    }
-    if (typeof steveOcppIdTag !== "string" || steveOcppIdTag.length === 0) {
-      return jsonResponse(400, { error: "steveOcppIdTag is required" });
+      // Both omitted → server-default from the creator's mappings.
+      const adminUserId = ctx.state.user?.id ?? null;
+      if (!adminUserId) {
+        return jsonResponse(400, {
+          error: "steveOcppIdTag is required (no creator session)",
+        });
+      }
+      const [mapping] = await db
+        .select({
+          tagPk: schema.userMappings.steveOcppTagPk,
+          idTag: schema.userMappings.steveOcppIdTag,
+        })
+        .from(schema.userMappings)
+        .where(and(
+          eq(schema.userMappings.userId, adminUserId),
+          eq(schema.userMappings.isActive, true),
+        ))
+        .orderBy(asc(schema.userMappings.createdAt))
+        .limit(1);
+      if (mapping) {
+        resolvedTagPk = mapping.tagPk;
+        resolvedIdTag = mapping.idTag;
+      } else {
+        // Sentinel — this is the friends-and-family blackout path. The
+        // tag-pk is unknown (no mapping row); we pass -1 so the
+        // service layer can detect it. The reservation is created in a
+        // "blackout" semantic (no charger-side OCPP startable).
+        resolvedTagPk = ADMIN_BLACKOUT_TAG_PK;
+        resolvedIdTag = ADMIN_BLACKOUT_ID_TAG;
+      }
+    } else {
+      if (
+        typeof steveOcppTagPk !== "number" || !Number.isInteger(steveOcppTagPk)
+      ) {
+        return jsonResponse(400, {
+          error: "steveOcppTagPk must be an integer",
+        });
+      }
+      if (typeof steveOcppIdTag !== "string" || steveOcppIdTag.length === 0) {
+        return jsonResponse(400, { error: "steveOcppIdTag is required" });
+      }
+      resolvedTagPk = steveOcppTagPk;
+      resolvedIdTag = steveOcppIdTag;
     }
     if (typeof startAtIso !== "string" || typeof endAtIso !== "string") {
       return jsonResponse(400, {
@@ -194,8 +255,8 @@ export const handler = define.handlers({
       const result = await createReservation({
         chargeBoxId,
         connectorId,
-        steveOcppTagPk,
-        steveOcppIdTag,
+        steveOcppTagPk: resolvedTagPk,
+        steveOcppIdTag: resolvedIdTag,
         lagoSubscriptionExternalId:
           typeof lagoSubscriptionExternalId === "string"
             ? lagoSubscriptionExternalId

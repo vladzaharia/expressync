@@ -318,6 +318,8 @@ export const handler = define.handlers({
             "device.scan.cancelled",
             "device.session.replaced",
             "device.token.revoked",
+            "device.capabilities.changed",
+            "device.settings.changed",
           ] as const;
           const buffered = eventBus.replay(lastEventId, [...replayTypes]);
           for (const ev of buffered) {
@@ -351,6 +353,14 @@ export const handler = define.handlers({
               safeEnqueue(formatEvent("device.token.revoked", ev.seq, {}));
               cleanup();
               return;
+            } else if (ev.type === "device.capabilities.changed") {
+              safeEnqueue(
+                formatEvent("device.capabilities.changed", ev.seq, p),
+              );
+            } else if (ev.type === "device.settings.changed") {
+              safeEnqueue(
+                formatEvent("device.settings.changed", ev.seq, p),
+              );
             }
           }
         }
@@ -362,6 +372,8 @@ export const handler = define.handlers({
             "device.scan.cancelled",
             "device.session.replaced",
             "device.token.revoked",
+            "device.capabilities.changed",
+            "device.settings.changed",
           ],
           (delivered) => {
             if (closed) return;
@@ -419,6 +431,31 @@ export const handler = define.handlers({
                 formatEvent("device.token.revoked", delivered.seq, {}),
               );
               cleanup();
+              return;
+            }
+
+            // Wave 6 / Slice D — capability + settings change forwarding.
+            // The matching device's iOS coordinator listens on these and
+            // re-fetches `me/state` on receipt. The `payload.deviceId`
+            // filter above already restricted these to the bound device.
+            if (delivered.type === "device.capabilities.changed") {
+              safeEnqueue(
+                formatEvent(
+                  "device.capabilities.changed",
+                  delivered.seq,
+                  p,
+                ),
+              );
+              return;
+            }
+            if (delivered.type === "device.settings.changed") {
+              safeEnqueue(
+                formatEvent(
+                  "device.settings.changed",
+                  delivered.seq,
+                  p,
+                ),
+              );
               return;
             }
           },

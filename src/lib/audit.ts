@@ -71,7 +71,10 @@ export type AuthAuditEvent =
   | "device.token.issued"
   | "device.token.revoked"
   | "device.token.invalid"
-  | "device.capability.denied";
+  | "device.capability.denied"
+  // ExpresScan v2 / Wave 6 Slice D — admin App Configuration writes.
+  | "device.capability.changed"
+  | "device.settings.updated";
 
 export interface AuthEventPayload {
   /** Optional user reference (set on success; omit on failed-pre-resolve flows). */
@@ -209,3 +212,7 @@ export const logDeviceTokenInvalid = (p: AuthEventPayload) =>
   logAuthEvent("device.token.invalid", p);
 export const logDeviceCapabilityDenied = (p: AuthEventPayload) =>
   logAuthEvent("device.capability.denied", p);
+export const logDeviceCapabilityChanged = (p: AuthEventPayload) =>
+  logAuthEvent("device.capability.changed", p);
+export const logDeviceSettingsUpdated = (p: AuthEventPayload) =>
+  logAuthEvent("device.settings.updated", p);
