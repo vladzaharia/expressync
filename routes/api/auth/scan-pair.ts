@@ -1,51 +1,75 @@
 /**
  * POST /api/auth/scan-pair
  *
- * Polaris Track C — initiates the scan-to-login pairing flow.
+ * Customer-facing arm endpoint for the scan-to-login flow. Two pairable
+ * targets share one route:
  *
- * Body: { chargeBoxId?: string }
- *   - When omitted: server queries `chargers_cache` for ONLINE chargers.
- *     If exactly 1 exists, server auto-picks it. Otherwise returns 400.
+ *   - **charger** (legacy): `{chargeBoxId?: string}` (or auto-pick if there's
+ *     exactly one online charger). Inserts `scan-pair:{chargeBoxId}:{code}`
+ *     and the StEvE pre-authorize hook intercepts the next OCPP tap.
  *
- * Behavior:
- *   1. Resolve chargeBoxId (from body or auto-pick).
- *   2. Reject if there's already an armed pairing for this charger
- *      (only ONE armed pairing per charger at a time → 409 Conflict).
- *   3. Generate pairingCode (16 random bytes, base64url).
- *   4. Insert verifications row:
- *        identifier = "scan-pair:{chargeBoxId}:{pairingCode}"
- *        value      = JSON.stringify({ chargeBoxId, ip, ua, status: "armed" })
- *        expiresAt  = now + 90 seconds
- *   5. Return { pairingCode, chargeBoxId, expiresInSec: 90 }.
+ *   - **device** (Wave 5): `{pairableType: "device", deviceId}`. Lets the
+ *     customer arm an admin's online phone for remote sign-in. Inserts
+ *     `device-scan:{deviceId}:{code}` with `purpose: "login"`, publishes
+ *     `device.scan.requested`, and fires an APNs push so the phone wakes
+ *     up. The admin then taps the customer's card on their phone, which
+ *     POSTs `/api/devices/scan-result` and triggers the customer's
+ *     `/api/auth/scan-detect` SSE → `scan-login` completion.
+ *
+ * DELETE releases an armed pairing — bidirectional cancel for devices
+ * (publishes `device.scan.cancelled` with `source: "customer"` so the
+ * iOS active-scan screen dismisses); silent for chargers (no UI to
+ * dismiss on the charger side).
  *
  * Public route — no session required. Rate-limited per IP and globally.
  *
  * Security model:
- *   - The pairing is bound to a specific chargeBoxId. Only Docker log
- *     events from THAT charger will be forwarded over the SSE stream.
- *     This prevents the cross-pickup attack where a holder of a valid
- *     pairing code observes an unrelated victim's tap and steals the
- *     login.
+ *   - Charger pairings are bound to a chargeBoxId so an attacker holding
+ *     a leaked pairing code can't intercept an unrelated victim's tap.
+ *   - Device pairings are bound to a deviceId. The pairing code itself
+ *     is single-use; the customer's HMAC nonce on scan-login is bound
+ *     to (idTag, pairingCode, deviceId, t) and replays past 60s are
+ *     rejected.
+ *   - The device path validates the device is registered, not deleted/
+ *     revoked, has the `tap` capability, and is online — same gates the
+ *     admin scan-arm endpoint enforces.
  */
 
-import { and, eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { define } from "../../../utils.ts";
 import { db } from "../../../src/db/index.ts";
-import { chargersCache, verifications } from "../../../src/db/schema.ts";
+import { chargersCache } from "../../../src/db/schema.ts";
 import { checkRateLimit } from "../../../src/lib/utils/rate-limit.ts";
 import { logAuthEvent } from "../../../src/lib/audit.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
+import {
+  chargerPairingIdentifier,
+  clearDevicePushToken,
+  deletePairingRow,
+  devicePairingIdentifier,
+  findArmedChargerPairing,
+  findArmedDevicePairing,
+  fireDeviceScanApns,
+  generateChargerPairingCode,
+  generateDevicePairingCode,
+  insertChargerPairingRow,
+  insertDevicePairingRow,
+  isDeviceOnline,
+  loadDeviceForArm,
+  PAIRING_TTL_SEC,
+  publishDeviceScanCancelled,
+  publishDeviceScanRequested,
+} from "../../../src/services/scan-arm.service.ts";
 
 const log = logger.child("ScanPair");
 
-const PAIRING_TTL_SEC = 90;
-const ONLINE_WINDOW_MS = 10 * 60 * 1000; // 10-min "online" window
+const ONLINE_WINDOW_MS = 10 * 60 * 1000; // 10-min "online" window for chargers
 // 5/min was too tight: legitimate users re-arm a couple of times during a
-// normal sign-in (Cancel → re-pick a charger) plus the integration suite
+// normal sign-in (Cancel → re-pick a target) plus the integration suite
 // hammers the endpoint across 10 scenarios in <30s. 30/min still deters
 // brute-force without breaking real usage.
-const RATE_LIMIT_PER_IP = 30; // per minute
-const RATE_LIMIT_GLOBAL = 100; // per minute (cap on total churn)
+const RATE_LIMIT_PER_IP = 30;
+const RATE_LIMIT_GLOBAL = 100;
 
 function getClientIp(req: Request): string {
   return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
@@ -61,24 +85,9 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-function base64UrlEncode(bytes: Uint8Array): string {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function generatePairingCode(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  return base64UrlEncode(bytes);
-}
-
 /**
- * Resolve `chargeBoxId` either from the request body or, when absent,
- * by picking the unique online charger from `chargers_cache`.
- *
- * Returns `{ ok: true, chargeBoxId }` on success or `{ ok: false, status,
- * error }` on a failure that should be relayed to the caller.
+ * Resolve `chargeBoxId` either from the body or by picking the unique
+ * online charger from `chargers_cache`.
  */
 async function resolveChargeBoxId(
   bodyChargeBoxId: string | null,
@@ -89,7 +98,6 @@ async function resolveChargeBoxId(
   if (bodyChargeBoxId && bodyChargeBoxId.trim() !== "") {
     return { ok: true, chargeBoxId: bodyChargeBoxId.trim() };
   }
-  // Auto-pick: query online chargers.
   let rows: { chargeBoxId: string; lastSeenAt: Date | string }[];
   try {
     rows = await db
@@ -123,9 +131,16 @@ async function resolveChargeBoxId(
   };
 }
 
+interface PairBody {
+  pairableType?: unknown;
+  chargeBoxId?: unknown;
+  deviceId?: unknown;
+}
+
 export const handler = define.handlers({
   async POST(ctx) {
     const ip = getClientIp(ctx.req);
+    const ua = ctx.req.headers.get("user-agent") ?? null;
     if (!await checkRateLimit(`scanpair:ip:${ip}`, RATE_LIMIT_PER_IP)) {
       return jsonResponse(429, { error: "rate_limited" });
     }
@@ -133,65 +148,56 @@ export const handler = define.handlers({
       return jsonResponse(429, { error: "rate_limited" });
     }
 
-    let body: { chargeBoxId?: unknown } = {};
+    let body: PairBody = {};
     try {
       const raw = await ctx.req.text();
-      if (raw.trim() !== "") {
-        body = JSON.parse(raw);
-      }
+      if (raw.trim() !== "") body = JSON.parse(raw);
     } catch {
       return jsonResponse(400, { error: "invalid_json" });
     }
 
+    const pairableType = typeof body.pairableType === "string"
+      ? body.pairableType
+      : "charger";
+
+    if (pairableType === "device") {
+      return await armDevicePath({
+        deviceId: typeof body.deviceId === "string" ? body.deviceId.trim() : "",
+        ip,
+        ua,
+      });
+    }
+    if (pairableType !== "charger") {
+      return jsonResponse(400, { error: "invalid_pairableType" });
+    }
+
+    // ---- charger path ----
     const inputChargeBoxId = typeof body.chargeBoxId === "string"
       ? body.chargeBoxId
       : null;
-
     const resolved = await resolveChargeBoxId(inputChargeBoxId);
     if (!resolved.ok) {
       return jsonResponse(resolved.status, { error: resolved.error });
     }
     const chargeBoxId = resolved.chargeBoxId;
 
-    // Reject if an armed pairing already exists for this charger. The
-    // verifications.identifier prefix has the chargeBoxId baked in so a
-    // simple LIKE + JSON status check is enough.
-    try {
-      const existing = await db.execute<{ id: string }>(sql`
-        SELECT id FROM verifications
-        WHERE identifier LIKE ${`scan-pair:${chargeBoxId}:%`}
-          AND expires_at > now()
-          AND value::jsonb->>'status' = 'armed'
-        LIMIT 1
-      `);
-      const list = Array.isArray(existing)
-        ? existing
-        : (existing as { rows?: unknown[] }).rows ?? [];
-      if (list.length > 0) {
-        return jsonResponse(409, { error: "already_armed_for_charger" });
-      }
-    } catch (err) {
-      log.error("Failed armed-pairing precheck", {
-        error: err instanceof Error ? err.message : String(err),
-      });
-      // Continue — the unique conflict, if any, will surface on insert.
+    // Single-flight per charger.
+    const existing = await findArmedChargerPairing(chargeBoxId);
+    if (existing) {
+      return jsonResponse(409, { error: "already_armed_for_charger" });
     }
 
-    const pairingCode = generatePairingCode();
-    const identifier = `scan-pair:${chargeBoxId}:${pairingCode}`;
-    const ua = ctx.req.headers.get("user-agent") ?? null;
-    const value = JSON.stringify({ chargeBoxId, ip, ua, status: "armed" });
-    const expiresAt = new Date(Date.now() + PAIRING_TTL_SEC * 1000);
-
+    const pairingCode = generateChargerPairingCode();
+    let expiresAt: Date;
     try {
-      await db.insert(verifications).values({
-        id: crypto.randomUUID(),
-        identifier,
-        value,
-        expiresAt,
+      expiresAt = await insertChargerPairingRow({
+        chargeBoxId,
+        pairingCode,
+        ip,
+        ua,
       });
     } catch (err) {
-      log.error("Failed to insert pairing row", {
+      log.error("Failed to insert charger pairing row", {
         error: err instanceof Error ? err.message : String(err),
       });
       return jsonResponse(500, { error: "internal" });
@@ -201,25 +207,23 @@ export const handler = define.handlers({
       ip,
       ua,
       route: "/api/auth/scan-pair",
-      metadata: { chargeBoxId },
+      metadata: { pairableType: "charger", chargeBoxId },
     });
 
     return jsonResponse(200, {
       pairingCode,
+      pairableType: "charger",
       chargeBoxId,
       expiresInSec: PAIRING_TTL_SEC,
+      expiresAtEpochMs: expiresAt.getTime(),
     });
   },
 
   /**
-   * Release an armed pairing before it expires. Called when the user backs
-   * out of the scan step in the login wizard — without it the
-   * `already_armed_for_charger` guard in POST would block a re-attempt for
-   * the remainder of the 90-second TTL, and the charger stays visibly
-   * "listening" for a tap the user no longer intends to make.
-   *
-   * Body: { chargeBoxId: string, pairingCode: string }
-   * Public route; the chargeBoxId+pairingCode pair is the auth token.
+   * Release an armed pairing before TTL. Body shape:
+   *   - charger: { chargeBoxId, pairingCode } (legacy)
+   *   - device:  { pairableType: "device", deviceId, pairingCode }
+   * Public; (deviceId/chargeBoxId, pairingCode) is the auth token.
    */
   async DELETE(ctx) {
     const ip = getClientIp(ctx.req);
@@ -227,44 +231,83 @@ export const handler = define.handlers({
       return jsonResponse(429, { error: "rate_limited" });
     }
 
-    let body: { chargeBoxId?: unknown; pairingCode?: unknown } = {};
+    let body: {
+      pairableType?: unknown;
+      chargeBoxId?: unknown;
+      deviceId?: unknown;
+      pairingCode?: unknown;
+    } = {};
     try {
       const raw = await ctx.req.text();
       if (raw.trim() !== "") body = JSON.parse(raw);
     } catch {
       return jsonResponse(400, { error: "invalid_json" });
     }
-    const chargeBoxId = typeof body.chargeBoxId === "string"
-      ? body.chargeBoxId.trim()
-      : "";
+
     const pairingCode = typeof body.pairingCode === "string"
       ? body.pairingCode.trim()
       : "";
-    if (!chargeBoxId || !pairingCode) {
-      return jsonResponse(400, {
-        error: "chargeBoxId and pairingCode required",
-      });
+    if (!pairingCode) {
+      return jsonResponse(400, { error: "pairingCode required" });
     }
 
-    const identifier = `scan-pair:${chargeBoxId}:${pairingCode}`;
+    const pairableType = typeof body.pairableType === "string"
+      ? body.pairableType
+      : (typeof body.deviceId === "string" ? "device" : "charger");
+
+    if (pairableType === "device") {
+      const deviceId = typeof body.deviceId === "string"
+        ? body.deviceId.trim()
+        : "";
+      if (!deviceId) return jsonResponse(400, { error: "deviceId required" });
+      const identifier = devicePairingIdentifier(deviceId, pairingCode);
+      try {
+        await deletePairingRow(identifier);
+      } catch (err) {
+        log.warn("Failed to release device pairing (idempotent)", {
+          deviceId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      // Notify the iOS active-scan screen so it dismisses immediately.
+      publishDeviceScanCancelled({
+        deviceId,
+        pairingCode,
+        cancelledAt: Date.now(),
+        source: "customer",
+      });
+      void logAuthEvent("scan.released", {
+        ip,
+        ua: ctx.req.headers.get("user-agent") ?? null,
+        route: "/api/auth/scan-pair",
+        metadata: { pairableType: "device", deviceId },
+      });
+      return new Response(null, { status: 204 });
+    }
+
+    // charger path
+    const chargeBoxId = typeof body.chargeBoxId === "string"
+      ? body.chargeBoxId.trim()
+      : "";
+    if (!chargeBoxId) {
+      return jsonResponse(400, { error: "chargeBoxId required" });
+    }
+    const identifier = chargerPairingIdentifier(chargeBoxId, pairingCode);
     try {
-      const deleted = await db
-        .delete(verifications)
-        .where(eq(verifications.identifier, identifier))
-        .returning({ id: verifications.id });
+      const deletedCount = await deletePairingRow(identifier);
       void logAuthEvent("scan.released", {
         ip,
         ua: ctx.req.headers.get("user-agent") ?? null,
         route: "/api/auth/scan-pair",
         metadata: {
+          pairableType: "charger",
           chargeBoxId,
-          existed: deleted.length > 0,
+          existed: deletedCount > 0,
         },
       });
-      // Idempotent: if the row was already expired/consumed, still 204.
       return new Response(null, { status: 204 });
     } catch (err) {
-      log.error("Failed to release pairing", {
+      log.error("Failed to release charger pairing", {
         error: err instanceof Error ? err.message : String(err),
       });
       return jsonResponse(500, { error: "internal" });
@@ -272,5 +315,98 @@ export const handler = define.handlers({
   },
 });
 
-// Silence unused-import warning if a future refactor drops the helper.
-void and;
+/**
+ * Customer remote-login arm against an admin's online phone. Mirrors the
+ * device gates from `/api/admin/devices/[id]/scan-arm` (capability +
+ * online + not-revoked) but with no session check — the customer owns
+ * the binding via the pairing code + HMAC nonce on scan-login.
+ */
+async function armDevicePath({
+  deviceId,
+  ip,
+  ua,
+}: {
+  deviceId: string;
+  ip: string;
+  ua: string | null;
+}): Promise<Response> {
+  if (!deviceId) {
+    return jsonResponse(400, { error: "deviceId required" });
+  }
+
+  const device = await loadDeviceForArm(deviceId);
+  if (!device) return jsonResponse(404, { error: "not_found" });
+  if (device.deletedAt !== null || device.revokedAt !== null) {
+    return jsonResponse(410, { error: "device_revoked" });
+  }
+  if (!device.capabilities.includes("tap")) {
+    return jsonResponse(400, { error: "capability_missing" });
+  }
+  if (!isDeviceOnline(device)) {
+    return jsonResponse(409, { error: "device_offline" });
+  }
+
+  const existing = await findArmedDevicePairing(deviceId);
+  if (existing) {
+    return jsonResponse(409, { error: "already_armed_for_device" });
+  }
+
+  const pairingCode = generateDevicePairingCode();
+  let expiresAt: Date;
+  try {
+    expiresAt = await insertDevicePairingRow({
+      deviceId,
+      pairingCode,
+      purpose: "login",
+      hintLabel: null,
+      armedByUserId: null,
+    });
+  } catch (err) {
+    log.warn("Pairing INSERT failed; re-checking for armed", {
+      deviceId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    const fallback = await findArmedDevicePairing(deviceId);
+    if (fallback) {
+      return jsonResponse(409, { error: "already_armed_for_device" });
+    }
+    return jsonResponse(500, { error: "internal" });
+  }
+
+  publishDeviceScanRequested({
+    deviceId,
+    pairingCode,
+    purpose: "login",
+    expiresAtIso: expiresAt.toISOString(),
+    expiresAtEpochMs: expiresAt.getTime(),
+    requestedByUserId: null,
+    hintLabel: null,
+  });
+
+  fireDeviceScanApns({
+    device,
+    deviceId,
+    pairingCode,
+    purpose: "login",
+    hintLabel: null,
+    expiresAtEpochMs: expiresAt.getTime(),
+    onDeadToken: () => clearDevicePushToken(deviceId),
+  });
+
+  void logAuthEvent("scan.paired", {
+    ip,
+    ua,
+    route: "/api/auth/scan-pair",
+    metadata: { pairableType: "device", deviceId },
+  });
+
+  return jsonResponse(200, {
+    pairingCode,
+    pairableType: "device",
+    deviceId,
+    expiresInSec: PAIRING_TTL_SEC,
+    expiresAtEpochMs: expiresAt.getTime(),
+  });
+}
+
+void sql;

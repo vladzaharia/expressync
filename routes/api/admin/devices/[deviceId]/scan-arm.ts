@@ -655,8 +655,8 @@ export const handler = define.handlers({
         });
       }
 
-      // Notify both the in-flight admin SSE consumer (so the
-      // TapToAddModal closes) and the device's SSE stream (so the
+      // Notify both the in-flight admin SSE consumer (so the unified
+      // `<ScanModal>` closes) and the device's SSE stream (so the
       // active-scan screen dismisses on the iPhone). Source `"admin"`
       // disambiguates from device-initiated cancels in the audit
       // trail.

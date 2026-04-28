@@ -11,6 +11,7 @@ import { stepsForTarget } from "./scan-steps.ts";
 const baseEntry: Omit<TapTargetEntry, "kind" | "label"> = {
   deviceId: "x",
   pairableType: "device",
+  friendlyName: null,
   capabilities: ["tap"],
   isOnline: true,
 };
@@ -29,6 +30,7 @@ Deno.test("stepsForTarget — phone target yields phone-specific prep step", () 
     ...baseEntry,
     kind: "phone_nfc",
     label: "Aisha's iPhone",
+    friendlyName: "Aisha's iPhone",
   });
   assertEquals(steps[0], "Unlock your phone");
   assertEquals(steps[1], "Tap your card on Aisha's iPhone");
@@ -41,6 +43,7 @@ Deno.test("stepsForTarget — charger uses 'Tap it on {label}' copy", () => {
     pairableType: "charger",
     kind: "charger",
     label: "Garage",
+    friendlyName: "Garage",
   });
   assertEquals(steps[0], "Wake your card");
   assertEquals(steps[1], "Tap it on Garage");
@@ -52,18 +55,19 @@ Deno.test("stepsForTarget — laptop NFC reuses charger-style copy", () => {
     ...baseEntry,
     kind: "laptop_nfc",
     label: "Front desk laptop",
+    friendlyName: "Front desk laptop",
   });
   assertEquals(steps[0], "Wake your card");
   assertEquals(steps[1], "Tap it on Front desk laptop");
 });
 
-Deno.test("stepsForTarget — empty/whitespace label falls through to 'the reader'", () => {
+Deno.test("stepsForTarget — empty/whitespace label falls through to kind fallback", () => {
   const steps = stepsForTarget({
     ...baseEntry,
     kind: "phone_nfc",
     label: "   ",
+    friendlyName: null,
   });
-  // Whitespace-only label collapses to the generic placeholder so the
-  // rendered step never says "Tap your card on    ".
-  assertEquals(steps[1], "Tap your card on the reader");
+  // No friendlyName + whitespace label → kind-prefixed fallback ("Phone X").
+  assertEquals(steps[1].startsWith("Tap your card on Phone"), true);
 });

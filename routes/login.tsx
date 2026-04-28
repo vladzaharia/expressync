@@ -5,12 +5,14 @@
  * `polaris.express/login`. Mobile-first, warm copy, magic-link primary,
  * scan-to-sign-in secondary. No discoverable link to `/admin/login`.
  *
- * The route is fully server-rendered chrome with two interactive islands:
- *   - `CustomerScanLoginIsland`  — opens the scan-to-login modal.
- *   - `CustomerLoginForm`        — POSTs the magic-link preflight.
+ * The route is server-rendered chrome wrapping a single interactive island:
+ *   - `CustomerLoginWizard` — orchestrates Scan Card vs Email Link, embedding
+ *     the unified `<ScanFlow>` inline for the scan path and `CustomerLoginForm`
+ *     for the magic-link path.
  *
- * Deep-link support: `?scan=1` (and optional `?chargeBoxId=...`) auto-opens
- * the scan modal so QR-code arrivals via `/auth/scan` jump straight in.
+ * Deep-link support: `?scan=1` (and optional `?chargeBoxId=...`) jumps
+ * straight to the scan step so QR-code arrivals via `/auth/scan` skip the
+ * method picker.
  */
 
 import { define } from "../utils.ts";

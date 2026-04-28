@@ -3,60 +3,45 @@
  * DELETE /api/admin/tag/scan-arm    — release it
  *
  * Admin-side arming endpoint for the pre-authorize intercept pipeline.
- * Analogous to `/api/auth/scan-pair` but session-gated to admins and
+ * Analogous to `/api/auth/scan-pair` (charger path) but session-gated and
  * stamped with `purpose: "admin-link"` on the verification row, so the
- * scan.intercepted event fans out to admin SSE consumers (TapToAddModal,
- * ScanTagAction) rather than the customer login flow.
+ * scan.intercepted event fans out to admin SSE consumers (the unified
+ * `<ScanModal>` and `<ScanFlow>`) rather than the customer login flow.
  *
  * Why a separate endpoint:
- *   - scan-pair is unauthenticated (the whole point — user can't log in
- *     yet). scan-arm is only usable by an already-authenticated admin, so
- *     the arming model diverges: no rate-limit theater, no IP-only auth.
- *   - The `purpose` field lets consumers discriminate; an admin tap at
- *     charger CB-A to add a new tag MUST NOT be routable to the customer
- *     login flow even if a customer happens to be listening there.
+ *   - scan-pair is unauthenticated (customer hasn't logged in yet);
+ *     scan-arm is admin-only, so the arming model diverges (no rate-
+ *     limit theater, no IP-only auth).
+ *   - The `purpose` field lets pre-authorize discriminate; an admin
+ *     tap at charger CB-A to add a new tag MUST NOT be routable to
+ *     the customer login flow even if a customer happens to be
+ *     listening on the same charger.
  *
- * Design mirrors scan-pair's semantics:
- *   identifier = "scan-pair:{chargeBoxId}:{pairingCode}"
- *   value      = {chargeBoxId, status:"armed", purpose:"admin-link",
- *                 adminUserId, ua, ip}
- *   expiresAt  = now + 90s
- * One armed row per charger — 409 on conflict.
- *
- * Admin session enforcement: the root middleware already gates
- * `/api/admin/*` to admin-role sessions (see routes/_middleware.ts). This
- * handler only re-reads the user id to stamp it on the row.
+ * Admin session enforcement: `routes/_middleware.ts` already gates
+ * `/api/admin/*` to admin-role sessions. This handler only re-reads
+ * the user id to stamp it on the row.
  */
 
 import { sql } from "drizzle-orm";
-import { eq } from "drizzle-orm";
 import { define } from "../../../../utils.ts";
-import { db } from "../../../../src/db/index.ts";
-import { verifications } from "../../../../src/db/schema.ts";
 import { auth } from "../../../../src/lib/auth.ts";
 import { logger } from "../../../../src/lib/utils/logger.ts";
+import {
+  chargerPairingIdentifier,
+  deletePairingRow,
+  findArmedChargerPairing,
+  generateChargerPairingCode,
+  insertChargerPairingRow,
+  PAIRING_TTL_SEC,
+} from "../../../../src/services/scan-arm.service.ts";
 
 const log = logger.child("AdminScanArm");
-
-const PAIRING_TTL_SEC = 90;
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { "Content-Type": "application/json" },
   });
-}
-
-function base64UrlEncode(bytes: Uint8Array): string {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function generatePairingCode(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  return base64UrlEncode(bytes);
 }
 
 function getClientIp(req: Request): string {
@@ -94,49 +79,27 @@ export const handler = define.handlers({
       return jsonResponse(400, { error: "chargeBoxId required" });
     }
 
-    // One armed intent per charger at a time, same as scan-pair. Purpose
-    // doesn't relax that — an admin and a customer can't both be
-    // intercepting the same charger simultaneously.
-    try {
-      const existing = await db.execute<{ id: string }>(sql`
-        SELECT id FROM verifications
-        WHERE identifier LIKE ${`scan-pair:${chargeBoxId}:%`}
-          AND expires_at > now()
-          AND value::jsonb->>'status' = 'armed'
-        LIMIT 1
-      `);
-      const list = Array.isArray(existing)
-        ? existing
-        : (existing as { rows?: unknown[] }).rows ?? [];
-      if (list.length > 0) {
-        return jsonResponse(409, { error: "already_armed_for_charger" });
-      }
-    } catch (err) {
-      log.warn("Armed precheck failed; continuing", {
-        error: err instanceof Error ? err.message : String(err),
-      });
+    // One armed intent per charger at a time (matches scan-pair). Purpose
+    // doesn't relax that — admin and customer can't both intercept the
+    // same charger simultaneously.
+    const existing = await findArmedChargerPairing(chargeBoxId);
+    if (existing) {
+      return jsonResponse(409, { error: "already_armed_for_charger" });
     }
 
-    const pairingCode = generatePairingCode();
-    const identifier = `scan-pair:${chargeBoxId}:${pairingCode}`;
+    const pairingCode = generateChargerPairingCode();
     const ip = getClientIp(ctx.req);
     const ua = ctx.req.headers.get("user-agent") ?? null;
-    const value = JSON.stringify({
-      chargeBoxId,
-      ip,
-      ua,
-      status: "armed",
-      purpose: "admin-link",
-      adminUserId,
-    });
-    const expiresAt = new Date(Date.now() + PAIRING_TTL_SEC * 1000);
 
+    let expiresAt: Date;
     try {
-      await db.insert(verifications).values({
-        id: crypto.randomUUID(),
-        identifier,
-        value,
-        expiresAt,
+      expiresAt = await insertChargerPairingRow({
+        chargeBoxId,
+        pairingCode,
+        ip,
+        ua,
+        purpose: "admin-link",
+        adminUserId,
       });
     } catch (err) {
       log.error("Failed to insert admin-link intent", {
@@ -149,6 +112,7 @@ export const handler = define.handlers({
       pairingCode,
       chargeBoxId,
       expiresInSec: PAIRING_TTL_SEC,
+      expiresAtEpochMs: expiresAt.getTime(),
       purpose: "admin-link",
     });
   },
@@ -175,11 +139,9 @@ export const handler = define.handlers({
         error: "chargeBoxId and pairingCode required",
       });
     }
-    const identifier = `scan-pair:${chargeBoxId}:${pairingCode}`;
+    const identifier = chargerPairingIdentifier(chargeBoxId, pairingCode);
     try {
-      await db.delete(verifications).where(
-        eq(verifications.identifier, identifier),
-      );
+      await deletePairingRow(identifier);
     } catch (err) {
       log.warn("Failed to release admin-link intent", {
         error: err instanceof Error ? err.message : String(err),
@@ -188,3 +150,5 @@ export const handler = define.handlers({
     return new Response(null, { status: 204 });
   },
 });
+
+void sql;

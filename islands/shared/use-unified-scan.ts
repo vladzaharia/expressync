@@ -197,12 +197,29 @@ export function useUnifiedScan(opts: UseUnifiedScanOptions): UseUnifiedScanApi {
     const arm = refs.arm;
     if (!arm) return;
     refs.arm = null;
-    const url = arm.pairableType === "device"
-      ? `/api/admin/devices/${encodeURIComponent(arm.deviceId)}/scan-arm`
-      : "/api/auth/scan-pair";
-    const body = arm.pairableType === "device"
-      ? { pairingCode: arm.pairingCode }
-      : { chargeBoxId: arm.deviceId, pairingCode: arm.pairingCode };
+    // Cancel routes by mode + target. Customer flows always release via
+    // the public scan-pair endpoint (charger and device branches both
+    // live there). Admin device arms release via the per-device admin
+    // endpoint (session-gated). Admin charger arms release via the
+    // admin scan-arm endpoint.
+    let url: string;
+    let body: Record<string, unknown>;
+    if (arm.mode === "customer") {
+      url = "/api/auth/scan-pair";
+      body = arm.pairableType === "device"
+        ? {
+          pairableType: "device",
+          deviceId: arm.deviceId,
+          pairingCode: arm.pairingCode,
+        }
+        : { chargeBoxId: arm.deviceId, pairingCode: arm.pairingCode };
+    } else if (arm.pairableType === "device") {
+      url = `/api/admin/devices/${encodeURIComponent(arm.deviceId)}/scan-arm`;
+      body = { pairingCode: arm.pairingCode };
+    } else {
+      url = "/api/admin/tag/scan-arm";
+      body = { chargeBoxId: arm.deviceId, pairingCode: arm.pairingCode };
+    }
     try {
       await fetch(url, {
         method: "DELETE",
@@ -279,18 +296,29 @@ export function useUnifiedScan(opts: UseUnifiedScanOptions): UseUnifiedScanApi {
     state.value = { kind: "arming", target };
 
     const isDevice = target.pairableType === "device";
-    const armUrl = isDevice
-      ? `/api/admin/devices/${encodeURIComponent(target.deviceId)}/scan-arm`
-      : opts.mode === "customer"
-      ? "/api/auth/scan-pair"
-      : "/api/admin/tag/scan-arm";
-
-    const armBody = isDevice
-      ? {
+    // Route by (mode, pairableType). Customer flows always go through
+    // the public scan-pair endpoint — both branches (charger / device)
+    // are handled there. Admin-device hits the session-gated
+    // per-device endpoint; admin-charger uses the admin scan-arm endpoint.
+    let armUrl: string;
+    let armBody: Record<string, unknown>;
+    if (opts.mode === "customer") {
+      armUrl = "/api/auth/scan-pair";
+      armBody = isDevice
+        ? { pairableType: "device", deviceId: target.deviceId }
+        : { chargeBoxId: target.deviceId };
+    } else if (isDevice) {
+      armUrl = `/api/admin/devices/${
+        encodeURIComponent(target.deviceId)
+      }/scan-arm`;
+      armBody = {
         purpose: opts.purpose === "login" ? "login" : "admin-link",
         hintLabel: opts.hintLabel ?? null,
-      }
-      : { chargeBoxId: target.deviceId };
+      };
+    } else {
+      armUrl = "/api/admin/tag/scan-arm";
+      armBody = { chargeBoxId: target.deviceId };
+    }
 
     let armResp: Response;
     try {
