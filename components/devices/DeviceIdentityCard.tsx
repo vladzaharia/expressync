@@ -19,13 +19,11 @@
  */
 
 import {
-  AppWindow,
+  Bell,
+  BellOff,
   Calendar,
-  Check,
   Clock,
   ExternalLink,
-  KeyRound,
-  Layers,
   Smartphone,
   User as UserIcon,
 } from "lucide-preact";
@@ -72,22 +70,27 @@ function formatAbs(iso: string | null): string {
  *   - Active  → emerald (positive — device is reachable via push)
  *   - Missing → amber (advisory — push not registered yet, fall back to SSE)
  */
-function PushTokenPill(
+function NotificationsPill(
   { last8, env }: { last8: string | null; env: string | null },
 ) {
   if (last8 === null) {
     return (
-      <span class="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
-        <KeyRound class="size-3" aria-hidden="true" />
-        Missing
+      <span
+        class="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300"
+        title="Push notifications not registered yet — falling back to SSE"
+      >
+        <BellOff class="size-3" aria-hidden="true" />
+        Notifications off
       </span>
     );
   }
   return (
-    <span class="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-      <Check class="size-3" aria-hidden="true" />
-      Active
-      <span class="font-mono opacity-80">··{last8.slice(-4)}</span>
+    <span
+      class="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300"
+      title={`APNs token registered (last 4: ${last8.slice(-4)})`}
+    >
+      <Bell class="size-3" aria-hidden="true" />
+      Notifications on
       {env && env !== "production" && (
         <span class="rounded border border-amber-500/40 bg-amber-500/10 px-1 text-[10px] uppercase">
           {env}
@@ -100,11 +103,11 @@ function PushTokenPill(
 export function DeviceIdentityCard({
   deviceId: _deviceId,
   kind,
-  label,
+  label: _label,
   platform,
   model,
-  osVersion,
-  appVersion,
+  osVersion: _osVersion,
+  appVersion: _appVersion,
   ownerUserId,
   ownerEmail,
   capabilities,
@@ -125,18 +128,18 @@ export function DeviceIdentityCard({
 
   const ownerDisplay = ownerEmail ?? ownerUserId ?? "—";
 
-  // Description: form-factor + model when present. The technical
-  // `deviceId` lives only as the page URL — surfacing it inline here
-  // doubled up with the device label in the title.
+  // The device label lives in the PageCard title at the page level —
+  // surfacing it again here was redundant. The identity card is now
+  // titled by its purpose ("Identity") with the model line as the
+  // description, mirroring the charger detail page treatment.
+  const kindLabel = kind === "phone_nfc" ? "Phone" : "Laptop";
   const description = modelDisplay && modelDisplay !== "—"
-    ? `${kind === "phone_nfc" ? "Phone" : "Laptop"} · ${modelDisplay}`
-    : kind === "phone_nfc"
-    ? "Phone"
-    : "Laptop";
+    ? `${kindLabel} · ${modelDisplay}`
+    : kindLabel;
 
   return (
     <SectionCard
-      title={label}
+      title="Identity"
       description={description}
       icon={Smartphone}
       accent="teal"
@@ -154,29 +157,11 @@ export function DeviceIdentityCard({
               <CapabilityPill key={cap} capability={cap} />
             ))}
           <span class="ml-auto">
-            <PushTokenPill last8={pushTokenLast8} env={apnsEnvironment} />
+            <NotificationsPill last8={pushTokenLast8} env={apnsEnvironment} />
           </span>
         </div>
 
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <MetricTile
-            icon={Layers}
-            label="Model"
-            value={modelDisplay}
-            accent="teal"
-          />
-          <MetricTile
-            icon={Smartphone}
-            label="OS"
-            value={osVersion ?? "—"}
-            accent="teal"
-          />
-          <MetricTile
-            icon={AppWindow}
-            label="App version"
-            value={appVersion ?? "—"}
-            accent="teal"
-          />
+        <div class="grid grid-cols-1 gap-4">
           <MetricTile
             icon={UserIcon}
             label="Owner"
