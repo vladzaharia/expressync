@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ExpressCharge app-icon glyph — same squircle as logo.svg, but the
+  thunderbolt is white with a soft cyan glow and lucide-style rounded
+  joins so the icon reads correctly at large launcher sizes (iOS home
+  screen, Android adaptive, App Store / Play Store marketing). The
+  favicon (logo.svg) stays navy for tab-bar legibility at 16px.
+-->
+<svg
+  width="256"
+  height="256"
+  viewBox="0 0 256 256"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <defs>
+    <linearGradient
+      id="es-bg-app"
+      x1="0"
+      y1="0"
+      x2="256"
+      y2="256"
+      gradientUnits="userSpaceOnUse"
+    >
+      <stop offset="0" stop-color="#06b6d4" />
+      <stop offset="0.55" stop-color="#22c55e" />
+      <stop offset="1" stop-color="#06b6d4" />
+    </linearGradient>
+    <!-- Cyan glow around the thunderbolt — three stacked drop-shadows so
+         the bloom reads soft + bright, like the web UI's drop-shadow class. -->
+    <filter id="bolt-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="0" stdDeviation="2" flood-color="#a5f3fc" flood-opacity="0.95" />
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#67e8f9" flood-opacity="0.7" />
+      <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#22d3ee" flood-opacity="0.45" />
+    </filter>
+  </defs>
+  <!-- Squircle (rx ≈ 30%, matches the React glyph). -->
+  <rect
+    x="0"
+    y="0"
+    width="256"
+    height="256"
+    rx="76"
+    ry="76"
+    fill="url(#es-bg-app)"
+  />
+  <!-- Lucide Zap glyph — white fill + matching stroke at lucide's
+       stroke-width=2 with round joins/caps so the corners are rounded
+       exactly like the web `<Zap />` icon. -->
+  <g
+    transform="translate(56 56) scale(6)"
+    fill="#ffffff"
+    stroke="#ffffff"
+    stroke-width="2"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+    filter="url(#bolt-glow)"
+  >
+    <path d="M13 2 L3 14 h9 l-1 8 L21 10 h-9 l1 -8 z" />
+  </g>
+</svg>

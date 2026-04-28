@@ -4,6 +4,10 @@
   glyph is centred inside the inner 264×264 safe zone (66×66dp of the
   108×108dp adaptive viewport). Background is transparent — paired with
   logo-background.svg by the launcher, then masked.
+
+  Thunderbolt is white with a cyan glow + lucide rounded joins, matching
+  logo-app.svg so the launcher icon and the embedded app glyph render
+  identically.
 -->
 <svg
   width="432"
@@ -12,14 +16,23 @@
   fill="none"
   xmlns="http://www.w3.org/2000/svg"
 >
-  <!-- Lucide Zap glyph, scaled to fill the inner 264px safe zone.
-       24x24 source path → 264px box, offset (432-264)/2 = 84. -->
+  <defs>
+    <filter id="bolt-glow-fg" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#a5f3fc" flood-opacity="0.95" />
+      <feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="#67e8f9" flood-opacity="0.7" />
+      <feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="#22d3ee" flood-opacity="0.45" />
+    </filter>
+  </defs>
+  <!-- Lucide Zap glyph — white + matching stroke at lucide's stroke-width=2
+       with round joins/caps. 24x24 path → 264px box, offset (432-264)/2 = 84. -->
   <g
     transform="translate(84 84) scale(11)"
-    fill="#0b1b3d"
-    stroke="#0b1b3d"
-    stroke-width="0.6"
+    fill="#ffffff"
+    stroke="#ffffff"
+    stroke-width="2"
     stroke-linejoin="round"
+    stroke-linecap="round"
+    filter="url(#bolt-glow-fg)"
   >
     <path d="M13 2 L3 14 h9 l-1 8 L21 10 h-9 l1 -8 z" />
   </g>

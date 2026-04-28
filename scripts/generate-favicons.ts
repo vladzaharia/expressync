@@ -19,9 +19,13 @@
  *      at the same density buckets), plus the 512×512 Play Store icon.
  *
  * Sources (all under static/):
- *   logo.svg            — primary glyph (squircle bleeds inside its own
- *                          canvas; web tabs, apple-touch-icon, iOS App
- *                          Icon, Android legacy launcher).
+ *   logo.svg            — favicon glyph: navy thunderbolt for max
+ *                          legibility at 16/32/48px tab-bar sizes.
+ *   logo-app.svg        — app-icon glyph: white thunderbolt with cyan
+ *                          glow + lucide rounded joins. Used everywhere
+ *                          the icon shows as an app launcher (iOS home,
+ *                          Android legacy, App Store / Play Store, PWA
+ *                          "any" icons).
  *   logo-maskable.svg   — full-bleed gradient with glyph in 80% safe zone;
  *                          PWA "maskable" purpose icons.
  *   logo-foreground.svg — Android adaptive-icon foreground (transparent
@@ -47,16 +51,27 @@ interface Job {
 }
 
 // --- Web favicons ---------------------------------------------------------
+// Tab-bar favicons stay on logo.svg (navy bolt) for max legibility at small
+// sizes. Anything that shows as an app launcher icon (apple-touch, manifest
+// "any" icons) renders from logo-app.svg (white bolt + cyan glow).
 const WEB_JOBS: Job[] = [
   { src: "logo.svg", out: `${STATIC}/favicon-16.png`, size: 16 },
   { src: "logo.svg", out: `${STATIC}/favicon-32.png`, size: 32 },
   { src: "logo.svg", out: `${STATIC}/favicon-48.png`, size: 48 },
   { src: "logo.svg", out: `${STATIC}/favicon-96.png`, size: 96 },
-  { src: "logo.svg", out: `${STATIC}/apple-touch-icon.png`, size: 180 },
-  { src: "logo.svg", out: `${STATIC}/icon-192.png`, size: 192 },
-  { src: "logo.svg", out: `${STATIC}/icon-512.png`, size: 512 },
-  { src: "logo-maskable.svg", out: `${STATIC}/icon-maskable-192.png`, size: 192 },
-  { src: "logo-maskable.svg", out: `${STATIC}/icon-maskable-512.png`, size: 512 },
+  { src: "logo-app.svg", out: `${STATIC}/apple-touch-icon.png`, size: 180 },
+  { src: "logo-app.svg", out: `${STATIC}/icon-192.png`, size: 192 },
+  { src: "logo-app.svg", out: `${STATIC}/icon-512.png`, size: 512 },
+  {
+    src: "logo-maskable.svg",
+    out: `${STATIC}/icon-maskable-192.png`,
+    size: 192,
+  },
+  {
+    src: "logo-maskable.svg",
+    out: `${STATIC}/icon-maskable-512.png`,
+    size: 512,
+  },
 ];
 
 // --- iOS App Icon set -----------------------------------------------------
@@ -73,25 +88,127 @@ interface IosEntry {
 }
 const IOS_ENTRIES: IosEntry[] = [
   // iPhone
-  { size: 40, filename: "Icon-20@2x.png", idiom: "iphone", iconSize: "20x20", scale: "2x" },
-  { size: 60, filename: "Icon-20@3x.png", idiom: "iphone", iconSize: "20x20", scale: "3x" },
-  { size: 58, filename: "Icon-29@2x.png", idiom: "iphone", iconSize: "29x29", scale: "2x" },
-  { size: 87, filename: "Icon-29@3x.png", idiom: "iphone", iconSize: "29x29", scale: "3x" },
-  { size: 80, filename: "Icon-40@2x.png", idiom: "iphone", iconSize: "40x40", scale: "2x" },
-  { size: 120, filename: "Icon-40@3x.png", idiom: "iphone", iconSize: "40x40", scale: "3x" },
-  { size: 120, filename: "Icon-60@2x.png", idiom: "iphone", iconSize: "60x60", scale: "2x" },
-  { size: 180, filename: "Icon-60@3x.png", idiom: "iphone", iconSize: "60x60", scale: "3x" },
+  {
+    size: 40,
+    filename: "Icon-20@2x.png",
+    idiom: "iphone",
+    iconSize: "20x20",
+    scale: "2x",
+  },
+  {
+    size: 60,
+    filename: "Icon-20@3x.png",
+    idiom: "iphone",
+    iconSize: "20x20",
+    scale: "3x",
+  },
+  {
+    size: 58,
+    filename: "Icon-29@2x.png",
+    idiom: "iphone",
+    iconSize: "29x29",
+    scale: "2x",
+  },
+  {
+    size: 87,
+    filename: "Icon-29@3x.png",
+    idiom: "iphone",
+    iconSize: "29x29",
+    scale: "3x",
+  },
+  {
+    size: 80,
+    filename: "Icon-40@2x.png",
+    idiom: "iphone",
+    iconSize: "40x40",
+    scale: "2x",
+  },
+  {
+    size: 120,
+    filename: "Icon-40@3x.png",
+    idiom: "iphone",
+    iconSize: "40x40",
+    scale: "3x",
+  },
+  {
+    size: 120,
+    filename: "Icon-60@2x.png",
+    idiom: "iphone",
+    iconSize: "60x60",
+    scale: "2x",
+  },
+  {
+    size: 180,
+    filename: "Icon-60@3x.png",
+    idiom: "iphone",
+    iconSize: "60x60",
+    scale: "3x",
+  },
   // iPad
-  { size: 20, filename: "Icon-20.png", idiom: "ipad", iconSize: "20x20", scale: "1x" },
-  { size: 40, filename: "Icon-20@2x-ipad.png", idiom: "ipad", iconSize: "20x20", scale: "2x" },
-  { size: 29, filename: "Icon-29.png", idiom: "ipad", iconSize: "29x29", scale: "1x" },
-  { size: 58, filename: "Icon-29@2x-ipad.png", idiom: "ipad", iconSize: "29x29", scale: "2x" },
-  { size: 40, filename: "Icon-40.png", idiom: "ipad", iconSize: "40x40", scale: "1x" },
-  { size: 80, filename: "Icon-40@2x-ipad.png", idiom: "ipad", iconSize: "40x40", scale: "2x" },
-  { size: 152, filename: "Icon-76@2x.png", idiom: "ipad", iconSize: "76x76", scale: "2x" },
-  { size: 167, filename: "Icon-83.5@2x.png", idiom: "ipad", iconSize: "83.5x83.5", scale: "2x" },
+  {
+    size: 20,
+    filename: "Icon-20.png",
+    idiom: "ipad",
+    iconSize: "20x20",
+    scale: "1x",
+  },
+  {
+    size: 40,
+    filename: "Icon-20@2x-ipad.png",
+    idiom: "ipad",
+    iconSize: "20x20",
+    scale: "2x",
+  },
+  {
+    size: 29,
+    filename: "Icon-29.png",
+    idiom: "ipad",
+    iconSize: "29x29",
+    scale: "1x",
+  },
+  {
+    size: 58,
+    filename: "Icon-29@2x-ipad.png",
+    idiom: "ipad",
+    iconSize: "29x29",
+    scale: "2x",
+  },
+  {
+    size: 40,
+    filename: "Icon-40.png",
+    idiom: "ipad",
+    iconSize: "40x40",
+    scale: "1x",
+  },
+  {
+    size: 80,
+    filename: "Icon-40@2x-ipad.png",
+    idiom: "ipad",
+    iconSize: "40x40",
+    scale: "2x",
+  },
+  {
+    size: 152,
+    filename: "Icon-76@2x.png",
+    idiom: "ipad",
+    iconSize: "76x76",
+    scale: "2x",
+  },
+  {
+    size: 167,
+    filename: "Icon-83.5@2x.png",
+    idiom: "ipad",
+    iconSize: "83.5x83.5",
+    scale: "2x",
+  },
   // App Store
-  { size: 1024, filename: "Icon-1024.png", idiom: "ios-marketing", iconSize: "1024x1024", scale: "1x" },
+  {
+    size: 1024,
+    filename: "Icon-1024.png",
+    idiom: "ios-marketing",
+    iconSize: "1024x1024",
+    scale: "1x",
+  },
 ];
 
 // --- Android launcher + adaptive icons ------------------------------------
@@ -126,7 +243,11 @@ async function run(cmd: string, args: string[]): Promise<void> {
   }
 }
 
-async function rasterise(src: string, out: string, size: number): Promise<void> {
+async function rasterise(
+  src: string,
+  out: string,
+  size: number,
+): Promise<void> {
   await run("convert", [
     "-background",
     "none",
@@ -169,8 +290,8 @@ await ensureDir(IOS);
 // iOS marketing (1024) requires no transparency; render onto a solid
 // background colour the same as the squircle's lightest hue to be safe.
 // All other iOS sizes can keep transparent corners — iOS masks them anyway
-// since iOS 7. We use logo.svg (with built-in squircle) as the source so
-// the visual matches the home-screen icon exactly.
+// since iOS 7. We use logo-app.svg (white bolt + cyan glow + lucide
+// rounded joins) so the visual matches the home-screen launcher rendering.
 for (const entry of IOS_ENTRIES) {
   const out = `${IOS}/${entry.filename}`;
   if (entry.idiom === "ios-marketing") {
@@ -182,7 +303,7 @@ for (const entry of IOS_ENTRIES) {
       "#06b6d4",
       "-density",
       "1024",
-      `${STATIC}/logo.svg`,
+      `${STATIC}/logo-app.svg`,
       "-resize",
       `${entry.size}x${entry.size}`,
       "-alpha",
@@ -193,7 +314,7 @@ for (const entry of IOS_ENTRIES) {
     ]);
     console.log(`  wrote ${out}`);
   } else {
-    await rasterise("logo.svg", out, entry.size);
+    await rasterise("logo-app.svg", out, entry.size);
   }
 }
 // Contents.json for Xcode.
@@ -219,8 +340,9 @@ console.log("[android] mipmap + adaptive icons");
 for (const d of ANDROID_DENSITIES) {
   const dir = `${ANDROID}/mipmap-${d.density}`;
   await ensureDir(dir);
-  // Legacy square launcher icon (pre-Android 8).
-  await rasterise("logo.svg", `${dir}/ic_launcher.png`, d.legacyPx);
+  // Legacy square launcher icon (pre-Android 8). Uses the app-icon glyph
+  // so pre-adaptive-icon devices match the post-adaptive rendering.
+  await rasterise("logo-app.svg", `${dir}/ic_launcher.png`, d.legacyPx);
   // Adaptive icon layers (Android 8+). Same density bucket, larger canvas
   // (108dp instead of 48dp) since the system mask shrinks visible content.
   await rasterise(
@@ -241,7 +363,7 @@ await run("convert", [
   "#06b6d4",
   "-density",
   "1024",
-  `${STATIC}/logo.svg`,
+  `${STATIC}/logo-app.svg`,
   "-resize",
   "512x512",
   "-alpha",
