@@ -1,41 +1,57 @@
 /**
- * UnifiedDeviceCard — single card surface for both OCPP chargers and
- * iOS/macOS NFC scanners.
+ * DeviceCard — single card surface for both OCPP chargers and iOS/macOS NFC
+ * scanners.
  *
- * Layout is identical across the two types so the grid reads cleanly:
+ * Both branches share the same three-section body skeleton (pills row →
+ * primary status line → 2-col metric grid) and the same action-row layout
+ * (primary, secondary, admin-destructive on `ml-auto`). The only thing that
+ * differs is the *content* of each slot — chargers carry a live kW chip, an
+ * active-session description, uptime, refresh/stop/reserve/unlock; scanners
+ * carry capability pills, a "last seen / online now" line, owner +
+ * registration date, view/rename/force-deregister.
+ *
+ * Layout:
  *
  *   ┌────────────────────────────────────────────┐
- *   │  [icon]  Display name                kW chip│   header row
+ *   │  [icon]  Display name                kW chip│   header
  *   │          chargeBoxId / model · v…           │
  *   │  ────────────────────────────────────────  │
- *   │  capability pills (scanner only)            │   body
- *   │  metric grid:   col-1            col-2      │
+ *   │  [pill] [pill] [pill]                       │   pills row
+ *   │  Primary status line                         │   status line
+ *   │  Metric A         Metric B                   │   metric grid
  *   │  ────────────────────────────────────────  │
- *   │  [Action]  [Action]              [Admin]    │   actions
+ *   │  [Primary] [Secondary]          [Destructive]│   actions
  *   └────────────────────────────────────────────┘
  *
- * The icon's halo carries status (offline = rose, charging = emerald, etc.)
- * — there's no explicit Online/Offline pill; the icon already says it.
+ * The icon's halo carries online/offline status; there's no Online/Offline
+ * pill in the header.
  *
  * Charger-specific behaviour:
  *   - Live kW chip in the header, driven by `transaction.meter` SSE events.
- *   - Body shows active session metrics (current kW, session kWh, duration)
- *     when a session is in flight; otherwise "No active session" + uptime.
- *   - Actions: Stop (when charging) or Refresh status, Reserve, Unlock (admin).
  *   - BorderBeam decoration only while a session is active.
  *
  * Scanner-specific behaviour:
- *   - Capability pills row.
- *   - Body shows "Online now" / "Last seen" + Owner.
- *   - Actions: View, then DeviceActionsMenu (admin).
+ *   - Rename + Force-deregister inlined as buttons (no dropdown). Confirms
+ *     reuse `ConfirmDialog` and the same API endpoints as the standalone
+ *     `DeviceActionsMenu` (which the device detail page still uses).
  */
 
 import { useEffect, useState } from "preact/hooks";
 import { useSignal } from "@preact/signals";
-import { ExternalLink, Lock, RefreshCw, StopCircle, Zap } from "lucide-preact";
+import { toast } from "sonner";
+import {
+  ExternalLink,
+  Lock,
+  Pencil,
+  RefreshCw,
+  ShieldOff,
+  StopCircle,
+  Zap,
+} from "lucide-preact";
 import { subscribeSse } from "@/islands/shared/SseProvider.tsx";
 import { BorderBeam } from "@/components/magicui/border-beam.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
 import {
   Tooltip,
   TooltipContent,
@@ -49,6 +65,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog.tsx";
 import { CapabilityPill } from "@/components/devices/CapabilityPill.tsx";
 import { getDeviceIcon } from "@/src/lib/utils/device-icons.ts";
 import { cn } from "@/src/lib/utils/cn.ts";
@@ -63,7 +80,6 @@ import {
   STALE_DIM_MS,
   STATUS_HALO,
 } from "@/islands/shared/device-visuals.ts";
-import DeviceActionsMenu from "@/islands/devices/DeviceActionsMenu.tsx";
 
 // ---- DTOs ----------------------------------------------------------------
 
@@ -103,7 +119,7 @@ export type UnifiedDeviceEntry =
   | { type: "charger"; data: ChargerCardDto; activeSession?: ActiveSessionDto }
   | { type: "scanner"; data: DeviceCardDto };
 
-export interface UnifiedDeviceCardProps {
+export interface DeviceCardProps {
   entry: UnifiedDeviceEntry;
   isAdmin?: boolean;
   /** Charger-only: forwarded to the OCPP operation poster for instrumentation. */
@@ -112,8 +128,8 @@ export interface UnifiedDeviceCardProps {
 
 // ---- Component -----------------------------------------------------------
 
-export default function UnifiedDeviceCard(
-  { entry, isAdmin = false, onAction }: UnifiedDeviceCardProps,
+export default function DeviceCard(
+  { entry, isAdmin = false, onAction }: DeviceCardProps,
 ) {
   return entry.type === "charger"
     ? (
@@ -156,7 +172,70 @@ function Divider() {
   return <div class="h-px w-full bg-border/60" />;
 }
 
+/** Pill row container — always reserves height so charger and scanner rows
+ *  align even when one side has no pills. */
+function PillRow({ children }: { children: preact.ComponentChildren }) {
+  return (
+    <div class="flex min-h-6 flex-wrap items-center gap-1.5">{children}</div>
+  );
+}
+
+/** Generic tone-mapped pill (for charger form-factor + connector status). */
+function StatusPill(
+  { tone, children, icon }: {
+    tone: "slate" | "emerald" | "amber" | "rose" | "cyan";
+    children: preact.ComponentChildren;
+    icon?: preact.ComponentChildren;
+  },
+) {
+  const toneClasses: Record<typeof tone, string> = {
+    slate:
+      "border-slate-500/30 bg-slate-500/10 text-slate-700 dark:text-slate-300",
+    emerald:
+      "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    amber:
+      "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    rose: "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+    cyan: "border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300",
+  };
+  return (
+    <span
+      class={cn(
+        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium",
+        toneClasses[tone],
+      )}
+    >
+      {icon}
+      <span>{children}</span>
+    </span>
+  );
+}
+
 // ---- Charger -------------------------------------------------------------
+
+const FORM_FACTOR_LABEL: Record<string, string> = {
+  wallbox: "Wallbox",
+  pulsar: "Pulsar",
+  commander: "Commander",
+  wall_mount: "Wall mount",
+  generic: "Generic",
+};
+
+const CONNECTOR_STATUS_TONE: Record<
+  string,
+  "slate" | "emerald" | "amber" | "rose" | "cyan"
+> = {
+  Charging: "emerald",
+  Available: "cyan",
+  Preparing: "amber",
+  SuspendedEV: "amber",
+  SuspendedEVSE: "amber",
+  Reserved: "amber",
+  Finishing: "amber",
+  Unavailable: "slate",
+  Faulted: "rose",
+  Offline: "rose",
+};
 
 function ChargerBody(
   { charger, activeSession, isAdmin, onAction }: {
@@ -244,6 +323,9 @@ function ChargerBody(
   const showChargeBoxIdSubtitle = !!charger.friendlyName?.trim() &&
     charger.friendlyName.trim() !== charger.chargeBoxId;
   const isCharging = status === "Charging";
+  const formFactorLabel = FORM_FACTOR_LABEL[charger.formFactor] ??
+    charger.formFactor;
+  const statusTone = CONNECTOR_STATUS_TONE[status] ?? "slate";
 
   const postOperation = async (
     operation: string,
@@ -298,6 +380,18 @@ function ChargerBody(
     setUnlockConfirmOpen(false);
     await postOperation("UnlockConnector", { connectorId: 1 });
   };
+
+  const sessionLine = activeSession
+    ? `${
+      activeSession.currentKw !== null
+        ? `${activeSession.currentKw.toFixed(1)} kW`
+        : "—"
+    } · ${formatSessionDuration(activeSession.startTimestampIso)}${
+      activeSession.sessionKwh !== null
+        ? ` · ${activeSession.sessionKwh.toFixed(1)} kWh`
+        : ""
+    }`
+    : "No active session";
 
   return (
     <>
@@ -362,53 +456,46 @@ function ChargerBody(
 
         <Divider />
 
-        {/* Metrics */}
+        {/* Pills row */}
+        <PillRow>
+          <StatusPill tone="slate">
+            {formatFormFactor(formFactorLabel)}
+          </StatusPill>
+          <StatusPill tone={statusTone}>{status}</StatusPill>
+        </PillRow>
+
+        {/* Primary status line — full-width */}
+        <div class="text-xs">
+          <span class="text-muted-foreground">Session:</span>{" "}
+          <span class="font-medium">{sessionLine}</span>
+        </div>
+
+        {/* Metric grid */}
         <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-          {activeSession
-            ? (
-              <>
-                <div>
-                  <span class="text-muted-foreground">Current:</span>{" "}
-                  <span class="font-medium">
-                    {activeSession.currentKw !== null
-                      ? `${activeSession.currentKw.toFixed(1)} kW`
-                      : "—"}
-                    {" · "}
-                    {formatSessionDuration(activeSession.startTimestampIso)}
-                  </span>
-                </div>
-                <div>
-                  <span class="text-muted-foreground">Session:</span>{" "}
-                  <span class="font-medium">
-                    {activeSession.sessionKwh !== null
-                      ? `${activeSession.sessionKwh.toFixed(1)} kWh`
-                      : "—"}
-                  </span>
-                </div>
-              </>
-            )
-            : (
-              <div class="col-span-2 text-muted-foreground">
-                No active session
-              </div>
-            )}
-          <div class="col-span-2">
+          <div>
             <span class="text-muted-foreground">Uptime:</span>{" "}
             <span class="font-medium">
               {formatUptime(charger.firstSeenAtIso)}
+            </span>
+          </div>
+          <div class="truncate">
+            <span class="text-muted-foreground">Status updated:</span>{" "}
+            <span class="font-medium">
+              {formatRelative(charger.lastStatusAtIso)}
             </span>
           </div>
         </div>
 
         <Divider />
 
-        {/* Actions */}
+        {/* Actions — same shape as scanner: [primary] [secondary] [admin ml-auto] */}
         <div class="flex items-center gap-2">
           {isCharging
             ? (
               <Button
                 size="sm"
-                variant="destructive"
+                variant="outline"
+                class="text-rose-600 hover:bg-rose-500/10 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-400"
                 onClick={handleStop}
                 disabled={pendingStop || !activeSession}
               >
@@ -442,7 +529,7 @@ function ChargerBody(
           {isAdmin && (
             <Button
               size="sm"
-              variant="ghost"
+              variant="outline"
               class="ml-auto text-rose-600 hover:bg-rose-500/10 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-400"
               onClick={() => setUnlockConfirmOpen(true)}
             >
@@ -453,7 +540,6 @@ function ChargerBody(
         </div>
       </CardShell>
 
-      {/* Reserve placeholder modal */}
       {reserveOpen && (
         <Dialog open={reserveOpen} onOpenChange={setReserveOpen}>
           <DialogContent onClose={() => setReserveOpen(false)}>
@@ -473,7 +559,6 @@ function ChargerBody(
         </Dialog>
       )}
 
-      {/* Unlock confirm modal */}
       {unlockConfirmOpen && (
         <Dialog open={unlockConfirmOpen} onOpenChange={setUnlockConfirmOpen}>
           <DialogContent
@@ -505,107 +590,269 @@ function ChargerBody(
   );
 }
 
+function formatFormFactor(label: string): string {
+  return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
+}
+
 // ---- Scanner -------------------------------------------------------------
 
 function ScannerBody(
   { device, isAdmin }: { device: DeviceCardDto; isAdmin: boolean },
 ) {
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState(device.label);
+  const [renameLoading, setRenameLoading] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deregisterLoading, setDeregisterLoading] = useState(false);
+
   const status = normalizeDeviceStatus(device.lastSeenAtIso, device.isOnline);
   const Icon = getDeviceIcon(device.kind);
   const halo = DEVICE_STATUS_HALO[status];
   const isOffline = status === "Offline";
   const subtitle = device.model ?? device.platform ?? "Unknown model";
 
+  const submitRename = async (e?: Event) => {
+    e?.preventDefault();
+    const trimmed = renameValue.trim();
+    if (trimmed.length === 0) {
+      setRenameError("Label can't be empty.");
+      return;
+    }
+    if (trimmed.length > 80) {
+      setRenameError("Max 80 characters.");
+      return;
+    }
+    setRenameError(null);
+    setRenameLoading(true);
+    try {
+      const res = await fetch(`/api/admin/devices/${device.deviceId}/rename`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: trimmed }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        setRenameError(`Rename failed (${res.status}): ${text}`);
+        return;
+      }
+      toast.success(`Renamed to "${trimmed}"`);
+      setRenameOpen(false);
+      globalThis.location.reload();
+    } catch (err) {
+      setRenameError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRenameLoading(false);
+    }
+  };
+
+  const submitDeregister = async () => {
+    setDeregisterLoading(true);
+    try {
+      const res = await fetch(
+        `/api/admin/devices/${device.deviceId}/deregister`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: "admin_ui" }),
+        },
+      );
+      if (!res.ok) {
+        const text = await res.text();
+        toast.error(`Deregister failed (${res.status}): ${text}`);
+        return;
+      }
+      toast.success(`Device "${device.label}" deregistered`);
+      setConfirmOpen(false);
+      globalThis.location.reload();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeregisterLoading(false);
+    }
+  };
+
+  const registeredRel = formatRelative(device.registeredAtIso);
+  const lastSeenLine = device.isOnline
+    ? "Online now"
+    : `Last seen ${formatRelative(device.lastSeenAtIso)}`;
+
   return (
-    <CardShell>
-      {/* Header row */}
-      <div class="flex items-center gap-3">
-        <span
-          class={cn("shrink-0 transition-opacity", isOffline && "opacity-60")}
-          role="status"
-          aria-label={`Status: ${status}`}
-        >
-          <Icon size="md" haloColor={halo} />
-        </span>
-        <a
-          href={`/admin/devices/${device.deviceId}`}
-          class="flex min-w-0 flex-1 flex-col hover:underline"
-        >
-          <span class="truncate text-base font-semibold tracking-tight">
-            {device.label}
+    <>
+      <CardShell>
+        {/* Header row */}
+        <div class="flex items-center gap-3">
+          <span
+            class={cn("shrink-0 transition-opacity", isOffline && "opacity-60")}
+            role="status"
+            aria-label={`Status: ${status}`}
+          >
+            <Icon size="md" haloColor={halo} />
           </span>
-          <span class="truncate text-xs text-muted-foreground">
-            {subtitle}
-            {device.appVersion ? ` · v${device.appVersion}` : ""}
-          </span>
-        </a>
-      </div>
-
-      <Divider />
-
-      {device.capabilities.length > 0 && (
-        <div class="flex flex-wrap gap-1.5">
-          {device.capabilities.map((c) => (
-            <CapabilityPill key={c} capability={c} />
-          ))}
+          <a
+            href={`/admin/devices/${device.deviceId}`}
+            class="flex min-w-0 flex-1 flex-col hover:underline"
+          >
+            <span class="truncate text-base font-semibold tracking-tight">
+              {device.label}
+            </span>
+            <span class="truncate text-xs text-muted-foreground">
+              {subtitle}
+              {device.appVersion ? ` · v${device.appVersion}` : ""}
+            </span>
+          </a>
         </div>
+
+        <Divider />
+
+        {/* Pills row — capabilities */}
+        <PillRow>
+          {device.capabilities.length > 0
+            ? device.capabilities.map((c) => (
+              <CapabilityPill key={c} capability={c} />
+            ))
+            : (
+              <span class="text-xs text-muted-foreground">
+                No capabilities
+              </span>
+            )}
+        </PillRow>
+
+        {/* Primary status line — full-width */}
+        <div class="text-xs">
+          <span class="text-muted-foreground">Status:</span>{" "}
+          <span
+            class={cn(
+              "font-medium",
+              device.isOnline && "text-emerald-600 dark:text-emerald-400",
+            )}
+          >
+            {lastSeenLine}
+          </span>
+        </div>
+
+        {/* Metric grid */}
+        <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+          <div class="truncate">
+            <span class="text-muted-foreground">Owner:</span>{" "}
+            {device.ownerUserId
+              ? (
+                <a
+                  href={`/admin/users/${device.ownerUserId}`}
+                  class="inline-flex items-center gap-0.5 font-medium hover:underline"
+                  title={device.ownerUserId}
+                >
+                  <span class="truncate max-w-[10ch]">
+                    {device.ownerUserId.slice(0, 8)}…
+                  </span>
+                  <ExternalLink class="size-3 opacity-60" aria-hidden="true" />
+                </a>
+              )
+              : <span class="font-medium">—</span>}
+          </div>
+          <div class="truncate">
+            <span class="text-muted-foreground">Registered:</span>{" "}
+            <span class="font-medium">{registeredRel}</span>
+          </div>
+        </div>
+
+        <Divider />
+
+        {/* Actions — same shape as charger: [primary] [secondary] [admin ml-auto] */}
+        <div class="flex items-center gap-2">
+          <Button size="sm" variant="outline" asChild>
+            <a href={`/admin/devices/${device.deviceId}`}>View</a>
+          </Button>
+          {isAdmin && (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setRenameValue(device.label);
+                  setRenameError(null);
+                  setRenameOpen(true);
+                }}
+              >
+                <Pencil class="size-4" />
+                Rename
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                class="ml-auto text-rose-600 hover:bg-rose-500/10 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-400"
+                onClick={() => setConfirmOpen(true)}
+              >
+                <ShieldOff class="size-4" />
+                Deregister
+              </Button>
+            </>
+          )}
+        </div>
+      </CardShell>
+
+      {renameOpen && (
+        <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+          <DialogContent onClose={() => setRenameOpen(false)}>
+            <DialogHeader>
+              <DialogTitle>Rename device</DialogTitle>
+              <DialogDescription>
+                Pick a label that admins will see in lists. Visible to the
+                device owner too.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={submitRename} class="flex flex-col gap-2">
+              <Input
+                type="text"
+                value={renameValue}
+                onInput={(e) =>
+                  setRenameValue((e.currentTarget as HTMLInputElement).value)}
+                maxLength={80}
+                autoFocus
+                disabled={renameLoading}
+              />
+              {renameError && (
+                <p class="text-sm text-destructive">{renameError}</p>
+              )}
+              <DialogFooter className="mt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setRenameOpen(false)}
+                  disabled={renameLoading}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={renameLoading}>
+                  {renameLoading ? "Saving…" : "Save"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       )}
 
-      <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-        <div>
-          {device.isOnline
-            ? (
-              <>
-                <span class="text-muted-foreground">Status:</span>{" "}
-                <span class="font-medium text-emerald-600 dark:text-emerald-400">
-                  Online now
-                </span>
-              </>
-            )
-            : (
-              <>
-                <span class="text-muted-foreground">Last seen:</span>{" "}
-                <span class="font-medium">
-                  {formatRelative(device.lastSeenAtIso)}
-                </span>
-              </>
-            )}
-        </div>
-        <div class="truncate">
-          <span class="text-muted-foreground">Owner:</span> {device.ownerUserId
-            ? (
-              <a
-                href={`/admin/users/${device.ownerUserId}`}
-                class="inline-flex items-center gap-0.5 font-medium hover:underline"
-                title={device.ownerUserId}
-              >
-                <span class="truncate max-w-[10ch]">
-                  {device.ownerUserId.slice(0, 8)}…
-                </span>
-                <ExternalLink class="size-3 opacity-60" aria-hidden="true" />
-              </a>
-            )
-            : <span class="font-medium">—</span>}
-        </div>
-      </div>
-
-      <Divider />
-
-      <div class="flex items-center gap-2">
-        <Button size="sm" variant="outline" asChild>
-          <a href={`/admin/devices/${device.deviceId}`}>View</a>
-        </Button>
-        {isAdmin && (
-          <div class="ml-auto">
-            <DeviceActionsMenu
-              deviceId={device.deviceId}
-              label={device.label}
-              kind={device.kind}
-              compact
-            />
-          </div>
-        )}
-      </div>
-    </CardShell>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Force deregister device?"
+        description={
+          <>
+            This soft-deletes <strong>{device.label}</strong>{" "}
+            and revokes every active bearer token. The owner will be signed out
+            on next request and the{" "}
+            {device.kind === "phone_nfc" ? "phone" : "laptop"}{" "}
+            must re-register. This cannot be undone via the admin UI.
+          </>
+        }
+        confirmLabel={deregisterLoading ? "Deregistering…" : "Force deregister"}
+        cancelLabel="Cancel"
+        variant="destructive"
+        icon={<ShieldOff class="size-4 text-rose-500" aria-hidden="true" />}
+        typeToConfirmPhrase={device.label}
+        onConfirm={submitDeregister}
+        isLoading={deregisterLoading}
+      />
+    </>
   );
 }

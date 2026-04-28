@@ -10,7 +10,7 @@
  *     PageCard title="Devices" colorScheme="teal"
  *       DevicesStatStrip      (Total · Online · Offline · Chargers · Scanners)
  *       DeviceFiltersBar      (type · kind · online · owner)
- *       UnifiedDeviceCard[]   (responsive 1/2/3-col grid, mixed charger+scanner)
+ *       DeviceCard[]          (responsive 1/2/3-col grid, mixed charger+scanner)
  *
  * Loader strategy: query `chargers_cache` and `devices` independently with
  * the typed Drizzle query builder (avoids the brittle `tappable_devices`
@@ -41,11 +41,11 @@ import type {
   DeviceOnlineFilter,
   DeviceTypeFilter,
 } from "../../../components/devices/DeviceFiltersBar.tsx";
-import UnifiedDeviceCard, {
+import DeviceCard, {
   type ChargerCardDto,
   type DeviceCardDto,
   type UnifiedDeviceEntry,
-} from "../../../islands/devices/UnifiedDeviceCard.tsx";
+} from "../../../islands/devices/DeviceCard.tsx";
 import { normalizeStatus } from "../../../islands/shared/device-visuals.ts";
 
 const log = logger.child("AdminDevicesPage");
@@ -352,7 +352,7 @@ export default define.page<typeof handler>(
               <>
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {data.entries.map((entry) => (
-                    <UnifiedDeviceCard
+                    <DeviceCard
                       key={entry.type === "charger"
                         ? `c:${entry.data.chargeBoxId}`
                         : `s:${entry.data.deviceId}`}
