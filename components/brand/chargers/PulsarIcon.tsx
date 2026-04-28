@@ -16,7 +16,12 @@ function resolveSize(size: ChargerIconProps["size"]): number {
  * centered on the face hints at the LED ring. 100×100 viewBox.
  */
 export function PulsarIcon(
-  { size = "md", class: classProp, className }: ChargerIconProps,
+  {
+    size = "md",
+    class: classProp,
+    className,
+    haloColor = "oklch(0.78 0.12 195)",
+  }: ChargerIconProps,
 ) {
   const px = resolveSize(size);
   const gradientId = "pulsar-gradient";
@@ -35,6 +40,19 @@ export function PulsarIcon(
           <stop offset="100%" stop-color="oklch(0.70 0.18 190)" />
         </linearGradient>
       </defs>
+      {/* Halo outer diffuse glow */}
+      <rect
+        x="28"
+        y="6"
+        width="44"
+        height="88"
+        rx="5"
+        ry="5"
+        fill="none"
+        stroke={haloColor}
+        stroke-width="1"
+        opacity="0.4"
+      />
       {/* Body — vertical slab, sharp corners */}
       <rect
         x="30"
@@ -44,6 +62,19 @@ export function PulsarIcon(
         rx="3"
         ry="3"
         fill={`url(#${gradientId})`}
+      />
+      {/* Halo ring — status-bearing LED, traced just inside the body */}
+      <rect
+        x="33"
+        y="11"
+        width="34"
+        height="78"
+        rx="2"
+        ry="2"
+        fill="none"
+        stroke={haloColor}
+        stroke-width="2.5"
+        opacity="0.95"
       />
       {/* Face recess */}
       <rect
