@@ -161,6 +161,20 @@ export const handler = define.handlers({
             lastSeenAtIso: (r.lastSeenAt ?? new Date(0)).toISOString(),
             lastStatus: r.lastStatus,
             lastStatusAtIso: isoOrNull(r.lastStatusAt),
+            // The DB CHECK on `chargers_cache.capabilities` (slice O —
+            // migration 0039) guarantees `'charger'` is present on every
+            // row, but defensively force it on so a misconfigured row
+            // can't blank out the pill in the listing.
+            capabilities: (() => {
+              const set = new Set<string>(
+                (r.capabilities ?? []).filter(
+                  (c): c is DeviceCapability =>
+                    (DEVICE_CAPABILITIES as readonly string[]).includes(c),
+                ),
+              );
+              set.add("charger");
+              return Array.from(set);
+            })(),
           } satisfies ChargerCardDto,
         }));
       } catch (error) {
