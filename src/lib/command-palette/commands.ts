@@ -115,12 +115,11 @@ export function buildActionCommands(env: ActionEnv): PaletteCommand[] {
         "scan",
         "scan ev card",
       ],
-      // Keep the palette open: the palette itself listens for this event,
-      // fetches the unified tap-target roster (chargers + phones), and
-      // either auto-arms (operator's own phone is the only online target)
-      // or switches to its inline picker subview. The actual scan UX
-      // lives in the TapToAddModal mounted by `ScanTagPaletteHost` once a
-      // tap-target is chosen.
+      // Keep the palette open: the palette listens for this event and
+      // swaps its body into scan-mode, embedding the unified `<ScanFlow>`
+      // inline (picker → armed → result, no auto-pick). The user picks a
+      // tappable device, the flow arms it, and the palette closes on
+      // resolution.
       keepOpenAfterRun: true,
       run: () => {
         if (typeof globalThis.dispatchEvent === "function") {

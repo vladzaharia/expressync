@@ -16,8 +16,9 @@
  *     handle the rest") — same as charger; the laptop's NFC sensor is
  *     just another reader.
  *
- * Single source so the customer-login `mapCustomerFlowToPanelState` and
- * the admin `TapToAddModal` stay in sync without copy-pasting strings.
+ * Single source for both the customer-login and admin scan flows so
+ * step copy stays in sync without copy-pasting strings across `<ScanFlow>`
+ * and `<ScanPanel>`.
  */
 
 import type { TapTargetEntry } from "@/src/lib/types/devices.ts";

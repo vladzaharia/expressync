@@ -1,5 +1,5 @@
 /**
- * ScanStateIcon — maps a `ScanTagState` kind to its canonical Lucide glyph
+ * ScanStateIcon — maps a scan-state kind to its canonical Lucide glyph
  * and color token. Centralized here so the modal body and any future
  * in-page summary card render consistent iconography.
  *
@@ -19,12 +19,12 @@ import {
   PlugZap,
   WifiOff,
 } from "lucide-preact";
-import type { ScanTagState } from "@/islands/shared/use-scan-tag.ts";
+import type { ScanStateForIcon } from "@/components/scan/types.ts";
 import { type AccentColor, stripToneClasses } from "@/src/lib/colors.ts";
 import { cn } from "@/src/lib/utils/cn.ts";
 
 interface Props {
-  state: ScanTagState;
+  state: ScanStateForIcon;
   /** Neutral-state tint. Defaults to cyan (the Tags page accent). */
   accent?: AccentColor;
   /** Extra classes merged onto the icon element. Size default is size-10. */
@@ -63,6 +63,8 @@ export function ScanStateIcon(
       return <WifiOff class={cn(base, "text-destructive")} />;
     case "lookup_failed":
       return <AlertTriangle class={cn(base, "text-destructive")} />;
+    case "cancelled":
+      return <AlertTriangle class={cn(base, "text-amber-500")} />;
     case "dismissed":
       return null;
   }

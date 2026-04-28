@@ -1,21 +1,27 @@
 /**
  * POST /api/auth/scan-login
  *
- * Polaris Track C — completes the scan-to-login flow by minting a
- * customer session AS-IF the user had just signed in via magic-link.
+ * Completes the scan-to-login flow by minting a customer session AS-IF
+ * the user had just signed in via magic-link.
  *
- * Body: { pairingCode, chargeBoxId, idTag, nonce, t }
+ * Body (charger path, legacy):
+ *     { pairingCode, chargeBoxId, idTag, nonce, t }
+ * Body (device path, customer remote-login on admin's phone):
+ *     { pairingCode, deviceId,    idTag, nonce, t }
+ *
+ * The HMAC nonce is bound to (idTag, pairingCode, pairableId, t) where
+ * pairableId is whichever of chargeBoxId/deviceId the request supplies.
+ * The verifications row identifier mirrors that split:
+ *   - charger: `scan-pair:{chargeBoxId}:{pairingCode}`
+ *   - device:  `device-scan:{deviceId}:{pairingCode}`
  *
  * Verification chain (each step rejects with a generic 4xx — never leak
  * which step failed, to deny enumeration):
- *   1. Re-compute the HMAC over (idTag, pairingCode, chargeBoxId, t)
- *      and constant-time compare with the supplied nonce.    -> 403 on mismatch
+ *   1. Re-compute the HMAC over (idTag, pairingCode, pairableId, t) and
+ *      constant-time compare with the supplied nonce.        -> 403
  *   2. Reject if t > 60s old (replay window).                -> 403
- *   3. ATOMIC single-use: UPDATE verifications
- *        SET value = jsonb_set(value, '{status}', '"consumed"')
- *        WHERE identifier = "scan-pair:{chargeBoxId}:{pairingCode}"
- *          AND value::jsonb->>'status' = 'armed'
- *      Require exactly one row affected.                     -> 410 on miss
+ *   3. ATOMIC single-use UPDATE on the matching verifications
+ *      row, transitioning status to "consumed".              -> 429 on miss
  *   4. Look up user_mappings by steve_ocpp_id_tag.           -> 401 generic
  *   5. Require mapping.userId IS NOT NULL                    -> 401 generic
  *   6. Require role = 'customer' (HARD restriction).         -> 401 generic
@@ -105,14 +111,14 @@ function constantTimeEqual(a: string, b: string): boolean {
 async function signNonce(
   idTag: string,
   pairingCode: string,
-  chargeBoxId: string,
+  pairableId: string,
   t: number,
 ): Promise<string> {
   const key = await getHmacKey();
   const sig = await crypto.subtle.sign(
     "HMAC",
     key,
-    _enc.encode(`${idTag}:${pairingCode}:${chargeBoxId}:${t}`),
+    _enc.encode(`${idTag}:${pairingCode}:${pairableId}:${t}`),
   );
   return hexEncode(sig);
 }
@@ -120,6 +126,7 @@ async function signNonce(
 interface LoginBody {
   pairingCode?: string;
   chargeBoxId?: string;
+  deviceId?: string;
   idTag?: string;
   nonce?: string;
   t?: number;
@@ -146,16 +153,26 @@ export const handler = define.handlers({
     const chargeBoxId = typeof body.chargeBoxId === "string"
       ? body.chargeBoxId
       : "";
+    const deviceId = typeof body.deviceId === "string" ? body.deviceId : "";
     const idTag = typeof body.idTag === "string" ? body.idTag.trim() : "";
     const nonce = typeof body.nonce === "string" ? body.nonce : "";
     const t = typeof body.t === "number" ? body.t : NaN;
 
     if (
-      !pairingCode || !chargeBoxId || !idTag || !nonce ||
-      !Number.isFinite(t)
+      !pairingCode || !idTag || !nonce ||
+      !Number.isFinite(t) ||
+      (!chargeBoxId && !deviceId) ||
+      (chargeBoxId && deviceId)
     ) {
       return jsonResponse(400, { error: "invalid_body" });
     }
+    // Pick one — the rest of the handler uses `pairableId` + `identifier`
+    // for both branches.
+    const pairableType: "charger" | "device" = deviceId ? "device" : "charger";
+    const pairableId = pairableType === "device" ? deviceId : chargeBoxId;
+    const identifier = pairableType === "device"
+      ? `device-scan:${pairableId}:${pairingCode}`
+      : `scan-pair:${pairableId}:${pairingCode}`;
 
     // Per-pairing single-use upper bound (the atomic UPDATE below is
     // the actual race-safe enforcement, but this also prevents a single
@@ -169,7 +186,7 @@ export const handler = define.handlers({
     // Step 1: HMAC mismatch → 403.
     let expected: string;
     try {
-      expected = await signNonce(idTag, pairingCode, chargeBoxId, t);
+      expected = await signNonce(idTag, pairingCode, pairableId, t);
     } catch (err) {
       log.error("HMAC sign failed", {
         error: err instanceof Error ? err.message : String(err),
@@ -181,7 +198,7 @@ export const handler = define.handlers({
         ip,
         ua,
         route: "/api/auth/scan-login",
-        metadata: { reason: "hmac_mismatch", chargeBoxId },
+        metadata: { reason: "hmac_mismatch", pairableType, pairableId },
       });
       return jsonResponse(403, { error: "forbidden" });
     }
@@ -193,7 +210,12 @@ export const handler = define.handlers({
         ip,
         ua,
         route: "/api/auth/scan-login",
-        metadata: { reason: "stale_timestamp", ageMs, chargeBoxId },
+        metadata: {
+          reason: "stale_timestamp",
+          ageMs,
+          pairableType,
+          pairableId,
+        },
       });
       return jsonResponse(403, { error: "stale" });
     }
@@ -201,14 +223,14 @@ export const handler = define.handlers({
     // Step 3: atomic single-use consume.
     //
     // Two valid starting states:
-    //   - status='armed': the legacy log-scrape path (unknown tag scanned,
-    //     SSE delivered the idTag from docker-log).
-    //   - status='matched' AND matchedIdTag === idTag: the pre-authorize
-    //     hook path. /api/ocpp/pre-authorize already transitioned the row
-    //     to matched and stamped the idTag — scan-login only finalizes
-    //     it. Without accepting this state, the new hook pipeline can't
+    //   - status='armed': the unknown-tag log-scrape path (charger) and the
+    //     phone scan-result path. Both transition straight from armed to
+    //     consumed here.
+    //   - status='matched' AND matchedIdTag === idTag (charger only): the
+    //     pre-authorize hook path. /api/ocpp/pre-authorize transitioned
+    //     the row to matched and stamped the idTag; scan-login finalizes
+    //     it. Without accepting this state, the hook pipeline can't
     //     complete login (the row has already moved past 'armed').
-    const identifier = `scan-pair:${chargeBoxId}:${pairingCode}`;
     let consumedRows: { id: string }[];
     try {
       const result = await db.execute<{ id: string }>(sql`
@@ -244,7 +266,8 @@ export const handler = define.handlers({
         route: "/api/auth/scan-login",
         metadata: {
           reason: "pairing_consumed_or_expired",
-          chargeBoxId,
+          pairableType,
+          pairableId,
         },
       });
       // Unify with the per-pairing rate-limit response (429 / "rate_limited")
@@ -285,7 +308,8 @@ export const handler = define.handlers({
         route: "/api/auth/scan-login",
         metadata: {
           reason: "no_mapping",
-          chargeBoxId,
+          pairableType,
+          pairableId,
           idTagPrefix: idTag.slice(0, 4),
         },
       });
@@ -300,7 +324,12 @@ export const handler = define.handlers({
         ip,
         ua,
         route: "/api/auth/scan-login",
-        metadata: { reason: "unmapped", chargeBoxId, mappingId: mapping.id },
+        metadata: {
+          reason: "unmapped",
+          pairableType,
+          pairableId,
+          mappingId: mapping.id,
+        },
       });
       return jsonResponse(401, { error: "unauthorized" });
     }
@@ -328,7 +357,8 @@ export const handler = define.handlers({
         metadata: {
           reason: "role_not_customer",
           role: userRow?.role ?? "missing",
-          chargeBoxId,
+          pairableType,
+          pairableId,
         },
       });
       return jsonResponse(401, { error: "unauthorized" });
@@ -353,7 +383,7 @@ export const handler = define.handlers({
       ip,
       ua,
       route: "/api/auth/scan-login",
-      metadata: { chargeBoxId, mappingId: mapping.id },
+      metadata: { pairableType, pairableId, mappingId: mapping.id },
     });
 
     // Best-effort cleanup of the consumed verification row (sync-worker

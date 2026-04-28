@@ -271,8 +271,9 @@ export const handler = define.handlers({
                 // stream's hard cap (`TIMEOUT_MS`, 60 s), which is
                 // about slow-loris guarding, not the pairing.
                 expiresInSec,
-                // Legacy field for backwards compat with the existing
-                // customer login flow (`CustomerScanLoginIsland.tsx`).
+                // Legacy field — older clients keyed off `chargeBoxId`
+                // before the unified `<ScanFlow>` started reading
+                // `pairableId` directly. Harmless to keep.
                 ...(binding.pairableType === "charger"
                   ? { chargeBoxId: binding.pairableId }
                   : {}),
@@ -367,11 +368,13 @@ export const handler = define.handlers({
         //     legacy `chargeBoxId` field on the payload was removed in
         //     the Wave 1 Track A generalization.
         //   - `device.scan.cancelled` — bidirectional cancel sync. When
-        //     the iOS app POSTs `/api/devices/scan-cancel` (or another
-        //     admin's DELETE `/scan-arm` lands), this stream forwards a
-        //     `cancelled` SSE event so the in-flight TapToAddModal can
-        //     close. Only relevant for the device pair-type — charger
-        //     pairings don't have a "remote cancel" surface.
+        //     the iOS app POSTs `/api/devices/scan-cancel` (or an admin's
+        //     DELETE `/scan-arm` lands, or a customer's DELETE
+        //     `/scan-pair` for a remote-login phone arm), this stream
+        //     forwards a `cancelled` SSE event so the in-flight
+        //     `<ScanModal>` / `<ScanFlow>` can close. Only relevant for
+        //     the device pair-type — charger pairings don't have a
+        //     "remote cancel" surface.
         unsubBus = eventBus.subscribe(
           ["scan.intercepted", "device.scan.cancelled"],
           (delivered) => {

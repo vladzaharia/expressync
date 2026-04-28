@@ -1,11 +1,10 @@
 /**
  * ScanPanel — canonical visual chrome for every "tap an RFID tag" flow.
  *
- * Both the customer login wizard and the admin scan-to-add / scan-to-link
- * surfaces render through this component, so the lighting, animation,
- * status pills, countdown, and error chrome stay identical across flows.
- * The only thing each caller customises is the *instructional copy* and
- * the *outcome action* shown after a match.
+ * The unified `<ScanFlow>` (admin and customer) renders through this
+ * component, so the lighting, animation, status pills, countdown, and
+ * error chrome stay identical across surfaces. Callers customise only
+ * the *instructional copy* and the *outcome action* shown after a match.
  *
  * Why a single visual primitive (and not just a shared hook):
  *   - "Hold tag to NFC reader" is a learned gesture; presenting it the same
@@ -16,23 +15,21 @@
  *
  * State surface
  * -------------
- * Each caller maps its internal state machine (`use-scan-tag.ts` for admin,
- * `CustomerScanLoginIsland`'s inline `FlowState` for customer) onto the
- * normalised `ScanPanelState` union below. The presentational layer doesn't
- * know about endpoints, SSE streams, or pairing codes — it just renders.
+ * Callers map their state machine onto the normalised `ScanPanelState`
+ * union below. The presentational layer doesn't know about endpoints,
+ * SSE streams, or pairing codes — it just renders.
  *
  * Layout
  * ------
  *   header           — title + subtitle (caller-supplied copy)
  *   body             — state-specific canonical chrome
- *   extras (slot)    — caller-owned content, e.g. the customer's charger
- *                      picker or the admin's manual-entry form
+ *   extras (slot)    — caller-owned content, e.g. a picker subview or
+ *                      the admin's manual-entry form
  *   actions (slot)   — caller-owned buttons (e.g. "Use email instead",
  *                      "Cancel and use email", "Open tag")
  *
  * For `state.kind === "armed"` (waiting) the body is the canonical
- * [countdown ring | numbered instructions] split — the same shape the
- * customer wizard already uses, now reused everywhere.
+ * [countdown ring | numbered instructions] split.
  */
 
 import type { ComponentChildren } from "preact";
@@ -40,7 +37,6 @@ import { Loader2, RotateCcw } from "lucide-preact";
 import { Button } from "@/components/ui/button.tsx";
 import { ScanCountdownRing } from "@/components/scan/ScanCountdownRing.tsx";
 import { ScanStateIcon } from "@/components/scan/ScanStateIcon.tsx";
-import type { ScanTagState } from "@/islands/shared/use-scan-tag.ts";
 import { type AccentColor } from "@/src/lib/colors.ts";
 import { cn } from "@/src/lib/utils/cn.ts";
 
@@ -117,69 +113,6 @@ const DEFAULT_STEPS = [
   "Tap it on the reader",
   "We'll handle the rest",
 ];
-
-/**
- * Shim that adapts a `ScanTagState` (from `use-scan-tag.ts`) onto the
- * normalised `ScanPanelState`. Centralised here so admin call sites don't
- * each re-derive the mapping.
- */
-export function adaptScanTagState(
-  s: ScanTagState,
-  opts: { total: number; readerName?: string | null },
-): ScanPanelState {
-  switch (s.kind) {
-    case "idle":
-      return { kind: "idle", message: "Getting ready…" };
-    case "connecting":
-      return { kind: "idle", message: "Connecting…" };
-    case "waiting":
-      return {
-        kind: "armed",
-        remaining: s.remaining,
-        total: opts.total,
-        readerName: opts.readerName,
-      };
-    case "detected":
-      return {
-        kind: "detected",
-        idTag: s.idTag,
-        message: "Looking up…",
-      };
-    case "resolving":
-      return { kind: "resolving", message: `Looking up ${s.idTag}…` };
-    case "routing":
-      return { kind: "success", message: `Opening ${s.destination}…` };
-    case "timeout":
-      return {
-        kind: "error",
-        message: "No tag detected in time. Try again to scan your card.",
-      };
-    case "unavailable":
-      return {
-        kind: "error",
-        message:
-          "The charger detection service is unreachable. It may be restarting — try again in a moment.",
-      };
-    case "network_error":
-      return {
-        kind: "error",
-        message: "Lost connection to the detection stream. Try again.",
-      };
-    case "lookup_failed":
-      return {
-        kind: "error",
-        message: `Couldn't look up ${s.idTag}.`,
-      };
-    case "cancelled":
-      return {
-        kind: "error",
-        message:
-          "Scan was cancelled on the device. Try again to scan your card.",
-      };
-    case "dismissed":
-      return { kind: "idle" };
-  }
-}
 
 /**
  * The canonical panel. All the visual decisions (icon, ring, layout) live
