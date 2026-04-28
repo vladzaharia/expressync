@@ -1,41 +1,40 @@
 /**
- * DeviceIdentityCard — `SectionCard`-shaped identity strip for the device
- * detail page.
+ * DeviceIdentityCard — left-column identity hero on the device detail
+ * page. Layout deliberately mirrors `ChargerIdentityCard`:
  *
- * Lays out the device's read-only identity facts as a grid of `MetricTile`s:
- *   - Model (with platform OS suffix)
- *   - OS version
- *   - App version
- *   - Owner (linked to /admin/users/{ownerId})
- *   - Last seen (relative)
- *   - Push token presence (Active / Missing pill)
- *   - Registered date (absolute)
+ *   ┌──────────────────────────────────────┐
+ *   │ [icon]   Device label                │   ← bold display name
+ *   │          [deviceId · copy]           │   ← copyable id chip
+ *   ├──────────────────────────────────────┤
+ *   │ Label        [editable input]        │
+ *   │ Kind          Phone                  │
+ *   │ Model         iPhone 15 Pro          │
+ *   │ OS            iOS 26                 │
+ *   │ App version   1.4.2 (203)            │
+ *   │ Owner         alice@…                │
+ *   │ Capabilities  [pills]                │
+ *   ├──────────────────────────────────────┤
+ *   │ Registered    …                      │
+ *   │ Last seen     …                      │
+ *   └──────────────────────────────────────┘
  *
- * Rendered as a `SectionCard` with `accent="teal"` so it inherits the page's
- * accent. No editable fields here — rename happens via the `DeviceActionsMenu`
- * row action and the page's `headerActions` slot, not inline on the identity
- * card. Mirrors the spirit of `ChargerIdentityCard` but without the form-
- * factor select (devices are kind-typed at register time).
+ * The editable Label row is the analogue of the charger card's
+ * `ChargerFormFactorSelect` — it surfaces a one-shot rename island
+ * (`DeviceLabelInput`) that POSTs `/api/admin/devices/{id}/rename` and
+ * reloads. Everything else is read-only; the rest of the device's
+ * configuration moves to the single-Save App Configuration form below
+ * this card.
  */
 
-import {
-  Bell,
-  BellOff,
-  Calendar,
-  Clock,
-  ExternalLink,
-  Smartphone,
-  User as UserIcon,
-} from "lucide-preact";
-import { SectionCard } from "@/components/shared/SectionCard.tsx";
-import { MetricTile } from "@/components/shared/MetricTile.tsx";
+import { Check, Copy, Smartphone } from "lucide-preact";
+import { useState } from "preact/hooks";
+import DeviceLabelInput from "@/islands/devices/DeviceLabelInput.tsx";
 import { CapabilityPill } from "@/components/devices/CapabilityPill.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
-import { formatRelative } from "@/islands/shared/device-visuals.ts";
 
 export interface DeviceIdentityCardProps {
   deviceId: string;
-  kind: "phone_nfc" | "laptop_nfc";
+  kind: "phone_nfc" | "tablet_nfc" | "laptop_nfc";
   label: string;
   platform: string | null;
   model: string | null;
@@ -44,14 +43,10 @@ export interface DeviceIdentityCardProps {
   ownerUserId: string | null;
   ownerEmail?: string | null;
   capabilities: string[];
-  pushTokenLast8: string | null;
-  /** "production" | "sandbox" — surfaced as small chip next to the push token presence pill. */
-  apnsEnvironment: string | null;
-  /** When true the "Last seen" tile renders "Online now" — the relative
-   *  time would be redundant with the live pill in the header strip. */
   isOnline: boolean;
   lastSeenAtIso: string | null;
   registeredAtIso: string;
+  isAdmin?: boolean;
   class?: string;
 }
 
@@ -64,143 +59,165 @@ function formatAbs(iso: string | null): string {
   }
 }
 
-/**
- * Pill for "Active" / "Missing" push-token state.
- *
- *   - Active  → emerald (positive — device is reachable via push)
- *   - Missing → amber (advisory — push not registered yet, fall back to SSE)
- */
-function NotificationsPill(
-  { last8, env }: { last8: string | null; env: string | null },
-) {
-  if (last8 === null) {
-    return (
-      <span
-        class="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300"
-        title="Push notifications not registered yet — falling back to SSE"
-      >
-        <BellOff class="size-3" aria-hidden="true" />
-        Notifications off
-      </span>
-    );
+function kindLabel(
+  kind: DeviceIdentityCardProps["kind"],
+): string {
+  switch (kind) {
+    case "phone_nfc":
+      return "Phone";
+    case "tablet_nfc":
+      return "Tablet";
+    case "laptop_nfc":
+      return "Laptop";
   }
-  return (
-    <span
-      class="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300"
-      title={`APNs token registered (last 4: ${last8.slice(-4)})`}
-    >
-      <Bell class="size-3" aria-hidden="true" />
-      Notifications on
-      {env && env !== "production" && (
-        <span class="rounded border border-amber-500/40 bg-amber-500/10 px-1 text-[10px] uppercase">
-          {env}
-        </span>
-      )}
-    </span>
-  );
 }
 
+const TEAL_HALO = "#14b8a6";
+
 export function DeviceIdentityCard({
-  deviceId: _deviceId,
+  deviceId,
   kind,
-  label: _label,
+  label,
   platform,
   model,
-  osVersion: _osVersion,
-  appVersion: _appVersion,
+  osVersion,
+  appVersion,
   ownerUserId,
   ownerEmail,
   capabilities,
-  pushTokenLast8,
-  apnsEnvironment,
   isOnline,
   lastSeenAtIso,
   registeredAtIso,
+  isAdmin = true,
   class: className,
 }: DeviceIdentityCardProps) {
-  // Derive a short "model" string that includes platform when both are
-  // present ("iPhone 15 Pro · iOS"). Tolerates either being null.
-  const modelDisplay = (() => {
-    if (!model && !platform) return "—";
-    if (model && platform) return `${model} · ${platform}`;
-    return (model ?? platform) as string;
-  })();
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(deviceId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      console.error("Clipboard write failed", err);
+    }
+  };
 
   const ownerDisplay = ownerEmail ?? ownerUserId ?? "—";
-
-  // The device label lives in the PageCard title at the page level —
-  // surfacing it again here was redundant. The identity card is now
-  // titled by its purpose ("Identity") with the model line as the
-  // description, mirroring the charger detail page treatment.
-  const kindLabel = kind === "phone_nfc" ? "Phone" : "Laptop";
-  const description = modelDisplay && modelDisplay !== "—"
-    ? `${kindLabel} · ${modelDisplay}`
-    : kindLabel;
+  const modelDisplay = model && platform
+    ? model
+    : (model ?? platform ?? "—");
 
   return (
-    <SectionCard
-      title="Identity"
-      description={description}
-      icon={Smartphone}
-      accent="teal"
-      className={cn(className)}
+    <div
+      class={cn(
+        "flex h-full flex-col gap-4 rounded-xl border bg-card p-5",
+        className,
+      )}
     >
-      <div class="flex flex-col gap-5">
-        <div class="flex flex-wrap items-center gap-1.5">
-          {capabilities.length === 0
-            ? (
-              <span class="text-xs text-muted-foreground">
-                No capabilities granted
-              </span>
-            )
-            : capabilities.map((cap) => (
-              <CapabilityPill key={cap} capability={cap} />
-            ))}
-          <span class="ml-auto">
-            <NotificationsPill last8={pushTokenLast8} env={apnsEnvironment} />
-          </span>
+      <div class="flex items-start gap-4">
+        <div class="shrink-0" aria-hidden="true">
+          <div
+            class="flex size-12 items-center justify-center rounded-full"
+            style={{
+              background: `${isOnline ? TEAL_HALO : "#94a3b8"}1A`,
+              color: isOnline ? TEAL_HALO : "#64748b",
+            }}
+          >
+            <Smartphone class="size-6" />
+          </div>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="text-base font-semibold truncate">{label}</div>
+          <div class="mt-1 flex items-center gap-1.5">
+            <code class="truncate rounded border bg-muted/40 px-2 py-0.5 font-mono text-xs">
+              {deviceId}
+            </code>
+            <button
+              type="button"
+              onClick={handleCopy}
+              aria-label={copied ? "Copied" : `Copy ${deviceId} to clipboard`}
+              title={copied ? "Copied" : "Copy device ID"}
+              class="inline-flex items-center justify-center rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {copied
+                ? <Check class="size-3.5 text-emerald-500" />
+                : <Copy class="size-3.5" />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <dl class="grid grid-cols-1 gap-y-2 text-sm">
+        <div class="flex items-center justify-between gap-2">
+          <dt class="text-muted-foreground">Label</dt>
+          <dd>
+            {isAdmin
+              ? <DeviceLabelInput deviceId={deviceId} value={label} />
+              : <span class="font-medium">{label}</span>}
+          </dd>
         </div>
 
-        <div class="grid grid-cols-1 gap-4">
-          <MetricTile
-            icon={UserIcon}
-            label="Owner"
-            value={ownerUserId
+        <div class="flex items-center justify-between gap-2">
+          <dt class="text-muted-foreground">Kind</dt>
+          <dd class="font-medium">{kindLabel(kind)}</dd>
+        </div>
+
+        <div class="flex items-center justify-between gap-2">
+          <dt class="text-muted-foreground">Model</dt>
+          <dd class="text-right">{modelDisplay}</dd>
+        </div>
+
+        <div class="flex items-center justify-between gap-2">
+          <dt class="text-muted-foreground">OS</dt>
+          <dd class="font-mono text-xs">{osVersion ?? "—"}</dd>
+        </div>
+
+        <div class="flex items-center justify-between gap-2">
+          <dt class="text-muted-foreground">App version</dt>
+          <dd class="font-mono text-xs">{appVersion ?? "—"}</dd>
+        </div>
+
+        <div class="flex items-center justify-between gap-2">
+          <dt class="text-muted-foreground">Owner</dt>
+          <dd class="truncate text-right">
+            {ownerUserId
               ? (
                 <a
                   href={`/admin/users/${ownerUserId}`}
-                  class="inline-flex items-center gap-1 hover:underline"
+                  class="hover:underline"
                   title={ownerUserId}
                 >
-                  <span class="truncate max-w-[16ch]">{ownerDisplay}</span>
-                  <ExternalLink
-                    class="size-3 shrink-0 opacity-60"
-                    aria-hidden="true"
-                  />
+                  {ownerDisplay}
                 </a>
               )
               : "—"}
-            accent="teal"
-          />
-          <MetricTile
-            icon={Clock}
-            label={isOnline ? "Status" : "Last seen"}
-            value={isOnline ? "Online now" : formatRelative(lastSeenAtIso)}
-            sublabel={isOnline
-              ? undefined
-              : lastSeenAtIso
-              ? formatAbs(lastSeenAtIso)
-              : undefined}
-            accent="teal"
-          />
-          <MetricTile
-            icon={Calendar}
-            label="Registered"
-            value={formatAbs(registeredAtIso)}
-            accent="teal"
-          />
+          </dd>
         </div>
-      </div>
-    </SectionCard>
+
+        <div class="flex items-start justify-between gap-2">
+          <dt class="text-muted-foreground pt-0.5">Capabilities</dt>
+          <dd class="flex flex-wrap items-center justify-end gap-1">
+            {capabilities.length === 0
+              ? <span class="text-xs text-muted-foreground">—</span>
+              : capabilities.map((c) => (
+                <CapabilityPill key={c} capability={c} />
+              ))}
+          </dd>
+        </div>
+
+        <div class="flex items-center justify-between gap-2 pt-1 border-t mt-1">
+          <dt class="text-muted-foreground">Registered</dt>
+          <dd class="text-xs">{formatAbs(registeredAtIso)}</dd>
+        </div>
+
+        <div class="flex items-center justify-between gap-2">
+          <dt class="text-muted-foreground">Last seen</dt>
+          <dd class="text-xs">
+            {isOnline ? "Online now" : formatAbs(lastSeenAtIso)}
+          </dd>
+        </div>
+      </dl>
+    </div>
   );
 }
