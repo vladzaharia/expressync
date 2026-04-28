@@ -193,10 +193,17 @@ export function getAllNavItems(isAdmin = false): NavItem[] {
 export function findSectionByPath(
   path: string,
 ): { section: NavSection; item: NavItem } | null {
+  // Match against both the raw path and the `/admin`-stripped form — see
+  // `isPathActive` for why the rewrite makes both shapes valid inputs.
+  const stripped = path.startsWith("/admin/") || path === "/admin"
+    ? path.slice("/admin".length) || "/"
+    : path;
+  const candidates = stripped === path ? [path] : [path, stripped];
+
   // Prefer exact match first so "/" doesn't swallow longer paths.
   for (const section of ADMIN_NAV_SECTIONS) {
     for (const item of section.items) {
-      if (item.path === path) return { section, item };
+      if (candidates.includes(item.path)) return { section, item };
     }
   }
   // Prefix match for nested routes (skip root to avoid swallowing).
@@ -204,20 +211,36 @@ export function findSectionByPath(
   for (const section of ADMIN_NAV_SECTIONS) {
     for (const item of section.items) {
       if (item.path === "/") continue;
-      if (path.startsWith(item.path + "/") || path === item.path) {
-        if (!best || item.path.length > best.len) {
-          best = { section, item, len: item.path.length };
-        }
+      const hit = candidates.some((c) =>
+        c === item.path || c.startsWith(item.path + "/")
+      );
+      if (hit && (!best || item.path.length > best.len)) {
+        best = { section, item, len: item.path.length };
       }
     }
   }
   return best ? { section: best.section, item: best.item } : null;
 }
 
-/** Active-state test used by the sidebar and the palette. */
+/** Active-state test used by the sidebar and the palette.
+ *
+ * The admin host rewrites browser-clean URLs (`/sync`) to `/admin/sync`
+ * server-side (see `main.ts#polarisCreateFetchHandler`), so route handlers
+ * pass the rewritten `url.pathname` as `currentPath`. Match against both
+ * the rewritten and stripped form so nav items that target a clean path
+ * (`/sync`) and items that target the prefixed path (`/admin/devices`)
+ * both highlight correctly.
+ */
 export function isPathActive(itemPath: string, currentPath: string): boolean {
-  if (itemPath === "/") return currentPath === "/";
-  return currentPath === itemPath || currentPath.startsWith(itemPath + "/");
+  const stripped =
+    currentPath.startsWith("/admin/") || currentPath === "/admin"
+      ? currentPath.slice("/admin".length) || "/"
+      : currentPath;
+  const matches = (path: string) =>
+    itemPath === "/"
+      ? path === "/"
+      : path === itemPath || path.startsWith(itemPath + "/");
+  return matches(currentPath) || matches(stripped);
 }
 
 /**
