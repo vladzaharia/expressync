@@ -41,6 +41,16 @@ import { DeviceIdentityCard } from "../../../components/devices/DeviceIdentityCa
 import { DeviceHeaderStrip } from "../../../components/devices/DeviceHeaderStrip.tsx";
 import DeviceActionsMenu from "../../../islands/devices/DeviceActionsMenu.tsx";
 import TriggerScanButton from "../../../islands/devices/TriggerScanButton.tsx";
+import { DeviceDiagnosticsCard } from "../../../components/devices/DeviceDiagnosticsCard.tsx";
+import type { DeviceDiagnostics } from "../../../components/devices/DeviceDiagnosticsCard.tsx";
+import { DeviceStateSyncList } from "../../../components/devices/DeviceStateSyncList.tsx";
+import type { DeviceSyncEntry } from "../../../components/devices/DeviceStateSyncList.tsx";
+import CapabilityPicker from "../../../islands/devices/CapabilityPicker.tsx";
+import DeviceSettingsForm from "../../../islands/devices/DeviceSettingsForm.tsx";
+import { History as HistoryIcon, Settings2, Stethoscope } from "lucide-preact";
+import { deviceSettings as deviceSettingsTable } from "../../../src/db/schema.ts";
+import { pickerOptionsForKind } from "../../../src/lib/devices/capability-metadata.ts";
+import type { DeviceCapability } from "../../../src/lib/types/devices.ts";
 
 const log = logger.child("AdminDeviceDetailPage");
 
@@ -63,6 +73,14 @@ interface DeviceDetail {
   revokedAtIso: string | null;
   tokenCount: number;
   activeTokenExpiresAtIso: string | null;
+  // Wave 6 / Slice D additions for the App Configuration tab.
+  lastStatus: Record<string, unknown> | null;
+  appConfigSettings: Record<
+    string,
+    { value: unknown; updatedAtIso: string; updatedBy: string }
+  >;
+  pickerEditable: DeviceCapability[];
+  pickerReadOnly: DeviceCapability[];
 }
 
 interface DeviceDetailPageData {
@@ -137,6 +155,7 @@ export const handler = define.handlers({
           pushToken: devices.pushToken,
           apnsEnvironment: devices.apnsEnvironment,
           lastSeenAt: devices.lastSeenAt,
+          lastStatus: devices.lastStatus,
           registeredAt: devices.registeredAt,
           deletedAt: devices.deletedAt,
           revokedAt: devices.revokedAt,
@@ -161,6 +180,31 @@ export const handler = define.handlers({
         const tokenCount = tokenRows.length;
         const activeToken = tokenRows.find((t) => t.revokedAt === null);
 
+        const settingsRows = await db
+          .select({
+            key: deviceSettingsTable.key,
+            valueJson: deviceSettingsTable.valueJson,
+            updatedAt: deviceSettingsTable.updatedAt,
+            updatedBy: deviceSettingsTable.updatedBy,
+          })
+          .from(deviceSettingsTable)
+          .where(eq(deviceSettingsTable.deviceId, row.id));
+
+        const appConfigSettings: Record<
+          string,
+          { value: unknown; updatedAtIso: string; updatedBy: string }
+        > = {};
+        for (const sRow of settingsRows) {
+          appConfigSettings[sRow.key] = {
+            value: sRow.valueJson,
+            updatedAtIso: isoOrNull(sRow.updatedAt) ??
+              new Date(0).toISOString(),
+            updatedBy: sRow.updatedBy,
+          };
+        }
+
+        const pickerOpts = pickerOptionsForKind(row.kind);
+
         detail = {
           deviceId: row.id,
           kind: (row.kind === "phone_nfc" || row.kind === "laptop_nfc")
@@ -183,6 +227,12 @@ export const handler = define.handlers({
           revokedAtIso: isoOrNull(row.revokedAt),
           tokenCount,
           activeTokenExpiresAtIso: isoOrNull(activeToken?.expiresAt ?? null),
+          lastStatus: (row.lastStatus ?? null) as
+            | Record<string, unknown>
+            | null,
+          appConfigSettings,
+          pickerEditable: [...pickerOpts.editable] as DeviceCapability[],
+          pickerReadOnly: [...pickerOpts.readOnly] as DeviceCapability[],
         };
       }
     } catch (error) {
@@ -315,6 +365,99 @@ export default define.page<typeof handler>(
               lastSeenAtIso={device.lastSeenAtIso}
               registeredAtIso={device.registeredAtIso}
             />
+
+            {(() => {
+              // Wave 6 / Slice D — App Configuration tab. Composed of
+              // CapabilityPicker, DeviceSettingsForm, DeviceDiagnosticsCard,
+              // DeviceStateSyncList. Title adapts per kind.
+              const isCharger = (device.kind as string) === "charger";
+              const tabTitle = isCharger
+                ? "Charger Configuration"
+                : "App Configuration";
+              const diagnostics: DeviceDiagnostics = {
+                lastSeenAtIso: device.lastSeenAtIso,
+                reconnectCount: typeof device.lastStatus?.reconnectCount ===
+                      "number" && device.lastStatus.reconnectCount >= 0
+                  ? Math.floor(device.lastStatus.reconnectCount)
+                  : 0,
+                pendingUploads: typeof device.lastStatus?.pendingUploads ===
+                      "number" && device.lastStatus.pendingUploads >= 0
+                  ? Math.floor(device.lastStatus.pendingUploads)
+                  : 0,
+                pushPermission:
+                  typeof device.lastStatus?.pushPermission === "boolean"
+                    ? device.lastStatus.pushPermission
+                    : null,
+                nfcPermission:
+                  typeof device.lastStatus?.nfcPermission === "boolean"
+                    ? device.lastStatus.nfcPermission
+                    : null,
+                appVersion: device.appVersion,
+                osVersion: device.osVersion,
+                model: device.model,
+                platform: device.platform,
+                pushTokenLast8: device.pushTokenLast8,
+                apnsEnvironment: device.apnsEnvironment,
+                lastErrorMessage:
+                  typeof device.lastStatus?.lastErrorMessage === "string"
+                    ? device.lastStatus.lastErrorMessage
+                    : null,
+              };
+              const recentSyncs: DeviceSyncEntry[] = [];
+              return (
+                <>
+                  <SectionCard
+                    title={tabTitle}
+                    description={isCharger
+                      ? "Capabilities and settings for this charger row."
+                      : "Capabilities and settings for this app device."}
+                    icon={Settings2}
+                    accent="teal"
+                  >
+                    <div class="flex flex-col gap-6">
+                      <div class="flex flex-col gap-3">
+                        <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Capabilities
+                        </h3>
+                        <CapabilityPicker
+                          deviceId={device.deviceId}
+                          current={device.capabilities as DeviceCapability[]}
+                          editable={device.pickerEditable}
+                          readOnly={device.pickerReadOnly}
+                        />
+                      </div>
+                      <div class="flex flex-col gap-3">
+                        <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Settings
+                        </h3>
+                        <DeviceSettingsForm
+                          deviceId={device.deviceId}
+                          settings={device.appConfigSettings}
+                        />
+                      </div>
+                    </div>
+                  </SectionCard>
+
+                  <SectionCard
+                    title="Diagnostics"
+                    description="Most recent device-reported diagnostic envelope."
+                    icon={Stethoscope}
+                    accent="teal"
+                  >
+                    <DeviceDiagnosticsCard diagnostics={diagnostics} />
+                  </SectionCard>
+
+                  <SectionCard
+                    title="Recent syncs"
+                    description="Recent device-state syncs from this device."
+                    icon={HistoryIcon}
+                    accent="teal"
+                  >
+                    <DeviceStateSyncList recentSyncs={recentSyncs} />
+                  </SectionCard>
+                </>
+              );
+            })()}
 
             <SectionCard
               title="Recent Scans"
