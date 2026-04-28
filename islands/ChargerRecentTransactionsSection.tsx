@@ -78,7 +78,7 @@ export default function ChargerRecentTransactionsSection(
                 <tr class="border-b">
                   <th class="py-2 text-left font-medium">Tx</th>
                   <th class="py-2 text-left font-medium">Connector</th>
-                  <th class="py-2 text-left font-medium">Tag</th>
+                  <th class="py-2 text-left font-medium">EV Card</th>
                   <th class="hidden py-2 text-left font-medium sm:table-cell">
                     Started
                   </th>

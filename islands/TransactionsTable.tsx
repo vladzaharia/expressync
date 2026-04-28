@@ -29,7 +29,7 @@ const columns: PaginatedTableColumn<TransactionSummary>[] = [
   },
   {
     key: "ocppTagId",
-    header: "OCPP Tag",
+    header: "OCPP EV Card",
     render: (tx) =>
       tx.ocppTagId
         ? (

@@ -127,7 +127,7 @@ export default define.page<typeof handler>(
       >
         <PageCard
           title="New reservation"
-          description="Pick a charger, connector, tag, and time window. Conflicts are detected inline."
+          description="Pick a charger, connector, EV Card, and time window. Conflicts are detected inline."
           colorScheme="indigo"
         >
           <ReservationWizard

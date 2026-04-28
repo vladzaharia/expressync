@@ -148,24 +148,24 @@ export default define.page<typeof handler>(
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                     <Link2 className="size-4" />
-                    Tag linking
+                    EV Card linking
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     <MetricTile
                       icon={CheckCircle2}
-                      label="Tags activated"
+                      label="EV Cards activated"
                       value={run.tagsActivated ?? 0}
                       accent="emerald"
                     />
                     <MetricTile
                       icon={AlertCircle}
-                      label="Tags deactivated"
+                      label="EV Cards deactivated"
                       value={run.tagsDeactivated ?? 0}
                       accent="rose"
                     />
                     <MetricTile
                       icon={RefreshCw}
-                      label="Tags unchanged"
+                      label="EV Cards unchanged"
                       value={run.tagsUnchanged ?? 0}
                       accent="blue"
                     />

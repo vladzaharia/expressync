@@ -102,7 +102,7 @@ interface Props {
 const STEP_LABELS = [
   "Charger",
   "Connector",
-  "Tag",
+  "EV Card",
   "Time",
   "Review",
 ] as const;
@@ -672,17 +672,17 @@ function StepTag(
 ) {
   return (
     <div class="flex flex-col gap-3">
-      <Label htmlFor="reservation-tag-filter">Pick an OCPP tag</Label>
+      <Label htmlFor="reservation-tag-filter">Pick an OCPP EV Card</Label>
       <Input
         id="reservation-tag-filter"
         type="search"
-        placeholder={`Filter ${totalTags} tag${totalTags !== 1 ? "s" : ""}…`}
+        placeholder={`Filter ${totalTags} EV Card${totalTags !== 1 ? "s" : ""}…`}
         value={filter}
         onInput={(e) => onFilterChange((e.target as HTMLInputElement).value)}
       />
       {tags.length === 0 && (
         <div class="rounded-md border border-dashed bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
-          No tags match the filter.
+          No EV Cards match the filter.
         </div>
       )}
       <ul class="max-h-80 overflow-auto rounded-md border divide-y">
@@ -808,7 +808,7 @@ function WizardContextAside(
       <ContextCard
         icon={TagIcon}
         iconTone="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
-        label="Tag"
+        label="EV Card"
         value={tag
           ? (tag.displayName ?? tag.idTag)
           : <span class="italic text-muted-foreground">Not chosen</span>}
@@ -890,7 +890,7 @@ function StepReview(
           term="Connector"
           value={connectorId === 0 ? "All (charger-wide)" : `#${connectorId}`}
         />
-        <Row term="Tag" value={tag.displayName ?? tag.idTag} hint={tag.idTag} />
+        <Row term="EV Card" value={tag.displayName ?? tag.idTag} hint={tag.idTag} />
         <Row
           term="Subscription"
           value={tag.lagoSubscriptionExternalId ?? "—"}

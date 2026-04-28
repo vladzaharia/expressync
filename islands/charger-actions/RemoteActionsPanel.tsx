@@ -64,7 +64,7 @@ const PRIMARY_TILES: TileSpec[] = [
     op: "RemoteStartTransaction",
     icon: Play,
     label: "Start transaction",
-    description: "Begin charging under a chosen OCPP tag.",
+    description: "Begin charging under a chosen OCPP EV Card.",
   },
   {
     op: "RemoteStopTransaction",
@@ -84,7 +84,7 @@ const PRIMARY_TILES: TileSpec[] = [
     op: "ReserveNow",
     icon: Timer,
     label: "Reserve connector",
-    description: "Hold the connector for a specific tag.",
+    description: "Hold the connector for a specific EV Card.",
   },
   {
     op: "CancelReservation",

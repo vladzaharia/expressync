@@ -56,7 +56,7 @@ export default function SyncRetryButton({ runId }: Props) {
         open={open.value}
         onOpenChange={(o) => (open.value = o)}
         title={`Retry sync from run #${runId}?`}
-        description="A new sync run will be started immediately. This is a global trigger — the scheduler will re-run and may pick up any transactions or tag state that the failed run left behind."
+        description="A new sync run will be started immediately. This is a global trigger — the scheduler will re-run and may pick up any transactions or EV Card state that the failed run left behind."
         confirmLabel="Trigger sync"
         onConfirm={confirm}
         isLoading={busy.value}

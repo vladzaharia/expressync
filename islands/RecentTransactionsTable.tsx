@@ -54,7 +54,7 @@ export default function RecentTransactionsTable({
         <TableHeader>
           <TableRow>
             <TableHead className="w-[100px]">Transaction</TableHead>
-            <TableHead>Tag</TableHead>
+            <TableHead>EV Card</TableHead>
             <TableHead className="text-right">kWh</TableHead>
             <TableHead className="text-right">When</TableHead>
           </TableRow>

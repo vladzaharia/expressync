@@ -448,7 +448,7 @@ export function useUnifiedScan(opts: UseUnifiedScanOptions): UseUnifiedScanApi {
       cleanup();
       state.value = {
         kind: "error",
-        message: "No tag detected in time. Try again.",
+        message: "No EV Card detected in time. Try again.",
         canRetry: true,
         backToPicker: false,
       };
@@ -513,7 +513,7 @@ export function useUnifiedScan(opts: UseUnifiedScanOptions): UseUnifiedScanApi {
         cleanup();
         state.value = {
           kind: "error",
-          message: "No tag detected in 90 seconds. Try again.",
+          message: "No EV Card detected in 90 seconds. Try again.",
           canRetry: true,
           backToPicker: false,
         };

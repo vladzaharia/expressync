@@ -74,7 +74,7 @@ export default function TagsFilterBar({ initial }: Props) {
   return (
     <div class="mb-4 flex items-center justify-between gap-2 rounded-md border border-dashed bg-muted/20 px-3 py-2 text-sm">
       <span class="text-muted-foreground">
-        Filter active — showing a subset of tags.
+        Filter active — showing a subset of EV Cards.
       </span>
       <Button variant="outline" size="sm" asChild>
         <a href="/tags">

@@ -58,7 +58,7 @@ export default function RemoteStartDialog(props: PerDialogProps) {
 
   const handleConfirm = async () => {
     if (!idTag) {
-      setError("Select an OCPP tag first.");
+      setError("Select an OCPP EV Card first.");
       return;
     }
     setSubmitting(true);
@@ -91,7 +91,7 @@ export default function RemoteStartDialog(props: PerDialogProps) {
     <ActionDialog
       icon={Play}
       title="Start transaction"
-      description="Send a RemoteStartTransaction so the charger begins charging under the selected OCPP tag."
+      description="Send a RemoteStartTransaction so the charger begins charging under the selected OCPP EV Card."
       isOpen={isOpen}
       onClose={onClose}
       onConfirm={handleConfirm}

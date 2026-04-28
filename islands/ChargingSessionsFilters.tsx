@@ -106,10 +106,10 @@ export default function ChargingSessionsFilters({
       </div>
 
       <div class="flex-1 min-w-[180px]">
-        <Label htmlFor="cs-tag" class="text-xs">OCPP tag</Label>
+        <Label htmlFor="cs-tag" class="text-xs">OCPP EV Card</Label>
         <Input
           id="cs-tag"
-          placeholder="Tag contains…"
+          placeholder="EV Card contains…"
           value={tag.value}
           onInput={(e) => {
             tag.value = (e.currentTarget as HTMLInputElement).value;

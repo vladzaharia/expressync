@@ -185,7 +185,7 @@ export default define.page<typeof handler>(
         label: r.ocppTagId,
         tone: "cyan",
         icon: <TagIcon class="size-3.5" aria-hidden="true" />,
-        title: "OCPP tag",
+        title: "OCPP EV Card",
       },
     ];
     if (r.lagoSubscriptionExternalId) {

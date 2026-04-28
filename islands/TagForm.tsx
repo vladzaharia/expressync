@@ -151,7 +151,7 @@ function TagFormInner(
     if (saving.value) return;
     const trimmed = idTag.value.trim();
     if (!trimmed) {
-      errorMessage.value = "Tag ID is required.";
+      errorMessage.value = "EV Card ID is required.";
       return;
     }
     saving.value = true;
@@ -228,7 +228,7 @@ function TagFormInner(
     <div class="space-y-5">
       {/* OCPP tag ID + Scan button */}
       <div class="space-y-1">
-        <Label for="tf-id-tag">OCPP tag ID *</Label>
+        <Label for="tf-id-tag">OCPP EV Card ID *</Label>
         <div class="flex gap-2">
           <Input
             id="tf-id-tag"
@@ -247,10 +247,10 @@ function TagFormInner(
                 variant="outline"
                 onClick={() => (scanOpen.value = true)}
                 disabled={saving.value}
-                aria-label="Scan a card to fill the OCPP tag ID"
+                aria-label="Scan a card to fill the OCPP EV Card ID"
               >
                 <Radio class="mr-2 h-4 w-4" />
-                Scan tag
+                Scan card
               </Button>
             )
             : null}
@@ -258,7 +258,7 @@ function TagFormInner(
         {idTagReadonly
           ? (
             <p class="text-xs text-muted-foreground">
-              Tag ID is permanent — it's the StEvE primary key and can't change
+              EV Card ID is permanent — it's the StEvE primary key and cannot change
               in place.
             </p>
           )
@@ -267,14 +267,14 @@ function TagFormInner(
               Exact string sent by the physical card/keytag/sticker. Use the
               {" "}
               <code>{META_TAG_PREFIX}</code>{" "}
-              prefix to create a meta-tag (a rollup parent for grouping other
-              tags under one customer).
+              prefix to create a meta-EV Card (a rollup parent for grouping other
+              cards under one customer).
             </p>
           )}
         {replaceUndoValue.value !== null
           ? (
             <p class="text-xs text-muted-foreground">
-              Replaced with scanned tag.{" "}
+              Replaced with scanned card.{" "}
               <button
                 type="button"
                 onClick={undoScan}
@@ -290,7 +290,7 @@ function TagFormInner(
       {/* Tag type — hidden for meta-tags */}
       {!meta && (
         <div class="space-y-1">
-          <Label>Tag type</Label>
+          <Label>EV Card type</Label>
           <div class="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-7">
             {TAG_TYPES.map((t) => {
               const Icon = tagTypeIcons[t];
@@ -328,7 +328,7 @@ function TagFormInner(
           {!tagTypeUserEdited.value && idTag.value.trim()
             ? (
               <p class="text-xs text-muted-foreground">
-                Auto-detected from the tag ID. Pick manually to override.
+                Auto-detected from the EV Card ID. Pick manually to override.
               </p>
             )
             : null}
@@ -356,7 +356,7 @@ function TagFormInner(
       }
       {meta && (
         <div class="space-y-1">
-          <Label>Parent tag (optional)</Label>
+          <Label>Parent EV Card (optional)</Label>
           <ParentTagGrid
             candidates={parentCandidates}
             value={parentIdTag.value}

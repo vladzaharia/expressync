@@ -47,7 +47,7 @@ export function TagPickerCombobox(props: TagPickerComboboxProps) {
   const {
     value,
     onChange,
-    label = "OCPP ID tag",
+    label = "OCPP EV Card",
     helpText,
     disabled,
     required,
@@ -162,7 +162,7 @@ export function TagPickerCombobox(props: TagPickerComboboxProps) {
               ? `${selectedTag.id}${
                 selectedTag.displayName ? ` — ${selectedTag.displayName}` : ""
               }`
-              : "Search OCPP tag…"}
+              : "Search OCPP EV Card…"}
             value={query}
             onFocus={() => setOpen(true)}
             onBlur={() => setTimeout(() => setOpen(false), 150)}
@@ -188,7 +188,7 @@ export function TagPickerCombobox(props: TagPickerComboboxProps) {
           >
             {loading && (
               <li class="px-3 py-2 text-xs text-muted-foreground">
-                Loading tags…
+                Loading EV Cards…
               </li>
             )}
             {loadError && (
@@ -196,7 +196,7 @@ export function TagPickerCombobox(props: TagPickerComboboxProps) {
             )}
             {!loading && !loadError && filtered.length === 0 && (
               <li class="px-3 py-2 text-xs text-muted-foreground">
-                No tags match "{query}"
+                No EV Cards match "{query}"
               </li>
             )}
             {filtered.map((t, idx) => {

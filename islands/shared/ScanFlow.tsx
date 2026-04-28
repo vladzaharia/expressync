@@ -75,8 +75,8 @@ export interface ScanFlowProps {
 
 function defaultTitle(mode: ScanMode, purpose: ScanPurpose): string {
   if (mode === "customer") return "Scan to sign in";
-  if (purpose === "lookup-tag") return "Scan a tag";
-  return "Scan a tag to add";
+  if (purpose === "lookup-tag") return "Scan a card";
+  return "Scan a card to add";
 }
 
 function pickerSubtitle(mode: ScanMode): string {
@@ -387,7 +387,7 @@ function ArmedFooter({
             variant="outline"
             size="sm"
             onClick={onToggleManual}
-            title="Enter the tag ID by hand"
+            title="Enter the EV Card ID by hand"
           >
             <Keyboard class="mr-1 size-4" aria-hidden="true" />
             Enter manually

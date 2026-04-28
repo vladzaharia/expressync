@@ -374,10 +374,10 @@ export default define.page<typeof handler>(
         actions={<BackAction href="/tags" />}
       >
         <PageCard
-          title={isMeta ? "Meta-tag details" : "Tag details"}
+          title={isMeta ? "Meta-EV Card details" : "EV Card details"}
           description={isMeta
-            ? "Meta-tags group multiple real tags under one customer. Edit the rollup's metadata here; child tags inherit via StEvE's parentIdTag."
-            : "Identity, metadata, linking, and recent charging for this tag."}
+            ? "Meta-EV Cards group multiple real cards under one customer. Edit the rollup's metadata here; child cards inherit via StEvE's parentIdTag."
+            : "Identity, metadata, linking, and recent charging for this card."}
           colorScheme="cyan"
         >
           <div class="space-y-6">

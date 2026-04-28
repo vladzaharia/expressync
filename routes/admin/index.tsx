@@ -96,7 +96,7 @@ export default define.page<typeof handler>(
               <EmptyState
                 icon={Zap}
                 title="Welcome to ExpressCharge"
-                description="Register a charge point in StEvE and scan a tag to get started. Link your first tag to a Lago customer to start billing."
+                description="Register a charge point in StEvE and scan an EV Card to get started. Link your first EV Card to a Lago customer to start billing."
                 primaryAction={{
                   label: "Register an EV card",
                   href: "/tags/new",
@@ -206,7 +206,7 @@ export default define.page<typeof handler>(
                   />
                   <MetricTile
                     icon={Tag}
-                    label="Tags activated"
+                    label="EV Cards activated"
                     value={overview.weekly.tagsActivatedWeek}
                     accent="violet"
                   />

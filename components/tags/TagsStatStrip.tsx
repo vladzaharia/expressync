@@ -46,7 +46,7 @@ export function TagsStatStrip(
   const items: StatStripItem[] = [
     {
       key: "all",
-      label: "Total tags",
+      label: "Total EV Cards",
       value: totals.all,
       icon: Tag,
       tone: "cyan",
@@ -76,7 +76,7 @@ export function TagsStatStrip(
     },
     {
       key: "meta",
-      label: "Meta-tags",
+      label: "Meta-EV Cards",
       value: totals.meta,
       icon: Layers,
       tone: "violet",
