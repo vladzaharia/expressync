@@ -18,9 +18,27 @@
 >
   <defs>
     <filter id="bolt-glow-fg" x="-50%" y="-50%" width="200%" height="200%">
-      <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#a5f3fc" flood-opacity="0.95" />
-      <feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="#67e8f9" flood-opacity="0.7" />
-      <feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="#22d3ee" flood-opacity="0.45" />
+      <feDropShadow
+        dx="0"
+        dy="0"
+        stdDeviation="3"
+        flood-color="#a5f3fc"
+        flood-opacity="0.95"
+      />
+      <feDropShadow
+        dx="0"
+        dy="0"
+        stdDeviation="7"
+        flood-color="#67e8f9"
+        flood-opacity="0.7"
+      />
+      <feDropShadow
+        dx="0"
+        dy="0"
+        stdDeviation="14"
+        flood-color="#22d3ee"
+        flood-opacity="0.45"
+      />
     </filter>
   </defs>
   <!-- Lucide Zap glyph — white + matching stroke at lucide's stroke-width=2
