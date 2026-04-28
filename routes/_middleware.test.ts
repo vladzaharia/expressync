@@ -261,6 +261,25 @@ Deno.test("selectAuth — bearer for /api/devices/* lifecycle routes", () => {
   );
 });
 
+Deno.test("selectAuth — bearer for admin charger-control endpoints (Wave 6 Slice J)", () => {
+  // The slice-J admin charger-control endpoints live under
+  // `/api/admin/devices/{id}/…` for URL-shape consistency, but are called
+  // by iOS devices with the `user` capability. Bearer auth + handler-level
+  // `requireCapability("user")`.
+  const dev = "/api/admin/devices/00000000-0000-0000-0000-000000000000";
+  assertEquals(selectAuth(`${dev}/start`), "bearer");
+  assertEquals(selectAuth(`${dev}/stop`), "bearer");
+  assertEquals(selectAuth(`${dev}/cancel-reservation`), "bearer");
+  assertEquals(selectAuth(`${dev}/session`), "bearer");
+  assertEquals(selectAuth(`${dev}/tags`), "bearer");
+  assertEquals(selectAuth(`${dev}/reservations`), "bearer");
+  // Sibling cookie-auth slice-C/D endpoints stay cookie.
+  assertEquals(selectAuth(`${dev}/scan-arm`), "cookie");
+  assertEquals(selectAuth(`${dev}/configuration`), "cookie");
+  assertEquals(selectAuth(`${dev}/capabilities`), "cookie");
+  assertEquals(selectAuth(`${dev}/settings`), "cookie");
+});
+
 Deno.test("selectAuth — register is public-or-cookie (PKCE entry point)", () => {
   // The register entrypoint authenticates via the one-time PKCE code,
   // not via the request's cookie/bearer headers. Classified as
