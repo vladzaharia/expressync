@@ -87,11 +87,14 @@ export default function TagsFilterBar({ initial }: Props) {
 }
 
 function hasActiveFilter(s: TagsFilterStateSerialized): boolean {
+  // `meta="no"` is the default view (auto-managed OCPP-{externalId}
+  // parents are hidden by default), so don't treat it as an active
+  // filter. Only `meta="yes"` (only-show meta) counts.
   return (
     s.q.trim().length > 0 ||
     s.linked !== "any" ||
     s.active !== "any" ||
-    s.meta !== "any" ||
+    s.meta === "yes" ||
     s.types.length > 0
   );
 }
