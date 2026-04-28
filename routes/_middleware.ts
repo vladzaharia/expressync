@@ -273,6 +273,7 @@ export function selectAuth(pathname: string): AuthScheme {
   // additions go through this function — we'd rather reject an unknown
   // /api/devices/x than silently let it fall through to cookie.
   if (
+    pathname === "/api/devices" ||
     pathname === "/api/devices/me" ||
     pathname === "/api/devices/me/state" ||
     pathname === "/api/devices/me/state/sync" ||
