@@ -68,6 +68,12 @@ const ChargerRowSchema = z.object({
   maxKw: z.number().nullable(),
   state: z.enum(CHARGER_STATES),
   lastSeenAt: z.string().nullable(),
+  /** Per-row capability set from `chargers_cache.capabilities`.
+   *  Always carries `'charger'` (auto-managed by StEvE sync); may also
+   *  carry `'scanner'` when the charger has built-in NFC. The iOS
+   *  Chargers list reads this to render the NFC pill on rows that
+   *  include `"scanner"`. */
+  capabilities: z.array(z.string()),
 }).strict();
 
 const ResponseSchema = z.object({
@@ -86,6 +92,7 @@ type ViewRow = {
   last_status: string | null;
   friendly_name: string | null;
   form_factor: string | null;
+  capabilities?: string[] | null;
 };
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -166,7 +173,8 @@ const defaultLoader: ChargerListLoader = async () => {
       cc.last_status_at,
       cc.last_status,
       cc.friendly_name,
-      cc.form_factor
+      cc.form_factor,
+      cc.capabilities
     FROM tappable_devices tv
     LEFT JOIN chargers_cache cc
       ON tv.kind = 'charger' AND cc.charge_box_id = tv.id
@@ -225,19 +233,27 @@ export const handler = define.handlers({
     const now = Date.now();
     const chargers: ChargerRow[] = rows
       .filter((r) => r.kind === "charger")
-      .map((r) => ({
-        chargerId: r.id,
-        label: r.friendly_name ?? r.label,
-        // siteName: not modelled today; reserved for future multi-site rollout.
-        siteName: null,
-        formFactor: normalizeFormFactor(r.form_factor),
-        // connectorType + maxKw aren't tracked on `chargers_cache` today;
-        // reserved for the connector-metadata follow-up (slice B5b in the plan).
-        connectorType: null,
-        maxKw: null,
-        state: mapChargerState(r.last_status, toMs(r.last_status_at), now),
-        lastSeenAt: toIso(r.last_seen_at),
-      }));
+      .map((r) => {
+        // Defensive: the DB CHECK guarantees `'charger'` is present
+        // on every charger row, but force-include it here so a
+        // partially-migrated row can't drop the auto-managed cap.
+        const caps = new Set(r.capabilities ?? []);
+        caps.add("charger");
+        return {
+          chargerId: r.id,
+          label: r.friendly_name ?? r.label,
+          // siteName: not modelled today; reserved for future multi-site rollout.
+          siteName: null,
+          formFactor: normalizeFormFactor(r.form_factor),
+          // connectorType + maxKw aren't tracked on `chargers_cache` today;
+          // reserved for the connector-metadata follow-up (slice B5b in the plan).
+          connectorType: null,
+          maxKw: null,
+          state: mapChargerState(r.last_status, toMs(r.last_status_at), now),
+          lastSeenAt: toIso(r.last_seen_at),
+          capabilities: Array.from(caps),
+        };
+      });
 
     const body: ChargersListResponse = { chargers };
     return jsonResponse(200, body);
