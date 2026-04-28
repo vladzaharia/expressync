@@ -62,36 +62,15 @@ export default define.page(function App({ Component, state }) {
         <meta name="theme-color" content={themeColor} />
         <title>{title}</title>
         <link rel="manifest" href={manifestHref} />
-        <link
-          rel="icon"
-          type="image/png"
-          sizes="16x16"
-          href={`/favicon-16.png`}
-        />
-        <link
-          rel="icon"
-          type="image/png"
-          sizes="32x32"
-          href={`/favicon-32.png`}
-        />
-        <link
-          rel="icon"
-          type="image/png"
-          sizes="48x48"
-          href={`/favicon-48.png`}
-        />
-        <link
-          rel="icon"
-          type="image/png"
-          sizes="192x192"
-          href={`/favicon-192.png`}
-        />
-        <link
-          rel="icon"
-          type="image/png"
-          sizes="512x512"
-          href={`/favicon-512.png`}
-        />
+        {/* Modern browsers prefer SVG; falls through to PNG/.ico otherwise. */}
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+        <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
+        <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96.png" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+        <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
         <link
           rel="apple-touch-icon"
           sizes="180x180"
