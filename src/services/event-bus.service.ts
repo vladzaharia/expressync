@@ -27,10 +27,12 @@ import {
   type SseTransport,
 } from "../lib/sse-transport.ts";
 import type {
+  DeviceCapabilitiesChangedPayload,
   DeviceScanCancelledPayload,
   DeviceScanCompletedPayload,
   DeviceScanRequestedPayload,
   DeviceSessionReplacedPayload,
+  DeviceSettingsChangedPayload,
   DeviceTokenRevokedPayload,
   ScanPurpose,
 } from "../lib/types/devices.ts";
@@ -58,7 +60,9 @@ export type EventBusEventType =
   | "device.scan.completed"
   | "device.scan.cancelled"
   | "device.session.replaced"
-  | "device.token.revoked";
+  | "device.token.revoked"
+  | "device.capabilities.changed"
+  | "device.settings.changed";
 
 export interface NotificationCreatedPayload {
   id: number;
@@ -230,7 +234,15 @@ export type EventBusEvent =
   | { type: "device.scan.completed"; payload: DeviceScanCompletedPayload }
   | { type: "device.scan.cancelled"; payload: DeviceScanCancelledPayload }
   | { type: "device.session.replaced"; payload: DeviceSessionReplacedPayload }
-  | { type: "device.token.revoked"; payload: DeviceTokenRevokedPayload };
+  | { type: "device.token.revoked"; payload: DeviceTokenRevokedPayload }
+  | {
+    type: "device.capabilities.changed";
+    payload: DeviceCapabilitiesChangedPayload;
+  }
+  | {
+    type: "device.settings.changed";
+    payload: DeviceSettingsChangedPayload;
+  };
 
 export interface DeliveredEvent {
   seq: number;
