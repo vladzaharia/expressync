@@ -107,11 +107,13 @@ function parseFilterFromUrl(url: URL): TagsFilterState {
 }
 
 function hasAnyFilter(f: TagsFilterState): boolean {
+  // `meta="no"` is the default view, not an active filter — only
+  // explicit `meta="yes"` (show-only-meta) counts.
   return (
     f.q.length > 0 ||
     f.linked !== "any" ||
     f.active !== "any" ||
-    f.meta !== "any" ||
+    f.meta === "yes" ||
     f.types.size > 0
   );
 }
