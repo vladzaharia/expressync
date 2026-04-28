@@ -40,7 +40,8 @@ import { useEffect, useState } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { toast } from "sonner";
 import {
-  ExternalLink,
+  CalendarClock,
+  Eye,
   Lock,
   Pencil,
   RefreshCw,
@@ -73,7 +74,6 @@ import {
   DEVICE_STATUS_HALO,
   formatRelative,
   formatSessionDuration,
-  formatUptime,
   normalizeDeviceStatus,
   normalizeStatus,
   REFRESH_COOLDOWN_MS,
@@ -381,7 +381,7 @@ function ChargerBody(
     await postOperation("UnlockConnector", { connectorId: 1 });
   };
 
-  const sessionLine = activeSession
+  const activityLine = activeSession
     ? `${
       activeSession.currentKw !== null
         ? `${activeSession.currentKw.toFixed(1)} kW`
@@ -391,7 +391,7 @@ function ChargerBody(
         ? ` · ${activeSession.sessionKwh.toFixed(1)} kWh`
         : ""
     }`
-    : "No active session";
+    : "idle";
 
   return (
     <>
@@ -466,22 +466,22 @@ function ChargerBody(
 
         {/* Primary status line — full-width */}
         <div class="text-xs">
-          <span class="text-muted-foreground">Session:</span>{" "}
-          <span class="font-medium">{sessionLine}</span>
+          <span class="text-muted-foreground">Activity:</span>{" "}
+          <span class="font-medium">{activityLine}</span>
         </div>
 
         {/* Metric grid */}
         <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-          <div>
-            <span class="text-muted-foreground">Uptime:</span>{" "}
+          <div class="truncate">
+            <span class="text-muted-foreground">First seen:</span>{" "}
             <span class="font-medium">
-              {formatUptime(charger.firstSeenAtIso)}
+              {formatRelative(charger.firstSeenAtIso)}
             </span>
           </div>
           <div class="truncate">
-            <span class="text-muted-foreground">Status updated:</span>{" "}
+            <span class="text-muted-foreground">Updated:</span>{" "}
             <span class="font-medium">
-              {formatRelative(charger.lastStatusAtIso)}
+              {formatRelative(charger.lastStatusAtIso) ?? "never"}
             </span>
           </div>
         </div>
@@ -524,6 +524,7 @@ function ChargerBody(
             variant="outline"
             onClick={() => setReserveOpen(true)}
           >
+            <CalendarClock class="size-4" />
             Reserve
           </Button>
           {isAdmin && (
@@ -672,10 +673,12 @@ function ScannerBody(
     }
   };
 
-  const registeredRel = formatRelative(device.registeredAtIso);
-  const lastSeenLine = device.isOnline
+  const kindLabel = device.kind === "phone_nfc" ? "Phone" : "Laptop";
+  const activityLine = device.isOnline
     ? "Online now"
-    : `Last seen ${formatRelative(device.lastSeenAtIso)}`;
+    : device.lastSeenAtIso
+    ? `Last seen ${formatRelative(device.lastSeenAtIso)}`
+    : "never seen";
 
   return (
     <>
@@ -705,54 +708,40 @@ function ScannerBody(
 
         <Divider />
 
-        {/* Pills row — capabilities */}
+        {/* Pills row — kind + capabilities */}
         <PillRow>
-          {device.capabilities.length > 0
-            ? device.capabilities.map((c) => (
-              <CapabilityPill key={c} capability={c} />
-            ))
-            : (
-              <span class="text-xs text-muted-foreground">
-                No capabilities
-              </span>
-            )}
+          <StatusPill tone="slate">{kindLabel}</StatusPill>
+          {device.capabilities.map((c) => (
+            <CapabilityPill key={c} capability={c} />
+          ))}
         </PillRow>
 
         {/* Primary status line — full-width */}
         <div class="text-xs">
-          <span class="text-muted-foreground">Status:</span>{" "}
+          <span class="text-muted-foreground">Activity:</span>{" "}
           <span
             class={cn(
               "font-medium",
               device.isOnline && "text-emerald-600 dark:text-emerald-400",
             )}
           >
-            {lastSeenLine}
+            {activityLine}
           </span>
         </div>
 
         {/* Metric grid */}
         <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
           <div class="truncate">
-            <span class="text-muted-foreground">Owner:</span>{" "}
-            {device.ownerUserId
-              ? (
-                <a
-                  href={`/admin/users/${device.ownerUserId}`}
-                  class="inline-flex items-center gap-0.5 font-medium hover:underline"
-                  title={device.ownerUserId}
-                >
-                  <span class="truncate max-w-[10ch]">
-                    {device.ownerUserId.slice(0, 8)}…
-                  </span>
-                  <ExternalLink class="size-3 opacity-60" aria-hidden="true" />
-                </a>
-              )
-              : <span class="font-medium">—</span>}
+            <span class="text-muted-foreground">Registered:</span>{" "}
+            <span class="font-medium">
+              {formatRelative(device.registeredAtIso)}
+            </span>
           </div>
           <div class="truncate">
-            <span class="text-muted-foreground">Registered:</span>{" "}
-            <span class="font-medium">{registeredRel}</span>
+            <span class="text-muted-foreground">Updated:</span>{" "}
+            <span class="font-medium">
+              {formatRelative(device.lastSeenAtIso) ?? "never"}
+            </span>
           </div>
         </div>
 
@@ -761,33 +750,42 @@ function ScannerBody(
         {/* Actions — same shape as charger: [primary] [secondary] [admin ml-auto] */}
         <div class="flex items-center gap-2">
           <Button size="sm" variant="outline" asChild>
-            <a href={`/admin/devices/${device.deviceId}`}>View</a>
+            <a href={`/admin/devices/${device.deviceId}`}>
+              <Eye class="size-4" />
+              View
+            </a>
           </Button>
-          {isAdmin && (
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  setRenameValue(device.label);
-                  setRenameError(null);
-                  setRenameOpen(true);
-                }}
-              >
-                <Pencil class="size-4" />
-                Rename
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                class="ml-auto text-rose-600 hover:bg-rose-500/10 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-400"
-                onClick={() => setConfirmOpen(true)}
-              >
-                <ShieldOff class="size-4" />
-                Deregister
-              </Button>
-            </>
-          )}
+          {isAdmin
+            ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setRenameValue(device.label);
+                    setRenameError(null);
+                    setRenameOpen(true);
+                  }}
+                >
+                  <Pencil class="size-4" />
+                  Rename
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  class="ml-auto text-rose-600 hover:bg-rose-500/10 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-400"
+                  onClick={() => setConfirmOpen(true)}
+                >
+                  <ShieldOff class="size-4" />
+                  Deregister
+                </Button>
+              </>
+            )
+            : (
+              // Same-width spacer keeps non-admin scanner cards aligned with
+              // the admin variant + the charger card.
+              <span class="ml-auto" aria-hidden="true" />
+            )}
         </div>
       </CardShell>
 
