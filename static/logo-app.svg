@@ -52,14 +52,17 @@
       />
     </filter>
   </defs>
-  <!-- Squircle (rx ≈ 30%, matches the React glyph). -->
+  <!-- Full square — iOS applies its own squircle mask on the home
+       screen, so a pre-rounded source produces a corner-trimmed-twice
+       look at certain DPRs. Other platforms (Android adaptive layers
+       + Play Store + PWA "any" icons) also expect full-bleed sources. -->
   <rect
     x="0"
     y="0"
     width="256"
     height="256"
-    rx="76"
-    ry="76"
+    rx="0"
+    ry="0"
     fill="url(#es-bg-app)"
   />
   <!-- Lucide Zap glyph — white fill + matching stroke at lucide's
