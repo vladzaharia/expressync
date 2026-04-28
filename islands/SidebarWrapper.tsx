@@ -5,14 +5,14 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar.tsx";
 import { AppSidebar, CHROME_SIZE } from "@/components/AppSidebar.tsx";
-import { ExpresSyncBrand } from "@/components/brand/ExpresSyncBrand.tsx";
+import { ExpressChargeBrand } from "@/components/brand/ExpressChargeBrand.tsx";
 import { PolarisExpressBrand } from "@/components/brand/PolarisExpressBrand.tsx";
 import { SectionNav } from "@/components/SectionNav.tsx";
 import PaletteTriggerPill from "@/islands/PaletteTriggerPill.tsx";
 import NotificationBell from "@/islands/NotificationBell.tsx";
 import UserMenu from "@/islands/UserMenu.tsx";
 
-// Shared shape used by `AppSidebar.brandComponent`. ExpresSyncBrand doesn't
+// Shared shape used by `AppSidebar.brandComponent`. ExpressChargeBrand doesn't
 // declare the "header-mobile" variant (only Polaris does), but AppSidebar
 // never invokes that variant on desktop, so widening via a cast is safe.
 type SidebarBrandComponent = ComponentType<
@@ -141,7 +141,7 @@ export default function SidebarWrapper({
         role={role}
         brandComponent={(role === "customer"
           ? PolarisExpressBrand
-          : ExpresSyncBrand) as SidebarBrandComponent}
+          : ExpressChargeBrand) as SidebarBrandComponent}
       />
       <SidebarInset>
         <TopBarContent

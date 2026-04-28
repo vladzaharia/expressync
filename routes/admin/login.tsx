@@ -26,7 +26,7 @@ import ForgotPasswordForm from "../../islands/admin/ForgotPasswordForm.tsx";
 import { GridPattern } from "../../components/magicui/grid-pattern.tsx";
 import { Particles } from "../../components/magicui/particles.tsx";
 import { ShineBorder } from "../../components/magicui/shine-border.tsx";
-import { ExpresSyncBrand } from "../../components/brand/ExpresSyncBrand.tsx";
+import { ExpressChargeBrand } from "../../components/brand/ExpressChargeBrand.tsx";
 import { BlurFade } from "../../components/magicui/blur-fade.tsx";
 import { isEmailEnabled } from "../../src/lib/email.ts";
 import { config } from "../../src/lib/config.ts";
@@ -49,6 +49,23 @@ interface LoginPageData {
    * never "//"; defaults to "/".
    */
   next: string;
+  /**
+   * URL of the customer-surface login. Mirrors the customer page's
+   * `adminLoginUrl` so the two surfaces cross-link. `null` when the
+   * admin landed here from an admin-only context (device-registration
+   * deep link, etc.) — there's no customer counterpart in those flows
+   * so a "Customer login →" link would be a dead end.
+   */
+  customerLoginUrl: string | null;
+}
+
+/** `?next=` paths that only make sense on the admin surface — when one of
+ *  these is in flight, hide the cross-link to the customer login since
+ *  the customer surface can't fulfil the deep link. */
+function isAdminOnlyContext(next: string): boolean {
+  return next.startsWith("/expresscan/") ||
+    next.startsWith("/admin/") ||
+    next === "/admin";
 }
 
 function sanitizeNext(raw: string | null): string {
@@ -66,12 +83,17 @@ export const handler = define.handlers({
     const oidcEnabled = config.ADMIN_OIDC_ISSUER.length > 0 &&
       config.ADMIN_OIDC_CLIENT_ID.length > 0;
 
+    const customerLoginUrl = isAdminOnlyContext(next)
+      ? null
+      : `${config.CUSTOMER_BASE_URL}/login`;
+
     if (oidcEnabled && !config.ADMIN_AUTH_SHOW_FALLBACK) {
       return {
         data: {
           mode: "oidc-only" as const,
           forgotPasswordEnabled: false,
           next,
+          customerLoginUrl,
         } satisfies LoginPageData,
       };
     }
@@ -81,6 +103,7 @@ export const handler = define.handlers({
           mode: "oidc-with-fallback" as const,
           forgotPasswordEnabled: isEmailEnabled(),
           next,
+          customerLoginUrl,
         } satisfies LoginPageData,
       };
     }
@@ -89,6 +112,7 @@ export const handler = define.handlers({
         mode: "password" as const,
         forgotPasswordEnabled: isEmailEnabled(),
         next,
+        customerLoginUrl,
       } satisfies LoginPageData,
     };
   },
@@ -138,7 +162,7 @@ export default define.page<typeof handler>(function LoginPage({ data }) {
         <BlurFade delay={0} duration={0.5} direction="down">
           <div class="flex justify-center mb-8">
             <div class="relative">
-              <ExpresSyncBrand
+              <ExpressChargeBrand
                 variant="login"
                 showParticles
               />
@@ -146,7 +170,12 @@ export default define.page<typeof handler>(function LoginPage({ data }) {
           </div>
         </BlurFade>
 
-        {/* Login form with shine border */}
+        {
+          /* Login form with shine border. Mirrors the customer page's
+            "Admin login →" pill: a small floating link top-right, hidden
+            when this is an admin-only flow (device registration etc.) so
+            we don't dead-end the user on the customer surface. */
+        }
         <BlurFade delay={0.2} duration={0.5} direction="up">
           <div class="relative">
             <ShineBorder borderRadius={12} borderWidth={1} duration={10}>
@@ -207,6 +236,14 @@ export default define.page<typeof handler>(function LoginPage({ data }) {
                 </div>
               )}
             </ShineBorder>
+            {data.customerLoginUrl && (
+              <a
+                href={data.customerLoginUrl}
+                class="absolute right-4 top-0 z-20 -translate-y-1/2 inline-flex items-center gap-1 rounded-full border border-slate-500/40 bg-background px-3 py-1 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-muted hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-200"
+              >
+                Customer login →
+              </a>
+            )}
           </div>
         </BlurFade>
 

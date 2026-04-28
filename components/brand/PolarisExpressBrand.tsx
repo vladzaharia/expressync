@@ -2,12 +2,12 @@ import { cn } from "@/src/lib/utils/cn.ts";
 import { AuroraText } from "../magicui/aurora-text.tsx";
 import { Particles } from "../magicui/particles.tsx";
 import { BorderBeam } from "../magicui/border-beam.tsx";
-import { ExpresSyncLogo } from "./ExpresSyncBrand.tsx";
+import { ExpressChargeLogo } from "./ExpressChargeBrand.tsx";
 
 /**
  * Polaris Track A — customer-surface brand component.
  *
- * Sibling to `ExpresSyncBrand.tsx`; mirrors its API surface so the layout
+ * Sibling to `ExpressChargeBrand.tsx`; mirrors its API surface so the layout
  * components can swap brands by `role`. The icon is an inline 8-point
  * compass star (the "Polaris" north star) on the existing squircle gradient,
  * and the wordmark reads "Polaris Express" via the same AuroraText effect.
@@ -75,7 +75,7 @@ function PolarisStar({ className }: { className?: string }) {
   );
 }
 
-// Logo component — squircle with Polaris star (mirrors ExpresSyncLogo).
+// Logo component — squircle with Polaris star (mirrors ExpressChargeLogo).
 function PolarisExpressLogo({
   size = "md",
   showParticles = false,
@@ -186,7 +186,7 @@ export function PolarisExpressBrand({
     case "logo-only":
     case "sidebar-collapsed":
       return (
-        <ExpresSyncLogo
+        <ExpressChargeLogo
           size="sm"
           showParticles={showParticles}
           className={className}
@@ -196,7 +196,7 @@ export function PolarisExpressBrand({
     case "sidebar-expanded":
       return (
         <div className={cn("flex items-center gap-3", className)}>
-          <ExpresSyncLogo size="sm" showParticles={showParticles} />
+          <ExpressChargeLogo size="sm" showParticles={showParticles} />
           <PolarisExpressWordmark size="sm" />
         </div>
       );
@@ -204,7 +204,7 @@ export function PolarisExpressBrand({
     case "header-mobile":
       return (
         <div className={cn("flex items-center gap-2", className)}>
-          <ExpresSyncLogo size="sm" showParticles={showParticles} />
+          <ExpressChargeLogo size="sm" showParticles={showParticles} />
           <PolarisExpressWordmark size="sm" />
         </div>
       );
@@ -212,7 +212,7 @@ export function PolarisExpressBrand({
     case "login":
       return (
         <div className={cn("flex items-center gap-3", className)}>
-          <ExpresSyncLogo size="lg" showParticles={showParticles} />
+          <ExpressChargeLogo size="lg" showParticles={showParticles} />
           <PolarisExpressWordmark size="lg" />
         </div>
       );

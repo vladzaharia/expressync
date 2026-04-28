@@ -23,7 +23,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip.tsx";
 import { Sheet, SheetContent, SheetTitle } from "./ui/sheet.tsx";
 import { BorderBeam } from "./magicui/border-beam.tsx";
 import { Particles } from "./magicui/particles.tsx";
-import { ExpresSyncBrand } from "./brand/ExpresSyncBrand.tsx";
+import { ExpressChargeBrand } from "./brand/ExpressChargeBrand.tsx";
 import { PolarisExpressBrand } from "./brand/PolarisExpressBrand.tsx";
 import { MobileBottomTabBar } from "./customer/MobileBottomTabBar.tsx";
 import { type AccentColor, accentTailwindClasses } from "@/src/lib/colors.ts";
@@ -48,7 +48,7 @@ interface UserInfo {
 }
 
 /**
- * Brand-component shape — mirrors both `ExpresSyncBrand` and
+ * Brand-component shape — mirrors both `ExpressChargeBrand` and
  * `PolarisExpressBrand` so callers can swap surfaces without changing the
  * sidebar's render call site.
  */
@@ -80,7 +80,7 @@ interface AppSidebarProps {
   role?: "admin" | "customer";
   /**
    * Polaris Track A: explicit override for the brand component. When
-   * omitted, defaults to ExpresSyncBrand for `role="admin"` and
+   * omitted, defaults to ExpressChargeBrand for `role="admin"` and
    * PolarisExpressBrand for `role="customer"`.
    */
   brandComponent?: BrandComponent;
@@ -237,7 +237,7 @@ export function AppSidebar({
   const Brand: BrandComponent = brandComponent ??
     (role === "customer"
       ? (PolarisExpressBrand as BrandComponent)
-      : (ExpresSyncBrand as BrandComponent));
+      : (ExpressChargeBrand as BrandComponent));
 
   // Filter nav sections by role — admin-only filter only applies to the
   // admin nav; the customer nav module never sets `adminOnly`, so this

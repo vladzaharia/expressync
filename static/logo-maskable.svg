@@ -5,8 +5,10 @@
   shape and the glyph must live inside the safe zone (inner 80%, i.e. a
   circle of radius 40% of the canvas centred on the canvas centre).
 
-  Generated to match logo.svg colours but without the inner squircle —
-  the gradient bleeds edge-to-edge and the launcher masks it.
+  Same gradient as logo-app.svg — bleed edge to edge so the mask never
+  exposes a hard corner. Thunderbolt is white with a cyan glow + lucide
+  rounded joins so the launcher icon matches the app icon and the web
+  glyph.
 -->
 <svg
   width="512"
@@ -28,17 +30,24 @@
       <stop offset="0.55" stop-color="#22c55e" />
       <stop offset="1" stop-color="#06b6d4" />
     </linearGradient>
+    <filter id="bolt-glow-mask" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#a5f3fc" flood-opacity="0.95" />
+      <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#67e8f9" flood-opacity="0.7" />
+      <feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="#22d3ee" flood-opacity="0.45" />
+    </filter>
   </defs>
   <!-- Full-bleed background — launcher will mask this. -->
   <rect x="0" y="0" width="512" height="512" fill="url(#es-bg-mask)" />
-  <!-- Lucide Zap glyph, scaled into the safe zone (inner 80% / 410px box,
-       centred). 24x24 source path → 320px box, offset (512-320)/2 = 96. -->
+  <!-- Lucide Zap glyph — white + matching stroke at lucide's stroke-width=2
+       with round joins/caps. 24x24 path → 320px box, offset (512-320)/2 = 96. -->
   <g
     transform="translate(96 96) scale(13.333)"
-    fill="#0b1b3d"
-    stroke="#0b1b3d"
-    stroke-width="0.6"
+    fill="#ffffff"
+    stroke="#ffffff"
+    stroke-width="2"
     stroke-linejoin="round"
+    stroke-linecap="round"
+    filter="url(#bolt-glow-mask)"
   >
     <path d="M13 2 L3 14 h9 l-1 8 L21 10 h-9 l1 -8 z" />
   </g>

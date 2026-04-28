@@ -17,7 +17,7 @@ import ForgotPasswordForm from "../../../islands/admin/ForgotPasswordForm.tsx";
 import { GridPattern } from "../../../components/magicui/grid-pattern.tsx";
 import { Particles } from "../../../components/magicui/particles.tsx";
 import { ShineBorder } from "../../../components/magicui/shine-border.tsx";
-import { ExpresSyncBrand } from "../../../components/brand/ExpresSyncBrand.tsx";
+import { ExpressChargeBrand } from "../../../components/brand/ExpressChargeBrand.tsx";
 import { BlurFade } from "../../../components/magicui/blur-fade.tsx";
 import { isEmailEnabled } from "../../../src/lib/email.ts";
 import { config } from "../../../src/lib/config.ts";
@@ -76,7 +76,7 @@ export default define.page<typeof handler>(function AdminEmailLoginPage(
         <BlurFade delay={0} duration={0.5} direction="down">
           <div class="flex justify-center mb-8">
             <div class="relative">
-              <ExpresSyncBrand variant="login" showParticles />
+              <ExpressChargeBrand variant="login" showParticles />
             </div>
           </div>
         </BlurFade>

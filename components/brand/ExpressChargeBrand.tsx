@@ -10,7 +10,7 @@ type BrandVariant =
   | "sidebar-expanded"
   | "login";
 
-interface ExpresSyncBrandProps {
+interface ExpressChargeBrandProps {
   variant?: BrandVariant;
   className?: string;
   showBorderBeam?: boolean;
@@ -26,7 +26,7 @@ const brandColors = [
 ];
 
 // Logo component - squircle with thunderbolt
-function ExpresSyncLogo({
+function ExpressChargeLogo({
   size = "md",
   showParticles = false,
   className,
@@ -107,7 +107,7 @@ function ExpresSyncLogo({
 }
 
 // Wordmark component
-function ExpresSyncWordmark({
+function ExpressChargeWordmark({
   size = "md",
 }: {
   size?: "sm" | "md" | "lg";
@@ -128,16 +128,16 @@ function ExpresSyncWordmark({
 }
 
 // Main component with variants
-export function ExpresSyncBrand({
+export function ExpressChargeBrand({
   variant = "sidebar-expanded",
   className,
   showParticles = false,
-}: ExpresSyncBrandProps) {
+}: ExpressChargeBrandProps) {
   switch (variant) {
     case "logo-only":
     case "sidebar-collapsed":
       return (
-        <ExpresSyncLogo
+        <ExpressChargeLogo
           size="sm"
           showParticles={showParticles}
           className={className}
@@ -147,16 +147,16 @@ export function ExpresSyncBrand({
     case "sidebar-expanded":
       return (
         <div className={cn("flex items-center gap-3", className)}>
-          <ExpresSyncLogo size="sm" showParticles={showParticles} />
-          <ExpresSyncWordmark size="sm" />
+          <ExpressChargeLogo size="sm" showParticles={showParticles} />
+          <ExpressChargeWordmark size="sm" />
         </div>
       );
 
     case "login":
       return (
         <div className={cn("flex items-center gap-3", className)}>
-          <ExpresSyncLogo size="lg" showParticles={showParticles} />
-          <ExpresSyncWordmark size="lg" />
+          <ExpressChargeLogo size="lg" showParticles={showParticles} />
+          <ExpressChargeWordmark size="lg" />
         </div>
       );
 
@@ -165,4 +165,4 @@ export function ExpresSyncBrand({
   }
 }
 
-export { ExpresSyncLogo, ExpresSyncWordmark };
+export { ExpressChargeLogo, ExpressChargeWordmark };

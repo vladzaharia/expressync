@@ -163,8 +163,10 @@ export type DeviceStatus = "Online" | "Offline" | "Scanning";
  *                color is the only thing this map fixes)
  */
 export const DEVICE_STATUS_HALO: Record<DeviceStatus, string> = {
-  Online: "oklch(0.72 0.14 196)", // teal
-  Offline: "oklch(0.65 0.22 25)", // red
+  // Match `STATUS_HALO.Available` exactly so a charger and a phone both
+  // showing "online" use the same azure-blue halo on the devices grid.
+  Online: "oklch(0.72 0.14 230)", // azure (== STATUS_HALO.Available)
+  Offline: "oklch(0.65 0.22 25)", // red (== STATUS_HALO.Offline)
   Scanning: "oklch(0.80 0.15 200)", // cyan pulse
 };
 
