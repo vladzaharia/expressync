@@ -140,6 +140,20 @@ export default function CapabilityPicker(
   return (
     <div class="flex flex-col gap-4">
       <ul class="flex flex-col gap-2">
+        {/* Read-only / auto-managed caps (e.g. `charger` on a charger
+            row) render first so the identity-defining capability sits
+            at the top of the list, with editable toggles below. */}
+        {readOnlyList.map((c) => (
+          <li
+            key={c}
+            class="flex items-center gap-3 rounded-md border border-border bg-muted/30 p-3 opacity-80"
+          >
+            <CapabilityPill capability={c} />
+            <span class="flex-1 text-xs text-muted-foreground">
+              {CAPABILITY_METADATA[c].description} (auto-managed)
+            </span>
+          </li>
+        ))}
         {editableList.map((c) => {
           const meta = CAPABILITY_METADATA[c];
           const Icon = iconFor(c);
@@ -185,17 +199,6 @@ export default function CapabilityPicker(
             </li>
           );
         })}
-        {readOnlyList.map((c) => (
-          <li
-            key={c}
-            class="flex items-center gap-3 rounded-md border border-border bg-muted/30 p-3 opacity-80"
-          >
-            <CapabilityPill capability={c} />
-            <span class="flex-1 text-xs text-muted-foreground">
-              {CAPABILITY_METADATA[c].description} (auto-managed)
-            </span>
-          </li>
-        ))}
       </ul>
 
       {error && <p class="text-xs text-destructive">{error}</p>}
