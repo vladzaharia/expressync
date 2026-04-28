@@ -242,7 +242,8 @@ Deno.test("selectAuth — rejects bearer on admin paths", () => {
 });
 
 Deno.test("selectAuth — bearer for /api/devices/* lifecycle routes", () => {
-  assertEquals(selectAuth("/api/devices/heartbeat"), "bearer");
+  assertEquals(selectAuth("/api/devices/me/state"), "bearer");
+  assertEquals(selectAuth("/api/devices/me/state/sync"), "bearer");
   assertEquals(selectAuth("/api/devices/me"), "bearer");
   assertEquals(selectAuth("/api/devices/scan-stream"), "bearer");
   assertEquals(selectAuth("/api/devices/scan-result"), "bearer");

@@ -233,3 +233,26 @@ export interface DeviceTokenRevokedPayload {
   /** Free-form reason ("admin", "self", "expiry", etc.). */
   reason?: string;
 }
+
+/**
+ * Body of the `device.capabilities.changed` event (Wave 6 / Slice C).
+ * Published by the admin capabilities-PATCH endpoint (slice D) so the
+ * matching device's open `me/state`-driven coordinator refreshes its
+ * envelope without polling. Filtered to the matching device's stream.
+ */
+export interface DeviceCapabilitiesChangedPayload {
+  deviceId: string;
+  capabilities: DeviceCapability[];
+}
+
+/**
+ * Body of the `device.settings.changed` event (Wave 6 / Slice C).
+ * Published by the admin settings-PATCH endpoint (slice D). `keys`
+ * lists which setting keys changed — the iOS app re-fetches the
+ * envelope, but the key list lets a UI badge "this admin just edited
+ * notifications.scanRequest" without diffing the entire blob.
+ */
+export interface DeviceSettingsChangedPayload {
+  deviceId: string;
+  keys: string[];
+}
