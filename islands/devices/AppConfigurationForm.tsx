@@ -53,6 +53,12 @@ interface Props {
   /** Settings blob from `GET .../configuration`. Empty when the row
    *  carries no per-key settings (e.g. chargers). */
   settings?: Record<string, SettingValueEntry>;
+  /** When `false` the "Scanning request notifications" toggle is
+   *  disabled (and forced unchecked) — the device has no APNs token,
+   *  so there's no useful behaviour to enable. Set `true` once the
+   *  device has registered a push token. Defaults to `true` so the
+   *  control stays usable on chargers / unwired callers. */
+  hasApnsToken?: boolean;
 }
 
 function iconFor(c: DeviceCapability) {
@@ -87,7 +93,7 @@ function formatTimestamp(iso: string): string {
 }
 
 export default function AppConfigurationForm(
-  { deviceId, kind, current, settings = {} }: Props,
+  { deviceId, kind, current, settings = {}, hasApnsToken = true }: Props,
 ) {
   const opts = pickerOptionsForKind(kind);
   const editableList = [...opts.editable] as DeviceCapability[];
@@ -102,7 +108,12 @@ export default function AppConfigurationForm(
   // The `device.label` setting is owned by the identity-card rename
   // input, so we don't expose it here.
   const scanReqEntry = settings["notifications.scanRequest"];
-  const initialScanReq = asBool(scanReqEntry?.value, true);
+  // No APNs token → the toggle is forced off and disabled. Persisting
+  // any other value would be misleading because there's no token to
+  // push to.
+  const initialScanReq = hasApnsToken
+    ? asBool(scanReqEntry?.value, true)
+    : false;
   const [scanRequestPush, setScanRequestPush] = useState<boolean>(
     initialScanReq,
   );
@@ -265,17 +276,24 @@ export default function AppConfigurationForm(
           <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Settings
           </h3>
-          <div class="flex items-center gap-3 rounded-md border border-border bg-card p-3">
+          <div
+            class={cn(
+              "flex items-center gap-3 rounded-md border border-border bg-card p-3",
+              !hasApnsToken && "opacity-60",
+            )}
+          >
             <Bell aria-hidden class="size-5 shrink-0 text-muted-foreground" />
             <div class="flex flex-1 flex-col gap-0.5">
               <label
                 for="setting-notifications-scan-request"
                 class="text-sm font-medium"
               >
-                Scan-arm push notifications
+                Scanning request notifications
               </label>
               <span class="text-xs text-muted-foreground">
-                {scanReqEntry
+                {!hasApnsToken
+                  ? "Disabled: this device hasn't registered an APNs token, so push can't be delivered."
+                  : scanReqEntry
                   ? `Last set ${
                     formatTimestamp(scanReqEntry.updatedAtIso)
                   } by ${formatActor(scanReqEntry.updatedBy)}`
@@ -285,13 +303,16 @@ export default function AppConfigurationForm(
             <input
               id="setting-notifications-scan-request"
               type="checkbox"
-              checked={scanRequestPush}
-              disabled={saving}
+              checked={hasApnsToken && scanRequestPush}
+              disabled={saving || !hasApnsToken}
               onChange={(e) =>
                 setScanRequestPush(
                   (e.currentTarget as HTMLInputElement).checked,
                 )}
-              class="size-5 cursor-pointer accent-teal-600"
+              class={cn(
+                "size-5 accent-teal-600",
+                hasApnsToken ? "cursor-pointer" : "cursor-not-allowed",
+              )}
             />
           </div>
         </div>

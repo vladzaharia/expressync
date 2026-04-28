@@ -343,35 +343,79 @@ export default define.page<typeof handler>(
             // last-sync timestamp, permission row, and the diagnostic
             // counters that used to live in the (now-folded) Diagnostics
             // card.
+            const ls = (device.lastStatus ?? {}) as Record<string, unknown>;
+            const num = (k: string): number | null =>
+              typeof ls[k] === "number" && Number.isFinite(ls[k] as number)
+                ? (ls[k] as number)
+                : null;
+            const str = (k: string): string | null =>
+              typeof ls[k] === "string" ? (ls[k] as string) : null;
+            const bool = (k: string): boolean | null =>
+              typeof ls[k] === "boolean" ? (ls[k] as boolean) : null;
+            const isPushPerm = (
+              v: unknown,
+            ): v is NonNullable<DeviceLiveStatus["pushPermission"]> =>
+              v === "authorized" || v === "denied" ||
+              v === "notDetermined" || v === "provisional" ||
+              v === "ephemeral";
+            const isPermState = (
+              v: unknown,
+            ): v is NonNullable<DeviceLiveStatus["nfcPermission"]> =>
+              v === "authorized" || v === "denied" ||
+              v === "notDetermined" || v === "restricted" ||
+              v === "unavailable";
+            const isBgState = (
+              v: unknown,
+            ): v is NonNullable<DeviceLiveStatus["backgroundRefreshStatus"]> =>
+              v === "available" || v === "denied" || v === "restricted";
+            const isBatteryState = (
+              v: unknown,
+            ): v is NonNullable<DeviceLiveStatus["batteryState"]> =>
+              v === "unknown" || v === "unplugged" ||
+              v === "charging" || v === "full";
+            const isThermalState = (
+              v: unknown,
+            ): v is NonNullable<DeviceLiveStatus["thermalState"]> =>
+              v === "nominal" || v === "fair" ||
+              v === "serious" || v === "critical";
+
             const liveStatus: DeviceLiveStatus = {
               isOnline,
               lastSeenAtIso: device.lastSeenAtIso,
-              reconnectCount: typeof device.lastStatus?.reconnectCount ===
-                    "number" && device.lastStatus.reconnectCount >= 0
-                ? Math.floor(device.lastStatus.reconnectCount)
-                : 0,
-              pendingUploads: typeof device.lastStatus?.pendingUploads ===
-                    "number" && device.lastStatus.pendingUploads >= 0
-                ? Math.floor(device.lastStatus.pendingUploads)
-                : 0,
-              pushPermission:
-                typeof device.lastStatus?.pushPermission === "boolean"
-                  ? device.lastStatus.pushPermission
-                  : null,
-              nfcPermission:
-                typeof device.lastStatus?.nfcPermission === "boolean"
-                  ? device.lastStatus.nfcPermission
-                  : null,
+              reconnectCount: Math.max(0, Math.floor(num("reconnectCount") ?? 0)),
+              pendingUploads: Math.max(0, Math.floor(num("pendingUploads") ?? 0)),
+              pushPermission: isPushPerm(ls.pushPermission)
+                ? ls.pushPermission
+                : null,
+              pushTokenLast8: device.pushTokenLast8,
+              apnsEnvironment: device.apnsEnvironment ?? str("apnsEnvironment"),
+              nfcAvailable: bool("nfcAvailable"),
+              nfcPermission: isPermState(ls.nfcPermission)
+                ? ls.nfcPermission
+                : null,
+              backgroundRefreshStatus: isBgState(ls.backgroundRefreshStatus)
+                ? ls.backgroundRefreshStatus
+                : null,
               appVersion: device.appVersion,
               osVersion: device.osVersion,
               model: device.model,
-              platform: device.platform,
-              pushTokenLast8: device.pushTokenLast8,
-              apnsEnvironment: device.apnsEnvironment,
-              lastErrorMessage:
-                typeof device.lastStatus?.lastErrorMessage === "string"
-                  ? device.lastStatus.lastErrorMessage
-                  : null,
+              localizedModel: str("localizedModel"),
+              platform: device.platform ?? str("platform"),
+              locale: str("locale"),
+              timezone: str("timezone"),
+              batteryLevel: num("batteryLevel"),
+              batteryState: isBatteryState(ls.batteryState)
+                ? ls.batteryState
+                : null,
+              lowPowerMode: bool("lowPowerMode"),
+              thermalState: isThermalState(ls.thermalState)
+                ? ls.thermalState
+                : null,
+              networkInterface: str("networkInterface"),
+              networkIsConstrained: bool("networkIsConstrained"),
+              networkIsExpensive: bool("networkIsExpensive"),
+              diskFreeBytes: num("diskFreeBytes"),
+              lastErrorMessage: str("lastErrorMessage"),
             };
             const recentSyncs: DeviceSyncEntry[] = [];
 
@@ -426,6 +470,7 @@ export default define.page<typeof handler>(
                     kind={device.kind}
                     current={device.capabilities as DeviceCapability[]}
                     settings={device.appConfigSettings}
+                    hasApnsToken={device.pushTokenLast8 !== null}
                   />
                 </SectionCard>
 
