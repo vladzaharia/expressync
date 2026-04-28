@@ -91,7 +91,11 @@ function parseFilterFromUrl(url: URL): TagsFilterState {
   const q = (sp.get("q") ?? "").trim();
   const linked = coerceTriState(sp.get("linked"));
   const active = coerceTriState(sp.get("active"));
-  const meta = coerceTriState(sp.get("meta"));
+  // Meta-tags (the auto-managed `OCPP-{externalId}` customer parents) are
+  // hidden by default — they're internal hierarchy plumbing, not operator-
+  // facing rows. Pass `?meta=any` (or `?meta=yes`) to surface them.
+  const metaParam = sp.get("meta");
+  const meta: TriState = metaParam === null ? "no" : coerceTriState(metaParam);
 
   const typesRaw = sp.get("types") ?? "";
   const types = new Set<TagType>();

@@ -15,6 +15,10 @@ import {
   resolveOrCreateCustomerAccount,
 } from "../../../../src/services/customer-account-provisioner.ts";
 import { syncSingleTagToSteve } from "../../../../src/services/tag-sync.service.ts";
+import {
+  ensureCustomerMetaTag,
+  parentIdTagFor,
+} from "../../../../src/lib/customer-meta-tags.ts";
 import { bulkCancelFutureReservationsForUser } from "../../../../src/services/reservation.service.ts";
 import { logAuthEvent } from "../../../../src/lib/audit.ts";
 
@@ -238,6 +242,36 @@ export const handler = define.handlers({
           );
         }
         throw err;
+      }
+
+      // Auto-managed customer meta-tag: materialize the OCPP-{externalId}
+      // parent tag (idempotent) and override the linked tag's
+      // steveParentIdTag so StEvE inherits config from the canonical
+      // customer parent. Skip for meta-tags themselves — they don't
+      // parent themselves under another customer parent.
+      const desiredParentIdTag = parentIdTagFor(lagoCustomerId);
+      const isLinkingAMetaTag = ocppTagId.startsWith("OCPP-");
+      if (!isLinkingAMetaTag) {
+        // Best-effort, fire-and-forget the StEvE-side parent materialization.
+        void ensureCustomerMetaTag(lagoCustomerId).catch((err) => {
+          logger.warn(
+            "API",
+            "ensureCustomerMetaTag from POST /tag/link failed",
+            err,
+          );
+        });
+        if (parentMapping !== null) {
+          const pm: schema.UserMapping = parentMapping;
+          const updated = await db
+            .update(schema.userMappings)
+            .set({
+              steveParentIdTag: desiredParentIdTag,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.userMappings.id, pm.id))
+            .returning();
+          parentMapping = updated[0] ?? pm;
+        }
       }
 
       // Inline StEvE sync — best-effort per affected mapping. Any failure
