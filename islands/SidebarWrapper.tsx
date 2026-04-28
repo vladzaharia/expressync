@@ -27,7 +27,7 @@ type SidebarBrandComponent = ComponentType<
   }
 >;
 import { cn } from "@/src/lib/utils/cn.ts";
-import { type AccentColor, accentTailwindClasses } from "@/src/lib/colors.ts";
+import { type AccentColor } from "@/src/lib/colors.ts";
 import { ADMIN_NAV_SECTIONS } from "@/src/lib/admin-navigation.ts";
 import { CUSTOMER_NAV_SECTIONS } from "@/src/lib/customer-navigation.ts";
 
@@ -73,9 +73,12 @@ function TopBarContent({
   // we now always render it on desktop for SectionNav + right-cluster chrome.
   if (isMobile) return null;
 
-  const colorClasses = accentTailwindClasses[accentColor];
-  const accentBgClass =
-    `${colorClasses.bg} ${colorClasses.bgHover} ${colorClasses.text}`;
+  // Accent classes used to colour the page-action wash; that has
+  // been retired in favour of a neutral background so the buttons
+  // inside aren't competing with their container. The accentColor
+  // prop is kept on the type (other surfaces still consume it
+  // elsewhere) but isn't read here.
+  void accentColor;
 
   return (
     <header
@@ -97,14 +100,11 @@ function TopBarContent({
         </div>
       )}
 
-      {/* Page action section — preserves accent gradient behavior. */}
+      {/* Page action section — neutral background; the buttons it
+         contains carry their own styling and the accent wash was
+         competing with them visually. */}
       {actions && (
-        <div
-          className={cn(
-            "flex items-center justify-center border-l transition-colors",
-            accentBgClass,
-          )}
-        >
+        <div className="flex items-center justify-center border-l transition-colors px-3">
           {actions}
         </div>
       )}

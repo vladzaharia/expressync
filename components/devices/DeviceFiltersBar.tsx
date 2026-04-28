@@ -46,7 +46,7 @@ const TYPE_OPTIONS: ReadonlyArray<{ value: DeviceTypeFilter; label: string }> =
   [
     { value: "all", label: "All types" },
     { value: "charger", label: "Chargers" },
-    { value: "scanner", label: "Scanners" },
+    { value: "scanner", label: "Phones" },
   ];
 
 const KIND_OPTIONS: ReadonlyArray<{ value: DeviceKindFilter; label: string }> =
