@@ -7,11 +7,12 @@
  * convention; same `getAllNavItems()` / `findSectionByPath()` /
  * `isPathActive()` helpers exported.
  *
- * Customer surface IS NOT admin-feature-rich — it's a 5-tab portal:
+ * Customer surface IS NOT admin-feature-rich — it's a 6-tab portal:
  *   - Dashboard       (Zap)
  *   - Sessions        (Receipt)
  *   - Reservations    (CalendarClock)
- *   - Cards           (CreditCard)
+ *   - EV Cards        (CreditCard)
+ *   - Subscription    (BadgeCheck)
  *   - Billing         (Wallet)
  *
  * Account / settings live in a top-right `UserAvatarMenu` (per the plan),
@@ -19,6 +20,7 @@
  */
 
 import {
+  BadgeCheck,
   CalendarClock,
   CreditCard,
   type LucideIcon,
@@ -78,11 +80,19 @@ export const CUSTOMER_NAV_SECTIONS: NavSection[] = [
       },
       {
         id: "nav:/cards",
-        title: "Cards",
+        title: "EV Cards",
         path: "/cards",
         icon: CreditCard,
         accentColor: "cyan",
-        keywords: ["tag", "rfid"],
+        keywords: ["tag", "rfid", "card"],
+      },
+      {
+        id: "nav:/subscription",
+        title: "Subscription",
+        path: "/subscription",
+        icon: BadgeCheck,
+        accentColor: "violet",
+        keywords: ["plan", "subscription", "expresscharge", "portal"],
       },
       {
         id: "nav:/billing",

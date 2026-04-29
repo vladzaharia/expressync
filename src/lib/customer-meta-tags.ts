@@ -145,6 +145,17 @@ export async function ensureCustomerMetaTag(
   // active flag + sub linkage so the admin UI reflects current intent.
   try {
     if (ocppTagPk !== null) {
+      // Resolve the auth user that owns this Lago customer. Required for
+      // `resolveCustomerScope` (which filters user_mappings by user_id) to
+      // see the meta-tag mapping — without it, remote-start sessions
+      // through the meta-tag never attribute to the customer's scope.
+      const [owner] = await db
+        .select({ id: schema.users.id })
+        .from(schema.users)
+        .where(eq(schema.users.lagoCustomerExternalId, externalId))
+        .limit(1);
+      const ownerUserId = owner?.id ?? null;
+
       const [existingRow] = await db
         .select()
         .from(schema.userMappings)
@@ -160,6 +171,8 @@ export async function ensureCustomerMetaTag(
             lagoSubscriptionExternalId: subExternalId,
             displayName: existingRow.displayName ?? displayName ?? null,
             isActive,
+            // Only fill userId when missing — never clobber an admin-set value.
+            userId: existingRow.userId ?? ownerUserId,
             updatedAt: new Date(),
           })
           .where(eq(schema.userMappings.id, existingRow.id));
@@ -172,6 +185,7 @@ export async function ensureCustomerMetaTag(
           displayName: displayName ?? null,
           tagType: "other",
           isActive,
+          userId: ownerUserId,
         });
       }
     }
