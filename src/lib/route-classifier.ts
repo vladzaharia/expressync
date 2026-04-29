@@ -100,6 +100,11 @@ const RULES: readonly RouteRule[] = [
     surface: "customer",
   },
   { prefix: "/cards", classification: "CUSTOMER_ONLY", surface: "customer" },
+  {
+    prefix: "/subscription",
+    classification: "CUSTOMER_ONLY",
+    surface: "customer",
+  },
   { prefix: "/billing", classification: "CUSTOMER_ONLY", surface: "customer" },
   { prefix: "/account", classification: "CUSTOMER_ONLY", surface: "customer" },
   // Customer API endpoints — only mounted on the customer surface.
