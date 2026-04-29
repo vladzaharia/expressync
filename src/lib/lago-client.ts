@@ -561,7 +561,7 @@ class LagoClient {
     externalId: string,
   ): Promise<{ customer: { portal_url: string } }> {
     return await this.request(
-      `/customer_portal/${encodeURIComponent(externalId)}/url`,
+      `/customers/${encodeURIComponent(externalId)}/portal_url`,
       z.object({ customer: z.object({ portal_url: z.string() }) }),
     );
   }
