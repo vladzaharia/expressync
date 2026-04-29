@@ -117,9 +117,23 @@ export const auth = betterAuth({
     user: {
       create: {
         before: (user, ctx) => {
+          // Customer surface: magic-link sign-ups are always customers.
           if (ctx?.path === "/sign-in/magic-link") {
             return Promise.resolve({
               data: { ...user, role: "customer" },
+            });
+          }
+          // Admin surface: any JIT user created via the Pocket ID OIDC
+          // callback is by definition an admin — Pocket ID's per-client
+          // allow-list has already authorised them for this surface, so
+          // a customer account here would be a misclassification.
+          // BetterAuth's generic-OAuth plugin doesn't always propagate
+          // the `role` field returned by `mapProfileToUser` to the
+          // database adapter (depends on the JIT path it takes), so we
+          // re-stamp it here as a defense-in-depth.
+          if (ctx?.path?.startsWith("/oauth2/callback/")) {
+            return Promise.resolve({
+              data: { ...user, role: "admin" },
             });
           }
           return Promise.resolve({ data: user });
