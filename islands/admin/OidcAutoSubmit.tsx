@@ -1,55 +1,100 @@
 /**
- * Tiny island that auto-submits the Pocket ID OIDC sign-in form on
- * mount. Used by `routes/admin/login.tsx` in mode 2 (OIDC-only) so the
- * BetterAuth start endpoint receives a POST and writes its state cookie
- * before bouncing to the IdP.
+ * Tiny island that kicks off the Pocket ID OIDC sign-in flow.
  *
- * For no-JS clients, the parent page's <button> remains the visible
- * fallback — clicking it submits the same form by hand.
+ * BetterAuth's `/api/auth/sign-in/oauth2` endpoint expects a JSON body
+ * and responds with `{ url, redirect }` — it does NOT return a 302. So
+ * we can't use a plain HTML form post (the browser would just render
+ * the JSON response). Instead we POST JSON via fetch and then assign
+ * `window.location.href` to the returned authorize URL.
+ *
+ * Two modes:
+ *   - autoSubmit=true  → kick off the request on mount (mode 2 of the
+ *     login page: OIDC-only, no email fallback).
+ *   - autoSubmit=false → wait for the user to click the button (mode 3:
+ *     OIDC primary, email fallback link below).
  */
 
-import { useEffect, useRef } from "preact/hooks";
-import type { JSX } from "preact";
+import { useEffect, useRef, useState } from "preact/hooks";
 
 interface Props {
-  /** Children rendered inside the form (the button). */
-  children: JSX.Element | JSX.Element[];
+  /** Visible button label. */
+  label: string;
   /**
    * Path to return the user to after BetterAuth completes the OIDC
    * round-trip. Defaults to "/". Caller must pre-sanitise; we forward
    * verbatim into BetterAuth's `callbackURL`.
    */
   callbackURL?: string;
+  /** Auto-submit on mount (mode 2). */
+  autoSubmit?: boolean;
 }
 
-export default function OidcAutoSubmit({ children, callbackURL = "/" }: Props) {
-  const formRef = useRef<HTMLFormElement | null>(null);
+export default function OidcAutoSubmit(
+  { label, callbackURL = "/", autoSubmit = false }: Props,
+) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const startedRef = useRef(false);
+
+  async function start() {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/auth/sign-in/oauth2", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ providerId: "pocket-id", callbackURL }),
+      });
+      if (!res.ok) {
+        startedRef.current = false;
+        setBusy(false);
+        setError(`Sign-in failed (${res.status}). Try again.`);
+        return;
+      }
+      const data = await res.json() as { url?: string; redirect?: boolean };
+      if (data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+      startedRef.current = false;
+      setBusy(false);
+      setError("Sign-in failed: no redirect URL returned.");
+    } catch (e) {
+      startedRef.current = false;
+      setBusy(false);
+      setError(
+        `Sign-in failed: ${e instanceof Error ? e.message : "network error"}`,
+      );
+    }
+  }
 
   useEffect(() => {
-    // Defer one tick so the DOM is fully attached before the synchronous
-    // submit triggers a navigation. Some browsers ignore an immediate
-    // submit-on-mount when an island still has pending hydration.
-    const timer = setTimeout(() => {
-      try {
-        formRef.current?.submit();
-      } catch {
-        // Best-effort: a popup blocker / extension might cancel the
-        // submit. The visible button remains as a fallback.
-      }
-    }, 0);
-    return () => clearTimeout(timer);
+    if (autoSubmit) {
+      const timer = setTimeout(() => {
+        void start();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
   }, []);
 
   return (
-    <form
-      ref={formRef}
-      method="POST"
-      action="/api/auth/sign-in/oauth2"
-      class="space-y-3"
-    >
-      <input type="hidden" name="providerId" value="pocket-id" />
-      <input type="hidden" name="callbackURL" value={callbackURL} />
-      {children}
-    </form>
+    <div class="space-y-3">
+      <button
+        type="button"
+        onClick={() => void start()}
+        disabled={busy}
+        class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {busy ? "Redirecting…" : label}
+      </button>
+      {error && (
+        <p class="text-center text-xs text-destructive" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
