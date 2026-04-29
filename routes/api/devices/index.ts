@@ -93,6 +93,8 @@ type ViewRow = {
   friendly_name: string | null;
   form_factor: string | null;
   capabilities?: string[] | null;
+  connector_type_override: string | null;
+  max_kw_override: string | null;
 };
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -156,6 +158,34 @@ function normalizeFormFactor(v: string | null): ChargerRow["formFactor"] {
   }
 }
 
+/** Wire the override-or-null connector type. The CHECK constraint
+ *  on `chargers_cache.connector_type_override` already pins valid
+ *  values; this guard is defence in depth in case the column is
+ *  ever loosened. */
+function normalizeConnectorType(
+  v: string | null,
+): ChargerRow["connectorType"] {
+  switch (v) {
+    case "ccs":
+    case "j1772":
+    case "nacs":
+    case "chademo":
+    case "type2":
+      return v;
+    default:
+      return null;
+  }
+}
+
+/** Drizzle `numeric` columns round-trip through TypeScript as
+ *  string ("11.50"). Coerce to a number for the wire shape so
+ *  iOS reads it directly. */
+function parseMaxKw(v: string | null): number | null {
+  if (v === null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 // ---------------------------------------------------------------------------
 // Test seam — handler-direct DB shim. Tests inject a fake loader to avoid
 // requiring DATABASE_URL.
@@ -174,7 +204,9 @@ const defaultLoader: ChargerListLoader = async () => {
       cc.last_status,
       cc.friendly_name,
       cc.form_factor,
-      cc.capabilities
+      cc.capabilities,
+      cc.connector_type_override,
+      cc.max_kw_override
     FROM tappable_devices tv
     LEFT JOIN chargers_cache cc
       ON tv.kind = 'charger' AND cc.charge_box_id = tv.id
@@ -245,10 +277,12 @@ export const handler = define.handlers({
           // siteName: not modelled today; reserved for future multi-site rollout.
           siteName: null,
           formFactor: normalizeFormFactor(r.form_factor),
-          // connectorType + maxKw aren't tracked on `chargers_cache` today;
-          // reserved for the connector-metadata follow-up (slice B5b in the plan).
-          connectorType: null,
-          maxKw: null,
+          // StEvE doesn't reliably surface connector type or kW
+          // rating, so we surface admin-set overrides from
+          // chargers_cache. Both fields stay nullable on the wire
+          // when no override is set; iOS renders `—` in that case.
+          connectorType: normalizeConnectorType(r.connector_type_override),
+          maxKw: parseMaxKw(r.max_kw_override),
           state: mapChargerState(r.last_status, toMs(r.last_status_at), now),
           // The wire field is named `lastSeenAt` for backward
           // compatibility, but it's the time we last received a real
