@@ -861,9 +861,45 @@ export const LagoWebhookEnvelopeSchema = z.object({
 export type LagoWebhookEnvelope = z.infer<typeof LagoWebhookEnvelopeSchema>;
 
 /**
+ * Lago entitlement privilege — one key/value pair attached to a feature on a
+ * plan or subscription. Lago coerces the `value` to the privilege's declared
+ * `value_type`; we keep it loosely typed here and let callers (e.g.
+ * `derivePlanChargingEntitlements`) coerce per-privilege.
+ */
+export const LagoEntitlementPrivilegeSchema = z.object({
+  code: z.string(),
+  name: z.string().nullable().optional(),
+  value_type: z.enum(["integer", "boolean", "string", "select"]).optional(),
+  value: z.union([z.string(), z.number(), z.boolean(), z.null()]).optional(),
+  plan_value: z.union([z.string(), z.number(), z.boolean(), z.null()])
+    .optional(),
+  override_value: z.union([z.string(), z.number(), z.boolean(), z.null()])
+    .optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const LagoEntitlementSchema = z.object({
+  code: z.string(),
+  name: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  privileges: z.array(LagoEntitlementPrivilegeSchema).default([]),
+  /** Subscription-only: which privileges have an explicit override. */
+  overrides: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type LagoEntitlement = z.infer<typeof LagoEntitlementSchema>;
+export type LagoEntitlementPrivilege = z.infer<
+  typeof LagoEntitlementPrivilegeSchema
+>;
+
+/**
  * Lago Plan — loose projection used by the reconcile-cache flow. We only need
  * a few denormalized fields for list/detail surfaces; `passthrough()` preserves
  * the raw payload so callers can read anything else directly from the row.
+ *
+ * `entitlements` is the only structured pass-through we type explicitly: the
+ * `ev` feature carries `max_amps` / `ramped_charge` privileges that downstream
+ * charging code (and the iPhone scan-result UI) reads off the plan.
  */
 export const LagoPlanSchema = z.object({
   lago_id: z.string(),
@@ -874,6 +910,80 @@ export const LagoPlanSchema = z.object({
   amount_currency: z.string().nullable().optional(),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),
+  entitlements: z.array(LagoEntitlementSchema).optional(),
 }).passthrough();
 
 export type LagoPlan = z.infer<typeof LagoPlanSchema>;
+
+/**
+ * Subscription entitlements response shape — `GET /subscriptions/{id}/entitlements`.
+ * Used when we need the effective subscription view (plan + override merge).
+ */
+export const LagoSubscriptionEntitlementsSchema = z.object({
+  entitlements: z.array(LagoEntitlementSchema),
+});
+
+export type LagoSubscriptionEntitlements = z.infer<
+  typeof LagoSubscriptionEntitlementsSchema
+>;
+
+/**
+ * Charging-feature privileges, normalised. The Lago feature is `ev` with
+ * `max_amps` (integer) and `ramped_charge` (boolean). We surface either side
+ * as `null` when the plan has no entitlement (defensive — every charging plan
+ * SHOULD have these set, but we don't want a missing entitlement to crash a
+ * scan).
+ */
+export interface ChargingEntitlements {
+  maxAmps: number | null;
+  rampedCharge: boolean | null;
+}
+
+/** Feature/privilege codes for the EV charging feature. Single source of truth. */
+export const EV_FEATURE_CODE = "ev";
+export const EV_PRIVILEGE_MAX_AMPS = "max_amps";
+export const EV_PRIVILEGE_RAMPED_CHARGE = "ramped_charge";
+
+function findEvPrivilege(
+  entitlements: readonly LagoEntitlement[] | undefined,
+  privilegeCode: string,
+): LagoEntitlementPrivilege | undefined {
+  if (!entitlements) return undefined;
+  const ev = entitlements.find((e) => e.code === EV_FEATURE_CODE);
+  if (!ev) return undefined;
+  return ev.privileges.find((p) => p.code === privilegeCode);
+}
+
+function readNumber(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function readBoolean(v: unknown): boolean | null {
+  if (typeof v === "boolean") return v;
+  if (v === "true") return true;
+  if (v === "false") return false;
+  return null;
+}
+
+/**
+ * Derive `{maxAmps, rampedCharge}` from a Lago plan's entitlements. Accepts
+ * the raw plan payload (as cached in `lago_plans.payload`) so callers don't
+ * have to re-parse the schema. Returns `null` for either field when the
+ * privilege is absent or unparseable.
+ */
+export function derivePlanChargingEntitlements(
+  plan: { entitlements?: readonly LagoEntitlement[] } | null | undefined,
+): ChargingEntitlements {
+  const ents = plan?.entitlements;
+  return {
+    maxAmps: readNumber(findEvPrivilege(ents, EV_PRIVILEGE_MAX_AMPS)?.value),
+    rampedCharge: readBoolean(
+      findEvPrivilege(ents, EV_PRIVILEGE_RAMPED_CHARGE)?.value,
+    ),
+  };
+}
