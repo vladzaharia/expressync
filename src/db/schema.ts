@@ -97,6 +97,9 @@ export const accounts = pgTable("accounts", {
   providerId: text("provider_id").notNull(), // "credential" for email/password
   accessToken: text("access_token"),
   refreshToken: text("refresh_token"),
+  // OIDC id_token — populated by BetterAuth's generic-OAuth plugin on
+  // successful callback. NULL for credential ("email/password") rows.
+  idToken: text("id_token"),
   accessTokenExpiresAt: timestamp("access_token_expires_at", {
     withTimezone: true,
   }),
