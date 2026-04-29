@@ -24,10 +24,11 @@ import {
   TransactionStatusBadge,
 } from "@/components/shared/index.ts";
 import { NumberTicker } from "@/components/magicui/number-ticker.tsx";
-import { Calendar, Tag as TagIcon, Zap } from "lucide-preact";
+import { Calendar, Receipt, Tag as TagIcon, Zap } from "lucide-preact";
 import { clientNavigate } from "@/src/lib/nav.ts";
 import { subscribeSse } from "@/islands/shared/SseProvider.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
+import { formatMoney } from "@/src/lib/invoice-ui.ts";
 
 /**
  * Row shape — matches the Track F `/api/customer/sessions` items. We only
@@ -44,6 +45,18 @@ export interface CustomerSessionRow {
   meterValueTo: number;
   isFinal: boolean | null;
   syncedAt: string | null;
+  /**
+   * Estimated cost in cents (server-computed via tiered tariff). `null`
+   * when the plan has no rate or this session falls outside the current
+   * period for a tiered plan (cumulative position unknown).
+   */
+  costCents: number | null;
+  /**
+   * - `included` — covered by a 0-rate tier; render "Included".
+   * - `billed`   — render `costCents` as money.
+   * - `unknown`  — hide the cost cell.
+   */
+  costCoverage: "included" | "billed" | "unknown";
 }
 
 interface Props {
@@ -52,6 +65,14 @@ interface Props {
   pageSize?: number;
   fetchParams?: Record<string, string>;
   emptyMessage?: string;
+  /**
+   * Per-kWh tariff in major units (e.g. 0.42). When non-null the table
+   * renders a Cost column with kwh * tariff. Null hides the column —
+   * customers without a Lago plan should not see an estimate.
+   */
+  tariffPerKwh?: number | null;
+  /** ISO 4217 currency code paired with `tariffPerKwh`. */
+  tariffCurrency?: string;
 }
 
 function formatDate(iso: string | null): string {
@@ -114,7 +135,32 @@ function applyMeterUpdate(p: MeterPayload): void {
   liveMetersSignal.value = next;
 }
 
-function buildColumns(): PaginatedTableColumn<CustomerSessionRow>[] {
+function renderCostCell(
+  row: CustomerSessionRow,
+  currency: string,
+): preact.JSX.Element | string {
+  if (row.costCoverage === "included") {
+    return (
+      <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+        <Receipt class="size-3.5" aria-hidden="true" />
+        Included
+      </span>
+    );
+  }
+  if (row.costCoverage === "billed" && row.costCents != null) {
+    return (
+      <span class="font-medium tabular-nums">
+        {formatMoney(row.costCents, currency)}
+      </span>
+    );
+  }
+  return <span class="text-muted-foreground text-sm">—</span>;
+}
+
+function buildColumns(
+  showCost: boolean,
+  currency: string,
+): PaginatedTableColumn<CustomerSessionRow>[] {
   return [
     {
       key: "syncedAt",
@@ -174,6 +220,14 @@ function buildColumns(): PaginatedTableColumn<CustomerSessionRow>[] {
         return <span class="font-medium tabular-nums">{rowKwh(row)}</span>;
       },
     },
+    ...(showCost
+      ? [{
+        key: "cost",
+        header: "Est. cost",
+        className: "text-right whitespace-nowrap",
+        render: (row: CustomerSessionRow) => renderCostCell(row, currency),
+      } satisfies PaginatedTableColumn<CustomerSessionRow>]
+      : []),
     {
       key: "status",
       header: "Status",
@@ -200,7 +254,15 @@ export default function CustomerSessionsTable({
   pageSize = 25,
   fetchParams,
   emptyMessage = "No charging sessions yet.",
+  tariffPerKwh,
+  tariffCurrency = "EUR",
 }: Props) {
+  // Show the Cost column when ANY visible row has a real cost figure or
+  // is marked included. Hide outright when no plan/tariff info reached us.
+  const showCost = tariffPerKwh != null ||
+    sessions.some((s) =>
+      s.costCoverage === "billed" || s.costCoverage === "included"
+    );
   const handleRowClick = (row: CustomerSessionRow) => {
     clientNavigate(`/sessions/${row.id}`);
   };
@@ -216,7 +278,7 @@ export default function CustomerSessionsTable({
     return unsub;
   }, [sessions]);
 
-  const columns = buildColumns();
+  const columns = buildColumns(showCost, tariffCurrency);
 
   return (
     <PaginatedTable
@@ -264,9 +326,14 @@ export default function CustomerSessionsTable({
                   )}
                 </span>
               }
-              secondaryLine={row.ocppTag
-                ? <span class="font-mono">{row.ocppTag}</span>
-                : `Session #${row.steveTransactionId}`}
+              secondaryLine={
+                <span class="flex items-center gap-2">
+                  {row.ocppTag
+                    ? <span class="font-mono">{row.ocppTag}</span>
+                    : <span>Session #{row.steveTransactionId}</span>}
+                  {showCost && renderCostCell(row, tariffCurrency)}
+                </span>
+              }
               primaryStat={`${kwhDisplay} kWh`}
             />
           </div>

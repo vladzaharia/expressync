@@ -22,8 +22,19 @@
 import { define } from "../../utils.ts";
 import { db } from "../../src/db/index.ts";
 import * as schema from "../../src/db/schema.ts";
-import { and, asc, eq, sql } from "drizzle-orm";
-import { assertOwnership, OwnershipError } from "../../src/lib/scoping.ts";
+import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import {
+  assertOwnership,
+  OwnershipError,
+  resolveCustomerScope,
+} from "../../src/lib/scoping.ts";
+import {
+  aggregateEstimates,
+  buildCumulativeMap,
+  estimateEventCost,
+  resolveCustomerTariff,
+} from "../../src/lib/customer-tariff.ts";
+import { periodWindow } from "../../src/lib/billing-derive.ts";
 import { steveClient } from "../../src/lib/steve-client.ts";
 import { logger } from "../../src/lib/utils/logger.ts";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
@@ -199,6 +210,73 @@ export const handler = define.handlers({
       );
 
     const totalKwh = Number(agg?.totalKwh ?? 0);
+
+    // ── Estimated cost (tier-aware, per-event so cross-period sessions
+    //    attribute correctly) ───────────────────────────────────────
+    const scope = await resolveCustomerScope(ctx);
+    const tariff = await resolveCustomerTariff(scope.lagoCustomerExternalId);
+    const { from: periodFrom, to: periodTo } = periodWindow("current");
+    const periodFromMs = periodFrom.getTime();
+    const periodToMs = periodTo.getTime();
+
+    let costCents: number | null = null;
+    let costCoverage: "included" | "billed" | "unknown" = "unknown";
+    if (scope.mappingIds.length > 0) {
+      try {
+        // Build cumulative map across ALL events in the period (not just
+        // this transaction's). For tiered plans this is what gives each
+        // event its correct tier position.
+        let cumulative = new Map<number, number>();
+        if (tariff.tiers.length > 0) {
+          const periodRows = await db
+            .select({
+              id: schema.syncedTransactionEvents.id,
+              syncedAt: schema.syncedTransactionEvents.syncedAt,
+              kwhDelta: schema.syncedTransactionEvents.kwhDelta,
+            })
+            .from(schema.syncedTransactionEvents)
+            .where(
+              and(
+                inArray(
+                  schema.syncedTransactionEvents.userMappingId,
+                  scope.mappingIds,
+                ),
+                gte(schema.syncedTransactionEvents.syncedAt, periodFrom),
+                lte(schema.syncedTransactionEvents.syncedAt, periodTo),
+              ),
+            );
+          cumulative = buildCumulativeMap(
+            periodRows.map((r) => ({
+              id: r.id,
+              syncedAtMs: r.syncedAt ? new Date(r.syncedAt).getTime() : 0,
+              kwh: Number(r.kwhDelta ?? 0),
+            })),
+          );
+        }
+        // Estimate per-event for this transaction, then aggregate.
+        const perEvent = timelineRaw.map((r) => {
+          const ts = r.syncedAt ? new Date(r.syncedAt).getTime() : 0;
+          const k = Number(r.kwhDelta ?? 0);
+          return estimateEventCost(
+            tariff,
+            r.id,
+            ts,
+            k,
+            cumulative,
+            periodFromMs,
+            periodToMs,
+          );
+        });
+        const agg2 = aggregateEstimates(perEvent);
+        costCents = agg2.cents;
+        costCoverage = agg2.coverage;
+      } catch (err) {
+        log.warn("session detail cost estimate failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     // Prefer StEvE's `startTimestamp` for live sessions (more accurate than
     // first synced event); fall back to the first sync timestamp otherwise.
     const startTime = liveStartedAt
@@ -240,10 +318,9 @@ export const handler = define.handlers({
         totalKwh,
         totalDurationSeconds,
         avgKw,
-        // Cost wiring is handed off to G3 (billing) — surfaced as null here
-        // until that track lands the Lago-side resolver.
-        costCents: null,
-        costCurrency: null,
+        costCents,
+        costCoverage,
+        costCurrency: tariff.currency,
         invoiceId: null,
         liveChargeBoxId,
         liveFriendlyName,
@@ -310,6 +387,7 @@ export default define.page<typeof handler>(
                 totalDurationSeconds={data.totalDurationSeconds}
                 avgKw={data.avgKw}
                 costCents={data.costCents}
+                costCoverage={data.costCoverage}
                 costCurrency={data.costCurrency}
                 invoiceId={data.invoiceId}
                 chargeBoxId={data.liveChargeBoxId}

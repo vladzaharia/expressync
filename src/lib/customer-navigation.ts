@@ -7,13 +7,15 @@
  * convention; same `getAllNavItems()` / `findSectionByPath()` /
  * `isPathActive()` helpers exported.
  *
- * Customer surface IS NOT admin-feature-rich — it's a 6-tab portal:
- *   - Dashboard       (Zap)
- *   - Sessions        (Receipt)
- *   - Reservations    (CalendarClock)
- *   - EV Cards        (CreditCard)
- *   - Subscription    (BadgeCheck)
- *   - Billing         (Wallet)
+ * Customer surface IS NOT admin-feature-rich — it's a 6-tab portal.
+ * Tabs render in this order (own subscription first, then money, then
+ * identity, then activity):
+ *   - Dashboard          (Zap)
+ *   - My Subscription    (BadgeCheck)
+ *   - Billing            (Wallet)
+ *   - EV Cards           (CreditCard)
+ *   - Charging Sessions  (Receipt)
+ *   - Reservations       (CalendarClock)
  *
  * Account / settings live in a top-right `UserAvatarMenu` (per the plan),
  * NOT in the bottom-tab nav.
@@ -63,32 +65,8 @@ export const CUSTOMER_NAV_SECTIONS: NavSection[] = [
     title: "",
     items: [
       {
-        id: "nav:/sessions",
-        title: "Sessions",
-        path: "/sessions",
-        icon: Receipt,
-        accentColor: "green",
-        keywords: ["history", "kwh", "transactions"],
-      },
-      {
-        id: "nav:/reservations",
-        title: "Reservations",
-        path: "/reservations",
-        icon: CalendarClock,
-        accentColor: "indigo",
-        keywords: ["booking", "reserve", "schedule"],
-      },
-      {
-        id: "nav:/cards",
-        title: "EV Cards",
-        path: "/cards",
-        icon: CreditCard,
-        accentColor: "cyan",
-        keywords: ["tag", "rfid", "card"],
-      },
-      {
         id: "nav:/subscription",
-        title: "Subscription",
+        title: "My Subscription",
         path: "/subscription",
         icon: BadgeCheck,
         accentColor: "violet",
@@ -100,7 +78,31 @@ export const CUSTOMER_NAV_SECTIONS: NavSection[] = [
         path: "/billing",
         icon: Wallet,
         accentColor: "teal",
-        keywords: ["invoice", "subscription", "usage"],
+        keywords: ["invoice", "usage"],
+      },
+      {
+        id: "nav:/cards",
+        title: "EV Cards",
+        path: "/cards",
+        icon: CreditCard,
+        accentColor: "cyan",
+        keywords: ["tag", "rfid", "card"],
+      },
+      {
+        id: "nav:/sessions",
+        title: "Charging Sessions",
+        path: "/sessions",
+        icon: Receipt,
+        accentColor: "green",
+        keywords: ["history", "kwh", "transactions", "charging", "sessions"],
+      },
+      {
+        id: "nav:/reservations",
+        title: "Reservations",
+        path: "/reservations",
+        icon: CalendarClock,
+        accentColor: "indigo",
+        keywords: ["booking", "reserve", "schedule"],
       },
     ],
   },

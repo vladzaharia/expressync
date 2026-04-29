@@ -51,8 +51,15 @@ interface SessionDetailCardProps {
   totalDurationSeconds: number | null;
   /** Per-kWh ÷ duration (avg power); null when duration unknown / zero. */
   avgKw: number | null;
-  /** Estimated cost in cents (resolved from Lago, may be null pre-billing). */
+  /** Estimated cost in cents (tier-aware estimate; may be null). */
   costCents: number | null;
+  /**
+   * - `included` — entirely covered by a 0-rate tier (e.g. "first 100 kWh
+   *   free"); render "Included" instead of `costCents`.
+   * - `billed`   — render `costCents`.
+   * - `unknown`  — show "—".
+   */
+  costCoverage: "included" | "billed" | "unknown";
   costCurrency: string | null;
   /** Lago invoice id for cross-link (null until invoice issued). */
   invoiceId: string | null;
@@ -80,12 +87,29 @@ function formatCost(cents: number | null, currency: string | null): string {
   return currency ? `${currency.toUpperCase()} ${c}` : `€${c}`;
 }
 
+function renderCostValue(
+  cents: number | null,
+  coverage: "included" | "billed" | "unknown",
+  currency: string | null,
+) {
+  if (coverage === "included") {
+    return (
+      <span class="text-emerald-600 dark:text-emerald-400">Included</span>
+    );
+  }
+  if (coverage === "billed" && cents != null) {
+    return <span class="tabular-nums">{formatCost(cents, currency)}</span>;
+  }
+  return <span class="tabular-nums">—</span>;
+}
+
 export function SessionDetailCard({
   session,
   totalKwh,
   totalDurationSeconds,
   avgKw,
   costCents,
+  costCoverage,
   costCurrency,
   invoiceId,
   chargeBoxId,
@@ -105,13 +129,13 @@ export function SessionDetailCard({
   const costTile = (
     <MetricTile
       icon={Receipt}
-      label="Cost"
-      value={
-        <span class="tabular-nums">
-          {formatCost(costCents, costCurrency)}
-        </span>
-      }
-      sublabel={invoiceId ? "View invoice" : undefined}
+      label="Est. cost"
+      value={renderCostValue(costCents, costCoverage, costCurrency)}
+      sublabel={invoiceId
+        ? "View invoice"
+        : costCoverage === "unknown"
+        ? "Spans previous period"
+        : undefined}
       accent="teal"
     />
   );

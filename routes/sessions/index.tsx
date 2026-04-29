@@ -32,6 +32,12 @@ import {
   sql,
 } from "drizzle-orm";
 import { resolveCustomerScope } from "../../src/lib/scoping.ts";
+import {
+  buildCumulativeMap,
+  estimateEventCost,
+  resolveCustomerTariff,
+} from "../../src/lib/customer-tariff.ts";
+import { periodWindow } from "../../src/lib/billing-derive.ts";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
 import {
@@ -209,6 +215,10 @@ export const handler = define.handlers({
     let totalCount = 0;
     let rows: CustomerSessionRow[] = [];
 
+    // Resolve tariff in parallel with the page query so cost estimates
+    // are ready by the time we render rows.
+    const tariffPromise = resolveCustomerTariff(scope.lagoCustomerExternalId);
+
     if (whereClause) {
       const [{ value }] = await db
         .select({ value: count() })
@@ -242,10 +252,77 @@ export const handler = define.handlers({
         meterValueTo: r.event.meterValueTo,
         isFinal: r.event.isFinal ?? false,
         syncedAt: r.event.syncedAt ? r.event.syncedAt.toISOString() : null,
+        costCents: null,
+        costCoverage: "unknown",
       }));
     }
 
-    const stats = await computeStats(scope.mappingIds);
+    const [stats, tariff] = await Promise.all([
+      computeStats(scope.mappingIds),
+      tariffPromise,
+    ]);
+
+    // Annotate rows with estimated cost. For sessions in the current
+    // billing period we walk tiers using their cumulative position; older
+    // sessions only get a number when the plan is flat (no tiers) — we
+    // can't reconstruct historical period totals.
+    if (rows.length > 0) {
+      const { from: periodFrom, to: periodTo } = periodWindow("current");
+      const periodFromMs = periodFrom.getTime();
+      const periodToMs = periodTo.getTime();
+
+      let cumulative = new Map<number, number>();
+      if (tariff.tiers.length > 0 && scope.mappingIds.length > 0) {
+        try {
+          const periodRows = await db
+            .select({
+              id: schema.syncedTransactionEvents.id,
+              syncedAt: schema.syncedTransactionEvents.syncedAt,
+              kwhDelta: schema.syncedTransactionEvents.kwhDelta,
+            })
+            .from(schema.syncedTransactionEvents)
+            .where(
+              and(
+                inArray(
+                  schema.syncedTransactionEvents.userMappingId,
+                  scope.mappingIds,
+                ),
+                gte(schema.syncedTransactionEvents.syncedAt, periodFrom),
+                lte(schema.syncedTransactionEvents.syncedAt, periodTo),
+              ),
+            );
+          cumulative = buildCumulativeMap(
+            periodRows.map((r) => ({
+              id: r.id,
+              syncedAtMs: r.syncedAt ? new Date(r.syncedAt).getTime() : 0,
+              kwh: Number(r.kwhDelta ?? 0),
+            })),
+          );
+        } catch (err) {
+          log.warn("period-cumulative lookup failed; cost estimate disabled", {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      rows = rows.map((row) => {
+        const ts = row.syncedAt ? new Date(row.syncedAt).getTime() : 0;
+        const estimate = estimateEventCost(
+          tariff,
+          row.id,
+          ts,
+          Number(row.kwhDelta ?? 0),
+          cumulative,
+          periodFromMs,
+          periodToMs,
+        );
+        return {
+          ...row,
+          costCents: estimate.cents,
+          costCoverage: estimate.coverage,
+        };
+      });
+    }
 
     return {
       data: {
@@ -253,6 +330,7 @@ export const handler = define.handlers({
         totalCount,
         stats,
         filters,
+        tariff,
       },
     };
   },
@@ -345,6 +423,8 @@ export default define.page<typeof handler>(
                 sessions={data.rows}
                 totalCount={data.totalCount}
                 pageSize={PAGE_SIZE}
+                tariffPerKwh={data.tariff.perKwh}
+                tariffCurrency={data.tariff.currency}
                 fetchParams={{
                   ...(filters.status !== "all"
                     ? { status: filters.status }

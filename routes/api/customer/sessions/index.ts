@@ -25,6 +25,12 @@ import { db } from "../../../../src/db/index.ts";
 import * as schema from "../../../../src/db/schema.ts";
 import { and, count, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { resolveCustomerScope } from "../../../../src/lib/scoping.ts";
+import {
+  buildCumulativeMap,
+  estimateEventCost,
+  resolveCustomerTariff,
+} from "../../../../src/lib/customer-tariff.ts";
+import { periodWindow } from "../../../../src/lib/billing-derive.ts";
 import { logger } from "../../../../src/lib/utils/logger.ts";
 
 const log = logger.child("CustomerSessionsAPI");
@@ -113,10 +119,58 @@ export const handler = define.handlers({
         .offset(skip)
         .limit(limit);
 
-      const items = rows.map((r) => ({
-        ...r.event,
-        ocppTag: r.ocppTag ?? null,
-      }));
+      // Annotate with estimated cost. Mirrors the page loader's behaviour
+      // so paginated pages match the first page.
+      const tariff = await resolveCustomerTariff(scope.lagoCustomerExternalId);
+      const { from: periodFrom, to: periodTo } = periodWindow("current");
+      const periodFromMs = periodFrom.getTime();
+      const periodToMs = periodTo.getTime();
+      let cumulative = new Map<number, number>();
+      if (tariff.tiers.length > 0) {
+        const periodRows = await db
+          .select({
+            id: schema.syncedTransactionEvents.id,
+            syncedAt: schema.syncedTransactionEvents.syncedAt,
+            kwhDelta: schema.syncedTransactionEvents.kwhDelta,
+          })
+          .from(schema.syncedTransactionEvents)
+          .where(
+            and(
+              inArray(
+                schema.syncedTransactionEvents.userMappingId,
+                scope.mappingIds,
+              ),
+              gte(schema.syncedTransactionEvents.syncedAt, periodFrom),
+              lte(schema.syncedTransactionEvents.syncedAt, periodTo),
+            ),
+          );
+        cumulative = buildCumulativeMap(
+          periodRows.map((r) => ({
+            id: r.id,
+            syncedAtMs: r.syncedAt ? new Date(r.syncedAt).getTime() : 0,
+            kwh: Number(r.kwhDelta ?? 0),
+          })),
+        );
+      }
+
+      const items = rows.map((r) => {
+        const ts = r.event.syncedAt ? r.event.syncedAt.getTime() : 0;
+        const estimate = estimateEventCost(
+          tariff,
+          r.event.id,
+          ts,
+          Number(r.event.kwhDelta ?? 0),
+          cumulative,
+          periodFromMs,
+          periodToMs,
+        );
+        return {
+          ...r.event,
+          ocppTag: r.ocppTag ?? null,
+          costCents: estimate.cents,
+          costCoverage: estimate.coverage,
+        };
+      });
       return jsonResponse(200, { items, total, skip, limit });
     } catch (error) {
       log.error("Failed to fetch customer sessions", error as Error);

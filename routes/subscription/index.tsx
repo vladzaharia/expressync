@@ -42,7 +42,6 @@ import {
   CircleDollarSign,
   ExternalLink,
   Gauge,
-  Receipt,
   Settings2,
   Zap,
 } from "lucide-preact";
@@ -60,6 +59,11 @@ import {
   type ChargingEntitlements,
   derivePlanChargingEntitlements,
 } from "../../src/lib/types/lago.ts";
+import {
+  buildCumulativeMap,
+  estimateEventCost,
+  resolveCustomerTariff,
+} from "../../src/lib/customer-tariff.ts";
 import { formatMoney } from "../../src/lib/invoice-ui.ts";
 import { logger } from "../../src/lib/utils/logger.ts";
 import { config } from "../../src/lib/config.ts";
@@ -86,6 +90,8 @@ interface RecentSession {
   kwh: number;
   ocppTag: string | null;
   isFinal: boolean;
+  costCents: number | null;
+  costCoverage: "included" | "billed" | "unknown";
 }
 
 interface SubscriptionPageData {
@@ -104,6 +110,7 @@ interface SubscriptionPageData {
   periodSessionCount: number;
   periodLabel: string;
   recentSessions: RecentSession[];
+  recentSessionsCurrency: string;
   portalUrl: string | null;
   operatorEmail?: string;
 }
@@ -152,6 +159,7 @@ export const handler = define.handlers({
       periodSessionCount: 0,
       periodLabel: "",
       recentSessions: [],
+      recentSessionsCurrency: "EUR",
       portalUrl: null,
       operatorEmail: config.OPERATOR_CONTACT_EMAIL || undefined,
     };
@@ -230,6 +238,8 @@ export const handler = define.handlers({
           kwh: Number(r.kwhDelta ?? 0),
           ocppTag: r.displayName ?? r.ocppTag ?? null,
           isFinal: !!r.isFinal,
+          costCents: null,
+          costCoverage: "unknown",
         }));
       } catch (err) {
         log.warn("recent sessions lookup failed", {
@@ -337,6 +347,59 @@ export const handler = define.handlers({
       });
     }
 
+    // ── Annotate recent sessions with estimated cost (tier-aware) ─────
+    const tariff = await resolveCustomerTariff(extCustomerId);
+    if (recentSessions.length > 0 && scope.mappingIds.length > 0) {
+      try {
+        let cumulative = new Map<number, number>();
+        if (tariff.tiers.length > 0) {
+          const periodRows = await db
+            .select({
+              id: schema.syncedTransactionEvents.id,
+              syncedAt: schema.syncedTransactionEvents.syncedAt,
+              kwhDelta: schema.syncedTransactionEvents.kwhDelta,
+            })
+            .from(schema.syncedTransactionEvents)
+            .where(
+              and(
+                inArray(
+                  schema.syncedTransactionEvents.userMappingId,
+                  scope.mappingIds,
+                ),
+                gte(schema.syncedTransactionEvents.syncedAt, periodFrom),
+                lt(schema.syncedTransactionEvents.syncedAt, periodTo),
+              ),
+            );
+          cumulative = buildCumulativeMap(
+            periodRows.map((r) => ({
+              id: r.id,
+              syncedAtMs: r.syncedAt ? new Date(r.syncedAt).getTime() : 0,
+              kwh: Number(r.kwhDelta ?? 0),
+            })),
+          );
+        }
+        const periodFromMs = periodFrom.getTime();
+        const periodToMs = periodTo.getTime();
+        recentSessions = recentSessions.map((s) => {
+          const ts = s.syncedAtIso ? new Date(s.syncedAtIso).getTime() : 0;
+          const est = estimateEventCost(
+            tariff,
+            s.id,
+            ts,
+            s.kwh,
+            cumulative,
+            periodFromMs,
+            periodToMs,
+          );
+          return { ...s, costCents: est.cents, costCoverage: est.coverage };
+        });
+      } catch (err) {
+        log.warn("recent session cost estimate failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     return {
       data: {
         ...empty,
@@ -351,6 +414,7 @@ export const handler = define.handlers({
         periodSessionCount,
         periodLabel,
         recentSessions,
+        recentSessionsCurrency: tariff.currency,
         portalUrl,
       } satisfies SubscriptionPageData,
     };
@@ -616,6 +680,22 @@ export default define.page<typeof handler>(
                               Live
                             </span>
                           )}
+                          {s.costCoverage === "included"
+                            ? (
+                              <span class="font-medium text-emerald-600 dark:text-emerald-400">
+                                Included
+                              </span>
+                            )
+                            : s.costCoverage === "billed" && s.costCents != null
+                            ? (
+                              <span class="font-medium tabular-nums text-muted-foreground">
+                                {formatMoney(
+                                  s.costCents,
+                                  data.recentSessionsCurrency,
+                                )}
+                              </span>
+                            )
+                            : null}
                           <span class="font-semibold tabular-nums">
                             {s.kwh.toLocaleString(undefined, {
                               maximumFractionDigits: 2,
@@ -664,14 +744,6 @@ export default define.page<typeof handler>(
                 )}
             </SectionCard>
 
-            <div class="text-xs text-muted-foreground text-center">
-              Looking for invoices?{" "}
-              <a href="/billing" class="underline hover:text-foreground">
-                See your billing page
-              </a>
-              <span class="mx-1">·</span>
-              <Receipt class="inline size-3" />
-            </div>
           </div>
         </PageCard>
       </SidebarLayout>

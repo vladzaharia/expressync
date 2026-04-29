@@ -4,9 +4,11 @@
  * IA (top-down, inside one PageCard, accent=blue):
  *   StatStrip [ Amount due · Next due · Paid last 30d · kWh this month ]
  *   SectionCard "Overview"        → BillingOverviewCard (pay-now pill or paid-up tick)
- *   SectionCard "Plan & Usage"    → PeriodUsageChart + PlanInfoCard (1fr · 1fr on lg)
  *   SectionCard "Wallet"          → CustomerWalletSection (conditional)
  *   SectionCard "Invoices"        → filter bar + CustomerInvoicesTable + EmptyState
+ *
+ * Plan/usage details and self-service live on /subscription — Billing is
+ * money-only.
  */
 
 import { and, eq, gte, inArray, isNotNull, lt, ne } from "drizzle-orm";
@@ -21,17 +23,11 @@ import {
 import { EmptyState } from "../../components/shared/EmptyState.tsx";
 import { BlurFade } from "../../components/magicui/blur-fade.tsx";
 import { MoneyBadge } from "../../components/billing/MoneyBadge.tsx";
-import { BillingPeriodSwitcher } from "../../components/shared/BillingPeriodSwitcher.tsx";
-import type { BillingPeriod } from "../../components/shared/BillingPeriodSwitcher.tsx";
 import {
   BillingOverviewCard,
   type BillingOverviewData,
 } from "../../components/customer/BillingOverviewCard.tsx";
 import { type PlanInfo } from "../../components/customer/PlanInfoCard.tsx";
-import { PeriodBreakdownCard } from "../../components/customer/PeriodBreakdownCard.tsx";
-import PeriodUsageChart, {
-  type UsageDayPoint,
-} from "../../islands/customer/PeriodUsageChart.tsx";
 import CustomerInvoicesTable from "../../islands/customer/CustomerInvoicesTable.tsx";
 import CustomerInvoiceFilterBar from "../../islands/customer/CustomerInvoiceFilterBar.tsx";
 import type { CustomerInvoiceFilter } from "../../islands/customer/CustomerInvoiceFilterBar.tsx";
@@ -44,7 +40,6 @@ import {
   Bolt,
   CalendarClock,
   CircleDollarSign,
-  Gauge,
   Receipt,
   Wallet,
 } from "lucide-preact";
@@ -60,8 +55,6 @@ import * as schema from "../../src/db/schema.ts";
 import {
   currencySymbolFor,
   derivePlanInfo,
-  enumerateDays,
-  localDayKey,
   periodWindow,
 } from "../../src/lib/billing-derive.ts";
 import { config } from "../../src/lib/config.ts";
@@ -71,7 +64,8 @@ const log = logger.child("CustomerBillingPage");
 interface BillingPageData {
   overview: BillingOverviewData;
   plan: PlanInfo | null;
-  dailyUsage: UsageDayPoint[];
+  /** Total kWh charged in the current billing period (drives the kWh stat tile). */
+  periodKwh: number;
   periodLabel: string;
   wallet: WalletData | null;
   invoices: {
@@ -144,7 +138,7 @@ export const handler = define.handlers({
   async GET(ctx) {
     const url = new URL(ctx.req.url);
     // Current only for now — previous/year not yet wired.
-    const period: BillingPeriod = "current";
+    const period = "current" as const;
 
     const statusParams = url.searchParams.getAll("status").filter(
       (s): s is CustomerInvoiceFilter =>
@@ -170,18 +164,15 @@ export const handler = define.handlers({
     let nextInvoiceDateIso: string | null = null;
     let nextInvoiceEstimateCents: number | null = null;
 
-    // ── Usage series for the current period (DB-backed) ───────────────
+    // ── Total kWh for the current period (drives the kWh stat tile) ────
     const { from: periodFrom, to: periodTo, label: periodLabel } = periodWindow(
       period,
     );
     let usageValueKwh = 0;
-    const dayBuckets = new Map<string, number>();
-    for (const d of enumerateDays(periodFrom, periodTo)) dayBuckets.set(d, 0);
     if (scope.mappingIds.length > 0) {
       try {
         const rows = await db
           .select({
-            syncedAt: schema.syncedTransactionEvents.syncedAt,
             kwhDelta: schema.syncedTransactionEvents.kwhDelta,
           })
           .from(schema.syncedTransactionEvents)
@@ -195,23 +186,13 @@ export const handler = define.handlers({
               lt(schema.syncedTransactionEvents.syncedAt, periodTo),
             ),
           );
-        for (const r of rows) {
-          const kwh = Number(r.kwhDelta ?? 0);
-          usageValueKwh += kwh;
-          if (r.syncedAt) {
-            const key = localDayKey(new Date(r.syncedAt));
-            dayBuckets.set(key, (dayBuckets.get(key) ?? 0) + kwh);
-          }
-        }
+        for (const r of rows) usageValueKwh += Number(r.kwhDelta ?? 0);
       } catch (err) {
-        log.warn("Failed to fetch daily usage for billing page", {
+        log.warn("Failed to fetch period kWh for billing page", {
           error: err instanceof Error ? err.message : String(err),
         });
       }
     }
-    const dailyUsage: UsageDayPoint[] = [...dayBuckets.entries()].map((
-      [date, kwh],
-    ) => ({ date, kwh: Number(kwh.toFixed(3)) }));
 
     let wallet: WalletData | null = null;
 
@@ -497,7 +478,7 @@ export const handler = define.handlers({
       data: {
         overview,
         plan: planInfo,
-        dailyUsage,
+        periodKwh: usageValueKwh,
         periodLabel,
         wallet,
         invoices: {
@@ -598,10 +579,7 @@ export default define.page<typeof handler>(function BillingIndexPage(
       key: "kwh",
       label: `kWh · ${data.periodLabel}`,
       value: `${
-        data.dailyUsage.reduce((a, p) => a + p.kwh, 0).toLocaleString(
-          undefined,
-          { maximumFractionDigits: 1 },
-        )
+        data.periodKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })
       } kWh`,
       icon: Bolt,
     },
@@ -658,47 +636,8 @@ export default define.page<typeof handler>(function BillingIndexPage(
             title="Overview"
             icon={CircleDollarSign}
             accent="blue"
-            actions={
-              <a
-                href="/subscription"
-                class="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Manage subscription and payment methods"
-              >
-                Manage subscription &amp; payment methods →
-              </a>
-            }
           >
             <BillingOverviewCard {...data.overview} accent="blue" />
-          </SectionCard>
-
-          <SectionCard
-            title="Plan & Usage"
-            icon={Gauge}
-            accent="blue"
-            actions={
-              <BillingPeriodSwitcher
-                value="current"
-                basePath="/billing"
-                supportedPeriods={["current"]}
-              />
-            }
-          >
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
-              <div className="min-w-0 rounded-lg border bg-card p-4 lg:col-span-2">
-                <PeriodUsageChart
-                  points={data.dailyUsage}
-                  periodLabel={data.periodLabel}
-                  accent="blue"
-                  emphasizeTotal
-                />
-              </div>
-              <div className="min-w-0 rounded-lg border bg-card p-4 lg:col-span-1">
-                <PeriodBreakdownCard
-                  points={data.dailyUsage}
-                  accent="blue"
-                />
-              </div>
-            </div>
           </SectionCard>
 
           {data.wallet && (
