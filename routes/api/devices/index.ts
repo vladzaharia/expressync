@@ -250,7 +250,12 @@ export const handler = define.handlers({
           connectorType: null,
           maxKw: null,
           state: mapChargerState(r.last_status, toMs(r.last_status_at), now),
-          lastSeenAt: toIso(r.last_seen_at),
+          // The wire field is named `lastSeenAt` for backward
+          // compatibility, but it's the time we last received a real
+          // OCPP status from the charger. The cache's `last_seen_at`
+          // bumps on every sync iteration regardless of contact, so
+          // exposing that one would lie to the client.
+          lastSeenAt: toIso(r.last_status_at),
           capabilities: Array.from(caps),
         };
       });
