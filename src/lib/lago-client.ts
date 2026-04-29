@@ -17,9 +17,13 @@ import {
   LagoInvoiceSchema,
   type LagoLifetimeUsage,
   LagoLifetimeUsageSchema,
+  type LagoEntitlement,
+  LagoEntitlementSchema,
   type LagoPlan,
   LagoPlanSchema,
   type LagoSubscription,
+  type LagoSubscriptionEntitlements,
+  LagoSubscriptionEntitlementsSchema,
   type LagoSubscriptionAlert,
   LagoSubscriptionAlertSchema,
   LagoSubscriptionSchema,
@@ -826,6 +830,85 @@ class LagoClient {
       z.object({ plan: LagoPlanSchema }),
     );
     return res.plan;
+  }
+
+  /**
+   * Replace the entitlements on a plan. Lago's POST replaces the full set
+   * (PATCH would partial-update); we use POST so the script's intent is
+   * authoritative — if the user later removes a privilege from the script, it
+   * disappears from the plan.
+   *
+   * `entitlements` shape: `{ [feature_code]: { [privilege_code]: value } }`.
+   */
+  async setPlanEntitlements(
+    planCode: string,
+    entitlements: Record<string, Record<string, string | number | boolean>>,
+  ): Promise<LagoEntitlement[]> {
+    const res = await this.request(
+      `/plans/${encodeURIComponent(planCode)}/entitlements`,
+      z.object({ entitlements: z.array(LagoEntitlementSchema) }),
+      {
+        method: "POST",
+        body: JSON.stringify({ entitlements }),
+      },
+    );
+    return res.entitlements;
+  }
+
+  /**
+   * Effective subscription entitlements (plan + override merge). `override_value`
+   * is `null` on every privilege when the subscription is purely plan-inherited.
+   */
+  async getSubscriptionEntitlements(
+    externalSubscriptionId: string,
+  ): Promise<LagoSubscriptionEntitlements> {
+    return await this.request(
+      `/subscriptions/${
+        encodeURIComponent(externalSubscriptionId)
+      }/entitlements`,
+      LagoSubscriptionEntitlementsSchema,
+    );
+  }
+
+  /**
+   * Remove a subscription-level feature override entirely. Lago records this
+   * as a "feature removal" tombstone — the plan's entitlement for that feature
+   * is no longer inherited until the tombstone is cleared. Use sparingly:
+   * usually you want `patchSubscriptionEntitlements` with the plan's value
+   * (which reads as "explicit override that happens to match the plan").
+   */
+  async deleteSubscriptionEntitlement(
+    externalSubscriptionId: string,
+    featureCode: string,
+  ): Promise<void> {
+    await this.request(
+      `/subscriptions/${
+        encodeURIComponent(externalSubscriptionId)
+      }/entitlements/${encodeURIComponent(featureCode)}`,
+      z.unknown(),
+      { method: "DELETE" },
+    );
+  }
+
+  /**
+   * Remove a single privilege override from a subscription. The privilege
+   * remains available via the plan (no tombstone is created at the privilege
+   * level — only `deleteSubscriptionEntitlement` creates feature tombstones).
+   */
+  async deleteSubscriptionPrivilegeOverride(
+    externalSubscriptionId: string,
+    featureCode: string,
+    privilegeCode: string,
+  ): Promise<void> {
+    await this.request(
+      `/subscriptions/${
+        encodeURIComponent(externalSubscriptionId)
+      }/entitlements/${encodeURIComponent(featureCode)}/privileges/${
+        encodeURIComponent(privilegeCode)
+      }`,
+      z.unknown(),
+      { method: "DELETE" },
+    );
   }
 
   /**
