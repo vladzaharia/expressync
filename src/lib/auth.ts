@@ -65,6 +65,29 @@ export const auth = betterAuth({
       : []),
   ],
 
+  /**
+   * Declare `role` as a known user field. Without this, BetterAuth's
+   * `transformInput` strips any non-standard column from create/update
+   * payloads (see `db/schema.mjs#parseInputData` + `db/adapter#transformInput`)
+   * — which silently dropped `role` from both the magic-link `before`
+   * hook and the OIDC `mapProfileToUser` mapper, leaving the DB default
+   * (`customer`) in place. That manifested as Pocket ID admins landing
+   * as customers. With the field declared, `role` flows end-to-end.
+   *
+   * `defaultValue: "customer"` mirrors the DB default — defense in depth
+   * against a code path that omits role entirely.
+   */
+  user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        required: false,
+        defaultValue: "customer",
+        input: true,
+      },
+    },
+  },
+
   // Email & password authentication (admin path).
   emailAndPassword: {
     enabled: true,
