@@ -30,29 +30,28 @@ const CONNECTOR_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
   { value: "chademo", label: "CHAdeMO" },
 ];
 
-/** Standard AC + DC ratings recognised by major OEMs. Sorted by
- *  power so the dropdown reads from "trickle" up to "ultra-fast". */
+/** North-American EV charger ratings. Single-phase 120 V (Level 1),
+ *  single-phase 240 V (Level 2), and CCS/NACS DC-fast tiers as seen
+ *  in the wild from ChargePoint, Wallbox, JuiceBox, Tesla, EA, EVgo.
+ *  Sorted by power so the dropdown reads from "trickle" up to
+ *  "ultra-fast". */
 const KW_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
   { value: NULL_OPTION, label: "— Auto / unset —" },
-  // AC — Level 1 / Level 2 (single-phase 240 V)
+  // Level 1 — 120 V
   { value: "1.4", label: "1.4 kW (Level 1, 12 A @ 120 V)" },
-  { value: "1.9", label: "1.9 kW (Level 1, 16 A @ 120 V)" },
-  { value: "3.7", label: "3.7 kW (Level 2, 16 A @ 240 V)" },
+  // Level 2 — 240 V single-phase
+  { value: "3.8", label: "3.8 kW (Level 2, 16 A @ 240 V)" },
+  { value: "5.8", label: "5.8 kW (Level 2, 24 A @ 240 V)" },
   { value: "7.2", label: "7.2 kW (Level 2, 30 A @ 240 V)" },
   { value: "7.7", label: "7.7 kW (Level 2, 32 A @ 240 V)" },
   { value: "9.6", label: "9.6 kW (Level 2, 40 A @ 240 V)" },
   { value: "11.5", label: "11.5 kW (Level 2, 48 A @ 240 V)" },
   { value: "19.2", label: "19.2 kW (Level 2, 80 A @ 240 V)" },
-  // AC — three-phase EU
-  { value: "11", label: "11 kW (3-phase, 16 A @ 400 V)" },
-  { value: "22", label: "22 kW (3-phase, 32 A @ 400 V)" },
-  // DC fast
-  { value: "24", label: "24 kW (DC fast)" },
+  // DC fast (CCS / NACS)
   { value: "50", label: "50 kW (DC fast)" },
-  { value: "75", label: "75 kW (DC fast)" },
   { value: "100", label: "100 kW (DC fast)" },
   { value: "150", label: "150 kW (DC fast)" },
-  { value: "200", label: "200 kW (DC fast)" },
+  { value: "175", label: "175 kW (DC fast)" },
   { value: "250", label: "250 kW (DC ultra-fast)" },
   { value: "350", label: "350 kW (DC ultra-fast)" },
 ];
