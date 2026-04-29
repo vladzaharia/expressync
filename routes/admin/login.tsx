@@ -5,18 +5,18 @@
  *
  *   1. ADMIN_OIDC_ISSUER unset → render the email/password form (legacy).
  *   2. ADMIN_OIDC_ISSUER set + ADMIN_AUTH_SHOW_FALLBACK unset → render
- *      the OIDC button and auto-submit it on mount via an island. This
- *      gets BetterAuth's `/api/auth/sign-in/oauth2` start endpoint to
- *      write its state cookie and bounce to the IdP without flashing
- *      a password form.
+ *      the OIDC button and auto-kick the sign-in on mount via an island.
  *   3. ADMIN_OIDC_ISSUER set + ADMIN_AUTH_SHOW_FALLBACK=true → render
  *      the OIDC button (primary CTA) plus a small "Sign in with email
  *      instead" link → /login/email (the email form on its own page).
  *
- * The OIDC button posts against BetterAuth's `/api/auth/sign-in/oauth2`
- * with `providerId=pocket-id` (matching `auth-oidc.ts`). BetterAuth
- * resolves the discovery document, signs PKCE state into a cookie, then
- * 302s to the issuer's authorize URL.
+ * The OIDC button POSTs JSON against BetterAuth's
+ * `/api/auth/sign-in/oauth2` with `providerId=pocket-id` (matching
+ * `auth-oidc.ts`). BetterAuth resolves the discovery document, signs
+ * PKCE state into a cookie, and returns the authorize URL as
+ * `{url, redirect}` JSON; the island then sets `window.location.href`.
+ * (BetterAuth's sign-in endpoint accepts JSON only and does not 302 —
+ * a plain `<form method="POST">` would render the JSON response.)
  */
 
 import { define } from "../../utils.ts";
@@ -118,19 +118,6 @@ export const handler = define.handlers({
   },
 });
 
-/** Visible OIDC button — used on its own (mode 3) or wrapped by
- *  `OidcAutoSubmit` (mode 2). The button submits the parent form. */
-function OidcSignInButton({ label }: { label: string }) {
-  return (
-    <button
-      type="submit"
-      class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      {label}
-    </button>
-  );
-}
-
 export default define.page<typeof handler>(function LoginPage({ data }) {
   return (
     <div class="min-h-screen flex items-center justify-center relative overflow-hidden bg-background">
@@ -188,12 +175,14 @@ export default define.page<typeof handler>(function LoginPage({ data }) {
                   <p class="text-sm text-center text-muted-foreground mb-5">
                     Redirecting you to your single sign-on provider…
                   </p>
-                  <OidcAutoSubmit callbackURL={data.next}>
-                    <OidcSignInButton label="Continue with Pocket ID" />
-                  </OidcAutoSubmit>
+                  <OidcAutoSubmit
+                    callbackURL={data.next}
+                    autoSubmit
+                    label="Continue with Pocket ID"
+                  />
                   <noscript>
-                    <p class="mt-3 text-center text-xs text-muted-foreground">
-                      JavaScript is disabled. Use the button above to continue.
+                    <p class="mt-3 text-center text-xs text-destructive">
+                      JavaScript is required to sign in with Pocket ID.
                     </p>
                   </noscript>
                 </div>
@@ -206,23 +195,10 @@ export default define.page<typeof handler>(function LoginPage({ data }) {
                   <p class="text-sm text-center text-muted-foreground">
                     Sign in with your Pocket ID single sign-on.
                   </p>
-                  <form
-                    method="POST"
-                    action="/api/auth/sign-in/oauth2"
-                    class="space-y-3"
-                  >
-                    <input
-                      type="hidden"
-                      name="providerId"
-                      value="pocket-id"
-                    />
-                    <input
-                      type="hidden"
-                      name="callbackURL"
-                      value={data.next}
-                    />
-                    <OidcSignInButton label="Continue with Pocket ID" />
-                  </form>
+                  <OidcAutoSubmit
+                    callbackURL={data.next}
+                    label="Continue with Pocket ID"
+                  />
                   <div class="pt-1 text-center">
                     <a
                       href={data.next === "/"
