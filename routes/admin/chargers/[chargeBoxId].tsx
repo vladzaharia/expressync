@@ -91,6 +91,11 @@ interface ChargerDetailLoaderData {
     // Wave 6 Slice O — admin-editable capability set. Always contains
     // `'charger'` (auto-on); admin may toggle `'scanner'`.
     capabilities: DeviceCapability[];
+
+    // Migration 0040 — admin overrides for connector spec when StEvE
+    // doesn't surface them (or surfaces them incorrectly).
+    connectorTypeOverride: string | null;
+    maxKwOverride: number | null;
   };
   connectors: ConnectorDto[];
   recentTransactions: ChargerRecentTxRow[];
@@ -407,6 +412,10 @@ export const handler = define.handlers({
         friendlyName: cacheRow.friendlyName,
         formFactor: cacheRow.formFactor,
         capabilities,
+        connectorTypeOverride: cacheRow.connectorTypeOverride ?? null,
+        maxKwOverride: cacheRow.maxKwOverride !== null
+          ? Number(cacheRow.maxKwOverride)
+          : null,
         firstSeenAtIso: (cacheRow.firstSeenAt ?? new Date()).toISOString(),
         lastSeenAtIso: (cacheRow.lastSeenAt ?? new Date()).toISOString(),
         lastStatus: cacheRow.lastStatus,
@@ -519,6 +528,8 @@ export default define.page<typeof handler>(
                 model={charger.model}
                 firmwareVersion={charger.firmwareVersion}
                 iccid={charger.iccid}
+                connectorTypeOverride={charger.connectorTypeOverride}
+                maxKwOverride={charger.maxKwOverride}
                 uiStatus={charger.uiStatus}
                 isAdmin={data.isAdmin}
               />

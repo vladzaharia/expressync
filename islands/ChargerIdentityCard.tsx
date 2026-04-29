@@ -10,6 +10,7 @@
 import { useState } from "preact/hooks";
 import { Check, Copy } from "lucide-preact";
 import ChargerFormFactorSelect from "./ChargerFormFactorSelect.tsx";
+import ChargerConnectorOverrideSelect from "./ChargerConnectorOverrideSelect.tsx";
 import { FORM_FACTORS } from "@/src/lib/types/steve.ts";
 import {
   chargerFormFactorIcons,
@@ -30,6 +31,11 @@ interface Props {
   model: string | null;
   firmwareVersion: string | null;
   iccid: string | null;
+  /** Migration 0040 — admin override when StEvE doesn't surface
+   *  connector/kW. `null` = no override; falls back to whatever the
+   *  vendor reports (or the `—` placeholder when nothing reported). */
+  connectorTypeOverride: string | null;
+  maxKwOverride: number | null;
   uiStatus: UiStatus;
   isAdmin: boolean;
   class?: string;
@@ -56,6 +62,8 @@ export default function ChargerIdentityCard({
   model,
   firmwareVersion,
   iccid,
+  connectorTypeOverride,
+  maxKwOverride,
   uiStatus,
   isAdmin,
   class: className,
@@ -127,6 +135,31 @@ export default function ChargerIdentityCard({
               : <span class="font-medium">{formFactor}</span>}
           </dd>
         </div>
+
+        {isAdmin
+          ? (
+            <ChargerConnectorOverrideSelect
+              chargeBoxId={chargeBoxId}
+              connectorTypeOverride={connectorTypeOverride}
+              maxKwOverride={maxKwOverride}
+            />
+          )
+          : (
+            <>
+              <div class="flex items-center justify-between gap-2">
+                <dt class="text-muted-foreground">Connector type</dt>
+                <dd class="font-medium">
+                  {connectorTypeOverride ?? "—"}
+                </dd>
+              </div>
+              <div class="flex items-center justify-between gap-2">
+                <dt class="text-muted-foreground">Max kW</dt>
+                <dd class="font-medium">
+                  {maxKwOverride !== null ? `${maxKwOverride} kW` : "—"}
+                </dd>
+              </div>
+            </>
+          )}
 
         <div class="flex items-center justify-between gap-2">
           <dt class="text-muted-foreground">StEvE PK</dt>

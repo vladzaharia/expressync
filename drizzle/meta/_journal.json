@@ -288,6 +288,13 @@
       "when": 1777912480000,
       "tag": "0040_backfill_meta_tag_user_id",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1777996800000,
+      "tag": "0041_charger_connector_overrides",
+      "breakpoints": true
     }
   ]
 }

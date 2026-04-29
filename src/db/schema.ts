@@ -552,6 +552,15 @@ export const chargersCache = pgTable("chargers_cache", {
     .array()
     .notNull()
     .default(sql`ARRAY['charger']::text[]`),
+  /// Admin override for the connector type when StEvE doesn't
+  /// surface it (or surfaces it incorrectly). Pinned to the
+  /// canonical wire enum {ccs, j1772, nacs, chademo, type2} by a
+  /// CHECK constraint. Migration 0040.
+  connectorTypeOverride: text("connector_type_override"),
+  /// Admin override for the AC/DC kW rating when StEvE doesn't
+  /// surface it. Stored as numeric so values like 11.5 round-trip
+  /// without floating-point hash. Migration 0040.
+  maxKwOverride: numeric("max_kw_override", { precision: 6, scale: 2 }),
 }, (table) => [
   check(
     "chargers_cache_form_factor_check",
@@ -565,6 +574,16 @@ export const chargersCache = pgTable("chargers_cache", {
       AND NOT ('management' = ANY(${table.capabilities}))
       AND NOT ('tap' = ANY(${table.capabilities}))
       AND NOT ('ev' = ANY(${table.capabilities}))`,
+  ),
+  check(
+    "chargers_cache_connector_type_override_check",
+    sql`${table.connectorTypeOverride} IS NULL
+      OR ${table.connectorTypeOverride} IN ('ccs','j1772','nacs','chademo','type2')`,
+  ),
+  check(
+    "chargers_cache_max_kw_override_check",
+    sql`${table.maxKwOverride} IS NULL
+      OR (${table.maxKwOverride} > 0 AND ${table.maxKwOverride} <= 1000)`,
   ),
   index("idx_chargers_cache_last_seen").on(table.lastSeenAt.desc()),
 ]);
