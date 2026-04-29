@@ -31,20 +31,28 @@
  *     customerName: string | null;
  *     kwh: number | null;
  *     kw: number | null;
+ *     amps: number | null;       // derived from kW (240V), whole amps
+ *     maxAmps: number | null;    // plan `ev.max_amps` cap
  *     elapsedSec: number | null;
  *     connectorId: number | null;
  *   } | null
  */
 
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { define } from "../../../../../utils.ts";
 import { db } from "../../../../../src/db/index.ts";
 import {
+  lagoPlans,
+  lagoSubscriptions,
   syncedTransactionEvents,
   userMappings,
 } from "../../../../../src/db/schema.ts";
 import { steveClient } from "../../../../../src/lib/steve-client.ts";
 import type { StEvETransaction } from "../../../../../src/lib/types/steve.ts";
+import {
+  derivePlanChargingEntitlements,
+  type LagoPlan,
+} from "../../../../../src/lib/types/lago.ts";
 import {
   CapabilityDeniedError,
   requireCapability,
@@ -80,6 +88,14 @@ export interface ChargerSession {
   customerName: string | null;
   kwh: number | null;
   kw: number | null;
+  /// Whole-amp current draw, derived from kW assuming 240V single-phase
+  /// (`kw * 1000 / 240`, rounded). Surfaced server-side so iOS doesn't
+  /// re-implement the same arithmetic.
+  amps: number | null;
+  /// Customer's plan max-amps cap (`ev.max_amps` Lago entitlement).
+  /// `null` when no active subscription, no plan, or the privilege is
+  /// not set on the plan.
+  maxAmps: number | null;
   elapsedSec: number | null;
   connectorId: number | null;
 }
@@ -121,9 +137,22 @@ function mapStatus(
 type ActiveTxnFinder = (
   chargeBoxId: string,
 ) => Promise<StEvETransaction | null>;
+/// Customer enrichment for the active session: display label + the
+/// active subscription external ID we'll use to resolve plan
+/// entitlements (max amps, ramped charge).
+interface CustomerInfo {
+  label: string | null;
+  lagoSubscriptionExternalId: string | null;
+}
 type CustomerLabelLoader = (
   ocppTagPk: number,
-) => Promise<string | null>;
+) => Promise<CustomerInfo>;
+/// Loads the `max_amps` privilege from the customer's active plan.
+/// Returns `null` when no subscription, no plan, or the entitlement
+/// is not set.
+type PlanMaxAmpsLoader = (
+  lagoSubscriptionExternalId: string,
+) => Promise<number | null>;
 type MeterTotalsLoader = (steveTransactionId: number) => Promise<
   {
     kwh: number;
@@ -144,11 +173,45 @@ const defaultCustomerLabelLoader: CustomerLabelLoader = async (ocppTagPk) => {
     .select({
       displayName: userMappings.displayName,
       lagoCustomerExternalId: userMappings.lagoCustomerExternalId,
+      lagoSubscriptionExternalId: userMappings.lagoSubscriptionExternalId,
     })
     .from(userMappings)
     .where(eq(userMappings.steveOcppTagPk, ocppTagPk))
     .limit(1);
-  return row?.displayName ?? row?.lagoCustomerExternalId ?? null;
+  return {
+    label: row?.displayName ?? row?.lagoCustomerExternalId ?? null,
+    lagoSubscriptionExternalId: row?.lagoSubscriptionExternalId ?? null,
+  };
+};
+
+const defaultPlanMaxAmpsLoader: PlanMaxAmpsLoader = async (
+  lagoSubscriptionExternalId,
+) => {
+  // Subscription → plan code → plan payload → derive entitlements.
+  const [sub] = await db
+    .select({ planCode: lagoSubscriptions.planCode })
+    .from(lagoSubscriptions)
+    .where(
+      and(
+        eq(lagoSubscriptions.externalId, lagoSubscriptionExternalId),
+        isNull(lagoSubscriptions.deletedAt),
+      ),
+    )
+    .limit(1);
+  if (!sub?.planCode) return null;
+  const [plan] = await db
+    .select({ payload: lagoPlans.payload })
+    .from(lagoPlans)
+    .where(
+      and(
+        eq(lagoPlans.code, sub.planCode),
+        isNull(lagoPlans.deletedAt),
+      ),
+    )
+    .limit(1);
+  if (!plan?.payload) return null;
+  const ents = derivePlanChargingEntitlements(plan.payload as LagoPlan);
+  return ents.maxAmps;
 };
 
 const defaultMeterTotalsLoader: MeterTotalsLoader = async (
@@ -184,6 +247,7 @@ const defaultMeterTotalsLoader: MeterTotalsLoader = async (
 let activeTxnFinder: ActiveTxnFinder = defaultActiveTxnFinder;
 let customerLabelLoader: CustomerLabelLoader = defaultCustomerLabelLoader;
 let meterTotalsLoader: MeterTotalsLoader = defaultMeterTotalsLoader;
+let planMaxAmpsLoader: PlanMaxAmpsLoader = defaultPlanMaxAmpsLoader;
 type ChargerLoader = (chargerId: string) => Promise<ChargerRow | null>;
 let chargerLoader: ChargerLoader = (id) => loadChargerRow(id);
 
@@ -202,6 +266,11 @@ export function _setMeterTotalsLoaderForTests(
 ): void {
   meterTotalsLoader = fn ?? defaultMeterTotalsLoader;
 }
+export function _setPlanMaxAmpsLoaderForTests(
+  fn: PlanMaxAmpsLoader | null,
+): void {
+  planMaxAmpsLoader = fn ?? defaultPlanMaxAmpsLoader;
+}
 export function _setChargerLoaderForTests(fn: ChargerLoader | null): void {
   chargerLoader = fn ?? ((id) => loadChargerRow(id));
 }
@@ -209,6 +278,7 @@ export function _resetSessionTestSeams(): void {
   activeTxnFinder = defaultActiveTxnFinder;
   customerLabelLoader = defaultCustomerLabelLoader;
   meterTotalsLoader = defaultMeterTotalsLoader;
+  planMaxAmpsLoader = defaultPlanMaxAmpsLoader;
   chargerLoader = (id) => loadChargerRow(id);
 }
 
@@ -281,7 +351,7 @@ export const handler = define.handlers({
       ? Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000))
       : null;
 
-    const customerName = await customerLabelLoader(active.ocppTagPk);
+    const customerInfo = await customerLabelLoader(active.ocppTagPk);
     const totals = await meterTotalsLoader(active.id);
 
     let kw: number | null = null;
@@ -299,15 +369,40 @@ export const handler = define.handlers({
       if (!Number.isFinite(kw)) kw = null;
     }
 
+    // Whole-amp current draw assuming 240V single-phase. Computed once
+    // server-side so iOS and the admin page render the same number.
+    const amps = kw !== null && kw > 0
+      ? Math.round((kw * 1000) / 240)
+      : null;
+
+    // Plan-level max-amps cap (`ev.max_amps` Lago entitlement). A
+    // failed lookup is non-fatal — the iOS UI will simply hide the
+    // "/N A" suffix when this is null.
+    let maxAmps: number | null = null;
+    if (customerInfo.lagoSubscriptionExternalId) {
+      try {
+        maxAmps = await planMaxAmpsLoader(
+          customerInfo.lagoSubscriptionExternalId,
+        );
+      } catch (err) {
+        log.warn("Plan max-amps lookup failed; omitting from response", {
+          chargerId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     const session: ChargerSession = {
       chargerId,
       sessionId: String(active.id),
       state,
       startedAt: startedAtIso,
       idTag: active.ocppIdTag,
-      customerName,
+      customerName: customerInfo.label,
       kwh: totals ? totals.kwh : null,
       kw: kw !== null ? Number(kw.toFixed(2)) : null,
+      amps,
+      maxAmps,
       elapsedSec,
       connectorId: active.connectorId,
     };

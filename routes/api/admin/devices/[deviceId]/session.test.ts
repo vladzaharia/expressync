@@ -137,7 +137,9 @@ Deno.test({
         stopReason: null,
       })
     );
-    _setCustomerLabelLoaderForTests(() => Promise.resolve("Alice"));
+    _setCustomerLabelLoaderForTests(() =>
+      Promise.resolve({ label: "Alice", lagoSubscriptionExternalId: null })
+    );
     _setMeterTotalsLoaderForTests(() =>
       Promise.resolve({ kwh: 5.0, lastSyncedAt: new Date() })
     );
