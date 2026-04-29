@@ -20,6 +20,7 @@
 import { Separator } from "@/components/ui/separator.tsx";
 import { type AccentColor, stripToneClasses } from "@/src/lib/colors.ts";
 import { cn } from "@/src/lib/utils/cn.ts";
+import { PlanName } from "@/components/customer/PlanName.tsx";
 
 export interface PlanTier {
   /**
@@ -121,7 +122,7 @@ export function PlanInfoCard(
         <p class="text-xs uppercase tracking-wide text-muted-foreground">
           Plan
         </p>
-        <p class="text-lg font-semibold leading-tight">{plan.name}</p>
+        <PlanName name={plan.name} className="text-lg leading-tight" />
       </div>
 
       {(plan.monthlyCharge != null && plan.monthlyCharge > 0) ||

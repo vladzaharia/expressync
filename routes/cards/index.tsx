@@ -1,23 +1,27 @@
 /**
- * Polaris Track G2 — customer Cards list (`/cards`).
+ * Customer EV Cards list (`/cards`).
  *
- * Listing-page anatomy from the plan with one tweak: cards render as a grid
- * of SectionCards instead of a PaginatedTable (small N per customer, more
- * visual). Per plan:
- *   StatStrip(accent=cyan) — Active | Inactive (clickable) | Total Sessions
- *                            | Last Used
- *   EmptyState(accent=cyan, icon=CreditCard) when no cards
+ * Source of truth is StEvE — fetch the live OCPP tag roster and intersect
+ * with this user's `user_mappings` rows (by `steveOcppTagPk`). That mirrors
+ * the admin EV Cards page (`routes/admin/tags/index.tsx`) and makes
+ * deleted-from-StEvE tags fall out automatically without needing a cleanup
+ * pass on `user_mappings`.
  *
- * Loader: scoped via `resolveCustomerScope`. Stats roll up the same
- * mappings the API endpoint returns so numbers match what the user sees in
- * each tile.
+ * Meta-tags (the auto-managed `OCPP-{externalId}` parents) are hidden
+ * unconditionally — customers can't act on them and they exist purely to
+ * enable remote-start when no physical card is present. No escape hatch.
+ *
+ * Loader: scoped via `resolveCustomerScope`. Stats and the filtered grid
+ * derive from the same intersected card set so numbers always match.
  */
 
 import { define } from "../../utils.ts";
-import { count, desc, eq, max, sum } from "drizzle-orm";
+import { count, desc, eq, inArray, max, sum } from "drizzle-orm";
 import { db } from "../../src/db/index.ts";
 import * as schema from "../../src/db/schema.ts";
 import { resolveCustomerScope } from "../../src/lib/scoping.ts";
+import { steveClient } from "../../src/lib/steve-client.ts";
+import { isMetaTag } from "../../src/lib/tag-hierarchy.ts";
 import { config } from "../../src/lib/config.ts";
 import { SidebarLayout } from "../../components/SidebarLayout.tsx";
 import { PageCard } from "../../components/PageCard.tsx";
@@ -47,6 +51,11 @@ export const handler = define.handlers({
 
     let allCards: CustomerCard[] = [];
     if (scope.mappingIds.length > 0) {
+      // Live StEvE roster is the ground truth. Tags deleted in StEvE drop
+      // out of this set even if their `user_mappings` row lingers.
+      const ocppTags = await steveClient.getOcppTags().catch(() => []);
+      const livePkSet = new Set(ocppTags.map((t) => t.ocppTagPk));
+
       const rows = await db
         .select({
           id: schema.userMappings.id,
@@ -68,30 +77,28 @@ export const handler = define.handlers({
             schema.userMappings.id,
           ),
         )
-        .where(
-          eq(
-            schema.userMappings.userId,
-            ctx.state.actingAs ?? ctx.state.user!.id,
-          ),
-        )
+        .where(inArray(schema.userMappings.id, scope.mappingIds))
         .groupBy(schema.userMappings.id)
         .orderBy(
           desc(schema.userMappings.isActive),
           desc(schema.userMappings.createdAt),
         );
 
-      allCards = rows.map((r) => ({
-        id: r.id,
-        displayName: r.displayName ?? null,
-        ocppTagId: r.steveOcppIdTag,
-        ocppTagPk: r.steveOcppTagPk,
-        tagType: r.tagType,
-        isActive: !!r.isActive,
-        createdAt: r.createdAt?.toISOString() ?? null,
-        sessionCount: Number(r.sessionCount ?? 0),
-        lastUsedAt: r.lastUsedAt ? r.lastUsedAt.toISOString() : null,
-        totalKwh: r.totalKwh ? Number(r.totalKwh) : 0,
-      }));
+      allCards = rows
+        .filter((r) => livePkSet.has(r.steveOcppTagPk)) // drop StEvE-orphans
+        .filter((r) => !isMetaTag(r.steveOcppIdTag))   // hide meta-tags
+        .map((r) => ({
+          id: r.id,
+          displayName: r.displayName ?? null,
+          ocppTagId: r.steveOcppIdTag,
+          ocppTagPk: r.steveOcppTagPk,
+          tagType: r.tagType,
+          isActive: !!r.isActive,
+          createdAt: r.createdAt?.toISOString() ?? null,
+          sessionCount: Number(r.sessionCount ?? 0),
+          lastUsedAt: r.lastUsedAt ? r.lastUsedAt.toISOString() : null,
+          totalKwh: r.totalKwh ? Number(r.totalKwh) : 0,
+        }));
     }
 
     // Stats are computed against the FULL card set (so the strip matches
@@ -145,8 +152,8 @@ export default define.page<typeof handler>(
       ? formatRelative(stats.lastUsedAt)
       : "Never";
     const description = data.totalCards === 0
-      ? "Cards your operator linked to your account will appear here."
-      : `${data.totalCards} card${data.totalCards === 1 ? "" : "s"}`;
+      ? "EV Cards your operator linked to your account will appear here."
+      : `${data.totalCards} EV Card${data.totalCards === 1 ? "" : "s"}`;
 
     return (
       <SidebarLayout
@@ -156,7 +163,7 @@ export default define.page<typeof handler>(
         role="customer"
       >
         <PageCard
-          title="Your cards"
+          title="Your EV Cards"
           description={description}
           colorScheme="cyan"
         >
@@ -204,8 +211,8 @@ export default define.page<typeof handler>(
                 ? (
                   <EmptyState
                     icon={CreditCard}
-                    title="No cards linked yet"
-                    description="Contact your operator to get a card linked to your account."
+                    title="No EV Cards linked yet"
+                    description="Contact your operator to get an EV Card linked to your account."
                     accent="cyan"
                     primaryAction={{
                       label: "Contact operator",
@@ -217,11 +224,11 @@ export default define.page<typeof handler>(
                 : (
                   <EmptyState
                     icon={CreditCard}
-                    title="No matching cards"
-                    description="Try clearing the filters above to see all cards on your account."
+                    title="No matching EV Cards"
+                    description="Try clearing the filters above to see all EV Cards on your account."
                     accent="cyan"
                     primaryAction={{
-                      label: "Show all cards",
+                      label: "Show all EV Cards",
                       href: "/cards",
                     }}
                   />

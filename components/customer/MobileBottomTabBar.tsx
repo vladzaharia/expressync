@@ -2,7 +2,7 @@
  * MobileBottomTabBar — fixed 64px bottom navigation bar for the customer
  * mobile shell. Hidden at `md+` (the desktop sidebar takes over).
  *
- * Four tabs: Sessions, Reservations, Cards, Billing — driven by
+ * Five tabs: Sessions, Reservations, EV Cards, Subscription, Billing — driven by
  * `getCustomerBottomTabs()` so the source of truth lives in one file.
  * (Dashboard used to be the fifth tab but was moved onto the logo's home
  * link to declutter the nav.)
@@ -41,7 +41,7 @@ export function MobileBottomTabBar({ currentPath }: Props) {
       )}
       aria-label="Customer primary"
     >
-      <ul class="grid h-16 grid-cols-4">
+      <ul class="grid h-16 grid-cols-5">
         {tabs.map((tab) => (
           <li key={tab.id} class="contents">
             <BottomTab
