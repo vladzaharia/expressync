@@ -22,10 +22,6 @@ export const PRIVACY_CARDS: LegalCard[] = [
       "We collect what we need to charge your EV and bill you. Nothing more. We don't sell your data.",
     body:
       "ExpressCharge is built and run by Polaris Express. This policy covers what data we collect when you use example.com, the ExpressCharge iOS app, or charge at one of our stations — and what you can do about it.\n\nWe don't sell your data. We don't hand it to advertisers. We don't run third-party analytics or trackers.",
-    bullets: [
-      "Operated by Polaris Express",
-      "Effective from 2026-05-06",
-    ],
   },
   {
     id: "who-this-applies-to",
