@@ -1,6 +1,15 @@
 /**
  * Charge Box Details page (`/chargers/[chargeBoxId]`).
  *
+ * URL rename in flight: the canonical device URL is
+ * `/admin/devices/<id>` for both scanners and chargers. Outbound links
+ * (DeviceCard "View", NewUnmanagedChargerForm success redirect, the
+ * customer-host `/c/<id>` admin redirect) all point at the canonical
+ * URL; `/admin/devices/[deviceId].tsx` 307s charger ids here for the
+ * actual render. The follow-up consolidation moves this file's loader
+ * + page into `[deviceId].tsx` and replaces this file with a 308 — at
+ * which point all the outbound links land in one place with no hop.
+ *
  * Rebuild scope (see plan `polaris-express-is-an-streamed-crown.md`):
  *   - Header strip (friendlyName + chargeBoxId + status pills)
  *   - Identity card (island) + live-status card (island), 1+2 split at lg:
@@ -49,9 +58,14 @@ import ChargerOperationLogTable, {
 } from "../../../islands/ChargerOperationLogTable.tsx";
 import RemoteActionsPanel from "../../../islands/charger-actions/RemoteActionsPanel.tsx";
 import { SectionCard } from "../../../components/shared/SectionCard.tsx";
-import { ClipboardList, Settings2 } from "lucide-preact";
+import { ClipboardList, MapPin, Settings2, Sticker } from "lucide-preact";
 import AppConfigurationForm from "../../../islands/devices/AppConfigurationForm.tsx";
 import type { DeviceCapability } from "../../../src/lib/types/devices.ts";
+import {
+  DUMB_CHARGER_HEADLINE,
+  DUMB_CHARGER_STEPS,
+  DUMB_CHARGER_TAGLINE,
+} from "../../../src/lib/content/dumb-charger-instructions.ts";
 
 // ---------------------------------------------------------------------------
 // Loader DTO
@@ -96,6 +110,13 @@ interface ChargerDetailLoaderData {
     // doesn't surface them (or surfaces them incorrectly).
     connectorTypeOverride: string | null;
     maxKwOverride: number | null;
+
+    // Migration 0043 — non-OCPP "unmanaged" chargers (Tesla Wall
+    // Connectors etc.). When `managementMode === 'unmanaged'` the page
+    // renders an entirely separate, leaner layout that hides every
+    // OCPP-derived section.
+    managementMode: "ocpp" | "unmanaged";
+    locationDescription: string | null;
   };
   connectors: ConnectorDto[];
   recentTransactions: ChargerRecentTxRow[];
@@ -182,45 +203,71 @@ export const handler = define.handlers({
       };
     }
 
+    // Migration 0043: unmanaged chargers don't speak OCPP, so StEvE and
+    // the operation log will always be empty for them. Skip the network
+    // calls entirely — they'd just produce 90s timeouts.
+    const isUnmanaged = cacheRow.managementMode === "unmanaged";
+
     // 2. Parallel pulls — allSettled so the page renders even when StEvE or
-    //    the operation log query hiccups.
+    //    the operation log query hiccups. For unmanaged chargers we
+    //    short-circuit with empty fulfilled results.
     const [
       txActiveSettled,
       txRecentSettled,
       opLogSettled,
-    ] = await Promise.allSettled([
-      steveClient.getTransactions({
-        chargeBoxId,
-        type: "ACTIVE",
-        periodType: "ALL",
-      }),
-      steveClient.getTransactions({
-        chargeBoxId,
-        type: "ALL",
-        periodType: "LAST_30",
-      }),
-      db
-        .select({
-          id: schema.chargerOperationLog.id,
-          operation: schema.chargerOperationLog.operation,
-          params: schema.chargerOperationLog.params,
-          status: schema.chargerOperationLog.status,
-          taskId: schema.chargerOperationLog.taskId,
-          result: schema.chargerOperationLog.result,
-          createdAt: schema.chargerOperationLog.createdAt,
-          completedAt: schema.chargerOperationLog.completedAt,
-          requestedByUserId: schema.chargerOperationLog.requestedByUserId,
-          requestedByEmail: schema.users.email,
-        })
-        .from(schema.chargerOperationLog)
-        .leftJoin(
-          schema.users,
-          eq(schema.chargerOperationLog.requestedByUserId, schema.users.id),
-        )
-        .where(eq(schema.chargerOperationLog.chargeBoxId, chargeBoxId))
-        .orderBy(desc(schema.chargerOperationLog.createdAt))
-        .limit(50),
-    ]);
+    ] = isUnmanaged
+      ? [
+        { status: "fulfilled" as const, value: [] as StEvETransaction[] },
+        { status: "fulfilled" as const, value: [] as StEvETransaction[] },
+        {
+          status: "fulfilled" as const,
+          value: [] as Array<{
+            id: number;
+            operation: string;
+            params: unknown;
+            status: string;
+            taskId: number | null;
+            result: unknown;
+            createdAt: Date | null;
+            completedAt: Date | null;
+            requestedByUserId: string | null;
+            requestedByEmail: string | null;
+          }>,
+        },
+      ]
+      : await Promise.allSettled([
+        steveClient.getTransactions({
+          chargeBoxId,
+          type: "ACTIVE",
+          periodType: "ALL",
+        }),
+        steveClient.getTransactions({
+          chargeBoxId,
+          type: "ALL",
+          periodType: "LAST_30",
+        }),
+        db
+          .select({
+            id: schema.chargerOperationLog.id,
+            operation: schema.chargerOperationLog.operation,
+            params: schema.chargerOperationLog.params,
+            status: schema.chargerOperationLog.status,
+            taskId: schema.chargerOperationLog.taskId,
+            result: schema.chargerOperationLog.result,
+            createdAt: schema.chargerOperationLog.createdAt,
+            completedAt: schema.chargerOperationLog.completedAt,
+            requestedByUserId: schema.chargerOperationLog.requestedByUserId,
+            requestedByEmail: schema.users.email,
+          })
+          .from(schema.chargerOperationLog)
+          .leftJoin(
+            schema.users,
+            eq(schema.chargerOperationLog.requestedByUserId, schema.users.id),
+          )
+          .where(eq(schema.chargerOperationLog.chargeBoxId, chargeBoxId))
+          .orderBy(desc(schema.chargerOperationLog.createdAt))
+          .limit(50),
+      ]);
 
     const txActive = txActiveSettled.status === "fulfilled"
       ? txActiveSettled.value
@@ -432,6 +479,10 @@ export const handler = define.handlers({
         uiStatus,
         isStale,
         isOffline,
+        managementMode: cacheRow.managementMode === "unmanaged"
+          ? "unmanaged"
+          : "ocpp",
+        locationDescription: cacheRow.locationDescription,
       },
       connectors,
       recentTransactions,
@@ -476,6 +527,22 @@ export default define.page<typeof handler>(
     }
 
     const displayName = charger.friendlyName ?? charger.chargeBoxId;
+
+    // Migration 0043 — unmanaged chargers (Tesla Wall Connectors etc.)
+    // render an entirely different, leaner page. None of the OCPP-derived
+    // sections (live status, connectors, recent transactions, operation
+    // audit, configuration, remote actions) are reachable from this branch
+    // because the components aren't even imported into the DOM here.
+    if (charger.managementMode === "unmanaged") {
+      return (
+        <UnmanagedChargerDetailLayout
+          url={url}
+          state={state}
+          charger={charger}
+          displayName={displayName}
+        />
+      );
+    }
 
     const activeSessionForLive = data.activeSessions[0]
       ? {
@@ -615,3 +682,128 @@ export default define.page<typeof handler>(
     );
   },
 );
+
+// ---------------------------------------------------------------------------
+// Unmanaged charger layout (Migration 0043)
+// ---------------------------------------------------------------------------
+
+type UnmanagedCharger = NonNullable<ChargerDetailLoaderData["charger"]>;
+
+function UnmanagedChargerDetailLayout(
+  { url, state, charger, displayName }: {
+    url: URL;
+    // deno-lint-ignore no-explicit-any
+    state: any;
+    charger: UnmanagedCharger;
+    displayName: string;
+  },
+) {
+  // Customer surface — admins don't scan stickers. The AASA file is
+  // served from both surfaces, so the iOS app intercepts the customer
+  // URL via universal-link regardless of which host fielded the AASA
+  // request originally.
+  const universalLink = `https://example.com/c/${charger.chargeBoxId}`;
+  return (
+    <SidebarLayout
+      currentPath={url.pathname}
+      user={state.user}
+      accentColor="orange"
+    >
+      <PageCard
+        title={displayName}
+        description="Unmanaged charger — no OCPP connection. Customers tap the sticker to land on a public 'just plug in' page."
+        colorScheme="orange"
+      >
+        <div class="flex flex-col gap-6">
+          {/* Lightweight header strip — two pills, no connector roll-up */}
+          <div class="flex flex-wrap items-center gap-2 text-sm">
+            <span class="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+              Free
+            </span>
+            <span class="inline-flex items-center gap-1 rounded-full border border-slate-500/30 bg-slate-500/10 px-2 py-0.5 text-xs font-medium text-slate-700 dark:text-slate-300">
+              Unmanaged
+            </span>
+            <span class="ml-2 truncate font-mono text-xs text-muted-foreground">
+              {charger.chargeBoxId}
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <SectionCard title="Identity" accent="orange" icon={MapPin}>
+              <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <dt class="text-xs uppercase tracking-wide text-muted-foreground">
+                    Friendly name
+                  </dt>
+                  <dd class="mt-1 font-medium">
+                    {charger.friendlyName ?? "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-xs uppercase tracking-wide text-muted-foreground">
+                    Charger ID
+                  </dt>
+                  <dd class="mt-1 font-mono text-xs">{charger.chargeBoxId}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs uppercase tracking-wide text-muted-foreground">
+                    Form factor
+                  </dt>
+                  <dd class="mt-1">{charger.formFactor}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs uppercase tracking-wide text-muted-foreground">
+                    Added
+                  </dt>
+                  <dd class="mt-1">
+                    {new Date(charger.firstSeenAtIso).toLocaleString()}
+                  </dd>
+                </div>
+                {charger.locationDescription && (
+                  <div class="sm:col-span-2">
+                    <dt class="text-xs uppercase tracking-wide text-muted-foreground">
+                      Location
+                    </dt>
+                    <dd class="mt-1 whitespace-pre-line">
+                      {charger.locationDescription}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </SectionCard>
+
+            <SectionCard title="Scan codes" accent="orange" icon={Sticker}>
+              <p class="text-sm text-muted-foreground">
+                Print and affix this URL to the charger as a QR or NFC sticker.
+                iOS opens the app directly when installed; everyone else lands
+                on a public "plug in and charge" page.
+              </p>
+              <div class="mt-3 rounded-md border bg-muted/40 p-3">
+                <code class="break-all text-xs">{universalLink}</code>
+              </div>
+              <p class="mt-3 text-xs text-muted-foreground">
+                QR generation lands in a follow-up; for now, paste the URL into
+                your sticker tooling of choice.
+              </p>
+            </SectionCard>
+          </div>
+
+          <SectionCard title="User instructions preview" accent="orange">
+            <p class="text-xs uppercase tracking-wide text-muted-foreground">
+              What customers see when they scan the sticker
+            </p>
+            <h3 class="mt-2 text-base font-semibold">
+              {DUMB_CHARGER_HEADLINE}
+            </h3>
+            <ol class="mt-3 list-decimal space-y-1 pl-6 text-sm">
+              {DUMB_CHARGER_STEPS.map((step) => <li key={step}>{step}</li>)}
+            </ol>
+            <p class="mt-3 text-sm text-muted-foreground">
+              {DUMB_CHARGER_TAGLINE}
+            </p>
+          </SectionCard>
+        </div>
+      </PageCard>
+    </SidebarLayout>
+  );
+}

@@ -564,10 +564,25 @@ export const chargersCache = pgTable("chargers_cache", {
   /// surface it. Stored as numeric so values like 11.5 round-trip
   /// without floating-point hash. Migration 0040.
   maxKwOverride: numeric("max_kw_override", { precision: 6, scale: 2 }),
+  /// Distinguishes OCPP-managed chargers (the StEvE-synced default) from
+  /// "unmanaged" chargers like Tesla Wall Connectors that don't speak
+  /// OCPP. Unmanaged rows are admin-created via /admin/devices/new-unmanaged
+  /// and are skipped by every StEvE sync code path. Pinned to {ocpp,
+  /// unmanaged} by a CHECK. Migration 0043.
+  managementMode: text("management_mode").notNull().default("ocpp"),
+  /// Free-text location ("North lot, level 2") shown on the customer-
+  /// facing web fallback and the admin detail page for unmanaged
+  /// chargers. Stays null for OCPP chargers — they get their location
+  /// from StEvE. Migration 0043.
+  locationDescription: text("location_description"),
 }, (table) => [
   check(
     "chargers_cache_form_factor_check",
     sql`${table.formFactor} IN ('wallbox','pulsar','commander','wall_mount','generic')`,
+  ),
+  check(
+    "chargers_cache_management_mode_check",
+    sql`${table.managementMode} IN ('ocpp','unmanaged')`,
   ),
   check(
     "chargers_cache_capabilities_invariants_check",

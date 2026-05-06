@@ -74,6 +74,11 @@ const ChargerRowSchema = z.object({
    *  Chargers list reads this to render the NFC pill on rows that
    *  include `"scanner"`. */
   capabilities: z.array(z.string()),
+  /** Distinguishes OCPP-managed chargers from "unmanaged" ones (Tesla
+   *  Wall Connectors etc.) that don't speak OCPP. Optional on the wire
+   *  for back-compat with older app builds — they ignore the field and
+   *  treat every charger as OCPP. */
+  managementMode: z.enum(["ocpp", "unmanaged"]).optional(),
 }).strict();
 
 const ResponseSchema = z.object({
@@ -95,6 +100,7 @@ type ViewRow = {
   capabilities?: string[] | null;
   connector_type_override: string | null;
   max_kw_override: string | null;
+  management_mode: string | null;
 };
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -206,7 +212,8 @@ const defaultLoader: ChargerListLoader = async () => {
       cc.form_factor,
       cc.capabilities,
       cc.connector_type_override,
-      cc.max_kw_override
+      cc.max_kw_override,
+      cc.management_mode
     FROM tappable_devices tv
     LEFT JOIN chargers_cache cc
       ON tv.kind = 'charger' AND cc.charge_box_id = tv.id
@@ -271,6 +278,7 @@ export const handler = define.handlers({
         // partially-migrated row can't drop the auto-managed cap.
         const caps = new Set(r.capabilities ?? []);
         caps.add("charger");
+        const isUnmanaged = r.management_mode === "unmanaged";
         return {
           chargerId: r.id,
           label: r.friendly_name ?? r.label,
@@ -283,7 +291,13 @@ export const handler = define.handlers({
           // when no override is set; iOS renders `—` in that case.
           connectorType: normalizeConnectorType(r.connector_type_override),
           maxKw: parseMaxKw(r.max_kw_override),
-          state: mapChargerState(r.last_status, toMs(r.last_status_at), now),
+          // Unmanaged chargers don't send OCPP heartbeats, so
+          // `mapChargerState` would always return 'offline' (zombie row).
+          // Force 'idle' instead — they're physically ready, just not
+          // tracked. Migration 0043.
+          state: isUnmanaged
+            ? "idle"
+            : mapChargerState(r.last_status, toMs(r.last_status_at), now),
           // The wire field is named `lastSeenAt` for backward
           // compatibility, but it's the time we last received a real
           // OCPP status from the charger. The cache's `last_seen_at`
@@ -291,6 +305,10 @@ export const handler = define.handlers({
           // exposing that one would lie to the client.
           lastSeenAt: toIso(r.last_status_at),
           capabilities: Array.from(caps),
+          // Optional on the wire — older builds ignore the field. We
+          // only emit it when explicitly known to keep the response
+          // tight; absence is equivalent to 'ocpp' on the iOS side.
+          ...(isUnmanaged ? { managementMode: "unmanaged" as const } : {}),
         };
       });
 

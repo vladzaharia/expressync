@@ -98,6 +98,13 @@ export interface ChargerCardDto {
    *  pills so the Devices listing has the same vocabulary on both
    *  charger and scanner cards. */
   capabilities: string[];
+  /** Distinguishes OCPP-managed chargers from "unmanaged" ones (Tesla
+   *  Wall Connectors etc.). Migration 0043. Defaults to `'ocpp'` server-
+   *  side; absent in older serialised DTOs is treated as `'ocpp'`. */
+  managementMode?: "ocpp" | "unmanaged";
+  /** Free-text location for unmanaged chargers (admin-entered). Null
+   *  for OCPP chargers. */
+  locationDescription?: string | null;
 }
 
 export interface ActiveSessionDto {
@@ -315,6 +322,7 @@ function ChargerBody(
   const isCharging = status === "Charging";
   const formFactorLabel = FORM_FACTOR_LABEL[charger.formFactor] ??
     charger.formFactor;
+  const isUnmanaged = charger.managementMode === "unmanaged";
 
   const postOperation = async (
     operation: string,
@@ -451,6 +459,12 @@ function ChargerBody(
             row feel busier than the scanner pills row. */
         }
         <PillRow>
+          {isUnmanaged && (
+            <>
+              <StatusPill tone="emerald">Free</StatusPill>
+              <StatusPill tone="slate">Unmanaged</StatusPill>
+            </>
+          )}
           <StatusPill tone="slate">
             {formatFormFactor(formFactorLabel)}
           </StatusPill>
@@ -462,7 +476,9 @@ function ChargerBody(
         {/* Primary status line — full-width */}
         <div class="text-xs">
           <span class="text-muted-foreground">Activity:</span>{" "}
-          <span class="font-medium">{activityLine}</span>
+          <span class="font-medium">
+            {isUnmanaged ? "No OCPP connection" : activityLine}
+          </span>
         </div>
 
         {/* Metric grid */}
@@ -483,57 +499,79 @@ function ChargerBody(
 
         <Divider />
 
-        {/* Actions — same shape as scanner: [primary] [secondary] [admin ml-auto] */}
-        <div class="flex items-center gap-2">
-          {isCharging
-            ? (
+        {
+          /* Actions — same shape as scanner: [primary] [secondary] [admin ml-auto].
+            Unmanaged chargers collapse to a single "View" link because no remote
+            actions are meaningful (no OCPP). */
+        }
+        {isUnmanaged
+          ? (
+            <div class="flex items-center gap-2">
+              <Button size="sm" variant="outline" asChild>
+                {
+                  /* Canonical device URL — same shape as scanner cards.
+                    Currently 307s to `/admin/chargers/<id>` for chargers
+                    until that rename consolidation lands. */
+                }
+                <a href={`/admin/devices/${charger.chargeBoxId}`}>
+                  <Eye class="size-4" />
+                  View
+                </a>
+              </Button>
+            </div>
+          )
+          : (
+            <div class="flex items-center gap-2">
+              {isCharging
+                ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    class="text-rose-600 hover:bg-rose-500/10 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-400"
+                    onClick={handleStop}
+                    disabled={pendingStop || !activeSession}
+                  >
+                    <StopCircle class="size-4" />
+                    {pendingStop ? "Stopping…" : "Stop"}
+                  </Button>
+                )
+                : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                    aria-label={refreshing
+                      ? "Refreshing…"
+                      : "Refresh status from StEvE"}
+                  >
+                    <RefreshCw
+                      class={cn("size-4", refreshing && "animate-spin")}
+                    />
+                    Refresh
+                  </Button>
+                )}
               <Button
                 size="sm"
                 variant="outline"
-                class="text-rose-600 hover:bg-rose-500/10 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-400"
-                onClick={handleStop}
-                disabled={pendingStop || !activeSession}
+                onClick={() => setReserveOpen(true)}
               >
-                <StopCircle class="size-4" />
-                {pendingStop ? "Stopping…" : "Stop"}
+                <CalendarClock class="size-4" />
+                Reserve
               </Button>
-            )
-            : (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleRefresh}
-                disabled={refreshing}
-                aria-label={refreshing
-                  ? "Refreshing…"
-                  : "Refresh status from StEvE"}
-              >
-                <RefreshCw
-                  class={cn("size-4", refreshing && "animate-spin")}
-                />
-                Refresh
-              </Button>
-            )}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setReserveOpen(true)}
-          >
-            <CalendarClock class="size-4" />
-            Reserve
-          </Button>
-          {isAdmin && (
-            <Button
-              size="sm"
-              variant="outline"
-              class="ml-auto text-rose-600 hover:bg-rose-500/10 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-400"
-              onClick={() => setUnlockConfirmOpen(true)}
-            >
-              <Lock class="size-4" />
-              Unlock
-            </Button>
+              {isAdmin && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  class="ml-auto text-rose-600 hover:bg-rose-500/10 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-400"
+                  onClick={() => setUnlockConfirmOpen(true)}
+                >
+                  <Lock class="size-4" />
+                  Unlock
+                </Button>
+              )}
+            </div>
           )}
-        </div>
       </CardShell>
 
       {reserveOpen && (

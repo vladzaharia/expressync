@@ -144,6 +144,12 @@ export async function refreshChargerCache(dbh: Db = defaultDb): Promise<{
         // admin-edited values (e.g. an admin toggled `'scanner'` on)
         // survive the next sync run. The CHECK constraint preserves
         // the `'charger'` invariant regardless.
+        // management_mode + location_description: also intentionally
+        // omitted. Unmanaged chargers (Tesla Wall Connectors etc.) are
+        // admin-created and never appear in StEvE's transaction or
+        // operation log, so `seen` won't include them and this UPDATE
+        // never fires for them. But if a chargeBoxId collision ever did
+        // happen, we'd still preserve the admin-set fields. Migration 0043.
       },
     });
 
