@@ -110,6 +110,7 @@ Deno.test({
       settings: {},
       scanStatus: { armed: false, pairingCode: null, expiresAt: null },
       pushToken: { last8: "abcdef12", environment: "production" },
+      needsPushToken: false,
       connectivity: {
         online: true,
         lastSyncAt: "2026-04-27T12:00:00.000Z",
@@ -124,6 +125,7 @@ Deno.test({
       "connectivity",
       "device",
       "kioskAllowed",
+      "needsPushToken",
       "ownerUser",
       "pushToken",
       "scanStatus",

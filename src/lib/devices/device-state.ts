@@ -76,6 +76,7 @@ export const DeviceStateSchema = z.object({
     last8: z.string(),
     environment: z.enum(["sandbox", "production"]),
   }).strict().nullable(),
+  needsPushToken: z.boolean(),
   connectivity: z.object({
     online: z.boolean(),
     lastSyncAt: z.string().nullable(),
@@ -286,6 +287,15 @@ export async function buildDeviceStateEnvelope(
   const lastStatus = (row.lastStatus ?? null) as Record<string, unknown> | null;
   const connectivity = deriveConnectivity(lastStatus, row.lastSeenAt);
 
+  // True when the device has granted push permission but hasn't delivered its
+  // APNs token to the server yet. The iOS app should respond by calling
+  // registerForRemoteNotifications() and PUT-ing the resulting token.
+  const ACTIVE_PUSH_PERMS = new Set(["authorized", "provisional", "ephemeral"]);
+  const storedPushPerm = lastStatus?.pushPermission;
+  const needsPushToken = pushToken === null &&
+    typeof storedPushPerm === "string" &&
+    ACTIVE_PUSH_PERMS.has(storedPushPerm);
+
   const displayName = (row.ownerName?.trim() || row.ownerEmail?.trim() ||
     row.ownerUserId).toString();
   const ownerRole: "admin" | "customer" = row.ownerRole === "admin"
@@ -321,6 +331,7 @@ export async function buildDeviceStateEnvelope(
     settings,
     scanStatus,
     pushToken,
+    needsPushToken,
     connectivity,
   };
 
