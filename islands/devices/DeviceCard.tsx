@@ -508,12 +508,7 @@ function ChargerBody(
           ? (
             <div class="flex items-center gap-2">
               <Button size="sm" variant="outline" asChild>
-                {
-                  /* Canonical device URL — same shape as scanner cards.
-                    Currently 307s to `/admin/chargers/<id>` for chargers
-                    until that rename consolidation lands. */
-                }
-                <a href={`/admin/devices/${charger.chargeBoxId}`}>
+                <a href={`/admin/chargers/${charger.chargeBoxId}`}>
                   <Eye class="size-4" />
                   View
                 </a>

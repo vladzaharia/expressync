@@ -7,12 +7,9 @@
  * Routing precedence (first match wins):
  *   1. iOS app installed → universal link intercepts via the `/c/*`
  *      AASA component; this handler is never reached.
- *   2. Logged-in admin → 302 to `/admin/devices/<id>` on the admin
+ *   2. Logged-in admin → 302 to `/admin/chargers/<id>` on the admin
  *      host. Admins don't want the public "plug in" view; they want
- *      to manage the charger. (`/admin/devices/<id>` is the canonical
- *      device URL across both scanners and chargers; for chargers it
- *      currently 307s on to `/admin/chargers/<id>` until that rename
- *      consolidation lands.)
+ *      to manage the charger.
  *   3. Everyone else (unauth'd customer, logged-in customer, Android,
  *      desktop, link share) → renders the public landing page.
  *
@@ -71,11 +68,7 @@ export const handler = define.handlers({
     // the DB lookup so a non-existent id still redirects predictably
     // to the admin not-found page (which is more useful for support).
     if (ctx.state.user?.role === "admin") {
-      // Canonical device URL — `/admin/devices/<id>` covers scanners and
-      // chargers alike. For chargers this currently 307s to
-      // `/admin/chargers/<id>` until the rename refactor lands; that
-      // hop is invisible to the user.
-      const target = `https://${ADMIN_HOST}/admin/devices/${
+      const target = `https://${ADMIN_HOST}/admin/chargers/${
         encodeURIComponent(chargerId)
       }`;
       return new Response(null, {
