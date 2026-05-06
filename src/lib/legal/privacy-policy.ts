@@ -6,6 +6,13 @@ export const PRIVACY_META: LegalDocumentMeta = {
   contactEmail: "privacy@example.com",
 };
 
+/**
+ * Card to render with extra emphasis at the top of the stack — same
+ * accent treatment the Terms agreement-gate gets. "At a Glance" is the
+ * one-paragraph summary of the policy and earns the visual weight.
+ */
+export const PRIVACY_GATE_ID = "at-a-glance";
+
 export const PRIVACY_CARDS: LegalCard[] = [
   {
     id: "at-a-glance",
@@ -52,9 +59,9 @@ export const PRIVACY_CARDS: LegalCard[] = [
     icon: "Zap",
     title: "Charging Sessions",
     summary:
-      "When you tap to charge, we record the session so we can bill you accurately.",
+      "When you charge — at a station or remotely from the app — we record the session so we can bill you accurately.",
     body:
-      "Each session is tied to the unique number on your card's RFID chip. We record which station and connector you used, when the session started and ended, and how many kilowatt-hours flowed.\n\nThose numbers feed our billing system to produce your invoice. The station's location is part of the station's setup — we don't derive it from your phone, and we don't collect your device's location. We hold session records as long as we need them for billing, disputes, and tax or accounting rules.",
+      "However the session starts (a tap of your charging card at the station, or a remote start from the app), we tie it to your registered card and account. We record which station and connector you used, when the session started and ended, and how many kilowatt-hours flowed.\n\nThose numbers feed our billing system to produce your invoice. The station's location is part of the station's setup — we don't derive it from your phone, and we don't collect your device's location. We hold session records as long as we need them for billing, disputes, and tax or accounting rules.",
   },
   {
     id: "reservations",
@@ -70,12 +77,12 @@ export const PRIVACY_CARDS: LegalCard[] = [
     icon: "Smartphone",
     title: "The iOS App",
     summary:
-      "The app reads your card and shows you the screen. It doesn't keep charging history on your phone.",
+      "The app is for managing your charging — starting sessions, watching them, and reviewing your account. Nothing about your charging is stored on your phone.",
     body:
-      "The ExpressCharge iOS app is a lightweight client. Your scan history, billing details, and charging sessions all live on our servers — not on your phone. The only thing the app stores locally is your sign-in credential, in the iOS Keychain.\n\nWhile the app is open, it sends us a short status update about once a minute so we know it's online and reachable for push notifications.",
+      "The ExpressCharge iOS app is a lightweight client. You can use it to start a charging session remotely, watch a session in real time, and review your usage and account details. The data you see comes from our servers — your charging history, billing details, and session records all live there, not on your phone.\n\nThe only thing the app stores on your device is your sign-in credential, in the iOS Keychain. While the app is open, it sends us a short status update about once a minute so we know it's online and reachable for push notifications.",
     bullets: [
       "What's in the status update: the name you gave the device, iPhone model and iOS version, the app version, the push-notification token Apple gives the app, your locale and timezone, battery level and state, thermal state, free disk space, NFC and notification permission states, and a last-seen timestamp",
-      "What we don't collect: location, contacts, photos, microphone, camera, advertising identifier, or any on-device scan history",
+      "What we don't collect: location, contacts, photos, microphone, camera, advertising identifier, or any on-device session history",
       "What we tell Apple: this data is linked to your account, but we don't use it to track you across other apps or websites",
     ],
   },
