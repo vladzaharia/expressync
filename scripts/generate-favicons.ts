@@ -37,7 +37,9 @@
  *   deno run --allow-read --allow-write --allow-run \
  *     scripts/generate-favicons.ts
  *
- * Prerequisites: ImageMagick on PATH (`convert`).
+ * Prerequisites:
+ *   - librsvg on PATH (`rsvg-convert`) for SVG→PNG rasterization
+ *   - ImageMagick on PATH (`convert`) for combining PNGs into favicon.ico
  */
 
 const STATIC = "static";
@@ -248,15 +250,44 @@ async function rasterise(
   out: string,
   size: number,
 ): Promise<void> {
-  await run("convert", [
-    "-background",
-    "none",
-    "-density",
-    "1024",
-    `${STATIC}/${src}`,
-    "-resize",
-    `${size}x${size}`,
+  // rsvg-convert (librsvg) handles SVG filters + gradients correctly.
+  // ImageMagick's bundled MSVG decoder doesn't render `feDropShadow`
+  // and can produce a 1-bit fallback for gradient-on-stroke shapes,
+  // which silently corrupts the icons. Always go through librsvg for
+  // the SVG→PNG step; keep ImageMagick only for raster→.ico bundling.
+  await run("rsvg-convert", [
+    "-w",
+    String(size),
+    "-h",
+    String(size),
+    "-o",
     out,
+    `${STATIC}/${src}`,
+  ]);
+  console.log(`  wrote ${out}`);
+}
+
+/**
+ * Render an SVG flat-painted onto an opaque background — for App Store /
+ * Play Store listing icons that disallow alpha. `rsvg-convert -b` bakes
+ * the colour in so we never need a second ImageMagick flatten pass.
+ */
+async function rasteriseOpaque(
+  src: string,
+  out: string,
+  size: number,
+  bgHex: string,
+): Promise<void> {
+  await run("rsvg-convert", [
+    "-w",
+    String(size),
+    "-h",
+    String(size),
+    "-b",
+    bgHex,
+    "-o",
+    out,
+    `${STATIC}/${src}`,
   ]);
   console.log(`  wrote ${out}`);
 }
@@ -298,21 +329,7 @@ for (const entry of IOS_ENTRIES) {
     // Marketing icon: no alpha allowed by App Store. Flatten on the
     // background's near-black mid-tone so any anti-aliased corner pixels
     // resolve to the brand black-gradient backdrop rather than white.
-    await run("convert", [
-      "-background",
-      "#0a0a0a",
-      "-density",
-      "1024",
-      `${STATIC}/logo-app.svg`,
-      "-resize",
-      `${entry.size}x${entry.size}`,
-      "-alpha",
-      "remove",
-      "-alpha",
-      "off",
-      out,
-    ]);
-    console.log(`  wrote ${out}`);
+    await rasteriseOpaque("logo-app.svg", out, entry.size, "#0a0a0a");
   } else {
     await rasterise("logo-app.svg", out, entry.size);
   }
@@ -358,21 +375,12 @@ for (const d of ANDROID_DENSITIES) {
 }
 // Play Store listing icon (512×512, no transparency).
 await ensureDir(ANDROID);
-await run("convert", [
-  "-background",
-  "#0a0a0a",
-  "-density",
-  "1024",
-  `${STATIC}/logo-app.svg`,
-  "-resize",
-  "512x512",
-  "-alpha",
-  "remove",
-  "-alpha",
-  "off",
+await rasteriseOpaque(
+  "logo-app.svg",
   `${ANDROID}/play-store-512.png`,
-]);
-console.log(`  wrote ${ANDROID}/play-store-512.png`);
+  512,
+  "#0a0a0a",
+);
 // Adaptive-icon XML descriptor — drop into res/mipmap-anydpi-v26/ic_launcher.xml.
 const adaptiveXml = `<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
