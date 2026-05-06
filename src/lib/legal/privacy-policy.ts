@@ -38,7 +38,7 @@ export const PRIVACY_CARDS: LegalCard[] = [
     summary:
       "We need your email to sign you in; name and avatar are optional.",
     body:
-      "When you create an account we store your email address, your role (customer or admin), and a link to your billing record in Lago (our billing processor). You may optionally add a display name and an avatar URL. We set a session cookie called `ev_billing_session` on the `.example.com` domain so you stay signed in; it is strictly necessary for the service to function.",
+      "When you create an account we store your email address, your role (customer or admin), and a link to your billing record. You may optionally add a display name and an avatar URL. We set a session cookie called `ev_billing_session` on the `.example.com` domain so you stay signed in; it is strictly necessary for the service to function.",
     bullets: [
       "Legal basis (GDPR): performance of a contract (Art. 6(1)(b))",
       "Retention: for the life of your account, plus the periods below",
@@ -51,7 +51,7 @@ export const PRIVACY_CARDS: LegalCard[] = [
     summary:
       "We email you a one-time link; we hash your email in our logs and only keep request metadata for 30 days.",
     body:
-      "We use passwordless “magic-link” sign-in. Your email is sent through a Cloudflare Email Worker (HMAC-signed for integrity) solely to deliver the link. In our audit logs your email is stored only as a SHA-256 hash — never in cleartext. When you request or consume a magic link, we record your IP address and User-Agent for fraud prevention and keep that record for 30 days. Authentication events more broadly are kept for 90 days.",
+      "We use passwordless “magic-link” sign-in. Your email passes through Cloudflare's email-delivery network solely to send you the link — it is not retained there once delivered. In our own audit logs your email is stored only as a SHA-256 hash, never in cleartext. When you request or consume a magic link, we record your IP address and User-Agent for fraud prevention and keep that record for 30 days. Authentication events more broadly are kept for 90 days.",
     bullets: [
       "Magic-link audit log: 30 days",
       "General auth audit log: 90 days",
@@ -65,7 +65,7 @@ export const PRIVACY_CARDS: LegalCard[] = [
     summary:
       "When you tap your card to charge, we record the session so we can bill you accurately.",
     body:
-      "Each charging session is associated with your card's RFID UID (the OCPP `idTag`). We record the charger ID, connector, session start and end times, and kilowatt-hours delivered. These usage events are forwarded to Lago to calculate your bill. The charger's physical location is the operator's data, not derived from you — we do not collect your device's location.",
+      "Each charging session is associated with your card's RFID UID. We record the charger ID, connector, session start and end times, and kilowatt-hours delivered. These usage events feed into our own billing system to calculate your invoice. The charger's physical location is part of the station's setup, not derived from you — we do not collect your device's location.",
     bullets: [
       "Legal basis (GDPR): performance of a contract (Art. 6(1)(b))",
       "Retention: as long as needed for billing, dispute resolution, and tax/accounting obligations",
@@ -97,17 +97,14 @@ export const PRIVACY_CARDS: LegalCard[] = [
   {
     id: "processors",
     icon: "Database",
-    title: "Who Processes Your Data",
+    title: "Where Your Data Lives",
     summary:
-      "We use a small, named set of vendors — each one only sees what they need to do their job.",
+      "Almost everything stays on our own infrastructure. Two outside services touch a narrow slice of it to do specific jobs.",
     body:
-      "We rely on the following sub-processors, each bound by a data processing agreement and limited to the purposes shown:",
+      "Your account, charging history, billing records, and device data live on servers we operate. We run our own billing system, our own charging-station network controller, and our own database. None of that is shared with a third-party SaaS vendor. Two external services handle tasks we can't do alone:",
     bullets: [
-      "Apple (APNs) — delivering push notifications to your iPhone",
-      "Lago — billing; receives usage events, customer ID, and subscription metadata",
-      "SteVe / OCPP backend — charge session data and RFID tag metadata",
-      "Cloudflare Email Worker — sending transactional sign-in emails (your email passes through but is not stored long-term by us in cleartext)",
-      "Pocket ID — admin SSO only; not used by customers",
+      "Apple Push Notification service — delivers a notification to your iPhone (e.g., to confirm a tap-to-start session). Apple sees the push token and the notification content; they do not retain it once delivered.",
+      "Cloudflare email delivery — relays your magic-link sign-in email. The message passes through their network in transit; they don't store the body once delivered.",
     ],
   },
   {
@@ -124,44 +121,27 @@ export const PRIVACY_CARDS: LegalCard[] = [
     icon: "Globe",
     title: "International Transfers",
     summary:
-      "Our infrastructure is US-based; if you're in the EU/UK, your data will travel to the US under standard contractual safeguards.",
+      "We operate from the United States; outside services may briefly handle your data wherever they're located.",
     body:
-      "ExpressCharge is operated from the United States. If you access the service from the European Economic Area, the United Kingdom, or Switzerland, your personal data will be transferred to and processed in the US. Where required, we rely on the European Commission's Standard Contractual Clauses (and the UK Addendum) with our sub-processors as the legal mechanism for transfer.",
+      "ExpressCharge is operated from the United States. If you access the service from outside the US, your personal data will be transferred to and processed there. The two outside services we rely on (Apple Push Notifications and Cloudflare email delivery) operate globally; where required, we rely on the European Commission's Standard Contractual Clauses (and the UK Addendum) with them as the legal mechanism for transfer.",
   },
   {
-    id: "your-rights-eu",
+    id: "your-rights",
     icon: "Scale",
-    title: "Your Rights (EU/UK)",
+    title: "Your Rights",
     summary:
-      "You can ask to see, fix, export, or delete your data — and we'll respond within a month.",
+      "You can ask to see, fix, export, or delete your data — and we extend these rights to everyone, not just where the law requires.",
     body:
-      "If GDPR or UK GDPR applies to you, you have the rights below. To exercise any of them, email accounts@vlad.gg from the address on your account; we'll respond within 30 days. You also have the right to lodge a complaint with your local supervisory authority.",
+      "Privacy laws like GDPR (EU/UK) and CCPA/CPRA (California) require us to give residents specific rights over their data. Rather than maintain two sets of rules, we offer the same rights to every customer, anywhere in the world. Email accounts@vlad.gg from the address on your account; we'll respond within 30 days. We won't penalize you for using any of these rights.",
     bullets: [
-      "Access — get a copy of what we hold",
-      "Rectification — correct inaccurate data",
-      "Erasure (“right to be forgotten”)",
-      "Portability — receive your data in a machine-readable format",
-      "Restriction — pause our processing",
-      "Objection — object to processing based on legitimate interest",
-      "Withdraw consent — where processing is consent-based",
-    ],
-  },
-  {
-    id: "your-rights-california",
-    icon: "BadgeCheck",
-    title: "Your Rights (California)",
-    summary:
-      "California residents have the right to know, delete, correct, and opt out — and we won't penalize you for using them.",
-    body:
-      "If you are a California resident, the CCPA/CPRA gives you the rights listed below. Because we do not sell or share personal information and we do not use sensitive personal information for inferring characteristics, the “opt-out of sale,” “opt-out of sharing,” and “limit use of sensitive PI” rights do not change anything in practice — but you have them, and you can exercise them at accounts@vlad.gg. We will not discriminate against you for exercising any privacy right.",
-    bullets: [
-      "Right to know what we collect and why",
-      "Right to delete",
-      "Right to correct",
-      "Right to opt out of sale (we don't sell)",
-      "Right to opt out of sharing for cross-context advertising (we don't share)",
-      "Right to limit use of sensitive personal information",
-      "Right to non-discrimination",
+      "Know — see what we hold about you and how we use it",
+      "Correct — fix anything that's wrong",
+      "Delete — close your account; we erase what we can and anonymize what we must keep for legal or accounting reasons",
+      "Export — receive your data in a machine-readable format",
+      "Restrict — pause our processing of your data",
+      "Object — challenge processing we base on legitimate interest",
+      "Withdraw consent — for anything we asked your consent for",
+      "Complain — EU/UK residents may also lodge a complaint with their local supervisory authority",
     ],
   },
   {
