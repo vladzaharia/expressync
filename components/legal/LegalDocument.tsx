@@ -34,19 +34,6 @@ export function LegalDocument({ meta, cards, emphasizedCardId }: Props) {
 
   return (
     <div class="flex flex-col gap-6">
-      {/* Meta strip */}
-      <div class="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
-        <span>
-          Questions:{" "}
-          <a
-            class="text-primary hover:underline"
-            href={`mailto:${meta.contactEmail}`}
-          >
-            {meta.contactEmail}
-          </a>
-        </span>
-      </div>
-
       {/* Table of contents — anchor links to each card */}
       <nav
         aria-label={`${meta.title} sections`}
@@ -78,10 +65,19 @@ export function LegalDocument({ meta, cards, emphasizedCardId }: Props) {
         {rest.map((c) => <LegalCard key={c.id} card={c} />)}
       </div>
 
-      {/* Updated-on line — subtle metadata at the foot of the document. */}
-      <p class="text-center text-xs text-muted-foreground">
-        Updated on {formattedDate}
-      </p>
+      {/* Subtle metadata footer — date on the left, contact on the right. */}
+      <div class="flex flex-col gap-1 text-xs text-muted-foreground/70 sm:flex-row sm:items-center sm:justify-between">
+        <span>Updated on {formattedDate}</span>
+        <span>
+          Questions?{" "}
+          <a
+            class="hover:text-foreground hover:underline"
+            href={`mailto:${meta.contactEmail}`}
+          >
+            {meta.contactEmail}
+          </a>
+        </span>
+      </div>
     </div>
   );
 }
