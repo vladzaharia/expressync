@@ -39,7 +39,7 @@ export const TERMS_CARDS: LegalCard[] = [
     summary:
       "ExpressCharge lets you tap to start charging at Polaris EV stations.",
     body:
-      "ExpressCharge has three parts: the example.com website, the iOS companion app (which reads your charging card and shows you what's happening), and the backend systems that authorize sessions and meter your charging at Polaris-operated stations.\n\nThe website and the app are interfaces to the same service. If they ever disagree about a number, the server's record is the one we'll bill from.",
+      "ExpressCharge has three parts: the example.com website, the iOS companion app — which lets you start charging sessions remotely, watch them in real time, and manage your account — and the backend systems that authorize and meter your charging at Polaris-operated stations.\n\nThe stations themselves have built-in NFC readers, so you can also walk up and tap a registered charging card to start. The website and the app are interfaces to the same service. If they ever disagree about a number, the server's record is the one we'll bill from.",
   },
   {
     id: "acceptable-use",
