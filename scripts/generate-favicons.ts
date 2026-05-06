@@ -251,10 +251,10 @@ async function rasterise(
   size: number,
 ): Promise<void> {
   // rsvg-convert (librsvg) handles SVG filters + gradients correctly.
-  // ImageMagick's bundled MSVG decoder doesn't render `feDropShadow`
-  // and can produce a 1-bit fallback for gradient-on-stroke shapes,
-  // which silently corrupts the icons. Always go through librsvg for
-  // the SVG→PNG step; keep ImageMagick only for raster→.ico bundling.
+  // ImageMagick's bundled MSVG decoder can produce a 1-bit fallback
+  // for some gradient/filter combinations, silently corrupting icons.
+  // Always go through librsvg for the SVG→PNG step; keep ImageMagick
+  // only for raster→.ico bundling.
   await run("rsvg-convert", [
     "-w",
     String(size),
@@ -270,7 +270,7 @@ async function rasterise(
 /**
  * Render an SVG flat-painted onto an opaque background — for App Store /
  * Play Store listing icons that disallow alpha. `rsvg-convert -b` bakes
- * the colour in so we never need a second ImageMagick flatten pass.
+ * the colour in so we don't need a second ImageMagick flatten pass.
  */
 async function rasteriseOpaque(
   src: string,
@@ -327,9 +327,9 @@ for (const entry of IOS_ENTRIES) {
   const out = `${IOS}/${entry.filename}`;
   if (entry.idiom === "ios-marketing") {
     // Marketing icon: no alpha allowed by App Store. Flatten on the
-    // background's near-black mid-tone so any anti-aliased corner pixels
-    // resolve to the brand black-gradient backdrop rather than white.
-    await rasteriseOpaque("logo-app.svg", out, entry.size, "#0a0a0a");
+    // gradient's mid-tone so any anti-aliased corner pixels resolve to
+    // brand colour rather than white.
+    await rasteriseOpaque("logo-app.svg", out, entry.size, "#06b6d4");
   } else {
     await rasterise("logo-app.svg", out, entry.size);
   }
@@ -379,7 +379,7 @@ await rasteriseOpaque(
   "logo-app.svg",
   `${ANDROID}/play-store-512.png`,
   512,
-  "#0a0a0a",
+  "#06b6d4",
 );
 // Adaptive-icon XML descriptor — drop into res/mipmap-anydpi-v26/ic_launcher.xml.
 const adaptiveXml = `<?xml version="1.0" encoding="utf-8"?>

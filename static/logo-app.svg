@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  ExpressCharge app-icon glyph — same squircle as logo.svg, but with a
-  soft cyan glow around the thunderbolt so the icon reads "electric" at
-  large launcher sizes (iOS home screen, Android adaptive, App Store /
-  Play Store marketing). Background is a subtle black gradient; the
-  thunderbolt carries the cyan→green brand gradient.
+  ExpressCharge app-icon glyph — same squircle as logo.svg, but the
+  thunderbolt is white with a soft cyan glow and lucide-style rounded
+  joins so the icon reads correctly at large launcher sizes (iOS home
+  screen, Android adaptive, App Store / Play Store marketing). The
+  favicon (logo.svg) stays navy for tab-bar legibility at 16px.
 -->
 <svg
   width="256"
@@ -22,56 +22,33 @@
       y2="256"
       gradientUnits="userSpaceOnUse"
     >
-      <stop offset="0" stop-color="#000000" />
-      <stop offset="0.55" stop-color="#141414" />
-      <stop offset="1" stop-color="#000000" />
-    </linearGradient>
-    <!-- Bolt gradient axis aligned with the bolt's visible long axis
-         (top-right tip → bottom-left tip) so green lands on the bolt's
-         centre body and cyan caps both tips. -->
-    <!-- Plateau-then-transition stops: the bolt's filled mass clusters
-         around the middle of its long axis, which would blend to a flat
-         teal under simple 0→1 cyan→green. Holding cyan to 0.35 and
-         green from 0.65 leaves a 30%-wide transition band where the
-         bolt is thinnest, so the top half reads vibrant cyan and the
-         bottom half reads vibrant green with only a slim teal seam. -->
-    <linearGradient
-      id="es-bolt-app"
-      x1="182"
-      y1="68"
-      x2="74"
-      y2="188"
-      gradientUnits="userSpaceOnUse"
-    >
       <stop offset="0" stop-color="#06b6d4" />
-      <stop offset="0.35" stop-color="#06b6d4" />
-      <stop offset="0.65" stop-color="#22c55e" />
-      <stop offset="1" stop-color="#22c55e" />
+      <stop offset="0.55" stop-color="#22c55e" />
+      <stop offset="1" stop-color="#06b6d4" />
     </linearGradient>
-    <!-- Cyan glow around the thunderbolt — three stacked drop-shadows on
-         the black background give a clean electric-edge bloom without
-         washing out the gradient on the bolt itself. -->
+    <!-- Cyan glow around the thunderbolt — three stacked drop-shadows so
+         the bloom reads soft + bright, like the web UI's drop-shadow class. -->
     <filter id="bolt-glow" x="-50%" y="-50%" width="200%" height="200%">
       <feDropShadow
         dx="0"
         dy="0"
         stdDeviation="2"
         flood-color="#a5f3fc"
-        flood-opacity="0.65"
+        flood-opacity="0.95"
       />
       <feDropShadow
         dx="0"
         dy="0"
         stdDeviation="4"
-        flood-color="#22d3ee"
-        flood-opacity="0.45"
+        flood-color="#67e8f9"
+        flood-opacity="0.7"
       />
       <feDropShadow
         dx="0"
         dy="0"
         stdDeviation="8"
         flood-color="#22d3ee"
-        flood-opacity="0.30"
+        flood-opacity="0.45"
       />
     </filter>
   </defs>
@@ -88,13 +65,13 @@
     ry="0"
     fill="url(#es-bg-app)"
   />
-  <!-- Lucide Zap glyph — cyan→green gradient fill + matching stroke at
-       lucide's stroke-width=2 with round joins/caps so the corners are
-       rounded exactly like the web `<Zap />` icon. -->
+  <!-- Lucide Zap glyph — white fill + matching stroke at lucide's
+       stroke-width=2 with round joins/caps so the corners are rounded
+       exactly like the web `<Zap />` icon. -->
   <g
     transform="translate(56 56) scale(6)"
-    fill="url(#es-bolt-app)"
-    stroke="url(#es-bolt-app)"
+    fill="#ffffff"
+    stroke="#ffffff"
     stroke-width="2"
     stroke-linejoin="round"
     stroke-linecap="round"

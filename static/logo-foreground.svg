@@ -5,7 +5,7 @@
   108×108dp adaptive viewport). Background is transparent — paired with
   logo-background.svg by the launcher, then masked.
 
-  Thunderbolt is a cyan→green gradient with a soft cyan glow, matching
+  Thunderbolt is white with a cyan glow + lucide rounded joins, matching
   logo-app.svg so the launcher icon and the embedded app glyph render
   identically.
 -->
@@ -17,52 +17,36 @@
   xmlns="http://www.w3.org/2000/svg"
 >
   <defs>
-    <!-- Bolt gradient axis aligned with the bolt's visible long axis
-         (top-right tip → bottom-left tip) so green lands on the bolt's
-         centre body and cyan caps both tips. -->
-    <linearGradient
-      id="es-bolt-fg"
-      x1="315"
-      y1="106"
-      x2="117"
-      y2="326"
-      gradientUnits="userSpaceOnUse"
-    >
-      <stop offset="0" stop-color="#06b6d4" />
-      <stop offset="0.35" stop-color="#06b6d4" />
-      <stop offset="0.65" stop-color="#22c55e" />
-      <stop offset="1" stop-color="#22c55e" />
-    </linearGradient>
     <filter id="bolt-glow-fg" x="-50%" y="-50%" width="200%" height="200%">
       <feDropShadow
         dx="0"
         dy="0"
         stdDeviation="3"
         flood-color="#a5f3fc"
-        flood-opacity="0.65"
+        flood-opacity="0.95"
       />
       <feDropShadow
         dx="0"
         dy="0"
         stdDeviation="7"
-        flood-color="#22d3ee"
-        flood-opacity="0.45"
+        flood-color="#67e8f9"
+        flood-opacity="0.7"
       />
       <feDropShadow
         dx="0"
         dy="0"
         stdDeviation="14"
         flood-color="#22d3ee"
-        flood-opacity="0.30"
+        flood-opacity="0.45"
       />
     </filter>
   </defs>
-  <!-- Lucide Zap glyph — cyan→green gradient + matching stroke at lucide's
-       stroke-width=2 with round joins/caps. 24x24 path → 264px box, offset (432-264)/2 = 84. -->
+  <!-- Lucide Zap glyph — white + matching stroke at lucide's stroke-width=2
+       with round joins/caps. 24x24 path → 264px box, offset (432-264)/2 = 84. -->
   <g
     transform="translate(84 84) scale(11)"
-    fill="url(#es-bolt-fg)"
-    stroke="url(#es-bolt-fg)"
+    fill="#ffffff"
+    stroke="#ffffff"
     stroke-width="2"
     stroke-linejoin="round"
     stroke-linecap="round"
