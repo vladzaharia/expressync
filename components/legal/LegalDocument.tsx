@@ -80,18 +80,6 @@ export function LegalDocument({ meta, cards, emphasizedCardId }: Props) {
         {gate ? <LegalCard card={gate} emphasis /> : null}
         {rest.map((c) => <LegalCard key={c.id} card={c} />)}
       </div>
-
-      {/* Footer note */}
-      <p class="text-center text-xs text-muted-foreground">
-        Need a copy of this document on a specific date? Email{" "}
-        <a
-          class="text-primary hover:underline"
-          href={`mailto:${meta.contactEmail}`}
-        >
-          {meta.contactEmail}
-        </a>{" "}
-        and we'll send you the version that applied at that time.
-      </p>
     </div>
   );
 }
