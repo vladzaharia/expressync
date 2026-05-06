@@ -29,20 +29,24 @@
       <stop offset="0.55" stop-color="#141414" />
       <stop offset="1" stop-color="#000000" />
     </linearGradient>
-    <!-- Brand cyan→green gradient for the thunderbolt — same stops the
-         background used to use, so the icon's prior identity is preserved
-         on the glyph itself. -->
+    <!-- Brand cyan→green→cyan gradient for the thunderbolt. Axis runs
+         along the bolt's *visible* long axis (top-right tip → bottom-
+         left tip) within bbox (74,68)→(182,188), so green lands on
+         the bolt's centre body and cyan caps both tips. Without this,
+         a top-left→bottom-right diagonal would land mostly perpendicular
+         to the bolt and the gradient would barely register. -->
     <linearGradient
       id="es-bolt"
-      x1="0"
-      y1="0"
-      x2="256"
-      y2="256"
+      x1="182"
+      y1="68"
+      x2="74"
+      y2="188"
       gradientUnits="userSpaceOnUse"
     >
       <stop offset="0" stop-color="#06b6d4" />
-      <stop offset="0.55" stop-color="#22c55e" />
-      <stop offset="1" stop-color="#06b6d4" />
+      <stop offset="0.35" stop-color="#06b6d4" />
+      <stop offset="0.65" stop-color="#22c55e" />
+      <stop offset="1" stop-color="#22c55e" />
     </linearGradient>
   </defs>
   <!-- Squircle (rx ≈ 30% of side, matching rounded-[30%] in the React glyph). -->

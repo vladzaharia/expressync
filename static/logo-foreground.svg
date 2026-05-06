@@ -17,17 +17,21 @@
   xmlns="http://www.w3.org/2000/svg"
 >
   <defs>
+    <!-- Bolt gradient axis aligned with the bolt's visible long axis
+         (top-right tip → bottom-left tip) so green lands on the bolt's
+         centre body and cyan caps both tips. -->
     <linearGradient
       id="es-bolt-fg"
-      x1="0"
-      y1="0"
-      x2="432"
-      y2="432"
+      x1="315"
+      y1="106"
+      x2="117"
+      y2="326"
       gradientUnits="userSpaceOnUse"
     >
       <stop offset="0" stop-color="#06b6d4" />
-      <stop offset="0.55" stop-color="#22c55e" />
-      <stop offset="1" stop-color="#06b6d4" />
+      <stop offset="0.35" stop-color="#06b6d4" />
+      <stop offset="0.65" stop-color="#22c55e" />
+      <stop offset="1" stop-color="#22c55e" />
     </linearGradient>
     <filter id="bolt-glow-fg" x="-50%" y="-50%" width="200%" height="200%">
       <feDropShadow

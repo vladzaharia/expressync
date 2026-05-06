@@ -28,17 +28,21 @@
       <stop offset="0.55" stop-color="#141414" />
       <stop offset="1" stop-color="#000000" />
     </linearGradient>
+    <!-- Bolt gradient axis aligned with the bolt's visible long axis
+         (top-right tip → bottom-left tip) so green lands on the bolt's
+         centre body and cyan caps both tips. -->
     <linearGradient
       id="es-bolt-mask"
-      x1="0"
-      y1="0"
-      x2="512"
-      y2="512"
+      x1="376"
+      y1="123"
+      x2="136"
+      y2="389"
       gradientUnits="userSpaceOnUse"
     >
       <stop offset="0" stop-color="#06b6d4" />
-      <stop offset="0.55" stop-color="#22c55e" />
-      <stop offset="1" stop-color="#06b6d4" />
+      <stop offset="0.35" stop-color="#06b6d4" />
+      <stop offset="0.65" stop-color="#22c55e" />
+      <stop offset="1" stop-color="#22c55e" />
     </linearGradient>
     <filter id="bolt-glow-mask" x="-50%" y="-50%" width="200%" height="200%">
       <feDropShadow
