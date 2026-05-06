@@ -84,6 +84,11 @@ const RULES: readonly RouteRule[] = [
   { prefix: "/login", classification: "PUBLIC", surface: "customer" },
   { prefix: "/auth/verify", classification: "PUBLIC", surface: "customer" },
   { prefix: "/auth/scan", classification: "PUBLIC", surface: "customer" },
+  // Legal pages — both surfaces serve them at the customer-host root so the
+  // App Store / Apple Developer portal links resolve without auth, and so
+  // admins linking from /admin can land on the same canonical content.
+  { prefix: "/privacy", classification: "PUBLIC" },
+  { prefix: "/terms", classification: "PUBLIC" },
 
   // ------- ADMIN_ONLY -------
   // Admin pages live at /admin/* in the file system (post-rewrite).
