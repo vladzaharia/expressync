@@ -998,9 +998,9 @@ Deno.test({
     assertEquals(parsed.applinks.apps, []);
     assertEquals(parsed.applinks.details.length, 1);
     const detail = parsed.applinks.details[0];
-    assertEquals(detail.appIDs, ["ABC1234XYZ.gg.vlad.expresscan"]);
+    assertEquals(detail.appIDs, ["ABC1234XYZ.com.example.expresscharge.ios"]);
     assertEquals(detail.components.length, 1);
-    assertEquals(detail.components[0]["/"], "/expresscan/register/*");
+    assertEquals(detail.components[0]["/"], "/app/register/*");
   },
 });
 
@@ -1037,7 +1037,7 @@ Deno.test({
     };
     assertEquals(
       body.applinks.details[0].appIDs[0],
-      "ABC1234XYZ.gg.vlad.expresscan",
+      "ABC1234XYZ.com.example.expresscharge.ios",
     );
   },
 });

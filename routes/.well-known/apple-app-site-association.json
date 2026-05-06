@@ -3,9 +3,9 @@
     "apps": [],
     "details": [
       {
-        "appIDs": ["ABC1234XYZ.gg.vlad.expresscan"],
+        "appIDs": ["ABC1234XYZ.com.example.expresscharge.ios"],
         "components": [
-          { "/": "/expresscan/register/*" }
+          { "/": "/app/register/*" }
         ]
       }
     ]

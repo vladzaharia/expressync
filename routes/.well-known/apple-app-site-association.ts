@@ -11,8 +11,8 @@
  *   - No redirects
  *   - Valid JSON
  *
- * The committed bundle ID `ABC1234XYZ.gg.vlad.expresscan` matches the iOS
- * app's signing identity and the path component `/expresscan/register/*`
+ * The committed bundle ID `ABC1234XYZ.com.example.expresscharge.ios` matches the iOS
+ * app's signing identity and the path component `/app/register/*`
  * matches the Universal Link landing page emitted by the registration
  * flow (see `30-backend.md` § "Registration flow (PKCE)").
  *

@@ -2,7 +2,7 @@
  * ExpresScan / Wave 2 Track B-lifecycle — device registration helpers.
  *
  * Centralizes the cryptographic + DB primitives that
- * `routes/api/devices/register.ts` and `routes/admin/expresscan/register.tsx`
+ * `routes/api/devices/register.ts` and `routes/admin/app/register.tsx`
  * share:
  *
  *   - `mintOneTimeCode`     — write a `verifications` row keyed on

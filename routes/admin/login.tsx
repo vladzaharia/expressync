@@ -45,7 +45,7 @@ interface LoginPageData {
   /**
    * Sanitised `?next=<path>` value plumbed through from the middleware
    * (e.g. iOS ExpresScan deep-link returns the admin to
-   * `/expresscan/register?codeChallenge=…`). Always begins with "/" and
+   * `/app/register?codeChallenge=…`). Always begins with "/" and
    * never "//"; defaults to "/".
    */
   next: string;
@@ -63,7 +63,7 @@ interface LoginPageData {
  *  these is in flight, hide the cross-link to the customer login since
  *  the customer surface can't fulfil the deep link. */
 function isAdminOnlyContext(next: string): boolean {
-  return next.startsWith("/expresscan/") ||
+  return next.startsWith("/app/") ||
     next.startsWith("/admin/") ||
     next === "/admin";
 }
