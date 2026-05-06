@@ -25,8 +25,9 @@ export interface LegalCard {
 export interface LegalDocumentMeta {
   /** Document title (e.g., "Privacy Policy"). */
   title: string;
-  /** Short description rendered in the page-card header. */
-  description: string;
+  /** Optional short description rendered beneath the title. Omit for a
+   *  cleaner header on documents whose title is self-explanatory. */
+  description?: string;
   /** ISO date — when this document took effect. */
   effectiveDate: string;
   /** Where to email questions / data requests / contract notices. */
