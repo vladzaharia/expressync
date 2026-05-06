@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   ExpresSync brand glyph — squircle with thunderbolt.
-  Mirrors the inline ExpresSyncLogo in components/brand/ExpresSyncBrand.tsx
-  (rounded-[30%] gradient from primary → accent, white Zap icon). Source for
-  all PNG favicons / app icons via scripts/generate-favicons.ts.
+  Reversed palette: subtle black gradient background with a cyan→green
+  gradient thunderbolt. Source for all PNG favicons / app icons via
+  scripts/generate-favicons.ts. The favicon variant skips the glow so
+  the 16px tab-bar render stays crisp.
 -->
 <svg
   width="256"
@@ -13,8 +14,26 @@
   xmlns="http://www.w3.org/2000/svg"
 >
   <defs>
+    <!-- Subtle black gradient — pure black at the corners, a touch of
+         lift at the diagonal midpoint so the icon reads polished rather
+         than flat. -->
     <linearGradient
       id="es-bg"
+      x1="0"
+      y1="0"
+      x2="256"
+      y2="256"
+      gradientUnits="userSpaceOnUse"
+    >
+      <stop offset="0" stop-color="#000000" />
+      <stop offset="0.55" stop-color="#141414" />
+      <stop offset="1" stop-color="#000000" />
+    </linearGradient>
+    <!-- Brand cyan→green gradient for the thunderbolt — same stops the
+         background used to use, so the icon's prior identity is preserved
+         on the glyph itself. -->
+    <linearGradient
+      id="es-bolt"
       x1="0"
       y1="0"
       x2="256"
@@ -39,8 +58,8 @@
   <!-- Lucide Zap glyph, scaled and centered. 24x24 path → 144px box, offset 56px. -->
   <g
     transform="translate(56 56) scale(6)"
-    fill="#0b1b3d"
-    stroke="#0b1b3d"
+    fill="url(#es-bolt)"
+    stroke="url(#es-bolt)"
     stroke-width="0.6"
     stroke-linejoin="round"
   >

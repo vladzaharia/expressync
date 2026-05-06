@@ -92,7 +92,7 @@ function unauthorizedResponse(): Response {
  * navigable HTML route (GET, not /api/*, not /login itself), we thread
  * the path+query through as `?next=…` so the login UI can return the
  * user to where they came from after sign-in. Critical for the iOS
- * ExpresScan registration deep-link (`/expresscan/register?codeChallenge=…`)
+ * ExpresScan registration deep-link (`/app/register?codeChallenge=…`)
  * — losing the codeChallenge during the login bounce stranded the flow.
  */
 function redirectToLogin(

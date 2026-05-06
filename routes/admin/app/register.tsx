@@ -1,6 +1,6 @@
 /**
- * GET /expresscan/register (admin surface; file path post-rewrite is
- * `/admin/expresscan/register`).
+ * GET /app/register (admin surface; file path post-rewrite is
+ * `/admin/app/register`).
  *
  * ExpresScan / Wave 2 Track B-lifecycle — silent server-side hop that the
  * iOS app's `ASWebAuthenticationSession` opens during device registration.
@@ -10,7 +10,7 @@
  * Flow (`30-backend.md` § "Registration flow (PKCE)"):
  *
  *   1. iOS opens
- *      `https://manage.example.com/expresscan/register?codeChallenge=…&label=…`
+ *      `https://manage.example.com/app/register?codeChallenge=…&label=…`
  *      inside its auth-session sandbox. The host's existing cookie session
  *      is used; the user signs in via the normal admin login flow if they
  *      aren't already (the middleware bounces unauthenticated traffic to
@@ -21,14 +21,14 @@
  *      `/admin/*` paths), validates the PKCE `codeChallenge`, mints a
  *      single-use 60s-TTL one-time code via `mintOneTimeCode`, and
  *      returns a 200 HTML page that performs a top-level client-side
- *      navigation to `expresscan://register/callback?code={oneTimeCode}`.
+ *      navigation to `expchg://register/callback?code={oneTimeCode}`.
  *
  *      We can't 302 directly: `ASWebAuthenticationSession`'s in-session
  *      `WKWebView` silently drops a cross-scheme `Location` redirect (see
  *      commit af88234). A top-level GET to the custom scheme, driven by
  *      `location.replace` / `<meta http-equiv="refresh">`, IS observed
  *      by the navigation policy delegate and matched against
- *      `callbackURLScheme: "expresscan"`, so the auth sheet dismisses
+ *      `callbackURLScheme: "expchg"`, so the auth sheet dismisses
  *      and the completion handler fires.
  *
  *   3. The iOS app reads `?code=…`, drops the auth session, transitions
@@ -88,13 +88,13 @@ function isValidChallenge(c: string): boolean {
 
 /**
  * Build the 200 HTML response that drives the auth-session WKWebView's
- * navigation to the `expresscan://` callback. Inlined CSS / styling
+ * navigation to the `expchg://` callback. Inlined CSS / styling
  * mirrors the brand colors in `static/logo.svg` and matches the same
  * spinner the iOS RegistrationView shows, so the brief flash between
  * dismiss and the native screen looks intentional.
  */
 function htmlRedirect(oneTimeCode: string): Response {
-  const callback = new URL("expresscan://register/callback");
+  const callback = new URL("expchg://register/callback");
   callback.searchParams.set("code", oneTimeCode);
   const callbackUrl = callback.toString();
   // The URL is built by `URL` so `oneTimeCode` (base64url, A–Z / a–z /

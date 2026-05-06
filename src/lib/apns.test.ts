@@ -312,7 +312,7 @@ Deno.test("sendApns — sends canonical headers + body to production host", asyn
       APNS_KEY_ID: TEST_KEY_ID,
       APNS_TEAM_ID: TEST_TEAM_ID,
       APNS_KEY_BASE64: TEST_P8_BASE64,
-      APNS_TOPIC: "gg.vlad.expresscan",
+      APNS_TOPIC: "com.example.expresscharge.ios",
     },
     async () => {
       _resetApnsJwtCache();
@@ -349,7 +349,7 @@ Deno.test("sendApns — sends canonical headers + body to production host", asyn
           "https://api.push.apple.com/3/device/abc123hex",
         );
         assertEquals(req.method, "POST");
-        assertEquals(req.headers["apns-topic"], "gg.vlad.expresscan");
+        assertEquals(req.headers["apns-topic"], "com.example.expresscharge.ios");
         assertEquals(req.headers["apns-priority"], "10");
         assertEquals(req.headers["apns-push-type"], "alert");
         assertEquals(req.headers["apns-expiration"], "1745622090");
@@ -508,7 +508,7 @@ Deno.test({
         APNS_KEY_ID: TEST_KEY_ID,
         APNS_TEAM_ID: TEST_TEAM_ID,
         APNS_KEY_BASE64: TEST_P8_BASE64,
-        APNS_TOPIC: "gg.vlad.expresscan",
+        APNS_TOPIC: "com.example.expresscharge.ios",
       },
       async () => {
         _resetApnsJwtCache();
@@ -562,7 +562,7 @@ Deno.test({
             assert(captured !== null, "server should have observed a request");
             const got = captured as unknown as CapturedRequest;
             assertEquals(got.method, "POST");
-            assertEquals(got.headers["apns-topic"], "gg.vlad.expresscan");
+            assertEquals(got.headers["apns-topic"], "com.example.expresscharge.ios");
             assert(got.headers["authorization"].startsWith("bearer "));
             assertEquals(
               (got.body as { v: number }).v,

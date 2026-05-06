@@ -296,11 +296,11 @@ for (const entry of IOS_ENTRIES) {
   const out = `${IOS}/${entry.filename}`;
   if (entry.idiom === "ios-marketing") {
     // Marketing icon: no alpha allowed by App Store. Flatten on the
-    // gradient's mid-tone so any anti-aliased corner pixels resolve to
-    // brand colour rather than white.
+    // background's near-black mid-tone so any anti-aliased corner pixels
+    // resolve to the brand black-gradient backdrop rather than white.
     await run("convert", [
       "-background",
-      "#06b6d4",
+      "#0a0a0a",
       "-density",
       "1024",
       `${STATIC}/logo-app.svg`,
@@ -360,7 +360,7 @@ for (const d of ANDROID_DENSITIES) {
 await ensureDir(ANDROID);
 await run("convert", [
   "-background",
-  "#06b6d4",
+  "#0a0a0a",
   "-density",
   "1024",
   `${STATIC}/logo-app.svg`,

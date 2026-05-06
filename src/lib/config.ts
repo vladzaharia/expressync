@@ -202,7 +202,7 @@ export const config = {
   /** Base64-encoded P8 (PKCS8 PEM) private key — full file contents, base64'd. */
   APNS_KEY_BASE64: Deno.env.get("APNS_KEY_BASE64") || "",
   /** Bundle ID used as the apns-topic header. */
-  APNS_TOPIC: Deno.env.get("APNS_TOPIC") || "gg.vlad.expresscan",
+  APNS_TOPIC: Deno.env.get("APNS_TOPIC") || "com.example.expresscharge.ios",
 } as const;
 
 /**
