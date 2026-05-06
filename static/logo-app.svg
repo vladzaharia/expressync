@@ -26,17 +26,27 @@
       <stop offset="0.55" stop-color="#141414" />
       <stop offset="1" stop-color="#000000" />
     </linearGradient>
+    <!-- Bolt gradient axis aligned with the bolt's visible long axis
+         (top-right tip → bottom-left tip) so green lands on the bolt's
+         centre body and cyan caps both tips. -->
+    <!-- Plateau-then-transition stops: the bolt's filled mass clusters
+         around the middle of its long axis, which would blend to a flat
+         teal under simple 0→1 cyan→green. Holding cyan to 0.35 and
+         green from 0.65 leaves a 30%-wide transition band where the
+         bolt is thinnest, so the top half reads vibrant cyan and the
+         bottom half reads vibrant green with only a slim teal seam. -->
     <linearGradient
       id="es-bolt-app"
-      x1="0"
-      y1="0"
-      x2="256"
-      y2="256"
+      x1="182"
+      y1="68"
+      x2="74"
+      y2="188"
       gradientUnits="userSpaceOnUse"
     >
       <stop offset="0" stop-color="#06b6d4" />
-      <stop offset="0.55" stop-color="#22c55e" />
-      <stop offset="1" stop-color="#06b6d4" />
+      <stop offset="0.35" stop-color="#06b6d4" />
+      <stop offset="0.65" stop-color="#22c55e" />
+      <stop offset="1" stop-color="#22c55e" />
     </linearGradient>
     <!-- Cyan glow around the thunderbolt — three stacked drop-shadows on
          the black background give a clean electric-edge bloom without
