@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   ExpresSync brand glyph — squircle with thunderbolt.
-  Reversed palette: subtle black gradient background with a cyan→green
-  gradient thunderbolt. Source for all PNG favicons / app icons via
-  scripts/generate-favicons.ts. The favicon variant skips the glow so
-  the 16px tab-bar render stays crisp.
+  Mirrors the inline ExpresSyncLogo in components/brand/ExpresSyncBrand.tsx
+  (rounded-[30%] gradient from primary → accent, white Zap icon). Source for
+  all PNG favicons / app icons via scripts/generate-favicons.ts.
 -->
 <svg
   width="256"
@@ -14,9 +13,6 @@
   xmlns="http://www.w3.org/2000/svg"
 >
   <defs>
-    <!-- Subtle black gradient — pure black at the corners, a touch of
-         lift at the diagonal midpoint so the icon reads polished rather
-         than flat. -->
     <linearGradient
       id="es-bg"
       x1="0"
@@ -25,28 +21,9 @@
       y2="256"
       gradientUnits="userSpaceOnUse"
     >
-      <stop offset="0" stop-color="#000000" />
-      <stop offset="0.55" stop-color="#141414" />
-      <stop offset="1" stop-color="#000000" />
-    </linearGradient>
-    <!-- Brand cyan→green→cyan gradient for the thunderbolt. Axis runs
-         along the bolt's *visible* long axis (top-right tip → bottom-
-         left tip) within bbox (74,68)→(182,188), so green lands on
-         the bolt's centre body and cyan caps both tips. Without this,
-         a top-left→bottom-right diagonal would land mostly perpendicular
-         to the bolt and the gradient would barely register. -->
-    <linearGradient
-      id="es-bolt"
-      x1="182"
-      y1="68"
-      x2="74"
-      y2="188"
-      gradientUnits="userSpaceOnUse"
-    >
       <stop offset="0" stop-color="#06b6d4" />
-      <stop offset="0.35" stop-color="#06b6d4" />
-      <stop offset="0.65" stop-color="#22c55e" />
-      <stop offset="1" stop-color="#22c55e" />
+      <stop offset="0.55" stop-color="#22c55e" />
+      <stop offset="1" stop-color="#06b6d4" />
     </linearGradient>
   </defs>
   <!-- Squircle (rx ≈ 30% of side, matching rounded-[30%] in the React glyph). -->
@@ -62,8 +39,8 @@
   <!-- Lucide Zap glyph, scaled and centered. 24x24 path → 144px box, offset 56px. -->
   <g
     transform="translate(56 56) scale(6)"
-    fill="url(#es-bolt)"
-    stroke="url(#es-bolt)"
+    fill="#0b1b3d"
+    stroke="#0b1b3d"
     stroke-width="0.6"
     stroke-linejoin="round"
   >
