@@ -1,14 +1,10 @@
 /**
- * Charge Box Details page (`/chargers/[chargeBoxId]`).
+ * Charge Box Details page (`/admin/chargers/[chargeBoxId]`).
  *
- * URL rename in flight: the canonical device URL is
- * `/admin/devices/<id>` for both scanners and chargers. Outbound links
- * (DeviceCard "View", NewUnmanagedChargerForm success redirect, the
- * customer-host `/c/<id>` admin redirect) all point at the canonical
- * URL; `/admin/devices/[deviceId].tsx` 307s charger ids here for the
- * actual render. The follow-up consolidation moves this file's loader
- * + page into `[deviceId].tsx` and replaces this file with a 308 — at
- * which point all the outbound links land in one place with no hop.
+ * Canonical URL for charger detail. The unified `/admin/devices`
+ * listing links here directly (and `/admin/devices/[deviceId]` 307s
+ * charger ids here for back-compat with anyone hitting the wrong
+ * URL by accident).
  *
  * Rebuild scope (see plan `polaris-express-is-an-streamed-crown.md`):
  *   - Header strip (friendlyName + chargeBoxId + status pills)

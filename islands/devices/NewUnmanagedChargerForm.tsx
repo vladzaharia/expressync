@@ -67,10 +67,7 @@ export default function NewUnmanagedChargerForm() {
       });
 
       if (res.status === 201) {
-        // Canonical device URL — same shape as scanner detail; for
-        // chargers this currently 307s to `/admin/chargers/<id>` until
-        // the rename refactor lands.
-        globalThis.location.href = `/admin/devices/${
+        globalThis.location.href = `/admin/chargers/${
           encodeURIComponent(idTrimmed)
         }`;
         return;
