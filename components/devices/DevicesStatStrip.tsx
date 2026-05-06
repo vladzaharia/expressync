@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   BatteryCharging,
   Smartphone,
+  Unplug,
   Wifi,
   WifiOff,
 } from "lucide-preact";
@@ -28,17 +29,20 @@ interface Totals {
   offline: number;
   scanners: number;
   chargers: number;
+  unmanaged: number;
 }
 
 interface Props {
   totals: Totals;
   /** Active type filter, drives the `active` ring on Chargers/Scanners cells. */
   activeType?: "all" | "charger" | "scanner";
+  /** Active management-mode filter, drives the ring on the Unmanaged cell. */
+  activeMode?: "all" | "ocpp" | "unmanaged";
   class?: string;
 }
 
 export function DevicesStatStrip(
-  { totals, activeType = "all", class: className }: Props,
+  { totals, activeType = "all", activeMode = "all", class: className }: Props,
 ) {
   const offlineWarning = totals.offline > 0;
 
@@ -81,6 +85,16 @@ export function DevicesStatStrip(
       active: activeType === "scanner",
       disabledWhenZero: totals.scanners === 0,
       title: "Filter to scanners (phones / laptops)",
+    },
+    {
+      key: "unmanaged",
+      label: "Unmanaged",
+      value: totals.unmanaged,
+      icon: Unplug,
+      href: "/admin/devices?type=charger&mode=unmanaged",
+      active: activeType === "charger" && activeMode === "unmanaged",
+      disabledWhenZero: totals.unmanaged === 0,
+      title: "Filter to unmanaged chargers (Tesla Wall Connectors etc.)",
     },
   ];
 

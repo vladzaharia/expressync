@@ -189,6 +189,32 @@ export const handler = define.handlers({
           });
         }
 
+        // 2b. Reject operations against unmanaged chargers. They don't speak
+        // OCPP, so RemoteStart / Unlock / TriggerMessage / etc. would all be
+        // sent to a charger that isn't in StEvE — wasted call, confusing
+        // failure surface. UI never offers these ops for unmanaged rows; this
+        // is defense-in-depth against a crafted request. Look up the row
+        // first to keep the response specific.
+        const [chargerRow] = await db
+          .select({
+            managementMode: schema.chargersCache.managementMode,
+          })
+          .from(schema.chargersCache)
+          .where(eq(schema.chargersCache.chargeBoxId, chargeBoxId))
+          .limit(1);
+        if (chargerRow?.managementMode === "unmanaged") {
+          logger.warn("API", "Rejected operation against unmanaged charger", {
+            operation,
+            chargeBoxId,
+            userId: ctx.state.user?.id,
+          });
+          return jsonResponse(422, {
+            error: "unmanaged_charger",
+            message:
+              "This charger is unmanaged (no OCPP). Remote operations are not available.",
+          });
+        }
+
         // 3. Validate params against the op-specific schema. Inject chargeBoxId
         // so per-op schemas (which require it) pass.
         const opName = operation as OcppOperationName;

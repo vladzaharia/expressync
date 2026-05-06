@@ -89,6 +89,14 @@ const RULES: readonly RouteRule[] = [
   // admins linking from /admin can land on the same canonical content.
   { prefix: "/privacy", classification: "PUBLIC" },
   { prefix: "/terms", classification: "PUBLIC" },
+  // Charger landing — sticker URLs (`/c/<chargeBoxId>`). Customer
+  // surface only: stickers always carry `https://example.com/c/<id>`
+  // (manage.example.com is admin-only and never appears on a
+  // sticker). Marking customer-only ensures the admin surface 404s any
+  // accidental request rather than serving a public info page from the
+  // admin host. iOS universal-link AASA still resolves on both hosts.
+  // Migration 0043.
+  { prefix: "/c/", classification: "PUBLIC", surface: "customer" },
 
   // ------- ADMIN_ONLY -------
   // Admin pages live at /admin/* in the file system (post-rewrite).

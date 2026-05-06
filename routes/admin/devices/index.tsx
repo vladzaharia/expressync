@@ -36,6 +36,8 @@ import {
 import { SidebarLayout } from "../../../components/SidebarLayout.tsx";
 import { PageCard } from "../../../components/PageCard.tsx";
 import { DevicesStatStrip } from "../../../components/devices/DevicesStatStrip.tsx";
+import { Button } from "../../../components/ui/button.tsx";
+import { Plus } from "lucide-preact";
 import type {
   DeviceKindFilter,
   DeviceOnlineFilter,
@@ -63,12 +65,16 @@ interface DevicesPageData {
     offline: number;
     scanners: number;
     chargers: number;
+    unmanaged: number;
   };
   filters: {
     type: DeviceTypeFilter;
     kind: DeviceKindFilter;
     online: DeviceOnlineFilter;
     owner: string;
+    /** Filter chargers by management mode. Server-side; ignored for
+     *  scanners. Migration 0043. */
+    mode: "all" | "ocpp" | "unmanaged";
   };
   errored: boolean;
 }
@@ -122,6 +128,11 @@ function coerceOnlineFilter(raw: string | null): DeviceOnlineFilter {
   return "any";
 }
 
+function coerceModeFilter(raw: string | null): "all" | "ocpp" | "unmanaged" {
+  if (raw === "ocpp" || raw === "unmanaged") return raw;
+  return "all";
+}
+
 export const handler = define.handlers({
   async GET(ctx) {
     if (ctx.state.user?.role !== "admin") {
@@ -134,6 +145,7 @@ export const handler = define.handlers({
       kind: coerceKindFilter(url.searchParams.get("kind")),
       online: coerceOnlineFilter(url.searchParams.get("online")),
       owner: (url.searchParams.get("owner") ?? "").trim(),
+      mode: coerceModeFilter(url.searchParams.get("mode")),
     };
 
     let chargerEntries: UnifiedDeviceEntry[] = [];
@@ -175,8 +187,17 @@ export const handler = define.handlers({
               set.add("charger");
               return Array.from(set);
             })(),
+            managementMode: r.managementMode === "unmanaged"
+              ? "unmanaged"
+              : "ocpp",
+            locationDescription: r.locationDescription,
           } satisfies ChargerCardDto,
         }));
+        if (filters.mode !== "all") {
+          chargerEntries = chargerEntries.filter((e) =>
+            e.type === "charger" && e.data.managementMode === filters.mode
+          );
+        }
       } catch (error) {
         errored = true;
         log.error("Failed to load chargers_cache", error as Error);
@@ -291,6 +312,9 @@ export const handler = define.handlers({
       offline: entries.filter((e) => !isOnline(e)).length,
       scanners: entries.filter((e) => e.type === "scanner").length,
       chargers: entries.filter((e) => e.type === "charger").length,
+      unmanaged: entries.filter((e) =>
+        e.type === "charger" && e.data.managementMode === "unmanaged"
+      ).length,
     };
 
     return {
@@ -355,11 +379,25 @@ export default define.page<typeof handler>(
         user={state.user}
         accentColor="teal"
       >
-        <PageCard title="Devices" colorScheme="teal">
+        <PageCard
+          title="Devices"
+          colorScheme="teal"
+          headerActions={isAdmin
+            ? (
+              <Button size="sm" variant="outline" asChild>
+                <a href="/admin/devices/new-unmanaged">
+                  <Plus class="size-4" />
+                  Add unmanaged charger
+                </a>
+              </Button>
+            )
+            : undefined}
+        >
           <div class="mb-6">
             <DevicesStatStrip
               totals={data.totals}
               activeType={data.filters.type}
+              activeMode={data.filters.mode}
             />
           </div>
 

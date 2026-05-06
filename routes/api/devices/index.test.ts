@@ -90,6 +90,9 @@ Deno.test("GET /api/devices — returns sorted charger rows", async () => {
         last_status: "Available",
         friendly_name: "Bay 1",
         form_factor: "wallbox",
+        connector_type_override: null,
+        max_kw_override: null,
+        management_mode: "ocpp",
       },
       {
         id: "BAY-2",
@@ -100,6 +103,9 @@ Deno.test("GET /api/devices — returns sorted charger rows", async () => {
         last_status: "Charging",
         friendly_name: null,
         form_factor: "pulsar",
+        connector_type_override: null,
+        max_kw_override: null,
+        management_mode: "ocpp",
       },
     ])
   );
@@ -140,6 +146,9 @@ Deno.test("GET /api/devices — non-charger rows are filtered out", async () => 
         last_status: null,
         friendly_name: null,
         form_factor: null,
+        connector_type_override: null,
+        max_kw_override: null,
+        management_mode: null,
       },
       {
         id: "BAY-3",
@@ -150,6 +159,9 @@ Deno.test("GET /api/devices — non-charger rows are filtered out", async () => 
         last_status: "Available",
         friendly_name: "Bay 3",
         form_factor: "commander",
+        connector_type_override: null,
+        max_kw_override: null,
+        management_mode: "ocpp",
       },
     ])
   );

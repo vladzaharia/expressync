@@ -302,6 +302,13 @@
       "when": 1777996900000,
       "tag": "0042_accounts_id_token",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1777996960000,
+      "tag": "0043_unmanaged_chargers",
+      "breakpoints": true
     }
   ]
 }

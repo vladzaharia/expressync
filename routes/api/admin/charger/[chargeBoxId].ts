@@ -64,6 +64,22 @@ export const handler = define.handlers({
       patch.friendlyName = body.friendlyName;
     }
 
+    if ("locationDescription" in body) {
+      // Free-text location ("North lot, level 2") on unmanaged chargers.
+      // OCPP chargers can technically receive a value too — harmless, just
+      // unused by the OCPP detail surfaces.
+      const v = body.locationDescription;
+      if (v !== null && (typeof v !== "string" || v.length > 500)) {
+        return new Response(
+          JSON.stringify({
+            error: "locationDescription must be string ≤500 chars or null",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      patch.locationDescription = v;
+    }
+
     if ("connectorTypeOverride" in body) {
       if (
         body.connectorTypeOverride !== null &&
