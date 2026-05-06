@@ -16,8 +16,8 @@ import { cn } from "@/src/lib/utils/cn.ts";
 interface Props {
   /** Document title — "Privacy Policy" or "Terms of Service". */
   title: string;
-  /** Short tagline shown beneath the title. */
-  description: string;
+  /** Optional short tagline shown beneath the title. */
+  description?: string;
   /** Active page key — drives the underline on the nav links. */
   active: "privacy" | "terms";
   children: ComponentChildren;
@@ -58,7 +58,11 @@ export function LegalShell(
           <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">
             {title}
           </h1>
-          <p class="mt-2 text-base text-muted-foreground">{description}</p>
+          {description
+            ? (
+              <p class="mt-2 text-base text-muted-foreground">{description}</p>
+            )
+            : null}
         </div>
         {children}
       </main>

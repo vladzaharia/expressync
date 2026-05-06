@@ -2,8 +2,6 @@ import type { LegalCard, LegalDocumentMeta } from "./types.ts";
 
 export const TERMS_META: LegalDocumentMeta = {
   title: "Terms of Service",
-  description:
-    "The contract between you and Polaris Express — written for humans.",
   effectiveDate: "2026-05-06",
   contactEmail: "support@example.com",
 };

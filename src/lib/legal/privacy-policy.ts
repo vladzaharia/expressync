@@ -2,7 +2,6 @@ import type { LegalCard, LegalDocumentMeta } from "./types.ts";
 
 export const PRIVACY_META: LegalDocumentMeta = {
   title: "Privacy Policy",
-  description: "How we use your data — in plain English.",
   effectiveDate: "2026-05-06",
   contactEmail: "privacy@example.com",
 };
