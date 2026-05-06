@@ -21,9 +21,7 @@
  *
  * Auth model:
  *   - Admin cookie session (middleware-gated). Bearer is rejected upstream.
- *   - Owner check in app code: `ctx.state.user.id === devices.owner_user_id`.
- *     Admin-on-someone-else's-device is deferred to v1.1 — `60-security.md`
- *     §5 stipulates 403 for v1.
+ *   - Any admin may arm any device (no per-device ownership check).
  *
  * Pre-flight rejections (POST):
  *   401 unauthorized          — no cookie session
@@ -32,7 +30,6 @@
  *   400 capability_missing    — device row lacks `'scanner' = ANY(capabilities)`
  *   404 not_found             — no device row with that id
  *   410 device_revoked        — `deleted_at IS NOT NULL` or `revoked_at IS NOT NULL`
- *   403 not_owner             — admin caller is not the device owner
  *   409 device_offline        — `last_seen_at` older than 90 s
  *   409 conflict              — already-armed row exists; body echoes the
  *                               existing `pairingCode` + `expiresInSec` so
@@ -405,12 +402,6 @@ export const handler = define.handlers({
       if (device.deletedAt !== null || device.revokedAt !== null) {
         return jsonResponse(410, { error: "device_revoked" });
       }
-      if (device.ownerUserId !== adminUserId) {
-        // v1: cross-admin arm-with-consent is deferred. Plain 403 keeps the
-        // attack surface minimal (an admin can't probe another admin's
-        // device fleet from this endpoint).
-        return forbidden("not_owner");
-      }
       if (!device.capabilities.includes("scanner")) {
         return badRequest("capability_missing");
       }
@@ -625,24 +616,6 @@ export const handler = define.handlers({
         }
       } catch {
         return badRequest("invalid_body");
-      }
-
-      // Owner check on release: even though the row is keyed by
-      // (deviceId, pairingCode), we still want a clean 403 when an admin
-      // tries to release a non-owned device's pairing — keeps the audit
-      // trail honest.
-      let device: DeviceRow | null;
-      try {
-        device = await deviceLoader(deviceId);
-      } catch (err) {
-        log.warn("DELETE device load failed; proceeding to delete", {
-          deviceId,
-          error: err instanceof Error ? err.message : String(err),
-        });
-        device = null;
-      }
-      if (device && device.ownerUserId !== adminUserId) {
-        return forbidden("not_owner");
       }
 
       const identifier = `device-scan:${deviceId}:${pairingCode}`;

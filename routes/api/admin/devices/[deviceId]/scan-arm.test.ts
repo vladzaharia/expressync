@@ -24,7 +24,6 @@
  *   400 invalid_body                  — missing `purpose`
  *   404 device-not-found              — UUID-shaped path, no row
  *   400 capability_missing            — device row lacks `'scanner'`
- *   403 admin-not-owner               — caller's userId !== owner
  *   410 device_revoked                — soft-deleted row
  *   409 device_offline                — `last_seen_at` > 90 s old
  *   409 conflict (with pairingCode echoed)
@@ -381,7 +380,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "POST scan-arm — admin-not-owner returns 403 not_owner",
+  name: "POST scan-arm — any admin can arm any device (no owner check)",
   sanitizeResources: false,
   sanitizeOps: false,
   fn: async () => {
@@ -393,9 +392,10 @@ Deno.test({
         state: adminState(),
         body: { purpose: "admin-link" },
       });
-      assertEquals(res.status, 403);
+      assertEquals(res.status, 200);
       const body = await res.json();
-      assertEquals(body.error, "not_owner");
+      assertEquals(body.ok, true);
+      assert(typeof body.pairingCode === "string");
     } finally {
       tearDown();
     }
@@ -717,7 +717,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "DELETE scan-arm — admin-not-owner returns 403",
+  name: "DELETE scan-arm — any admin can release any device pairing",
   sanitizeResources: false,
   sanitizeOps: false,
   fn: async () => {
@@ -729,9 +729,9 @@ Deno.test({
         state: adminState(),
         body: { pairingCode: "ABC123" },
       });
-      assertEquals(res.status, 403);
+      assertEquals(res.status, 200);
       const body = await res.json();
-      assertEquals(body.error, "not_owner");
+      assertEquals(body.ok, true);
     } finally {
       tearDown();
     }
