@@ -16,7 +16,9 @@ _design/
 # Local configuration (not tracked)
 docker-compose.override.yml
 docker-compose.env
+docker-compose.env.*
 docker-compose.postgres.env
+docker-compose.postgres.env.*
 
 # Claude Code agent worktrees + scratch
 .claude/worktrees/
