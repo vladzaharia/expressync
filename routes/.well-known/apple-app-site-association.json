@@ -6,7 +6,8 @@
         "appIDs": ["ABC1234XYZ.com.example.expresscharge.ios"],
         "components": [
           { "/": "/app/register/*" },
-          { "/": "/c/*" }
+          { "/": "/c/*" },
+          { "/": "/u/*" }
         ]
       }
     ]

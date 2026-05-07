@@ -39,6 +39,7 @@ import {
 } from "../../../islands/shared/device-visuals.ts";
 
 import { ChargerHeaderStrip } from "../../../components/chargers/ChargerHeaderStrip.tsx";
+import PublicIdQrPopover from "../../../islands/shared/PublicIdQrPopover.tsx";
 import ChargerIdentityCard from "../../../islands/ChargerIdentityCard.tsx";
 import ChargerLiveStatusCard from "../../../islands/ChargerLiveStatusCard.tsx";
 import ConnectorsSection from "../../../islands/ConnectorsSection.tsx";
@@ -77,6 +78,10 @@ interface ActiveSessionCtx {
 interface ChargerDetailLoaderData {
   charger: null | {
     chargeBoxId: string;
+    /** 8-char Crockford-ish public ID — sticker-printable, used in
+     *  https://example.com/c/<publicId> and the top-right popover.
+     *  Migration 0046; backfilled for every existing row. */
+    publicId: string;
     chargeBoxPk: number | null;
     friendlyName: string | null;
     formFactor: string;
@@ -451,6 +456,7 @@ export const handler = define.handlers({
     const data: ChargerDetailLoaderData = {
       charger: {
         chargeBoxId: cacheRow.chargeBoxId,
+        publicId: cacheRow.publicId,
         chargeBoxPk: cacheRow.chargeBoxPk,
         friendlyName: cacheRow.friendlyName,
         formFactor: cacheRow.formFactor,
@@ -560,6 +566,13 @@ export default define.page<typeof handler>(
         <PageCard
           title={displayName}
           colorScheme="orange"
+          topRightAccessory={
+            <PublicIdQrPopover
+              entity="charger"
+              publicId={charger.publicId}
+              size="md"
+            />
+          }
         >
           <div class="flex flex-col gap-6">
             {/* Header strip — identity + status pills */}
@@ -694,21 +707,27 @@ function UnmanagedChargerDetailLayout(
     displayName: string;
   },
 ) {
-  // Customer surface — admins don't scan stickers. The AASA file is
-  // served from both surfaces, so the iOS app intercepts the customer
-  // URL via universal-link regardless of which host fielded the AASA
-  // request originally.
-  const universalLink = `https://example.com/c/${charger.chargeBoxId}`;
+  // QR encodes the public sticker URL — same value the popover and
+  // public landing page use. Admins printing stickers should rely on
+  // the popover's QR rather than copying the URL by hand.
+  const universalLink = `https://example.com/c/${charger.publicId}`;
   return (
     <SidebarLayout
       currentPath={url.pathname}
       user={state.user}
-      accentColor="orange"
+      accentColor="blue"
     >
       <PageCard
         title={displayName}
         description="Unmanaged charger — no OCPP connection. Customers tap the sticker to land on a public 'just plug in' page."
-        colorScheme="orange"
+        colorScheme="blue"
+        topRightAccessory={
+          <PublicIdQrPopover
+            entity="charger"
+            publicId={charger.publicId}
+            size="md"
+          />
+        }
       >
         <div class="flex flex-col gap-6">
           {/* Lightweight header strip — two pills, no connector roll-up */}
@@ -716,7 +735,7 @@ function UnmanagedChargerDetailLayout(
             <span class="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
               Free
             </span>
-            <span class="inline-flex items-center gap-1 rounded-full border border-slate-500/30 bg-slate-500/10 px-2 py-0.5 text-xs font-medium text-slate-700 dark:text-slate-300">
+            <span class="inline-flex items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">
               Unmanaged
             </span>
             <span class="ml-2 truncate font-mono text-xs text-muted-foreground">
@@ -725,7 +744,7 @@ function UnmanagedChargerDetailLayout(
           </div>
 
           <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <SectionCard title="Identity" accent="orange" icon={MapPin}>
+            <SectionCard title="Identity" accent="blue" icon={MapPin}>
               <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                 <div>
                   <dt class="text-xs uppercase tracking-wide text-muted-foreground">
@@ -768,7 +787,7 @@ function UnmanagedChargerDetailLayout(
               </dl>
             </SectionCard>
 
-            <SectionCard title="Scan codes" accent="orange" icon={Sticker}>
+            <SectionCard title="Scan codes" accent="blue" icon={Sticker}>
               <p class="text-sm text-muted-foreground">
                 Print and affix this URL to the charger as a QR or NFC sticker.
                 iOS opens the app directly when installed; everyone else lands
@@ -784,7 +803,7 @@ function UnmanagedChargerDetailLayout(
             </SectionCard>
           </div>
 
-          <SectionCard title="User instructions preview" accent="orange">
+          <SectionCard title="User instructions preview" accent="blue">
             <p class="text-xs uppercase tracking-wide text-muted-foreground">
               What customers see when they scan the sticker
             </p>
