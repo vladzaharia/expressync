@@ -4,6 +4,7 @@ import { type ChargerIconProps, WallboxIcon } from "./WallboxIcon.tsx";
 import { PulsarIcon } from "./PulsarIcon.tsx";
 import { CommanderIcon } from "./CommanderIcon.tsx";
 import { WallMountIcon } from "./WallMountIcon.tsx";
+import { TeslaIcon } from "./TeslaIcon.tsx";
 import { GenericChargerIcon } from "./GenericChargerIcon.tsx";
 
 export type { ChargerIconProps };
@@ -11,6 +12,7 @@ export {
   CommanderIcon,
   GenericChargerIcon,
   PulsarIcon,
+  TeslaIcon,
   WallboxIcon,
   WallMountIcon,
 };
@@ -29,6 +31,7 @@ export const chargerFormFactorIcons: Record<
   pulsar: PulsarIcon,
   commander: CommanderIcon,
   wall_mount: WallMountIcon,
+  tesla: TeslaIcon,
   generic: GenericChargerIcon,
 };
 

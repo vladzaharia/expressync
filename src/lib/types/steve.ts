@@ -168,6 +168,7 @@ export const FORM_FACTORS = [
   "pulsar",
   "commander",
   "wall_mount",
+  "tesla",
   "generic",
 ] as const;
 export type FormFactor = typeof FORM_FACTORS[number];

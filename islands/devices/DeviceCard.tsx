@@ -231,6 +231,7 @@ const FORM_FACTOR_LABEL: Record<string, string> = {
   pulsar: "Pulsar",
   commander: "Commander",
   wall_mount: "Wall mount",
+  tesla: "Tesla Wall Connector",
   generic: "Generic",
 };
 
