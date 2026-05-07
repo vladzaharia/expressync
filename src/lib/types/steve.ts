@@ -165,9 +165,6 @@ export interface OcppTagFilters {
  */
 export const FORM_FACTORS = [
   "wallbox",
-  "pulsar",
-  "commander",
-  "wall_mount",
   "tesla",
   "generic",
 ] as const;

@@ -56,13 +56,7 @@ const ChargerRowSchema = z.object({
   chargerId: z.string(),
   label: z.string(),
   siteName: z.string().nullable(),
-  formFactor: z.enum([
-    "wallbox",
-    "pulsar",
-    "commander",
-    "wall_mount",
-    "generic",
-  ]),
+  formFactor: z.enum(["wallbox", "tesla", "generic"]),
   connectorType: z.enum(["ccs", "j1772", "nacs", "chademo", "type2"])
     .nullable(),
   maxKw: z.number().nullable(),
@@ -153,12 +147,16 @@ export function mapChargerState(
 
 function normalizeFormFactor(v: string | null): ChargerRow["formFactor"] {
   switch (v) {
+    case "tesla":
+    case "generic":
+      return v;
+    // Migration 0045: pulsar/commander/wall_mount were collapsed to
+    // wallbox in the DB; this is defensive in case a stale row slips
+    // through before the redeploy.
+    case "wallbox":
     case "pulsar":
     case "commander":
     case "wall_mount":
-    case "generic":
-      return v;
-    case "wallbox":
     default:
       return "wallbox";
   }

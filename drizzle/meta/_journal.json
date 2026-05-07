@@ -316,6 +316,13 @@
       "when": 1777997020000,
       "tag": "0044_charger_form_factor_tesla",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1777997080000,
+      "tag": "0045_consolidate_form_factors",
+      "breakpoints": true
     }
   ]
 }
