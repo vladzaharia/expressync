@@ -278,12 +278,28 @@ export async function ensureDeviceTag(
   // ---- 1. resolve the parent meta-tag for billing inheritance ---------
   const [user] = await db
     .select({
+      role: schema.users.role,
       lagoCustomerExternalId: schema.users.lagoCustomerExternalId,
     })
     .from(schema.users)
     .where(eq(schema.users.id, userId))
     .limit(1);
-  const parentIdTag = user?.lagoCustomerExternalId
+
+  // Hard guard: admins never get OCPP tags. Admin accounts have no
+  // Lago customer or subscription associated with them, so a tag
+  // would be a billing-attribution dead-end. Returning early here
+  // protects every call site (the QR sign-in handler already 404s
+  // non-customers, but the helper should be defensive against future
+  // call sites that bypass that check).
+  if (!user || user.role !== "customer") {
+    log.info(
+      "ensureDeviceTag skipped — non-customer user; admins don't carry OCPP tags",
+      { deviceId, userId, role: user?.role ?? "unknown" },
+    );
+    return { idTag, ocppTagPk: null, isActive: false };
+  }
+
+  const parentIdTag = user.lagoCustomerExternalId
     ? parentIdTagFor(user.lagoCustomerExternalId)
     : null;
 
