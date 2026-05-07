@@ -208,7 +208,7 @@ export default function AccountList(props: AccountListProps) {
 
   return (
     <div
-      class={cn("flex flex-col gap-1", className)}
+      class={cn("flex min-w-[16rem] flex-col gap-1", className)}
       role="list"
       aria-label="Signed-in accounts"
     >
@@ -241,10 +241,10 @@ export default function AccountList(props: AccountListProps) {
           >
             <span
               class={cn(
-                "inline-flex size-7 shrink-0 items-center justify-center rounded-full",
+                "inline-flex size-7 shrink-0 items-center justify-center rounded-full border",
                 surface === "admin"
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                  : "bg-primary/10 text-primary",
+                  ? "border-emerald-500/50 text-emerald-600 dark:text-emerald-400"
+                  : "border-primary/50 text-primary",
               )}
               aria-hidden="true"
             >
@@ -256,15 +256,12 @@ export default function AccountList(props: AccountListProps) {
                 {row.user.email}
               </span>
             </span>
-            <span class="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-              {surface === "admin" ? "Admin" : "Customer"}
-              {isActive && (
-                <Check
-                  class="size-3.5 text-foreground"
-                  aria-label="Current account"
-                />
-              )}
-            </span>
+            {isActive && (
+              <Check
+                class="size-3.5 shrink-0 text-foreground"
+                aria-label="Current account"
+              />
+            )}
             {allowRevoke && !isActive && (
               <span
                 role="button"
