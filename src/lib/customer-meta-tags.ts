@@ -34,28 +34,37 @@ import { logger } from "./utils/logger.ts";
 const log = logger.child("CustomerMetaTags");
 
 /**
- * LEGACY deterministic mapping from a Lago customer's `external_id` to
- * the old-format OCPP parent tag. Pure — no I/O. Kept exported so the
- * migration script and a small number of legacy callers can still
- * resolve the pre-rename tag in StEvE for cleanup; new code should use
- * `parentIdTagForUserPublicId` instead.
- *
- * @deprecated Use `parentIdTagForUserPublicId(publicId)` for new
- * tags. This function resolves to the format used before the
- * 2026-05-07 rename and is retained only for migration / reparenting
- * paths.
+ * LEGACY-1 mapping (Gen 1, 2026-05-06 and earlier): `OCPP-{externalId}`.
+ * @deprecated Detection-only. Used by the rename migration to find old
+ * tags for reparenting + deletion. Never write this format.
  */
 export function parentIdTagFor(externalId: string): string {
   return `OCPP-${externalId}`;
 }
 
 /**
- * Canonical mapping from a user's 8-char public ID to its managed
- * OCPP parent tag in StEvE. Pure — no I/O. The publicId column is
- * NOT NULL UNIQUE (migration 0046) so this is collision-free.
+ * LEGACY-2 mapping (Gen 2, 2026-05-07 morning): `OCPP-{userPublicId}`.
+ * Briefly minted before the format settled on `META-`. Detection-only,
+ * used to clean up rows the first apply pass created.
+ * @deprecated
+ */
+export function legacyOcppParentIdTagForUserPublicId(
+  userPublicId: string,
+): string {
+  return `OCPP-${userPublicId}`;
+}
+
+/**
+ * Canonical mapping (Gen 3, 2026-05-07 onward) from a user's 8-char
+ * public ID to its managed parent tag in StEvE: `META-{publicId}`.
+ * Pure — no I/O. The publicId column is NOT NULL UNIQUE (migration
+ * 0046) so this is collision-free. Renamed from `OCPP-` so the parent
+ * tag visually distinguishes itself from the OCPP prefix StEvE uses
+ * everywhere else, and so admins reading StEvE's tag list can spot
+ * "this is a customer meta-tag, not a child card" at a glance.
  */
 export function parentIdTagForUserPublicId(userPublicId: string): string {
-  return `OCPP-${userPublicId}`;
+  return `META-${userPublicId}`;
 }
 
 /**
@@ -125,12 +134,19 @@ export async function ensureCustomerMetaTag(
   // Resolve the customer's user_publicId. After migration 0046 every
   // user row has one; for an extreme edge case where a Lago customer
   // exists without a corresponding user (e.g. mid-provisioning), fall
-  // back to the legacy format so we still produce a usable tag.
+  // back to the legacy externalId format so we still produce a usable
+  // tag.
   const userPublicId = await resolveUserPublicIdForLagoCustomer(externalId);
   const idTag = userPublicId !== null
     ? parentIdTagForUserPublicId(userPublicId)
     : parentIdTagFor(externalId);
-  const legacyIdTag = parentIdTagFor(externalId);
+  // Both legacy formats we'll clean up if encountered: Gen 1
+  // (`OCPP-<externalId>`, 2026-05-06 and earlier) and Gen 2
+  // (`OCPP-<publicId>`, briefly used 2026-05-07 morning).
+  const legacyIdTags: string[] = [parentIdTagFor(externalId)];
+  if (userPublicId !== null) {
+    legacyIdTags.push(legacyOcppParentIdTagForUserPublicId(userPublicId));
+  }
   const subExternalId = await firstActiveSubscriptionExternalId(externalId);
   const isActive = subExternalId !== null;
   const maxActiveTransactionCount = isActive ? 1 : 0;
@@ -237,73 +253,81 @@ export async function ensureCustomerMetaTag(
     });
   }
 
-  // ---- 3. legacy parent reparenting + deactivation --------------------
+  // ---- 3. legacy parent cleanup --------------------------------------
   //
-  // The 2026-05-07 rename moves the meta-tag from `OCPP-{externalId}` to
-  // `OCPP-{userPublicId}`. When this is the first call for a customer
-  // post-rename, both tags exist in StEvE: the new one we just upserted
-  // and the legacy one with all the customer's child cards still
-  // parented to it. We:
-  //   a) reparent every child of the legacy tag to the new tag,
-  //   b) deactivate the legacy tag (maxActiveTransactionCount=0) so any
-  //      in-flight transaction can finish but no new one can start.
-  // Idempotent — once the legacy tag has zero children and is
-  // deactivated, repeated calls are no-ops.
-  if (idTag !== legacyIdTag && ocppTagPk !== null) {
+  // Two prior tag formats need to be migrated and removed:
+  //   Gen 1: `OCPP-<lagoExternalId>` (initial format, 2026-05-06 and
+  //          earlier).
+  //   Gen 2: `OCPP-<userPublicId>` (briefly minted 2026-05-07 morning
+  //          before the format settled on the META- prefix).
+  // For each legacy tag still present in StEvE we:
+  //   a) reparent every child to the new META- tag,
+  //   b) delete the local user_mappings row (we don't preserve it —
+  //      historical synced_transaction_events rows still join via
+  //      user_mapping_id, so we ON DELETE the user_mappings row only
+  //      after detaching it; in practice we set it to is_active=false
+  //      and let a separate prune pass remove the rows. For safety we
+  //      keep the row and only flip is_active here.),
+  //   c) DELETE the legacy tag from StEvE (now that no children
+  //      reference it).
+  // Idempotent — repeat calls find nothing in StEvE and short-circuit.
+  for (const legacyIdTag of legacyIdTags) {
+    if (legacyIdTag === idTag) continue;
+    if (ocppTagPk === null) continue;
     try {
       const [legacyTag] = await steveClient.getOcppTags({ idTag: legacyIdTag });
-      if (legacyTag) {
-        // Reparent every child whose parent_id_tag still references
-        // the legacy tag.
-        const children = await steveClient.getOcppTags({
-          parentIdTag: legacyIdTag,
-        });
-        for (const child of children) {
-          try {
-            await steveClient.updateOcppTag({ ...child, parentIdTag: idTag });
-          } catch (err) {
-            log.warn("Failed to reparent child tag during rename", {
-              childIdTag: child.idTag,
-              from: legacyIdTag,
-              to: idTag,
-              error: err instanceof Error ? err.message : String(err),
-            });
-          }
-        }
-        // Deactivate the legacy parent so new transactions can't start
-        // against it. We don't delete — preserving the row keeps StEvE's
-        // historical-transaction joins intact.
-        if (legacyTag.maxActiveTransactionCount !== 0) {
-          try {
-            await steveClient.updateOcppTag({
-              ...legacyTag,
-              maxActiveTransactionCount: 0,
-            });
-          } catch (err) {
-            log.warn("Failed to deactivate legacy meta-tag during rename", {
-              legacyIdTag,
-              error: err instanceof Error ? err.message : String(err),
-            });
-          }
-        }
-        // Also flip the local user_mappings row for the legacy tag to
-        // is_active=false so the admin UI reflects the deactivation.
+      if (!legacyTag) continue;
+
+      // Reparent children. We must do this BEFORE deleting the parent.
+      const children = await steveClient.getOcppTags({
+        parentIdTag: legacyIdTag,
+      });
+      for (const child of children) {
         try {
-          await db
-            .update(schema.userMappings)
-            .set({ isActive: false, updatedAt: new Date() })
-            .where(
-              eq(schema.userMappings.steveOcppIdTag, legacyIdTag),
-            );
+          await steveClient.updateOcppTag({ ...child, parentIdTag: idTag });
         } catch (err) {
-          log.warn("Failed to deactivate legacy user_mappings row", {
-            legacyIdTag,
+          log.warn("Failed to reparent child tag during cleanup", {
+            childIdTag: child.idTag,
+            from: legacyIdTag,
+            to: idTag,
             error: err instanceof Error ? err.message : String(err),
           });
         }
       }
+
+      // Drop the local user_mappings row referencing this legacy tag
+      // so the admin Tags listing stops surfacing it. The
+      // synced_transaction_events FK to user_mappings has no cascade,
+      // so we use a soft approach: flip is_active to false. A separate
+      // post-cleanup pass deletes the row when no transaction events
+      // reference it. Tracked as a follow-up; keeping the row safe by
+      // default avoids breaking historical session joins.
+      try {
+        await db
+          .update(schema.userMappings)
+          .set({ isActive: false, updatedAt: new Date() })
+          .where(eq(schema.userMappings.steveOcppIdTag, legacyIdTag));
+      } catch (err) {
+        log.warn("Failed to deactivate legacy user_mappings row", {
+          legacyIdTag,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+
+      // Delete the legacy tag from StEvE. Now that no children point at
+      // it and the local row is deactivated, no client should ever
+      // reference it again.
+      try {
+        await steveClient.deleteOcppTag(legacyTag.ocppTagPk);
+      } catch (err) {
+        log.warn("Failed to DELETE legacy meta-tag from StEvE", {
+          legacyIdTag,
+          ocppTagPk: legacyTag.ocppTagPk,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     } catch (err) {
-      log.warn("Legacy meta-tag rename pass failed; will retry next call", {
+      log.warn("Legacy meta-tag cleanup failed; will retry next call", {
         legacyIdTag,
         idTag,
         error: err instanceof Error ? err.message : String(err),
