@@ -21,8 +21,9 @@
 
 import { define } from "../../utils.ts";
 import LoginForm from "../../islands/LoginForm.tsx";
-import AccountList from "../../islands/auth/AccountList.tsx";
 import OidcAutoSubmit from "../../islands/admin/OidcAutoSubmit.tsx";
+import { sanitiseBackHref } from "../../src/lib/back-href.ts";
+import { ArrowLeft } from "lucide-preact";
 import ForgotPasswordForm from "../../islands/admin/ForgotPasswordForm.tsx";
 import { GridPattern } from "../../components/magicui/grid-pattern.tsx";
 import { Particles } from "../../components/magicui/particles.tsx";
@@ -58,6 +59,10 @@ interface LoginPageData {
    * so a "Customer login →" link would be a dead end.
    */
   customerLoginUrl: string | null;
+  /** Sanitised `?back=` value pointing at the account picker, when the
+   *  user reached this page from there. Used to render a small "Back"
+   *  affordance above the form. */
+  backHref: string | null;
 }
 
 /** `?next=` paths that only make sense on the admin surface — when one of
@@ -88,6 +93,11 @@ export const handler = define.handlers({
       ? null
       : `${config.CUSTOMER_BASE_URL}/login`;
 
+    const backHref = sanitiseBackHref(url.searchParams.get("back"), [
+      config.CUSTOMER_BASE_URL,
+      config.ADMIN_BASE_URL,
+    ]);
+
     if (oidcEnabled && !config.ADMIN_AUTH_SHOW_FALLBACK) {
       return {
         data: {
@@ -95,6 +105,7 @@ export const handler = define.handlers({
           forgotPasswordEnabled: false,
           next,
           customerLoginUrl,
+          backHref,
         } satisfies LoginPageData,
       };
     }
@@ -105,6 +116,7 @@ export const handler = define.handlers({
           forgotPasswordEnabled: isEmailEnabled(),
           next,
           customerLoginUrl,
+          backHref,
         } satisfies LoginPageData,
       };
     }
@@ -114,6 +126,7 @@ export const handler = define.handlers({
         forgotPasswordEnabled: isEmailEnabled(),
         next,
         customerLoginUrl,
+        backHref,
       } satisfies LoginPageData,
     };
   },
@@ -167,16 +180,17 @@ export default define.page<typeof handler>(function LoginPage({ data }) {
         <BlurFade delay={0.2} duration={0.5} direction="up">
           <div class="relative">
             <ShineBorder borderRadius={12} borderWidth={1} duration={10}>
-              {/*
-                Multi-session switcher — same component as the customer
-                login page. Renders nothing on first paint when the
-                visitor has no device sessions; otherwise lists them
-                above the form so the visitor can pick an existing
-                account instead of re-authenticating.
-              */}
-              <div class="px-6 pt-6">
-                <AccountList allowRevoke={false} />
-              </div>
+              {data.backHref && (
+                <div class="px-6 pt-6">
+                  <a
+                    href={data.backHref}
+                    class="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <ArrowLeft class="size-3.5" aria-hidden="true" />
+                    <span>Back to account picker</span>
+                  </a>
+                </div>
+              )}
               {data.mode === "password" && <LoginForm />}
               {data.mode === "oidc-only" && (
                 <div class="w-full max-w-md mx-auto p-6">
