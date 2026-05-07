@@ -109,6 +109,15 @@ export const handler = define.handlers({
     const isUnmanaged = row.managementMode === "unmanaged";
     const isDeactivated = row.deactivatedAt !== null;
 
+    // Apple Smart App Banner — set the app-argument to the canonical
+    // public URL so iOS Safari shows "Open in ExpresScan" and the
+    // app receives this exact URL on launch after install. Skipped
+    // for retired chargers (no point installing the app to interact
+    // with a charger that's gone).
+    if (!isDeactivated) {
+      ctx.state.appBannerArgument = `https://example.com/c/${row.publicId}`;
+    }
+
     const ct = row.connectorTypeOverride;
     const connectorType =
       (["ccs", "j1772", "nacs", "chademo", "type2"] as const).includes(

@@ -52,6 +52,11 @@ export const handler = define.handlers({
       return { data: { found: false } satisfies LoaderData };
     }
 
+    // Apple Smart App Banner — see _app.tsx. The argument is the
+    // exact URL the iOS Camera scanned, so the app receives it on
+    // launch and can complete sign-in without a second scan.
+    ctx.state.appBannerArgument = `https://example.com/u/${row.publicId}`;
+
     return {
       data: {
         found: true,

@@ -85,6 +85,18 @@ export interface State {
   customerScope?: CustomerScope;
 
   /**
+   * Apple Smart App Banner argument for the current page. When set,
+   * `_app.tsx` injects a `<meta name="apple-itunes-app">` tag into
+   * the document head with this URL as `app-argument`. Used by the
+   * public charger and user landing pages so iOS Safari shows the
+   * "Open in ExpresScan" banner — and so the app receives the
+   * scanned URL on launch when the user installs from the banner.
+   * Pages set this in their handler via `ctx.state.appBannerArgument
+   * = "https://example.com/c/<publicId>"`.
+   */
+  appBannerArgument?: string;
+
+  /**
    * ExpresScan / Wave 1 Track A: bearer-authenticated device context.
    *
    * Set by the bearer-auth branch in `_middleware.ts` when a valid
