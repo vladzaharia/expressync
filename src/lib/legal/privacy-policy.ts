@@ -2,7 +2,7 @@ import type { LegalCard, LegalDocumentMeta } from "./types.ts";
 
 export const PRIVACY_META: LegalDocumentMeta = {
   title: "Privacy Policy",
-  effectiveDate: "2026-05-06",
+  effectiveDate: "2026-05-07",
   contactEmail: "privacy@example.com",
 };
 
@@ -73,10 +73,12 @@ export const PRIVACY_CARDS: LegalCard[] = [
     summary:
       "The app is for managing your charging — starting sessions, watching them, and reviewing your account. Nothing about your charging is stored on your phone.",
     body:
-      "The ExpressCharge iOS app is a lightweight client. You can use it to start a charging session remotely, watch a session in real time, and review your usage and account details. The data you see comes from our servers — your charging history, billing details, and session records all live there, not on your phone.\n\nThe only thing the app stores on your device is your sign-in credential, in the iOS Keychain. While the app is open, it sends us a short status update about once a minute so we know it's online and reachable for push notifications.",
+      "The ExpressCharge iOS app is a lightweight client. You can use it to start a charging session remotely, watch a session in real time, and review your usage and account details. The data you see comes from our servers — your charging history, billing details, and session records all live there, not on your phone.\n\nThe only thing the app stores on your device is your sign-in credential, in the iOS Keychain. While the app is open, it sends us a short status update about once a minute so we know it's online and reachable for push notifications.\n\nIf you grant location access, the app uses your approximate location to sort the chargers list with the closest one first. The location stays on your phone — we never receive or store it.",
     bullets: [
-      "What's in the status update: the name you gave the device, iPhone model and iOS version, the app version, the push-notification token Apple gives the app, your locale and timezone, battery level and state, thermal state, free disk space, NFC and notification permission states, and a last-seen timestamp",
-      "What we don't collect: location, contacts, photos, microphone, camera, advertising identifier, or any on-device session history",
+      "What's in the status update for customer accounts: the name you gave the device, iPhone model and iOS version, the app version, the push-notification token Apple gives the app, your locale and timezone, NFC and notification permission states, and a last-seen timestamp",
+      "Customer-account devices do not send us battery level, thermal state, or free disk space. Polaris-team devices, which we use to manage the network, do continue to report those values so we can keep the fleet healthy.",
+      "Approximate location, while the app is open, is used only to order chargers by distance — not stored on our servers",
+      "What we don't collect: contacts, photos, microphone, camera, advertising identifier, or any on-device session history",
       "What we tell Apple: this data is linked to your account, but we don't use it to track you across other apps or websites",
     ],
   },
@@ -97,9 +99,10 @@ export const PRIVACY_CARDS: LegalCard[] = [
     id: "what-we-dont-do",
     icon: "Ban",
     title: "What We Don't Do",
-    summary: "No analytics. No ad trackers. No selling. No location tracking.",
+    summary:
+      "No analytics. No ad trackers. No selling. No location tracking on our servers.",
     body:
-      "We don't run third-party analytics, error-tracking, or advertising SDKs. We don't collect your device's location — the only location implied by your data is whichever station you actually charged at. We don't sell your data, and we don't trade it with advertisers for cross-app or cross-site profiling.",
+      "We don't run third-party analytics, error-tracking, or advertising SDKs. We don't store your location on our servers — when you grant the iOS app location access, your phone uses it locally to sort the chargers list, and that's it. The only station-side location implied by your account is whichever charger you actually used. We don't sell your data, and we don't trade it with advertisers for cross-app or cross-site profiling.",
   },
   {
     id: "international-transfers",

@@ -120,6 +120,67 @@ export const handler = define.handlers({
       }
     }
 
+    // Structured address fields. All optional; null clears the column.
+    // Country is ISO 3166-1 alpha-2 — pinned by both the JS regex below
+    // and the DB CHECK constraint added in migration 0046.
+    for (
+      const key of [
+        "addressLine1",
+        "addressLine2",
+        "addressCity",
+        "addressRegion",
+        "addressPostalCode",
+      ] as const
+    ) {
+      if (key in body) {
+        const v = body[key];
+        if (v !== null && (typeof v !== "string" || v.length > 200)) {
+          return new Response(
+            JSON.stringify({
+              error: `${key} must be string ≤200 chars or null`,
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        patch[key] = v;
+      }
+    }
+    if ("addressCountry" in body) {
+      const v = body.addressCountry;
+      if (v !== null && (typeof v !== "string" || !/^[A-Z]{2}$/.test(v))) {
+        return new Response(
+          JSON.stringify({
+            error:
+              "addressCountry must be ISO 3166-1 alpha-2 (e.g. 'US') or null",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      patch.addressCountry = v;
+    }
+    for (const key of ["latitude", "longitude"] as const) {
+      if (key in body) {
+        const v = body[key];
+        if (v === null) {
+          patch[key] = null;
+        } else {
+          const num = typeof v === "number" ? v : Number(v);
+          const max = key === "latitude" ? 90 : 180;
+          if (!Number.isFinite(num) || Math.abs(num) > max) {
+            return new Response(
+              JSON.stringify({
+                error:
+                  `${key} must be a finite number in [${-max}, ${max}] or null`,
+              }),
+              { status: 400, headers: { "Content-Type": "application/json" } },
+            );
+          }
+          // Numeric column → string round-trip to preserve precision.
+          patch[key] = num.toFixed(6);
+        }
+      }
+    }
+
     if (Object.keys(patch).length === 0) {
       return new Response(
         JSON.stringify({ error: "No valid fields to update" }),
