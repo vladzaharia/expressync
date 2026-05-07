@@ -9,6 +9,13 @@ import ScanModalHost from "../islands/shared/ScanModalHost.tsx";
 import SseProvider from "../islands/shared/SseProvider.tsx";
 
 /**
+ * Apple App Store id for ExpresScan. Hard-coded rather than env-driven
+ * because the value is build-time stable and ships in HTML — no secret.
+ * Update when the production listing goes live.
+ */
+const APP_STORE_ID = "0000000000";
+
+/**
  * Polaris Track A — root document. Hostname-aware: reads
  * `ctx.state.surface` (set by `_middleware.ts` after hostname dispatch) and
  * picks the right manifest, favicon set, theme bootstrap, and theme-color
@@ -25,6 +32,16 @@ export default define.page(function App({ Component, state }) {
   const isAdmin = surface === "admin";
 
   const manifestHref = isAdmin ? "/manifest.admin.json" : "/manifest.json";
+
+  // Apple Smart App Banner — only emitted when the active page handler
+  // populated `state.appBannerArgument`. iOS Safari uses this to surface
+  // the "Open in ExpresScan" banner, and `app-argument` carries the
+  // scanned URL through to the iOS app on first launch after install.
+  // App Store ID is the production ExpresScan listing — set to a
+  // placeholder until the listing is live.
+  const appBannerContent = state.appBannerArgument
+    ? `app-id=${APP_STORE_ID}, app-argument=${state.appBannerArgument}`
+    : null;
   // Unified ExpresSync brand glyph (squircle + thunderbolt) — both surfaces
   // share the same favicon set and match the gradient in the React glyph.
   const themeColor = "#06b6d4";
@@ -60,6 +77,9 @@ export default define.page(function App({ Component, state }) {
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta name="theme-color" content={themeColor} />
+        {appBannerContent && (
+          <meta name="apple-itunes-app" content={appBannerContent} />
+        )}
         <title>{title}</title>
         <link rel="manifest" href={manifestHref} />
         {/* Modern browsers prefer SVG; falls through to PNG/.ico otherwise. */}
