@@ -15,7 +15,7 @@
  *     chargeBoxId: string,                // unique, [A-Za-z0-9_\-.:]
  *     friendlyName: string,               // 1-200 chars
  *     locationDescription?: string|null,  // ≤500 chars
- *     formFactor?: FormFactor             // default 'wall_mount'
+ *     formFactor?: FormFactor             // default 'tesla'
  *   }
  */
 

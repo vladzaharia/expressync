@@ -52,19 +52,14 @@ function toIso(v: string | Date | null): string | null {
   return Number.isFinite(n) ? new Date(n).toISOString() : null;
 }
 
-const FORM_FACTORS = [
-  "wallbox",
-  "pulsar",
-  "commander",
-  "wall_mount",
-  "generic",
-] as const;
+const FORM_FACTORS = ["wallbox", "tesla", "generic"] as const;
 type WireFormFactor = (typeof FORM_FACTORS)[number];
 
 function normalizeFormFactor(v: string | null): WireFormFactor {
-  return (FORM_FACTORS as readonly string[]).includes(v ?? "")
-    ? (v as WireFormFactor)
-    : "wallbox";
+  if (v === "tesla" || v === "generic") return v;
+  // Migration 0045: legacy pulsar/commander/wall_mount collapse to
+  // wallbox; everything else also lands on the safe default.
+  return "wallbox";
 }
 
 const CONNECTOR_TYPES = ["ccs", "j1772", "nacs", "chademo", "type2"] as const;

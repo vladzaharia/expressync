@@ -2,7 +2,7 @@
  * Generic device-icon resolver.
  *
  * Until D1 we had `chargerFormFactorIcons` keyed by charger form factor
- * (`wallbox`, `pulsar`, `commander`, `wall_mount`, `generic`). The new
+ * (`wallbox`, `tesla`, `generic`). The new
  * Devices admin surface needs to render phones and laptops next to chargers
  * using the *same* icon contract, so callers everywhere now go through
  * `getDeviceIcon(kind, formFactor?)`.

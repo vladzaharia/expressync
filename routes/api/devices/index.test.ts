@@ -102,7 +102,7 @@ Deno.test("GET /api/devices — returns sorted charger rows", async () => {
         last_status_at: recentB,
         last_status: "Charging",
         friendly_name: null,
-        form_factor: "pulsar",
+        form_factor: "tesla",
         connector_type_override: null,
         max_kw_override: null,
         management_mode: "ocpp",
@@ -121,7 +121,7 @@ Deno.test("GET /api/devices — returns sorted charger rows", async () => {
     assertEquals(body.chargers[0].state, "idle"); // "Available" → idle
     assertEquals(body.chargers[1].chargerId, "BAY-2");
     assertEquals(body.chargers[1].label, "BAY-2"); // falls back to id
-    assertEquals(body.chargers[1].formFactor, "pulsar");
+    assertEquals(body.chargers[1].formFactor, "tesla");
     assertEquals(body.chargers[1].state, "charging");
     // siteName + connectorType + maxKw aren't tracked yet — null for now.
     assertEquals(body.chargers[0].siteName, null);
@@ -158,7 +158,7 @@ Deno.test("GET /api/devices — non-charger rows are filtered out", async () => 
         last_status_at: new Date(),
         last_status: "Available",
         friendly_name: "Bay 3",
-        form_factor: "commander",
+        form_factor: "generic",
         connector_type_override: null,
         max_kw_override: null,
         management_mode: "ocpp",
