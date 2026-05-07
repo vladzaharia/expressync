@@ -51,6 +51,7 @@
     "npm:@radix-ui/react-tooltip@^1.2.7": "1.2.8_react@19.2.6_react-dom@19.2.6__react@19.2.6",
     "npm:@tailwindcss/vite@^4.1.0": "4.1.18_vite@7.3.0__picomatch@4.0.3__@types+node@22.15.15_@types+node@22.15.15",
     "npm:@tanstack/react-form@^1.27.7": "1.27.7_react@19.2.6_react-dom@19.2.6__react@19.2.6",
+    "npm:@types/leaflet@^1.9.8": "1.9.21",
     "npm:@types/node@*": "22.15.15",
     "npm:@types/qrcode@^1.5.5": "1.5.6",
     "npm:better-auth@^1.6.9": "1.6.9_drizzle-kit@0.31.8__esbuild@0.25.12_drizzle-orm@0.45.1__@opentelemetry+api@1.9.0__kysely@0.28.17__postgres@3.4.7_react@19.2.6_react-dom@19.2.6__react@19.2.6",
@@ -64,6 +65,7 @@
     "npm:esbuild@0.25.7": "0.25.7",
     "npm:esbuild@~0.25.5": "0.25.12",
     "npm:juice@11": "11.1.1",
+    "npm:leaflet@^1.9.4": "1.9.4",
     "npm:lucide-preact@0.511": "0.511.0_preact@10.28.1",
     "npm:motion@^12.18.1": "12.23.26_react@19.2.6_react-dom@19.2.6__react@19.2.6",
     "npm:nanoid@^5.0.7": "5.1.11",
@@ -1826,6 +1828,15 @@
     "@types/estree@1.0.8": {
       "integrity": "sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w=="
     },
+    "@types/geojson@7946.0.16": {
+      "integrity": "sha512-6C8nqWur3j98U6+lXDfTUWIfgvZU+EumvpHKcYjujKH7woYyLj2sUmff0tRhrqM7BohUw7Pz3ZB1jj2gW9Fvmg=="
+    },
+    "@types/leaflet@1.9.21": {
+      "integrity": "sha512-TbAd9DaPGSnzp6QvtYngntMZgcRk+igFELwR2N99XZn7RXUdKgsXMR+28bUO0rPsWp8MIu/f47luLIQuSLYv/w==",
+      "dependencies": [
+        "@types/geojson"
+      ]
+    },
     "@types/node@22.15.15": {
       "integrity": "sha512-R5muMcZob3/Jjchn5LcO8jdKwSCbzqmPB6ruBxMcf9kbxtniZHP327s6C37iOfuw8mbKK3cAQa7sEl7afLrQ8A==",
       "dependencies": [
@@ -2364,6 +2375,9 @@
     "kysely@0.28.17": {
       "integrity": "sha512-nbD8lB9EB3wNdMhOCdx5Li8DxnLbvKByylRLcJ1h+4SkrowVeECAyZlyiKMThF7xFdRz0jSQ2MoJr+wXux2y0Q=="
     },
+    "leaflet@1.9.4": {
+      "integrity": "sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA=="
+    },
     "lightningcss-android-arm64@1.30.2": {
       "integrity": "sha512-BH9sEdOCahSgmkVhBLeU7Hc9DWeZ1Eb6wNS6Da8igvUwAe0sqROHddIlvU06q3WyXVEOYDZ6ykBZQnjTbmo4+A==",
       "os": ["android"],
@@ -2890,6 +2904,7 @@
       "npm:@radix-ui/react-tooltip@^1.2.7",
       "npm:@tailwindcss/vite@^4.1.0",
       "npm:@tanstack/react-form@^1.27.7",
+      "npm:@types/leaflet@^1.9.8",
       "npm:@types/qrcode@^1.5.5",
       "npm:better-auth@^1.6.9",
       "npm:class-variance-authority@~0.7.1",
@@ -2899,6 +2914,7 @@
       "npm:drizzle-kit@~0.31.8",
       "npm:drizzle-orm@~0.45.1",
       "npm:juice@11",
+      "npm:leaflet@^1.9.4",
       "npm:lucide-preact@0.511",
       "npm:motion@^12.18.1",
       "npm:nanoid@^5.0.7",
