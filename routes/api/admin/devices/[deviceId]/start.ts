@@ -169,17 +169,30 @@ export const handler = define.handlers({
       // already exists. The downstream RemoteStart references the parent
       // by idTag so a missing parent will fail at StEvE anyway; we attempt
       // creation here to make the happy path self-healing.
+      //
+      // Use the idTag returned from `ensureCustomerMetaTag` rather than
+      // recomputing — post-2026-05-07 the canonical format is
+      // `OCPP-<userPublicId>`, not `OCPP-<lagoExternalId>`. The ensure
+      // helper resolves the publicId internally and returns the right
+      // value; falling back to the legacy format only when the ensure
+      // call itself failed (StEvE outage).
+      let idTag: string;
       try {
-        await metaTagEnsurer(body.lagoCustomerExternalId, undefined);
+        const ensured = await metaTagEnsurer(
+          body.lagoCustomerExternalId,
+          undefined,
+        );
+        idTag = ensured.idTag;
       } catch (err) {
-        // Best-effort — log and proceed. If the parent really is missing
-        // StEvE will reject the RemoteStart and we'll surface a 502 below.
-        log.warn("ensureCustomerMetaTag failed; proceeding", {
-          externalId: body.lagoCustomerExternalId,
-          error: err instanceof Error ? err.message : String(err),
-        });
+        log.warn(
+          "ensureCustomerMetaTag failed; falling back to legacy format",
+          {
+            externalId: body.lagoCustomerExternalId,
+            error: err instanceof Error ? err.message : String(err),
+          },
+        );
+        idTag = parentIdTagFor(body.lagoCustomerExternalId);
       }
-      const idTag = parentIdTagFor(body.lagoCustomerExternalId);
 
       // ---- StEvE RemoteStart ----
       const validated = RemoteStartTransactionParamsSchema.safeParse({
