@@ -32,16 +32,11 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 import { toast } from "sonner";
-import countries from "i18n-iso-countries";
-import en from "i18n-iso-countries/langs/en.json" with { type: "json" };
 // `country-state-city` ships its dataset as JS modules; we load the
 // state list lazily from the named export so we don't pay the
 // 200KB+ data cost on the initial page render.
 import { State } from "country-state-city";
-
-countries.registerLocale(
-  en as unknown as Parameters<typeof countries.registerLocale>[0],
-);
+import { ISO_COUNTRIES } from "@/src/lib/utils/iso-countries.ts";
 
 interface ChargerLocationEditorProps {
   chargeBoxId: string;
@@ -104,12 +99,7 @@ export default function ChargerLocationEditor(
     initial.longitude,
   ]);
 
-  const countryOptions = useMemo(() => {
-    const map = countries.getNames("en") as Record<string, string>;
-    return Object.entries(map)
-      .map(([code, name]) => ({ code, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, []);
+  const countryOptions = useMemo(() => ISO_COUNTRIES, []);
 
   const regionOptions = useMemo(() => {
     if (!form.addressCountry) {
