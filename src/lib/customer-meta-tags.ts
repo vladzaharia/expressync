@@ -214,3 +214,205 @@ export function refreshCustomerMetaTag(
 ): Promise<EnsureMetaTagResult> {
   return ensureCustomerMetaTag(externalId);
 }
+
+// ============================================================================
+// Per-device OCPP tags (Wave W12 — added 2026-05-07)
+// ============================================================================
+//
+// Customer device registration auto-mints a per-device OCPP tag so the
+// iOS Mobile Start flow can submit charging requests with a tag that
+// uniquely identifies *this device's customer* — no admin tag picker
+// required. The tag's name is derived from the user's public ID +
+// device ID prefix so it's both human-readable in the StEvE admin and
+// deterministic across re-registers (same device → same tag, no
+// orphaning).
+//
+// TODO(meta-tag-rename): the customer's parent meta-tag still uses
+// `OCPP-{lagoExternalId}` (see `parentIdTagFor` above). Per the
+// 2026-05-07 plan we want to rename that to `OCPP-{userPublicId}`,
+// but the rename touches in-flight billing attribution and needs its
+// own migration with rollback. Track in a dedicated branch.
+
+const DEVICE_TAG_PREFIX = "OCPP-D-";
+
+/**
+ * Deterministic mapping from (userPublicId, deviceId) to a per-device
+ * OCPP tag. Pure — no I/O. Length is bounded by StEvE's tag-name limit
+ * (typically 20 chars); we use the first 6 hex chars of the device UUID
+ * to stay under that.
+ */
+export function deviceIdTagFor(
+  userPublicId: string,
+  deviceId: string,
+): string {
+  // device IDs are UUIDs; first 6 chars of the hex representation give
+  // ~16M variants per user — collision-free in practice for a friends-
+  // and-family fleet of phones.
+  const short = deviceId.replace(/-/g, "").slice(0, 6).toUpperCase();
+  return `${DEVICE_TAG_PREFIX}${userPublicId}-${short}`;
+}
+
+export interface EnsureDeviceTagResult {
+  idTag: string;
+  ocppTagPk: number | null;
+  isActive: boolean;
+}
+
+/**
+ * Idempotent upsert of a per-device OCPP tag in StEvE plus the matching
+ * `user_mappings` row. Re-registering the same device under the same
+ * user converges on the same tag without orphaning the old one.
+ *
+ * The created tag is parented to the customer's meta-tag so billing
+ * config inherits — admins don't have to configure each device-tag
+ * separately.
+ */
+export async function ensureDeviceTag(
+  deviceId: string,
+  userId: string,
+  userPublicId: string,
+  displayName?: string,
+): Promise<EnsureDeviceTagResult> {
+  const idTag = deviceIdTagFor(userPublicId, deviceId);
+
+  // ---- 1. resolve the parent meta-tag for billing inheritance ---------
+  const [user] = await db
+    .select({
+      lagoCustomerExternalId: schema.users.lagoCustomerExternalId,
+    })
+    .from(schema.users)
+    .where(eq(schema.users.id, userId))
+    .limit(1);
+  const parentIdTag = user?.lagoCustomerExternalId
+    ? parentIdTagFor(user.lagoCustomerExternalId)
+    : null;
+
+  // ---- 2. upsert in StEvE ---------------------------------------------
+  let ocppTagPk: number | null = null;
+  let isActive = true;
+  try {
+    const existing = await steveClient.getOcppTags({ idTag });
+    if (existing.length > 0) {
+      const tag = existing[0];
+      ocppTagPk = tag.ocppTagPk;
+      isActive = (tag.maxActiveTransactionCount ?? 0) > 0;
+    } else {
+      const created = await steveClient.createOcppTag(idTag, {
+        note: displayName
+          ? `ExpressCharge device — ${displayName}`
+          : "ExpressCharge device",
+        maxActiveTransactionCount: 1,
+        parentIdTag: parentIdTag ?? undefined,
+      });
+      ocppTagPk = created.ocppTagPk;
+    }
+  } catch (err) {
+    log.warn("StEvE device-tag upsert failed; mapping write skipped", {
+      idTag,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  // ---- 3. user_mappings row -------------------------------------------
+  try {
+    if (ocppTagPk !== null) {
+      const [existingRow] = await db
+        .select()
+        .from(schema.userMappings)
+        .where(eq(schema.userMappings.steveOcppTagPk, ocppTagPk))
+        .limit(1);
+
+      if (existingRow) {
+        await db
+          .update(schema.userMappings)
+          .set({
+            steveOcppIdTag: idTag,
+            displayName: existingRow.displayName ?? displayName ?? null,
+            isActive,
+            userId: existingRow.userId ?? userId,
+            deviceId: existingRow.deviceId ?? deviceId,
+            steveParentIdTag: parentIdTag,
+            tagType: "phone_nfc",
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.userMappings.id, existingRow.id));
+      } else {
+        await db.insert(schema.userMappings).values({
+          steveOcppTagPk: ocppTagPk,
+          steveOcppIdTag: idTag,
+          displayName: displayName ?? null,
+          tagType: "phone_nfc",
+          isActive,
+          userId,
+          deviceId,
+          steveParentIdTag: parentIdTag,
+        });
+      }
+    }
+  } catch (err) {
+    log.warn("user_mappings upsert for device-tag failed", {
+      idTag,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  return { idTag, ocppTagPk, isActive };
+}
+
+/**
+ * Deactivate a device's OCPP tag in StEvE and flip its
+ * `user_mappings.is_active` to false. Called from device deletion +
+ * deregister paths so the StEvE tag table doesn't accumulate orphans.
+ *
+ * The user_mappings row itself is preserved (not deleted) because the
+ * `device_id` FK cascades on device row delete; this helper handles the
+ * StEvE side of the cleanup so OCPP doesn't accept post-deregister
+ * charging requests.
+ */
+export async function revokeDeviceTag(deviceId: string): Promise<void> {
+  let rows: Array<{ id: number; ocppTagPk: number; idTag: string }> = [];
+  try {
+    rows = (await db
+      .select({
+        id: schema.userMappings.id,
+        ocppTagPk: schema.userMappings.steveOcppTagPk,
+        idTag: schema.userMappings.steveOcppIdTag,
+      })
+      .from(schema.userMappings)
+      .where(eq(schema.userMappings.deviceId, deviceId))) as typeof rows;
+  } catch (err) {
+    log.warn("device-tag lookup failed; cleanup skipped", {
+      deviceId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return;
+  }
+
+  for (const row of rows) {
+    try {
+      const [tag] = await steveClient.getOcppTags({ idTag: row.idTag });
+      if (tag) {
+        await steveClient.updateOcppTag({
+          ...tag,
+          maxActiveTransactionCount: 0,
+        });
+      }
+    } catch (err) {
+      log.warn("StEvE deactivate failed for device-tag", {
+        idTag: row.idTag,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    try {
+      await db
+        .update(schema.userMappings)
+        .set({ isActive: false, updatedAt: new Date() })
+        .where(eq(schema.userMappings.id, row.id));
+    } catch (err) {
+      log.warn("user_mappings deactivate failed for device-tag", {
+        idTag: row.idTag,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+}
