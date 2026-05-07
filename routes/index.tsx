@@ -329,11 +329,14 @@ async function loadCustomerData(
     const rows = await db
       .select({
         chargeBoxId: schema.chargersCache.chargeBoxId,
+        publicId: schema.chargersCache.publicId,
         friendlyName: schema.chargersCache.friendlyName,
         lastStatus: schema.chargersCache.lastStatus,
         lastStatusAt: schema.chargersCache.lastStatusAt,
         lastSeenAt: schema.chargersCache.lastSeenAt,
         formFactor: schema.chargersCache.formFactor,
+        connectorTypeOverride: schema.chargersCache.connectorTypeOverride,
+        maxKwOverride: schema.chargersCache.maxKwOverride,
       })
       .from(schema.chargersCache)
       .limit(50);
@@ -377,11 +380,20 @@ async function loadCustomerData(
       } else {
         status = "online";
       }
+      const ct = r.connectorTypeOverride;
       chargerCards.push({
         chargeBoxId: r.chargeBoxId,
         friendlyName: r.friendlyName,
         formFactor,
         status,
+        publicId: r.publicId,
+        connectorType:
+          (["ccs", "j1772", "nacs", "chademo", "type2"] as const).includes(
+              ct as "ccs" | "j1772" | "nacs" | "chademo" | "type2",
+            )
+            ? (ct as "ccs" | "j1772" | "nacs" | "chademo" | "type2")
+            : null,
+        maxKw: r.maxKwOverride !== null ? Number(r.maxKwOverride) : null,
       });
     }
   } catch (err) {

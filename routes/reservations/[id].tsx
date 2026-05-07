@@ -25,8 +25,7 @@ import { BackAction } from "../../components/shared/BackAction.tsx";
 import { SectionCard } from "../../components/shared/SectionCard.tsx";
 import { MetricTile } from "../../components/shared/MetricTile.tsx";
 import { ReservationStatusBadge } from "../../components/shared/ReservationStatusBadge.tsx";
-import { PublicIdDisplay } from "../../components/shared/PublicIdDisplay.tsx";
-import { ConnectorSpec } from "../../components/shared/ConnectorSpec.tsx";
+import { ChargerIdentityStrip } from "../../components/shared/ChargerIdentityStrip.tsx";
 import {
   BatteryCharging,
   Calendar,
@@ -272,27 +271,13 @@ export default define.page<typeof handler>(
               }
             >
               <div class="flex flex-col gap-6">
-                {data.charger &&
-                  (data.charger.publicId || data.charger.connectorType ||
-                    data.charger.maxKw != null) &&
-                  (
-                    <div class="flex flex-wrap items-center gap-4 rounded-lg border bg-card/40 px-4 py-3">
-                      {data.charger.publicId && (
-                        <PublicIdDisplay
-                          publicId={data.charger.publicId}
-                          size="sm"
-                        />
-                      )}
-                      {(data.charger.connectorType ||
-                        data.charger.maxKw != null) && (
-                        <ConnectorSpec
-                          type={data.charger.connectorType}
-                          kw={data.charger.maxKw}
-                          size="sm"
-                        />
-                      )}
-                    </div>
-                  )}
+                {data.charger && (
+                  <ChargerIdentityStrip
+                    publicId={data.charger.publicId}
+                    connectorType={data.charger.connectorType}
+                    maxKw={data.charger.maxKw}
+                  />
+                )}
                 <SectionCard
                   title="Summary"
                   icon={Calendar}

@@ -21,6 +21,8 @@ import { CalendarClock, Loader2, Zap } from "lucide-preact";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
+import { PublicIdDisplay } from "@/components/shared/PublicIdDisplay.tsx";
+import { ConnectorSpec } from "@/components/shared/ConnectorSpec.tsx";
 import {
   chargerFormFactorIcons,
   type FormFactor,
@@ -37,6 +39,12 @@ export interface CustomerChargerCardDto {
   friendlyName: string | null;
   formFactor: FormFactor;
   status: CustomerChargerStatus;
+  /** W11 — sticker-printable identity. When set, rendered as a tiny
+   *  watermark above the card's status pill so customers can match
+   *  the on-card code to the QR code on the physical sticker. */
+  publicId?: string | null;
+  connectorType?: "ccs" | "j1772" | "nacs" | "chademo" | "type2" | null;
+  maxKw?: number | null;
 }
 
 interface Props {
@@ -177,7 +185,22 @@ export default function CustomerChargersSection({ chargers }: Props) {
                 <p class="text-sm font-semibold leading-tight truncate">
                   {name}
                 </p>
-                {c.friendlyName && c.friendlyName.trim().length > 0 && (
+                {c.publicId && (
+                  <div class="mt-1">
+                    <PublicIdDisplay publicId={c.publicId} size="sm" />
+                  </div>
+                )}
+                {(c.connectorType || c.maxKw != null) && (
+                  <div class="mt-1">
+                    <ConnectorSpec
+                      type={c.connectorType ?? null}
+                      kw={c.maxKw ?? null}
+                      size="sm"
+                    />
+                  </div>
+                )}
+                {c.friendlyName && c.friendlyName.trim().length > 0 &&
+                  !c.publicId && (
                   <p class="mt-0.5 text-xs text-muted-foreground truncate">
                     {c.chargeBoxId}
                   </p>
