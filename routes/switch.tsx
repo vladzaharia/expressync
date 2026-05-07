@@ -105,13 +105,13 @@ export default define.page<typeof handler>(function SwitchPage({ data }) {
               <div class="grid grid-cols-2 gap-2">
                 <a
                   href={data.customerLoginUrl}
-                  class="inline-flex items-center justify-center rounded-md border border-primary/40 bg-background px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/5"
+                  class="inline-flex items-center justify-center rounded-md border border-primary/40 px-3 py-2 text-sm font-medium text-primary transition-colors hover:border-primary/80"
                 >
                   Customer login
                 </a>
                 <a
                   href={data.adminLoginUrl}
-                  class="inline-flex items-center justify-center rounded-md border border-emerald-500/40 bg-background px-3 py-2 text-sm font-medium text-emerald-600 transition-colors hover:bg-emerald-500/5 dark:text-emerald-400"
+                  class="inline-flex items-center justify-center rounded-md border border-emerald-500/40 px-3 py-2 text-sm font-medium text-emerald-600 transition-colors hover:border-emerald-500/80 dark:text-emerald-400"
                 >
                   Admin login
                 </a>
