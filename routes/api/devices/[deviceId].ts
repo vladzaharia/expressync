@@ -38,6 +38,7 @@ import { logDeviceDeregistered } from "../../../src/lib/audit.ts";
 import { withIdempotency } from "../../../src/lib/idempotency.ts";
 import { eventBus } from "../../../src/services/event-bus.service.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
+import { revokeDeviceTag } from "../../../src/lib/customer-meta-tags.ts";
 
 const log = logger.child("DeviceSelfDelete");
 
@@ -144,7 +145,19 @@ export const handler = define.handlers({
           );
         }
 
-        // Step 3: audit. Actor is the device's owner — see `60-security.md`
+        // Step 3: revoke any per-device OCPP tag minted at registration
+        // so StEvE stops accepting Mobile Start requests from this
+        // device. Best-effort; the device row's deleted_at already locks
+        // bearer auth, so a missed cleanup leaves an orphan tag in StEvE
+        // but doesn't enable charging.
+        void revokeDeviceTag(pathDeviceId).catch((err) => {
+          log.warn("device-tag revoke failed", {
+            deviceId: pathDeviceId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+
+        // Step 4: audit. Actor is the device's owner — see `60-security.md`
         // §12. Best-effort.
         const ip = getClientIp(ctx.req);
         const ua = ctx.req.headers.get("user-agent");

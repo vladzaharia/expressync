@@ -33,6 +33,7 @@ import {
 } from "../../../../../src/lib/audit.ts";
 import { eventBus } from "../../../../../src/services/event-bus.service.ts";
 import { logger } from "../../../../../src/lib/utils/logger.ts";
+import { revokeDeviceTag } from "../../../../../src/lib/customer-meta-tags.ts";
 
 const log = logger.child("AdminDeviceDeregister");
 
@@ -133,6 +134,14 @@ export const handler = define.handlers({
         }
 
         const { ownerUserId } = updated[0];
+
+        // Revoke any per-device OCPP tag minted at registration so the
+        // StEvE-side maxActiveTransactionCount drops to 0 and Mobile
+        // Start requests for this device stop being honored. The DB
+        // FK on user_mappings.device_id cascades on the device row's
+        // deletion (migration 0046), so the local mapping cleanup is
+        // free; this call handles the StEvE-side update too.
+        void revokeDeviceTag(deviceId).catch(() => {});
 
         // Revoke every still-live token row. We capture the ids so the
         // device.token.revoked event payload can include `tokenId` per the
