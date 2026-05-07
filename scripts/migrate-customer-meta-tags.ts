@@ -36,6 +36,7 @@ import {
   parentIdTagFor,
   parentIdTagForUserPublicId,
 } from "@/src/lib/customer-meta-tags.ts";
+import { steveClient } from "@/src/lib/steve-client.ts";
 import { syncSingleTagToSteve } from "@/src/services/tag-sync.service.ts";
 
 const APPLY = Deno.args.includes("--apply");
@@ -190,6 +191,100 @@ async function main() {
     }
   }
   console.log(`Self-parent repair pass: ${repaired} rows fixed.`);
+
+  // ---- Orphan-PK rescue: recreate StEvE tags whose PK no longer
+  //      exists. The cleanup pass that deleted legacy parent tags
+  //      caused some StEvE installations to also drop the children;
+  //      this pass walks every is_active=true user_mappings row, tries
+  //      to fetch its tag from StEvE by idTag, and re-creates it (with
+  //      the right parent) when missing. It also updates the local
+  //      steveOcppTagPk to the new PK so the syncer stops 404'ing.
+  const activeRows = await db
+    .select()
+    .from(schema.userMappings)
+    .where(eq(schema.userMappings.isActive, true));
+  console.log(
+    `Orphan-PK rescue: scanning ${activeRows.length} active user_mappings rows…`,
+  );
+  let rescued = 0;
+  for (const m of activeRows) {
+    // Skip meta-tag rows — those are owned by ensureCustomerMetaTag
+    // and we'll let it heal them on the next subscription/webhook
+    // event. The syncSingleTagToSteve path doesn't hit them.
+    if (m.steveOcppIdTag.startsWith("META-")) continue;
+    if (
+      m.steveOcppIdTag.startsWith("OCPP-") &&
+      !m.steveOcppIdTag.startsWith("OCPP-D-")
+    ) continue;
+
+    let stillThere: boolean;
+    try {
+      const [match] = await steveClient.getOcppTags({
+        idTag: m.steveOcppIdTag,
+      });
+      stillThere = !!match && match.ocppTagPk === m.steveOcppTagPk;
+      if (match && match.ocppTagPk !== m.steveOcppTagPk) {
+        // PK drifted — same idTag, different PK. Just point the
+        // local row at the live PK.
+        if (APPLY) {
+          await db
+            .update(schema.userMappings)
+            .set({
+              steveOcppTagPk: match.ocppTagPk,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.userMappings.id, m.id));
+          console.log(
+            `  PK drift on ${m.steveOcppIdTag}: ${m.steveOcppTagPk} → ${match.ocppTagPk}`,
+          );
+        } else {
+          console.log(
+            `  would patch PK on ${m.steveOcppIdTag}: ${m.steveOcppTagPk} → ${match.ocppTagPk}`,
+          );
+        }
+        rescued++;
+        continue;
+      }
+    } catch (err) {
+      console.warn(`  StEvE lookup failed for ${m.steveOcppIdTag}:`, err);
+      continue;
+    }
+    if (stillThere) continue;
+
+    if (!APPLY) {
+      console.log(
+        `  would recreate ${m.steveOcppIdTag} (parent=${
+          m.steveParentIdTag ?? "(none)"
+        })`,
+      );
+      rescued++;
+      continue;
+    }
+    try {
+      const created = await steveClient.createOcppTag(m.steveOcppIdTag, {
+        note: m.notes ??
+          (m.displayName
+            ? `Recreated by migration — ${m.displayName}`
+            : "Recreated by migration"),
+        maxActiveTransactionCount: 1,
+        parentIdTag: m.steveParentIdTag ?? undefined,
+      });
+      await db
+        .update(schema.userMappings)
+        .set({
+          steveOcppTagPk: created.ocppTagPk,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.userMappings.id, m.id));
+      console.log(
+        `  recreated ${m.steveOcppIdTag} → new PK ${created.ocppTagPk}`,
+      );
+      rescued++;
+    } catch (err) {
+      console.error(`  FAILED recreate ${m.steveOcppIdTag}:`, err);
+    }
+  }
+  console.log(`Orphan-PK rescue pass: ${rescued} rows rescued.`);
 
   console.log(APPLY ? "Done." : "Dry-run complete. Re-run with --apply.");
 }
