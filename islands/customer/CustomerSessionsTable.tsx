@@ -221,12 +221,14 @@ function buildColumns(
       },
     },
     ...(showCost
-      ? [{
-        key: "cost",
-        header: "Est. cost",
-        className: "text-right whitespace-nowrap",
-        render: (row: CustomerSessionRow) => renderCostCell(row, currency),
-      } satisfies PaginatedTableColumn<CustomerSessionRow>]
+      ? [
+        {
+          key: "cost",
+          header: "Est. cost",
+          className: "text-right whitespace-nowrap",
+          render: (row: CustomerSessionRow) => renderCostCell(row, currency),
+        } satisfies PaginatedTableColumn<CustomerSessionRow>,
+      ]
       : []),
     {
       key: "status",

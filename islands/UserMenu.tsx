@@ -107,7 +107,8 @@ export default function UserMenu({ user }: UserMenuProps) {
       >
         {user && (
           <>
-            {/*
+            {
+              /*
               The picker IS the user header. The active row (green
               border) carries the same info the old DropdownMenuLabel
               did — name, email, role-tinted icon — and any other
@@ -115,7 +116,8 @@ export default function UserMenu({ user }: UserMenuProps) {
               nothing for an unauthenticated visitor, but UserMenu only
               mounts when `user` is truthy so we always have at least
               the active row here.
-            */}
+            */
+            }
             <div class="px-1 py-1">
               <AccountList />
             </div>

@@ -28,10 +28,13 @@ import {
 } from "../../components/shared/index.ts";
 import { BlurFade } from "../../components/magicui/blur-fade.tsx";
 import {
-  PlanInfoCard,
   type PlanInfo,
+  PlanInfoCard,
 } from "../../components/customer/PlanInfoCard.tsx";
-import { PlanName, planTierLabel } from "../../components/customer/PlanName.tsx";
+import {
+  PlanName,
+  planTierLabel,
+} from "../../components/customer/PlanName.tsx";
 import {
   Activity,
   ArrowUpRight,
@@ -52,7 +55,6 @@ import { resolveCustomerScope } from "../../src/lib/scoping.ts";
 import {
   currencySymbolFor,
   derivePlanInfo,
-  enumerateDays,
   periodWindow,
 } from "../../src/lib/billing-derive.ts";
 import {
@@ -743,7 +745,6 @@ export default define.page<typeof handler>(
                   </p>
                 )}
             </SectionCard>
-
           </div>
         </PageCard>
       </SidebarLayout>

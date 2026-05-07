@@ -258,8 +258,8 @@ function TagFormInner(
         {idTagReadonly
           ? (
             <p class="text-xs text-muted-foreground">
-              EV Card ID is permanent — it's the StEvE primary key and cannot change
-              in place.
+              EV Card ID is permanent — it's the StEvE primary key and cannot
+              change in place.
             </p>
           )
           : (
@@ -267,8 +267,8 @@ function TagFormInner(
               Exact string sent by the physical card/keytag/sticker. Use the
               {" "}
               <code>{META_TAG_PREFIX}</code>{" "}
-              prefix to create a meta-EV Card (a rollup parent for grouping other
-              cards under one customer).
+              prefix to create a meta-EV Card (a rollup parent for grouping
+              other cards under one customer).
             </p>
           )}
         {replaceUndoValue.value !== null

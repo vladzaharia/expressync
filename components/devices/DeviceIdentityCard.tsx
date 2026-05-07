@@ -87,7 +87,7 @@ export function DeviceIdentityCard({
   isOnline,
   lastSeenAtIso,
   registeredAtIso,
-  isAdmin = true,
+  isAdmin: _isAdmin = true,
   class: className,
 }: DeviceIdentityCardProps) {
   const [copied, setCopied] = useState(false);
@@ -103,9 +103,7 @@ export function DeviceIdentityCard({
   };
 
   const ownerDisplay = ownerEmail ?? ownerUserId ?? "—";
-  const modelDisplay = model && platform
-    ? model
-    : (model ?? platform ?? "—");
+  const modelDisplay = model && platform ? model : (model ?? platform ?? "—");
 
   return (
     <div

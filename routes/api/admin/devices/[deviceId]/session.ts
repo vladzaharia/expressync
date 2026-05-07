@@ -371,9 +371,7 @@ export const handler = define.handlers({
 
     // Whole-amp current draw assuming 240V single-phase. Computed once
     // server-side so iOS and the admin page render the same number.
-    const amps = kw !== null && kw > 0
-      ? Math.round((kw * 1000) / 240)
-      : null;
+    const amps = kw !== null && kw > 0 ? Math.round((kw * 1000) / 240) : null;
 
     // Plan-level max-amps cap (`ev.max_amps` Lago entitlement). A
     // failed lookup is non-fatal — the iOS UI will simply hide the

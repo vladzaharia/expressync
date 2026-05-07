@@ -55,7 +55,11 @@ function splitName(
   // Order matters: longest match first so "AC" beats "C" if we ever add C.
   for (const suffix of ["AC", "M", "+"] as const) {
     if (name.endsWith(suffix)) {
-      return { base: name.slice(0, -suffix.length), suffix, spec: TIER_BY_SUFFIX[suffix] };
+      return {
+        base: name.slice(0, -suffix.length),
+        suffix,
+        spec: TIER_BY_SUFFIX[suffix],
+      };
     }
   }
   return { base: name, suffix: "", spec: BASE_SPEC };

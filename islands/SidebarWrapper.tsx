@@ -100,9 +100,11 @@ function TopBarContent({
         </div>
       )}
 
-      {/* Page action section — neutral background; the buttons it
+      {
+        /* Page action section — neutral background; the buttons it
          contains carry their own styling and the accent wash was
-         competing with them visually. */}
+         competing with them visually. */
+      }
       {actions && (
         <div className="flex items-center justify-center border-l transition-colors px-3">
           {actions}

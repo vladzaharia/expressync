@@ -65,8 +65,7 @@ export default function DeviceLabelInput({ deviceId, value }: Props) {
         value={draft}
         disabled={pending}
         maxLength={120}
-        onInput={(e) =>
-          setDraft((e.currentTarget as HTMLInputElement).value)}
+        onInput={(e) => setDraft((e.currentTarget as HTMLInputElement).value)}
         onBlur={submit}
         onKeyDown={(e) => {
           if (e.key === "Enter") {

@@ -15,10 +15,7 @@
  */
 
 import { lagoClient } from "./lago-client.ts";
-import {
-  currencySymbolFor,
-  derivePlanInfo,
-} from "./billing-derive.ts";
+import { currencySymbolFor, derivePlanInfo } from "./billing-derive.ts";
 import type { PlanTier } from "@/components/customer/PlanInfoCard.tsx";
 
 export interface CustomerTariff {
@@ -53,8 +50,9 @@ export async function resolveCustomerTariff(
     );
     if (!planRaw) return FALLBACK;
 
-    const currency = (planRaw as { amount_currency?: string }).amount_currency ??
-      FALLBACK.currency;
+    const currency =
+      (planRaw as { amount_currency?: string }).amount_currency ??
+        FALLBACK.currency;
     const symbol = currencySymbolFor(currency);
     const planInfo = derivePlanInfo(
       planRaw as unknown as Record<string, unknown>,

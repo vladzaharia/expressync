@@ -164,9 +164,7 @@ export default function ChargerConnectorOverrideSelect(
         </dd>
       </div>
 
-      {error && (
-        <span class="text-xs text-rose-500 self-end">{error}</span>
-      )}
+      {error && <span class="text-xs text-rose-500 self-end">{error}</span>}
     </div>
   );
 }

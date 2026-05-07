@@ -113,9 +113,7 @@ export function LegalCard({ card, emphasis = false }: Props) {
             <p class="text-sm text-muted-foreground">{card.summary}</p>
           </header>
           <div class="space-y-3 text-sm leading-relaxed">
-            {card.body.split(/\n\n+/).map((para, i) => (
-              <p key={i}>{para}</p>
-            ))}
+            {card.body.split(/\n\n+/).map((para, i) => <p key={i}>{para}</p>)}
             {card.bullets && card.bullets.length > 0
               ? (
                 <ul class="list-disc space-y-1 pl-5 text-sm">

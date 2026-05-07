@@ -406,8 +406,7 @@ export const handler = define.middleware(async (ctx) => {
   // table (see src/lib/auth.ts) so it rides along on session.user — no
   // extra query needed. Fall back to "customer" only if the field is
   // somehow missing on a legacy session.
-  const userRole =
-    (session.user as { role?: string }).role ?? "customer";
+  const userRole = (session.user as { role?: string }).role ?? "customer";
   ctx.state.user = { ...session.user, role: userRole };
   ctx.state.session = session.session;
 

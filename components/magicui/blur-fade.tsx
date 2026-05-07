@@ -1,4 +1,4 @@
-import type { ComponentChildren } from "preact";
+import type { ComponentChildren, JSX } from "preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 
 interface BlurFadeProps {
@@ -56,7 +56,7 @@ export function BlurFade({
         "--blur-fade-delay": `${delay}s`,
         "--blur-fade-blur": `${blur}px`,
         "--blur-fade-transform": getTransform(),
-      } as React.CSSProperties}
+      } as JSX.CSSProperties}
     >
       {children}
     </div>

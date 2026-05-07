@@ -25,6 +25,15 @@
 
 import { assertEquals, assertNotEquals } from "@std/assert";
 
+// Set AUTH_SECRET before any handler import so config.AUTH_SECRET is
+// populated when the handler caches its HMAC key. Without this the test
+// runs into a TextEncoder.encode(undefined) at signNonce time and falls
+// through to the 500 branch instead of exercising the 403 we're trying
+// to assert.
+if (!Deno.env.get("AUTH_SECRET")) {
+  Deno.env.set("AUTH_SECRET", "test-auth-secret-not-used-in-prod");
+}
+
 const SCAN_LOGIN_URL = "https://example.com/api/auth/scan-login";
 const SCAN_PAIR_URL = "https://example.com/api/auth/scan-pair";
 

@@ -676,7 +676,9 @@ function StepTag(
       <Input
         id="reservation-tag-filter"
         type="search"
-        placeholder={`Filter ${totalTags} EV Card${totalTags !== 1 ? "s" : ""}…`}
+        placeholder={`Filter ${totalTags} EV Card${
+          totalTags !== 1 ? "s" : ""
+        }…`}
         value={filter}
         onInput={(e) => onFilterChange((e.target as HTMLInputElement).value)}
       />
@@ -890,7 +892,11 @@ function StepReview(
           term="Connector"
           value={connectorId === 0 ? "All (charger-wide)" : `#${connectorId}`}
         />
-        <Row term="EV Card" value={tag.displayName ?? tag.idTag} hint={tag.idTag} />
+        <Row
+          term="EV Card"
+          value={tag.displayName ?? tag.idTag}
+          hint={tag.idTag}
+        />
         <Row
           term="Subscription"
           value={tag.lagoSubscriptionExternalId ?? "—"}
