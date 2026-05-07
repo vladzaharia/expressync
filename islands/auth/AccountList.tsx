@@ -7,15 +7,15 @@
  * `authClient.getSession()` on mount. This lets the island be embedded
  * without any prop drilling — drop it anywhere a switcher should appear.
  *
- * Behaviour:
- *   - Empty list → renders nothing (the caller can still render its own
- *     "no accounts" UI).
- *   - One row → still shown (e.g. on the login page so the user sees
- *     "you're already signed in as X").
- *   - Multiple rows → click row to call `setActive`; if the row's role
- *     is the same surface, refresh in place; if different, hard-nav to
- *     the matching host. The session cookie is shared across
- *     `.example.com`, so the destination picks up the new active.
+ * Visual model — border-only, NEVER background-fill:
+ *   - The currently-active session renders as a non-interactive row
+ *     with a green outline. It's the visual anchor that doubles as
+ *     the "you are X" header in the user menu.
+ *   - Other sessions render as buttons with a transparent border by
+ *     default and a blue border on hover. No row ever fills its
+ *     background.
+ *   - Active row is sorted to the top so the eye lands on "you are
+ *     here" first, then sees alternates below.
  *   - Per-row revoke (when `allowRevoke`) calls
  *     `authClient.multiSession.revoke` and reloads if the active was
  *     revoked.
@@ -206,6 +206,16 @@ export default function AccountList(props: AccountListProps) {
     return null;
   }
 
+  // Render the active session first so it doubles as the "you are
+  // here" header. Other sessions trail in the order Better Auth
+  // returned them (most-recently-active-first per the plugin docs).
+  const sortedSessions = activeSessionId
+    ? [
+      ...sessions.filter((r) => r.session.id === activeSessionId),
+      ...sessions.filter((r) => r.session.id !== activeSessionId),
+    ]
+    : sessions;
+
   return (
     <div
       class={cn("flex min-w-[16rem] flex-col gap-1", className)}
@@ -220,25 +230,19 @@ export default function AccountList(props: AccountListProps) {
           {error}
         </div>
       )}
-      {sessions.map((row) => {
+      {sortedSessions.map((row) => {
         const isActive = row.session.id === activeSessionId;
         const isBusy = busyId === row.session.id;
         const surface = roleSurface(row.user.role);
         const Icon = surface === "admin" ? ShieldCheck : UserIcon;
         const label = row.user.name || row.user.email;
-        return (
-          <button
-            key={row.session.id}
-            type="button"
-            role="listitem"
-            disabled={isBusy}
-            onClick={() => handleSwitch(row)}
-            class={cn(
-              "flex items-center gap-2 rounded-md px-2 py-1.5 text-left",
-              "transition-colors hover:bg-accent disabled:opacity-60",
-              isActive && "bg-accent/60",
-            )}
-          >
+
+        // Shared row content — used by both the non-interactive active
+        // row (rendered as a div) and the interactive switchable rows
+        // (rendered as buttons). Pulling it out keeps the markup and
+        // class logic in one place.
+        const rowInner = (
+          <>
             <span
               class={cn(
                 "inline-flex size-7 shrink-0 items-center justify-center rounded-full border",
@@ -258,7 +262,7 @@ export default function AccountList(props: AccountListProps) {
             </span>
             {isActive && (
               <Check
-                class="size-3.5 shrink-0 text-foreground"
+                class="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"
                 aria-label="Current account"
               />
             )}
@@ -275,8 +279,9 @@ export default function AccountList(props: AccountListProps) {
                   }
                 }}
                 class={cn(
-                  "ml-1 inline-flex size-6 shrink-0 items-center justify-center rounded",
-                  "text-muted-foreground hover:bg-destructive/10 hover:text-destructive",
+                  "ml-1 inline-flex size-6 shrink-0 items-center justify-center rounded border border-transparent",
+                  "text-muted-foreground transition-colors",
+                  "hover:border-destructive/50 hover:text-destructive",
                 )}
               >
                 {isBusy
@@ -287,6 +292,39 @@ export default function AccountList(props: AccountListProps) {
             {isBusy && !allowRevoke && (
               <Loader2 class="size-3.5 animate-spin text-muted-foreground" />
             )}
+          </>
+        );
+
+        // Active row: green border, non-interactive (no click handler,
+        // no button semantics, default cursor).
+        if (isActive) {
+          return (
+            <div
+              key={row.session.id}
+              role="listitem"
+              aria-current="true"
+              class="flex items-center gap-2 rounded-md border border-emerald-500/50 px-2 py-1.5 text-left"
+            >
+              {rowInner}
+            </div>
+          );
+        }
+
+        // Switchable row: transparent border by default, blue border on
+        // hover. NEVER applies a background fill.
+        return (
+          <button
+            key={row.session.id}
+            type="button"
+            role="listitem"
+            disabled={isBusy}
+            onClick={() => handleSwitch(row)}
+            class={cn(
+              "flex items-center gap-2 rounded-md border border-transparent px-2 py-1.5 text-left",
+              "transition-colors hover:border-blue-500/60 disabled:opacity-60",
+            )}
+          >
+            {rowInner}
           </button>
         );
       })}

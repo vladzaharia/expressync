@@ -1,12 +1,13 @@
 /**
  * UserMenu — top-bar right-cluster dropdown.
  *
- * Renders the signed-in user's avatar as the trigger and a dropdown with:
- *   - Name / email / role header
- *   - Theme toggle (reuses `useThemeToggle` from ThemeToggle island so the
- *     UI reflects and mutates the global html.dark class + localStorage key)
- *   - Sign Out (POST /api/auth/sign-out, then navigate to /login — mirrors
- *     the handler previously in AppSidebar)
+ * Renders the signed-in user's avatar as the trigger and a dropdown
+ * whose top section IS the AccountList: the active row (green border)
+ * doubles as the user header, with any other device sessions below as
+ * clickable switch targets. Below the picker:
+ *   - "Sign in to another account" → /switch on customer host
+ *   - Theme toggle
+ *   - Sign Out
  */
 
 import { useEffect, useState } from "preact/hooks";
@@ -15,7 +16,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
@@ -23,7 +23,6 @@ import { useThemeToggle } from "@/islands/ThemeToggle.tsx";
 import AccountList from "@/islands/auth/AccountList.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { signOutAndRedirect } from "@/src/lib/nav.ts";
-import { authClient } from "@/src/lib/auth-client.ts";
 
 interface UserMenuProps {
   user?: {
@@ -38,7 +37,6 @@ const STORAGE_KEY = "ev-billing-theme";
 export default function UserMenu({ user }: UserMenuProps) {
   const toggleTheme = useThemeToggle();
   const [isDark, setIsDark] = useState(true);
-  const [hasMultiple, setHasMultiple] = useState(false);
 
   // Track the actual theme on the document so the menu icon/label stay in sync.
   useEffect(() => {
@@ -58,26 +56,6 @@ export default function UserMenu({ user }: UserMenuProps) {
     return () => {
       mo.disconnect();
       globalThis.removeEventListener("storage", onStorage);
-    };
-  }, []);
-
-  // Probe device-session count once on mount so the menu can show the
-  // switcher only when there's more than one. Failure is silent — the
-  // menu still works, the switcher just doesn't appear.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await authClient.multiSession.listDeviceSessions();
-        if (cancelled) return;
-        const count = (res.data ?? []).length;
-        setHasMultiple(count > 1);
-      } catch {
-        // ignore
-      }
-    })();
-    return () => {
-      cancelled = true;
     };
   }, []);
 
@@ -129,31 +107,19 @@ export default function UserMenu({ user }: UserMenuProps) {
       >
         {user && (
           <>
-            <DropdownMenuLabel>
-              <div class="flex flex-col min-w-0">
-                <span class="text-sm font-medium truncate">{displayName}</span>
-                <span class="text-xs text-muted-foreground truncate">
-                  {user.email}
-                </span>
-                {user.role && (
-                  <span class="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">
-                    {user.role}
-                  </span>
-                )}
-              </div>
-            </DropdownMenuLabel>
+            {/*
+              The picker IS the user header. The active row (green
+              border) carries the same info the old DropdownMenuLabel
+              did — name, email, role-tinted icon — and any other
+              sessions trail it as switchable rows. AccountList renders
+              nothing for an unauthenticated visitor, but UserMenu only
+              mounts when `user` is truthy so we always have at least
+              the active row here.
+            */}
+            <div class="px-1 py-1">
+              <AccountList />
+            </div>
             <DropdownMenuSeparator />
-            {hasMultiple && (
-              <>
-                <DropdownMenuLabel class="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  Switch account
-                </DropdownMenuLabel>
-                <div class="px-1 pb-1">
-                  <AccountList />
-                </div>
-                <DropdownMenuSeparator />
-              </>
-            )}
             <DropdownMenuItem asChild>
               <a href={switchHref}>
                 <Plus className="size-4" />
