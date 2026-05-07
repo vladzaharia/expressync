@@ -552,21 +552,19 @@ export default define.page<typeof handler>(
 
     const displayName = charger.friendlyName ?? charger.chargeBoxId;
 
-    // Migration 0043 — unmanaged chargers (Tesla Wall Connectors etc.)
-    // render an entirely different, leaner page. None of the OCPP-derived
-    // sections (live status, connectors, recent transactions, operation
-    // audit, configuration, remote actions) are reachable from this branch
-    // because the components aren't even imported into the DOM here.
-    if (charger.managementMode === "unmanaged") {
-      return (
-        <UnmanagedChargerDetailLayout
-          url={url}
-          state={state}
-          charger={charger}
-          displayName={displayName}
-        />
-      );
-    }
+    // W8-rest — single render path. Per the cross-cutting principle
+    // ("managed and unmanaged should look and feel as similar as
+    // possible"), we don't fork the page template on managementMode;
+    // each OCPP-specific section gates itself below on `isUnmanaged`.
+    // Only the page accent flips (orange for managed, blue for
+    // unmanaged) so the operator gets an at-a-glance signal of which
+    // mode they're looking at.
+    const isUnmanaged = charger.managementMode === "unmanaged";
+    const accent = isUnmanaged ? "blue" : "orange";
+    // Universal-link URL printed on the sticker. Same value the
+    // PublicIdQrPopover encodes and what the public /c/<publicId>
+    // landing renders for.
+    const universalLink = `https://example.com/c/${charger.publicId}`;
 
     const activeSessionForLive = data.activeSessions[0]
       ? {
@@ -583,11 +581,14 @@ export default define.page<typeof handler>(
       <SidebarLayout
         currentPath={url.pathname}
         user={state.user}
-        accentColor="orange"
+        accentColor={accent}
       >
         <PageCard
           title={displayName}
-          colorScheme="orange"
+          description={isUnmanaged
+            ? "Unmanaged charger — no OCPP connection. Customers tap the sticker to land on a public 'just plug in' page."
+            : undefined}
+          colorScheme={accent}
           topRightAccessory={
             <PublicIdQrPopover
               entity="charger"
@@ -597,24 +598,55 @@ export default define.page<typeof handler>(
           }
         >
           <div class="flex flex-col gap-6">
-            {/* Header strip — identity + status pills */}
-            <ChargerHeaderStrip
-              chargeBoxId={charger.chargeBoxId}
-              friendlyName={charger.friendlyName}
-              registrationStatus={charger.registrationStatus}
-              uiStatus={charger.uiStatus}
-              isStale={charger.isStale}
-              isOffline={charger.isOffline}
-              lastStatusAtIso={charger.lastStatusAtIso}
-              connectors={data.connectors.map((c) => ({
-                uiStatus: c.uiStatus,
-              }))}
-            />
+            {
+              /* Unmanaged-only header pills — managed chargers use
+                ChargerHeaderStrip below for the same role. */
+            }
+            {isUnmanaged && (
+              <div class="flex flex-wrap items-center gap-2 text-sm">
+                <span class="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                  Free
+                </span>
+                <span class="inline-flex items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">
+                  Unmanaged
+                </span>
+                <span class="ml-2 truncate font-mono text-xs text-muted-foreground">
+                  {charger.chargeBoxId}
+                </span>
+              </div>
+            )}
 
-            {/* Row 1: identity + live status, 1+2 split at lg: */}
-            <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            {/* Managed-only header strip — identity + status pills */}
+            {!isUnmanaged && (
+              <ChargerHeaderStrip
+                chargeBoxId={charger.chargeBoxId}
+                friendlyName={charger.friendlyName}
+                registrationStatus={charger.registrationStatus}
+                uiStatus={charger.uiStatus}
+                isStale={charger.isStale}
+                isOffline={charger.isOffline}
+                lastStatusAtIso={charger.lastStatusAtIso}
+                connectors={data.connectors.map((c) => ({
+                  uiStatus: c.uiStatus,
+                }))}
+              />
+            )}
+
+            {
+              /* Row 1: identity + (managed-only) live status. The
+                identity card carries the form-factor / connector-type-
+                override / max-kW selects and is shared by both modes
+                — unmanaged chargers benefit from those same editors.
+                Live status is OCPP-only; when unmanaged, identity
+                spans the full row instead of 1/3. */
+            }
+            <div
+              class={`grid grid-cols-1 gap-6 ${
+                isUnmanaged ? "" : "lg:grid-cols-3"
+              }`}
+            >
               <ChargerIdentityCard
-                class="lg:col-span-1"
+                class={isUnmanaged ? "" : "lg:col-span-1"}
                 chargeBoxId={charger.chargeBoxId}
                 chargeBoxPk={charger.chargeBoxPk}
                 friendlyName={charger.friendlyName}
@@ -631,21 +663,27 @@ export default define.page<typeof handler>(
                 uiStatus={charger.uiStatus}
                 isAdmin={data.isAdmin}
               />
-              <ChargerLiveStatusCard
-                class="lg:col-span-2"
-                chargeBoxId={charger.chargeBoxId}
-                uiStatus={charger.uiStatus}
-                lastStatus={charger.lastStatus}
-                lastStatusAtIso={charger.lastStatusAtIso}
-                isStale={charger.isStale}
-                isOffline={charger.isOffline}
-                activeSession={activeSessionForLive}
-                steveFetchFailed={data.steveFetchFailed}
-              />
+              {!isUnmanaged && (
+                <ChargerLiveStatusCard
+                  class="lg:col-span-2"
+                  chargeBoxId={charger.chargeBoxId}
+                  uiStatus={charger.uiStatus}
+                  lastStatus={charger.lastStatus}
+                  lastStatusAtIso={charger.lastStatusAtIso}
+                  isStale={charger.isStale}
+                  isOffline={charger.isOffline}
+                  activeSession={activeSessionForLive}
+                  steveFetchFailed={data.steveFetchFailed}
+                />
+              )}
             </div>
 
-            {/* Row 1.5: structured location editor — inline edit. */}
-            <SectionCard title="Location" accent="orange" icon={MapPin}>
+            {
+              /* Row 1.5: structured location editor — inline edit.
+                Always rendered; the editor's read view collapses to
+                "no address set" when blank. */
+            }
+            <SectionCard title="Location" accent={accent} icon={MapPin}>
               <ChargerLocationEditor
                 chargeBoxId={charger.chargeBoxId}
                 initial={{
@@ -661,32 +699,39 @@ export default define.page<typeof handler>(
               />
             </SectionCard>
 
-            {/* Row 2: connector cards */}
-            <ConnectorsSection
-              chargeBoxId={charger.chargeBoxId}
-              connectors={data.connectors}
-              isAdmin={data.isAdmin}
-            />
-
-            {/* Row 3: recent tx + operation audit, side-by-side at xl: */}
-            <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
-              <ChargerRecentTransactionsSection
+            {
+              /* Row 2: connector cards (managed only — unmanaged has
+                no live connector data to render). */
+            }
+            {!isUnmanaged && (
+              <ConnectorsSection
                 chargeBoxId={charger.chargeBoxId}
-                rows={data.recentTransactions}
-                steveFetchFailed={data.steveFetchFailed}
+                connectors={data.connectors}
+                isAdmin={data.isAdmin}
               />
-              <SectionCard
-                title="Operation audit"
-                description={`Last ${data.operationLog.length} entries`}
-                icon={ClipboardList}
-                accent="orange"
-              >
-                <ChargerOperationLogTable
-                  rows={data.operationLog}
-                  isAdmin={data.isAdmin}
+            )}
+
+            {/* Row 3: recent tx + operation audit, managed-only. */}
+            {!isUnmanaged && (
+              <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                <ChargerRecentTransactionsSection
+                  chargeBoxId={charger.chargeBoxId}
+                  rows={data.recentTransactions}
+                  steveFetchFailed={data.steveFetchFailed}
                 />
-              </SectionCard>
-            </div>
+                <SectionCard
+                  title="Operation audit"
+                  description={`Last ${data.operationLog.length} entries`}
+                  icon={ClipboardList}
+                  accent="orange"
+                >
+                  <ChargerOperationLogTable
+                    rows={data.operationLog}
+                    isAdmin={data.isAdmin}
+                  />
+                </SectionCard>
+              </div>
+            )}
 
             {
               /* Slice O — Charger Configuration (admin-only). Mirrors the
@@ -697,7 +742,7 @@ export default define.page<typeof handler>(
                 (chargers don't carry per-key device_settings; the model
                 is app-scoped). */
             }
-            {data.isAdmin && (
+            {data.isAdmin && !isUnmanaged && (
               <SectionCard
                 title="Charger Configuration"
                 description="Admin-editable capabilities for this charger."
@@ -712,8 +757,11 @@ export default define.page<typeof handler>(
               </SectionCard>
             )}
 
-            {/* Row 4: admin-only actions palette */}
-            {data.isAdmin && (
+            {
+              /* Row 4: admin-only actions palette (managed only —
+                unmanaged chargers have nothing to remote-control). */
+            }
+            {data.isAdmin && !isUnmanaged && (
               <RemoteActionsPanel
                 chargeBoxId={charger.chargeBoxId}
                 friendlyName={charger.friendlyName}
@@ -724,156 +772,57 @@ export default define.page<typeof handler>(
                 }))}
               />
             )}
+
+            {
+              /* Unmanaged-only: sticker URL + customer-facing
+                instructions preview. */
+            }
+            {isUnmanaged && (
+              <>
+                <SectionCard
+                  title="Scan codes"
+                  accent={accent}
+                  icon={Sticker}
+                >
+                  <p class="text-sm text-muted-foreground">
+                    Print and affix this URL to the charger as a QR or NFC
+                    sticker. iOS opens the app directly when installed; everyone
+                    else lands on a public "plug in and charge" page.
+                  </p>
+                  <div class="mt-3 rounded-md border bg-muted/40 p-3">
+                    <code class="break-all text-xs">{universalLink}</code>
+                  </div>
+                  <p class="mt-3 text-xs text-muted-foreground">
+                    QR generation lands in a follow-up; for now the
+                    PublicIdQrPopover (top-right of this page) renders the same
+                    URL as a printable QR.
+                  </p>
+                </SectionCard>
+
+                <SectionCard
+                  title="User instructions preview"
+                  accent={accent}
+                >
+                  <p class="text-xs uppercase tracking-wide text-muted-foreground">
+                    What customers see when they scan the sticker
+                  </p>
+                  <h3 class="mt-2 text-base font-semibold">
+                    {DUMB_CHARGER_HEADLINE}
+                  </h3>
+                  <ol class="mt-3 list-decimal space-y-1 pl-6 text-sm">
+                    {DUMB_CHARGER_STEPS.map((step) => (
+                      <li key={step}>{step}</li>
+                    ))}
+                  </ol>
+                  <p class="mt-3 text-sm text-muted-foreground">
+                    {DUMB_CHARGER_TAGLINE}
+                  </p>
+                </SectionCard>
+              </>
+            )}
           </div>
         </PageCard>
       </SidebarLayout>
     );
   },
 );
-
-// ---------------------------------------------------------------------------
-// Unmanaged charger layout (Migration 0043)
-// ---------------------------------------------------------------------------
-
-type UnmanagedCharger = NonNullable<ChargerDetailLoaderData["charger"]>;
-
-function UnmanagedChargerDetailLayout(
-  { url, state, charger, displayName }: {
-    url: URL;
-    // deno-lint-ignore no-explicit-any
-    state: any;
-    charger: UnmanagedCharger;
-    displayName: string;
-  },
-) {
-  // QR encodes the public sticker URL — same value the popover and
-  // public landing page use. Admins printing stickers should rely on
-  // the popover's QR rather than copying the URL by hand.
-  const universalLink = `https://example.com/c/${charger.publicId}`;
-  return (
-    <SidebarLayout
-      currentPath={url.pathname}
-      user={state.user}
-      accentColor="blue"
-    >
-      <PageCard
-        title={displayName}
-        description="Unmanaged charger — no OCPP connection. Customers tap the sticker to land on a public 'just plug in' page."
-        colorScheme="blue"
-        topRightAccessory={
-          <PublicIdQrPopover
-            entity="charger"
-            publicId={charger.publicId}
-            size="md"
-          />
-        }
-      >
-        <div class="flex flex-col gap-6">
-          {/* Lightweight header strip — two pills, no connector roll-up */}
-          <div class="flex flex-wrap items-center gap-2 text-sm">
-            <span class="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-              Free
-            </span>
-            <span class="inline-flex items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">
-              Unmanaged
-            </span>
-            <span class="ml-2 truncate font-mono text-xs text-muted-foreground">
-              {charger.chargeBoxId}
-            </span>
-          </div>
-
-          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <SectionCard title="Identity" accent="blue" icon={MapPin}>
-              <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                <div>
-                  <dt class="text-xs uppercase tracking-wide text-muted-foreground">
-                    Friendly name
-                  </dt>
-                  <dd class="mt-1 font-medium">
-                    {charger.friendlyName ?? "—"}
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-xs uppercase tracking-wide text-muted-foreground">
-                    Charger ID
-                  </dt>
-                  <dd class="mt-1 font-mono text-xs">{charger.chargeBoxId}</dd>
-                </div>
-                <div>
-                  <dt class="text-xs uppercase tracking-wide text-muted-foreground">
-                    Form factor
-                  </dt>
-                  <dd class="mt-1">{charger.formFactor}</dd>
-                </div>
-                <div>
-                  <dt class="text-xs uppercase tracking-wide text-muted-foreground">
-                    Added
-                  </dt>
-                  <dd class="mt-1">
-                    {new Date(charger.firstSeenAtIso).toLocaleString()}
-                  </dd>
-                </div>
-                {charger.locationDescription && (
-                  <div class="sm:col-span-2">
-                    <dt class="text-xs uppercase tracking-wide text-muted-foreground">
-                      Location
-                    </dt>
-                    <dd class="mt-1 whitespace-pre-line">
-                      {charger.locationDescription}
-                    </dd>
-                  </div>
-                )}
-              </dl>
-            </SectionCard>
-
-            <SectionCard title="Scan codes" accent="blue" icon={Sticker}>
-              <p class="text-sm text-muted-foreground">
-                Print and affix this URL to the charger as a QR or NFC sticker.
-                iOS opens the app directly when installed; everyone else lands
-                on a public "plug in and charge" page.
-              </p>
-              <div class="mt-3 rounded-md border bg-muted/40 p-3">
-                <code class="break-all text-xs">{universalLink}</code>
-              </div>
-              <p class="mt-3 text-xs text-muted-foreground">
-                QR generation lands in a follow-up; for now, paste the URL into
-                your sticker tooling of choice.
-              </p>
-            </SectionCard>
-          </div>
-
-          <SectionCard title="Location" accent="blue" icon={MapPin}>
-            <ChargerLocationEditor
-              chargeBoxId={charger.chargeBoxId}
-              initial={{
-                addressLine1: charger.addressLine1,
-                addressLine2: charger.addressLine2,
-                addressCity: charger.addressCity,
-                addressRegion: charger.addressRegion,
-                addressPostalCode: charger.addressPostalCode,
-                addressCountry: charger.addressCountry,
-                latitude: charger.latitude,
-                longitude: charger.longitude,
-              }}
-            />
-          </SectionCard>
-
-          <SectionCard title="User instructions preview" accent="blue">
-            <p class="text-xs uppercase tracking-wide text-muted-foreground">
-              What customers see when they scan the sticker
-            </p>
-            <h3 class="mt-2 text-base font-semibold">
-              {DUMB_CHARGER_HEADLINE}
-            </h3>
-            <ol class="mt-3 list-decimal space-y-1 pl-6 text-sm">
-              {DUMB_CHARGER_STEPS.map((step) => <li key={step}>{step}</li>)}
-            </ol>
-            <p class="mt-3 text-sm text-muted-foreground">
-              {DUMB_CHARGER_TAGLINE}
-            </p>
-          </SectionCard>
-        </div>
-      </PageCard>
-    </SidebarLayout>
-  );
-}
