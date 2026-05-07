@@ -3,16 +3,16 @@
  * that surfaces the QR code an admin would print on the sticker.
  *
  * The QR encodes the public sticker URL (`/c/<publicId>` for chargers,
- * `/u/<publicId>` for users) so what's rendered here is exactly
- * what the printed sticker would carry. Source of the SVG is the
- * server-side `/api/admin/qr` endpoint, which is admin-gated by
- * middleware — non-admin viewers never reach this island, and
- * non-admin visitors of the public landing pages see the
- * `PublicIdDisplay` directly without a popover (set
- * `interactive={false}` on those surfaces).
+ * `/u/<publicId>` for users) so what's rendered here is exactly what
+ * the printed sticker would carry.
+ *
+ * QR generation is fully client-side: the popover lazy-loads the
+ * `qrcode` npm lib on first open and rasterises into a canvas. No
+ * server round-trip, no auth, no cache concerns — and the
+ * `/api/admin/qr` endpoint is no longer reachable from the popover.
  */
 
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { Copy } from "lucide-preact";
 import {
   Popover,
@@ -48,13 +48,41 @@ export default function PublicIdQrPopover({
     (entity === "charger"
       ? `${PUBLIC_HOST}/c/${publicId}`
       : `${PUBLIC_HOST}/u/${publicId}`);
-  const qrSrc = `/api/admin/qr?value=${
-    encodeURIComponent(stickerUrl)
-  }&size=256`;
   const formatted = formatPublicId(publicId);
+  const [open, setOpen] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [qrError, setQrError] = useState<string | null>(null);
+
+  // Render the QR into the canvas the first time the popover opens.
+  // Re-renders when the encoded URL changes (admin rotates the
+  // public ID, switches between charger/user, etc).
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const QRCode = (await import("qrcode")).default;
+        if (cancelled || !canvasRef.current) return;
+        await QRCode.toCanvas(canvasRef.current, stickerUrl, {
+          width: 224,
+          margin: 1,
+          errorCorrectionLevel: "M",
+          color: { dark: "#000000", light: "#ffffff" },
+        });
+        setQrError(null);
+      } catch (err) {
+        if (!cancelled) {
+          setQrError(err instanceof Error ? err.message : String(err));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, stickerUrl]);
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         type="button"
         class="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -69,20 +97,19 @@ export default function PublicIdQrPopover({
       <PopoverContent class="w-72" align="end">
         <div class="flex flex-col gap-3">
           <div class="flex justify-center">
-            {
-              /* The QR is admin-only and small enough that loading it
-                inline as an <img> is the simplest approach — Cache-
-                Control: private, max-age=300 keeps the round-trip
-                cost negligible on subsequent opens. */
-            }
-            <img
-              src={qrSrc}
+            <canvas
+              ref={canvasRef}
               width={224}
               height={224}
-              alt={`QR code that links to ${stickerUrl}`}
-              class="block bg-white rounded-md p-2"
+              aria-label={`QR code that links to ${stickerUrl}`}
+              class="block rounded-md bg-white p-2"
             />
           </div>
+          {qrError && (
+            <div class="text-center text-xs text-rose-500">
+              QR render failed: {qrError}
+            </div>
+          )}
           <div class="flex flex-col items-center gap-2">
             <PublicIdDisplay publicId={publicId} size="md" />
             <code class="text-xs text-muted-foreground break-all text-center">

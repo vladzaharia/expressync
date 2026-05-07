@@ -13,10 +13,9 @@
  *
  * "Use my location" pulls `navigator.geolocation` and reverse-
  * geocodes via `/api/admin/geocode`. "Look up from address"
- * forward-geocodes via the same proxy. The Leaflet pin-drop widget
- * the original plan called for is intentionally deferred — for the
- * friends-and-family deployment, browser geolocation + Nominatim
- * proxy cover the address-pin-drop UX without the bundle weight.
+ * forward-geocodes via the same proxy. A Leaflet pin-drop map sits
+ * between the lat/lon inputs and the geocode buttons so admins can
+ * fine-tune coordinates visually.
  */
 
 import { useEffect, useMemo, useState } from "preact/hooks";
@@ -37,6 +36,7 @@ import { toast } from "sonner";
 // 200KB+ data cost on the initial page render.
 import { State } from "country-state-city";
 import { ISO_COUNTRIES } from "@/src/lib/utils/iso-countries.ts";
+import LeafletPinDrop from "./LeafletPinDrop.tsx";
 
 interface ChargerLocationEditorProps {
   chargeBoxId: string;
@@ -411,6 +411,23 @@ export default function ChargerLocationEditor(
             Use my location
           </Button>
         </div>
+      </div>
+
+      <div class="space-y-1">
+        <Label>Pin on map</Label>
+        <LeafletPinDrop
+          latitude={form.latitude.trim() === "" ? null : Number(form.latitude)}
+          longitude={form.longitude.trim() === ""
+            ? null
+            : Number(form.longitude)}
+          onChange={(lat, lon) => {
+            update("latitude", lat.toFixed(6));
+            update("longitude", lon.toFixed(6));
+          }}
+        />
+        <p class="text-xs text-muted-foreground">
+          Click anywhere on the map or drag the marker to set coordinates.
+        </p>
       </div>
 
       <div class="flex flex-wrap gap-2">
