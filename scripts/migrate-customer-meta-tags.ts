@@ -1,28 +1,30 @@
 #!/usr/bin/env -S deno run -A
 /**
- * Backfill auto-managed `OCPP-{externalId}` parent tags for every Lago
- * customer.
+ * Backfill auto-managed parent tags for every Lago customer.
  *
  * Pass `--apply` to actually write to StEvE + DB. Without it, the script
  * runs as a dry-run and only logs what it would do.
  *
- * What it does
- *   1. List all Lago customers.
- *   2. For each, call `ensureCustomerMetaTag(externalId, name)` which:
- *      - upserts the StEvE `OCPP-{externalId}` tag (active state mirrors
- *        first active subscription),
- *      - upserts the `user_mappings` row.
- *   3. Reparent every existing customer-linked `user_mappings` row so its
- *      `steveParentIdTag` equals `OCPP-{externalId}`. Triggers a single
- *      StEvE sync per affected mapping so the parent edge propagates.
+ * 2026-05-07 RENAME — the canonical format moved from
+ * `OCPP-{lagoExternalId}` to `OCPP-{userPublicId}`. This script is the
+ * one-shot migration that performs the rename safely:
  *
- * What it does NOT do
- *   - Delete legacy `OCPP-VLAD` / `OCPP-JON` style organizational meta-
- *     tags. The StEvE client doesn't expose a delete method yet; remove
- *     them via the StEvE UI after confirming no children rely on them
- *     (children should already have been re-parented to `OCPP-{externalId}`
- *     via step 3, but verify before deleting). A future helper should add
- *     this once `steveClient.deleteOcppTag` is available.
+ *   1. List all Lago customers.
+ *   2. For each, call `ensureCustomerMetaTag(externalId, name)`. Post-
+ *      rename this:
+ *        - upserts the new `OCPP-{userPublicId}` tag,
+ *        - reparents every child of the legacy `OCPP-{externalId}` tag
+ *          to the new tag,
+ *        - deactivates the legacy tag (max_active_transaction_count=0)
+ *          + flips its local user_mappings row to is_active=false.
+ *   3. Reparent every customer-linked `user_mappings` row so its
+ *      `steveParentIdTag` matches the new canonical parent. Triggers a
+ *      StEvE sync per affected mapping so the StEvE-side parent edge
+ *      converges.
+ *
+ * Idempotent — safe to re-run. Once a customer's tags are migrated,
+ * subsequent passes are no-ops (the legacy tag has zero children and
+ * is already deactivated).
  */
 
 import { eq, isNotNull } from "drizzle-orm";
@@ -32,6 +34,7 @@ import { lagoClient } from "@/src/lib/lago-client.ts";
 import {
   ensureCustomerMetaTag,
   parentIdTagFor,
+  parentIdTagForUserPublicId,
 } from "@/src/lib/customer-meta-tags.ts";
 import { syncSingleTagToSteve } from "@/src/services/tag-sync.service.ts";
 
@@ -80,11 +83,33 @@ async function main() {
     .where(isNotNull(schema.userMappings.lagoCustomerExternalId));
   console.log(`Found ${linked.length} linked user_mappings rows.`);
 
+  // Resolve every customer's userPublicId in one pass so we don't fire
+  // a per-row lookup inside the loop.
+  const userRows = await db
+    .select({
+      lagoCustomerExternalId: schema.users.lagoCustomerExternalId,
+      publicId: schema.users.publicId,
+    })
+    .from(schema.users)
+    .where(isNotNull(schema.users.lagoCustomerExternalId));
+  const externalToPublic = new Map<string, string>();
+  for (const r of userRows) {
+    if (r.lagoCustomerExternalId && r.publicId) {
+      externalToPublic.set(r.lagoCustomerExternalId, r.publicId);
+    }
+  }
+
   let reparented = 0;
   for (const m of linked) {
     if (!m.lagoCustomerExternalId) continue;
     if (m.steveOcppIdTag.startsWith("OCPP-")) continue; // skip meta-tags themselves
-    const desired = parentIdTagFor(m.lagoCustomerExternalId);
+    // Prefer the new format. Fall back to the legacy format only if a
+    // customer somehow has no associated user (shouldn't happen post-
+    // migration 0046, but defensive).
+    const publicId = externalToPublic.get(m.lagoCustomerExternalId);
+    const desired = publicId
+      ? parentIdTagForUserPublicId(publicId)
+      : parentIdTagFor(m.lagoCustomerExternalId);
     if (m.steveParentIdTag === desired) continue;
     if (!APPLY) {
       console.log(

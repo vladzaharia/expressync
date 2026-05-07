@@ -244,22 +244,25 @@ export const handler = define.handlers({
         throw err;
       }
 
-      // Auto-managed customer meta-tag: materialize the OCPP-{externalId}
-      // parent tag (idempotent) and override the linked tag's
-      // steveParentIdTag so StEvE inherits config from the canonical
-      // customer parent. Skip for meta-tags themselves — they don't
-      // parent themselves under another customer parent.
-      const desiredParentIdTag = parentIdTagFor(lagoCustomerId);
+      // Auto-managed customer meta-tag: materialize the parent tag
+      // (idempotent) and override the linked tag's steveParentIdTag so
+      // StEvE inherits config from the canonical customer parent.
+      // Post-rename the parent format is `OCPP-<userPublicId>`; we
+      // await the ensure call so we have the canonical idTag rather
+      // than recomputing from a stale legacy format.
       const isLinkingAMetaTag = ocppTagId.startsWith("OCPP-");
+      let desiredParentIdTag = parentIdTagFor(lagoCustomerId);
       if (!isLinkingAMetaTag) {
-        // Best-effort, fire-and-forget the StEvE-side parent materialization.
-        void ensureCustomerMetaTag(lagoCustomerId).catch((err) => {
+        try {
+          const ensured = await ensureCustomerMetaTag(lagoCustomerId);
+          desiredParentIdTag = ensured.idTag;
+        } catch (err) {
           logger.warn(
             "API",
-            "ensureCustomerMetaTag from POST /tag/link failed",
-            err,
+            "ensureCustomerMetaTag from POST /tag/link failed; using legacy format",
+            err instanceof Error ? err : undefined,
           );
-        });
+        }
         if (parentMapping !== null) {
           const pm: schema.UserMapping = parentMapping;
           const updated = await db
