@@ -1,22 +1,38 @@
 import type { StEvEOcppTag } from "./types/steve.ts";
 
 /**
- * Prefix marking a tag as a "meta-tag" — a parent tag used purely to group
- * other tags under a single customer (e.g. `OCPP-VLAD` sits above `1234` and
- * `ABCD1234567890`). Meta-tags never correspond to a physical card handed to
- * a customer; they exist solely for hierarchy rollup in StEvE so that one
- * customer can own multiple real tags without duplicating the mapping.
+ * Canonical prefix marking a tag as a customer-parent "meta-tag" —
+ * `META-<userPublicId>`. Meta-tags never correspond to a physical
+ * card handed to a customer; they exist purely for hierarchy rollup
+ * in StEvE so that one customer can own multiple real tags without
+ * duplicating the mapping.
  *
- * Callers use this prefix to:
- *   - exclude meta-tag mappings from customer-facing surfaces (Lago invoice
- *     metadata, customer portal listings), and
- *   - reject attempts to issue a physical card against the meta-tag itself.
+ * Callers use this detection to:
+ *   - exclude meta-tag mappings from customer-facing surfaces,
+ *   - reject attempts to issue a physical card against the meta-tag,
+ *   - skip meta rows from re-parenting passes.
  */
-export const META_TAG_PREFIX = "OCPP-" as const;
+export const META_TAG_PREFIX = "META-" as const;
+
+/**
+ * Legacy `OCPP-<id>` parent prefix retained for detection during the
+ * Gen-1/Gen-2 → META- cleanup. Per-device customer tags are
+ * `OCPP-D-...` and explicitly excluded.
+ */
+const LEGACY_META_PREFIX = "OCPP-" as const;
+const DEVICE_TAG_PREFIX = "OCPP-D-" as const;
 
 /** True if the OCPP id tag is a meta-tag by naming convention. */
 export function isMetaTag(idTag: string | null | undefined): boolean {
-  return typeof idTag === "string" && idTag.startsWith(META_TAG_PREFIX);
+  if (typeof idTag !== "string") return false;
+  if (idTag.startsWith(META_TAG_PREFIX)) return true;
+  if (
+    idTag.startsWith(LEGACY_META_PREFIX) &&
+    !idTag.startsWith(DEVICE_TAG_PREFIX)
+  ) {
+    return true;
+  }
+  return false;
 }
 
 /**
