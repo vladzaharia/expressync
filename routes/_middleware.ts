@@ -441,29 +441,21 @@ export const handler = define.middleware(async (ctx) => {
   }
 
   // 8. Surface-vs-role enforcement.
-  // The /handoff/* routes are exempt: they ARE the picker shown to a
-  // visitor whose role doesn't match the current surface, so re-running
-  // the surface check here would loop. The handoff loaders themselves
-  // gate on auth state and render appropriate UI — they never leak
-  // admin data to a customer or vice versa.
-  const isHandoffPath = pathname === "/handoff/admin" ||
-    pathname === "/handoff/customer" ||
-    pathname === "/admin/handoff/customer" ||
-    pathname === "/admin/handoff/admin";
-
   if (surface === "admin") {
     // Admin host is admin-only. A logged-in customer who lands here is
-    // sent to the in-portal handoff picker, NOT cross-host bounced —
-    // the picker can either auto-switch to a customer session they
-    // already have on the device, or offer a clean choice.
-    if (userRole !== "admin" && !isHandoffPath) {
+    // bounced cross-host to the customer portal based on their active
+    // session role. If the user wants to switch portals deliberately,
+    // they navigate to the account picker (`/switch` on the customer
+    // host, also reachable via the user-menu "Sign in to another
+    // account" link).
+    if (userRole !== "admin") {
       if (pathname.startsWith("/api/")) {
         return applySecurityHeaders(notFoundResponse());
       }
       return applySecurityHeaders(
         new Response(null, {
           status: 302,
-          headers: { Location: "/handoff/customer" },
+          headers: { Location: `${config.CUSTOMER_BASE_URL}/` },
         }),
       );
     }

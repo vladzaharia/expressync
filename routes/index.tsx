@@ -520,16 +520,13 @@ export const handler = define.handlers({
     if (
       ctx.state.user.role === "admin" && !ctx.state.actingAs
     ) {
-      // Admins on the customer root land on the same-host handoff
-      // picker. Its loader auto-switches to a customer session if one
-      // exists on the device (multi-session), forwarding the active-
-      // session Set-Cookie on the redirect; otherwise it renders a
-      // picker so the visitor can sign in to a customer account or go
-      // to the admin portal. Avoids the previous "hard cross-host
-      // bounce with no context" UX.
+      // Cross-host redirect based on active session role: admins land
+      // on the admin portal. Deliberate portal switching is via the
+      // /switch account picker (in-menu or direct), not via this
+      // implicit bounce.
       return new Response(null, {
         status: 302,
-        headers: { Location: "/handoff/admin" },
+        headers: { Location: `${config.ADMIN_BASE_URL}/` },
       });
     }
 

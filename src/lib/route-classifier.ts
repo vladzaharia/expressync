@@ -84,6 +84,11 @@ const RULES: readonly RouteRule[] = [
   { prefix: "/login", classification: "PUBLIC", surface: "customer" },
   { prefix: "/auth/verify", classification: "PUBLIC", surface: "customer" },
   { prefix: "/auth/scan", classification: "PUBLIC", surface: "customer" },
+  // Multi-account picker — reachable signed-out so visitors can pick a
+  // login flow, and reachable signed-in so they can switch between
+  // sessions or add another. Customer-host only; admins on
+  // manage.example.com get a cross-host link from the user menu.
+  { prefix: "/switch", classification: "PUBLIC", surface: "customer" },
   // Legal pages — both surfaces serve them at the customer-host root so the
   // App Store / Apple Developer portal links resolve without auth, and so
   // admins linking from /admin can land on the same canonical content.

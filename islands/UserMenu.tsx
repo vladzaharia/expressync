@@ -83,22 +83,25 @@ export default function UserMenu({ user }: UserMenuProps) {
 
   const handleSignOut = () => signOutAndRedirect("/login");
 
-  // The "add another account" link points at the *other* portal's login.
-  // Cookie domain is shared across .example.com, so signing in there
-  // adds a session to this device which then appears in the switcher.
-  const otherPortalLoginHref = (() => {
-    if (typeof globalThis.location === "undefined") return "/login";
+  // "Sign in to another account" routes the visitor to the canonical
+  // `/switch` picker on the customer host. Cookie domain is shared
+  // across `.example.com`, so all sessions on the device — admin
+  // or customer — show up there. From the picker the user picks an
+  // existing session or jumps to a fresh login.
+  const switchHref = (() => {
+    if (typeof globalThis.location === "undefined") return "/switch";
     const host = globalThis.location.hostname;
     const port = globalThis.location.port ? `:${globalThis.location.port}` : "";
     const proto = globalThis.location.protocol;
     if (host === "localhost" || host === "127.0.0.1") {
-      // Pure-loopback dev — same host serves both. The login page already
-      // routes by surface heuristics, so just send them to /login.
-      return "/login";
+      // Pure-loopback dev — same host serves both surfaces.
+      return "/switch";
     }
-    const isAdmin = host.startsWith("manage.");
-    const otherHost = isAdmin ? host.slice("manage.".length) : `manage.${host}`;
-    return `${proto}//${otherHost}${port}/login`;
+    if (host.startsWith("manage.")) {
+      const customerHost = host.slice("manage.".length);
+      return `${proto}//${customerHost}${port}/switch`;
+    }
+    return "/switch";
   })();
 
   const displayName = user?.name || user?.email || "User";
@@ -152,7 +155,7 @@ export default function UserMenu({ user }: UserMenuProps) {
               </>
             )}
             <DropdownMenuItem asChild>
-              <a href={otherPortalLoginHref}>
+              <a href={switchHref}>
                 <Plus className="size-4" />
                 <span>Sign in to another account</span>
               </a>

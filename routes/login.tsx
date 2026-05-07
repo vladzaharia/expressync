@@ -24,7 +24,8 @@ import { GridPattern } from "../components/magicui/grid-pattern.tsx";
 import { ShineBorder } from "../components/magicui/shine-border.tsx";
 import { BlurFade } from "../components/magicui/blur-fade.tsx";
 import CustomerLoginWizard from "../islands/customer/CustomerLoginWizard.tsx";
-import AccountList from "../islands/auth/AccountList.tsx";
+import { sanitiseBackHref } from "../src/lib/back-href.ts";
+import { ArrowLeft } from "lucide-preact";
 
 interface CustomerLoginData {
   operatorEmail: string;
@@ -34,6 +35,7 @@ interface CustomerLoginData {
   initialChargeBoxId: string | null;
   defaultEmail: string;
   adminLoginUrl: string;
+  backHref: string | null;
 }
 
 export const handler = define.handlers({
@@ -42,6 +44,10 @@ export const handler = define.handlers({
     const scanParam = url.searchParams.get("scan");
     const chargerParam = url.searchParams.get("chargeBoxId");
     const emailParam = url.searchParams.get("email") ?? "";
+    const backHref = sanitiseBackHref(url.searchParams.get("back"), [
+      config.CUSTOMER_BASE_URL,
+      config.ADMIN_BASE_URL,
+    ]);
 
     // Scan-to-login is reachable whenever ANY tap-enabled target is
     // online — chargers AND ExpresScan phone/laptop scanners both
@@ -100,6 +106,7 @@ export const handler = define.handlers({
         initialChargeBoxId: chargerParam,
         defaultEmail: emailParam,
         adminLoginUrl: `${config.ADMIN_BASE_URL}/login`,
+        backHref,
       } satisfies CustomerLoginData,
     };
   },
@@ -144,15 +151,15 @@ export default define.page<typeof handler>(function CustomerLoginPage(
           <div class="relative">
             <ShineBorder borderRadius={12} borderWidth={1} duration={10}>
               <div class="space-y-5 p-5 sm:p-6">
-                {/*
-                  Multi-session: if the visitor already has at least one
-                  active session on this device (either customer or admin),
-                  show a switcher above the form so they can pick an
-                  existing account rather than re-signing-in. AccountList
-                  renders nothing when the list is empty — first-time
-                  visitors see only the form below.
-                */}
-                <AccountList allowRevoke={false} />
+                {data.backHref && (
+                  <a
+                    href={data.backHref}
+                    class="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <ArrowLeft class="size-3.5" aria-hidden="true" />
+                    <span>Back to account picker</span>
+                  </a>
+                )}
                 {data.scanLoginEnabled || data.magicLinkEnabled
                   ? (
                     <CustomerLoginWizard
