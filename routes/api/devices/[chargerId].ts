@@ -21,6 +21,7 @@ import {
 } from "../../../src/lib/devices/capability-gate.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
 import { type ChargerRow, mapChargerState } from "./index.ts";
+import { formatChargerAddress } from "../../../src/lib/charger/format-address.ts";
 
 const CHARGER_STATES = [
   "idle",
@@ -123,6 +124,17 @@ export const handler = define.handlers({
     const caps = new Set(row.capabilities ?? []);
     caps.add("charger");
 
+    const address = formatChargerAddress({
+      addressLine1: row.addressLine1,
+      addressLine2: row.addressLine2,
+      addressCity: row.addressCity,
+      addressRegion: row.addressRegion,
+      addressPostalCode: row.addressPostalCode,
+      addressCountry: row.addressCountry,
+    });
+    const lat = row.latitude != null ? Number(row.latitude) : null;
+    const lon = row.longitude != null ? Number(row.longitude) : null;
+
     const charger: ChargerRow = {
       chargerId: row.chargeBoxId,
       label: row.friendlyName ?? row.chargeBoxId,
@@ -130,17 +142,29 @@ export const handler = define.handlers({
       formFactor: normalizeFormFactor(row.formFactor),
       connectorType: normalizeConnectorType(row.connectorTypeOverride),
       maxKw: parseMaxKw(row.maxKwOverride),
-      state: isUnmanaged
-        ? "idle"
-        : mapChargerState(row.lastStatus, toMs(row.lastStatusAt), Date.now()),
       lastSeenAt: toIso(row.lastStatusAt),
       capabilities: Array.from(caps),
-      ...(isUnmanaged ? { managementMode: "unmanaged" as const } : {}),
     };
-    // sanity check the wire enum (kept for future-proofing if someone
-    // edits the chargers_cache row directly)
-    if (!(CHARGER_STATES as readonly string[]).includes(charger.state)) {
-      charger.state = "offline";
+    if (row.publicId) charger.publicId = row.publicId;
+    if (address) charger.address = address;
+    if (lat != null && Number.isFinite(lat)) charger.latitude = lat;
+    if (lon != null && Number.isFinite(lon)) charger.longitude = lon;
+
+    if (!isUnmanaged) {
+      const mapped = mapChargerState(
+        row.lastStatus,
+        toMs(row.lastStatusAt),
+        Date.now(),
+      );
+      // Sanity check the wire enum (kept for future-proofing if
+      // someone edits the chargers_cache row directly).
+      charger.state = (CHARGER_STATES as readonly string[]).includes(mapped)
+        ? mapped
+        : "offline";
+    } else {
+      charger.managementMode = "unmanaged";
+      // Unmanaged chargers omit `state` — the iOS detail view renders
+      // no status pill in that case.
     }
 
     return jsonResponse(200, { charger });

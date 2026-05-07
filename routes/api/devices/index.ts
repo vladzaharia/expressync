@@ -33,6 +33,7 @@ import {
 } from "../../../src/lib/devices/capability-gate.ts";
 import { CHARGER_ONLINE_WINDOW_MS } from "../../../src/lib/chargers/online.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
+import { formatChargerAddress } from "../../../src/lib/charger/format-address.ts";
 
 const log = logger.child("DevicesChargerList");
 
@@ -54,14 +55,28 @@ type ChargerState = (typeof CHARGER_STATES)[number];
 /** Strict response row — must match the iOS `ChargerListEntry` Codable. */
 const ChargerRowSchema = z.object({
   chargerId: z.string(),
+  /** 8-char Crockford-ish public ID, sticker-printable. Always present
+   *  on chargers minted after migration 0046. Optional on the wire for
+   *  back-compat with older app builds that don't decode it. */
+  publicId: z.string().optional(),
   label: z.string(),
   siteName: z.string().nullable(),
   formFactor: z.enum(["wallbox", "tesla", "generic"]),
   connectorType: z.enum(["ccs", "j1772", "nacs", "chademo", "type2"])
     .nullable(),
   maxKw: z.number().nullable(),
-  state: z.enum(CHARGER_STATES),
+  /** State is omitted entirely for unmanaged chargers — they don't
+   *  report OCPP heartbeats, so any synthesized state would lie to
+   *  the iOS client. iOS renders nothing in that case. Older builds
+   *  expecting `state` will tolerate the absence. */
+  state: z.enum(CHARGER_STATES).optional(),
   lastSeenAt: z.string().nullable(),
+  /** Single-line formatted address, ready for Apple Maps. Server
+   *  composes from the structured columns; iOS uses it verbatim
+   *  in the Navigate button URL. */
+  address: z.string().nullable().optional(),
+  latitude: z.number().nullable().optional(),
+  longitude: z.number().nullable().optional(),
   /** Per-row capability set from `chargers_cache.capabilities`.
    *  Always carries `'charger'` (auto-managed by StEvE sync); may also
    *  carry `'scanner'` when the charger has built-in NFC. The iOS
@@ -89,12 +104,21 @@ type ViewRow = {
   last_seen_at: Date | string | null;
   last_status_at: Date | string | null;
   last_status: string | null;
+  public_id: string | null;
   friendly_name: string | null;
   form_factor: string | null;
   capabilities?: string[] | null;
   connector_type_override: string | null;
   max_kw_override: string | null;
   management_mode: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  address_city: string | null;
+  address_region: string | null;
+  address_postal_code: string | null;
+  address_country: string | null;
+  latitude: string | null;
+  longitude: string | null;
 };
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -206,12 +230,21 @@ const defaultLoader: ChargerListLoader = async () => {
       tv.last_seen_at,
       cc.last_status_at,
       cc.last_status,
+      cc.public_id,
       cc.friendly_name,
       cc.form_factor,
       cc.capabilities,
       cc.connector_type_override,
       cc.max_kw_override,
-      cc.management_mode
+      cc.management_mode,
+      cc.address_line1,
+      cc.address_line2,
+      cc.address_city,
+      cc.address_region,
+      cc.address_postal_code,
+      cc.address_country,
+      cc.latitude,
+      cc.longitude
     FROM tappable_devices tv
     LEFT JOIN chargers_cache cc
       ON tv.kind = 'charger' AND cc.charge_box_id = tv.id
@@ -277,7 +310,17 @@ export const handler = define.handlers({
         const caps = new Set(r.capabilities ?? []);
         caps.add("charger");
         const isUnmanaged = r.management_mode === "unmanaged";
-        return {
+        const address = formatChargerAddress({
+          addressLine1: r.address_line1,
+          addressLine2: r.address_line2,
+          addressCity: r.address_city,
+          addressRegion: r.address_region,
+          addressPostalCode: r.address_postal_code,
+          addressCountry: r.address_country,
+        });
+        const lat = r.latitude != null ? Number(r.latitude) : null;
+        const lon = r.longitude != null ? Number(r.longitude) : null;
+        const row: ChargerRow = {
           chargerId: r.id,
           label: r.friendly_name ?? r.label,
           // siteName: not modelled today; reserved for future multi-site rollout.
@@ -289,13 +332,6 @@ export const handler = define.handlers({
           // when no override is set; iOS renders `—` in that case.
           connectorType: normalizeConnectorType(r.connector_type_override),
           maxKw: parseMaxKw(r.max_kw_override),
-          // Unmanaged chargers don't send OCPP heartbeats, so
-          // `mapChargerState` would always return 'offline' (zombie row).
-          // Force 'idle' instead — they're physically ready, just not
-          // tracked. Migration 0043.
-          state: isUnmanaged
-            ? "idle"
-            : mapChargerState(r.last_status, toMs(r.last_status_at), now),
           // The wire field is named `lastSeenAt` for backward
           // compatibility, but it's the time we last received a real
           // OCPP status from the charger. The cache's `last_seen_at`
@@ -303,11 +339,24 @@ export const handler = define.handlers({
           // exposing that one would lie to the client.
           lastSeenAt: toIso(r.last_status_at),
           capabilities: Array.from(caps),
-          // Optional on the wire — older builds ignore the field. We
-          // only emit it when explicitly known to keep the response
-          // tight; absence is equivalent to 'ocpp' on the iOS side.
-          ...(isUnmanaged ? { managementMode: "unmanaged" as const } : {}),
         };
+        if (r.public_id) row.publicId = r.public_id;
+        if (address) row.address = address;
+        if (lat != null && Number.isFinite(lat)) row.latitude = lat;
+        if (lon != null && Number.isFinite(lon)) row.longitude = lon;
+        // Unmanaged chargers don't report OCPP state — omit the
+        // field entirely so the iOS app renders nothing instead of
+        // a fake "Idle" badge. Older builds tolerate the absence.
+        if (!isUnmanaged) {
+          row.state = mapChargerState(
+            r.last_status,
+            toMs(r.last_status_at),
+            now,
+          );
+        } else {
+          row.managementMode = "unmanaged";
+        }
+        return row;
       });
 
     const body: ChargersListResponse = { chargers };
