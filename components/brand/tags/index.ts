@@ -15,29 +15,26 @@ import type { TagIconProps } from "./types.ts";
 
 import { IconEVCard } from "./IconEVCard.tsx";
 import { IconKeytag } from "./IconKeytag.tsx";
-import { IconSticker } from "./IconSticker.tsx";
 import { IconPhoneNFC } from "./IconPhoneNFC.tsx";
-import { IconGuestQR } from "./IconGuestQR.tsx";
-import { IconApp } from "./IconApp.tsx";
 import { IconOther } from "./IconOther.tsx";
 
-export {
-  IconApp,
-  IconEVCard,
-  IconGuestQR,
-  IconKeytag,
-  IconOther,
-  IconPhoneNFC,
-  IconSticker,
-};
+export { IconEVCard, IconKeytag, IconOther, IconPhoneNFC };
 export type { TagIconProps };
 
+/**
+ * One icon per `TagType`. The four-value taxonomy (post-0048) maps to:
+ *   ev_card  → physical EV card silhouette
+ *   keychain → keychain fob (renamed from keytag, same icon)
+ *   app      → phone-NFC silhouette — covers customer iOS device tags
+ *              and any other app-mediated identity
+ *   meta     → neutral "other" silhouette so admin Tags listings can
+ *              show meta-tags distinctly from the three card form
+ *              factors without introducing a brand-new icon for a
+ *              non-card construct
+ */
 export const tagTypeIcons: Record<TagType, FunctionComponent<TagIconProps>> = {
   ev_card: IconEVCard,
-  keytag: IconKeytag,
-  sticker: IconSticker,
-  phone_nfc: IconPhoneNFC,
-  guest_qr: IconGuestQR,
-  app: IconApp,
-  other: IconOther,
+  keychain: IconKeytag,
+  app: IconPhoneNFC,
+  meta: IconOther,
 };

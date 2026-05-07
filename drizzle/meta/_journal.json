@@ -337,6 +337,13 @@
       "when": 1778138100000,
       "tag": "0047_devices_allow_customer_owner",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1778153000000,
+      "tag": "0048_tag_type_simplify",
+      "breakpoints": true
     }
   ]
 }
