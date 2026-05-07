@@ -323,6 +323,20 @@
       "when": 1777997080000,
       "tag": "0045_consolidate_form_factors",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1778138000000,
+      "tag": "0046_charger_user_public_ids",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1778138100000,
+      "tag": "0047_devices_allow_customer_owner",
+      "breakpoints": true
     }
   ]
 }
