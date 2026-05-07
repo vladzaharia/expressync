@@ -15,7 +15,7 @@
 
 export const TAG_TYPES = [
   "ev_card",
-  "keychain",
+  "keytag",
   "app",
   "meta",
 ] as const;
@@ -35,7 +35,7 @@ export type TagType = typeof TAG_TYPES[number];
  */
 export const USER_SELECTABLE_TAG_TYPES = [
   "ev_card",
-  "keychain",
+  "keytag",
 ] as const;
 
 export type UserSelectableTagType = typeof USER_SELECTABLE_TAG_TYPES[number];
@@ -66,7 +66,7 @@ export function isUserSelectableTagType(
  */
 export const tagTypeLabels: Record<TagType, string> = {
   ev_card: "EV Card",
-  keychain: "Keychain",
+  keytag: "Keytag",
   app: "App",
   meta: "Meta-tag",
 };
@@ -77,7 +77,7 @@ export const tagTypeLabels: Record<TagType, string> = {
  */
 export const tagTypeColors: Record<TagType, string> = {
   ev_card: "blue",
-  keychain: "emerald",
+  keytag: "emerald",
   app: "cyan",
   meta: "violet",
 };
@@ -101,6 +101,6 @@ export function inferTagType(idTag: string): TagType {
   if (/^APP-/.test(idTag)) return "app";
   if (/^QR-/.test(idTag)) return "app";
   if (/^[0-9A-F]{14}$/i.test(idTag)) return "ev_card";
-  if (/^[0-9A-F]{8}$/i.test(idTag)) return "keychain";
+  if (/^[0-9A-F]{8}$/i.test(idTag)) return "keytag";
   return "ev_card";
 }

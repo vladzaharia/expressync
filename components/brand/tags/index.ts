@@ -22,19 +22,17 @@ export { IconEVCard, IconKeytag, IconOther, IconPhoneNFC };
 export type { TagIconProps };
 
 /**
- * One icon per `TagType`. The four-value taxonomy (post-0048) maps to:
- *   ev_card  → physical EV card silhouette
- *   keychain → keychain fob (renamed from keytag, same icon)
- *   app      → phone-NFC silhouette — covers customer iOS device tags
- *              and any other app-mediated identity
- *   meta     → neutral "other" silhouette so admin Tags listings can
- *              show meta-tags distinctly from the three card form
- *              factors without introducing a brand-new icon for a
- *              non-card construct
+ * One icon per `TagType`. The four-value taxonomy maps to:
+ *   ev_card → physical EV card silhouette
+ *   keytag  → keychain-fob silhouette
+ *   app     → phone-NFC silhouette (customer iOS device tags + any
+ *             other app-mediated identity)
+ *   meta    → neutral "other" silhouette so admin Tags listings show
+ *             meta-tags distinctly from the three card form factors
  */
 export const tagTypeIcons: Record<TagType, FunctionComponent<TagIconProps>> = {
   ev_card: IconEVCard,
-  keychain: IconKeytag,
+  keytag: IconKeytag,
   app: IconPhoneNFC,
   meta: IconOther,
 };

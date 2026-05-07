@@ -13,7 +13,7 @@ import type { TagType } from "./types/tags.ts";
 /** Foreground color — use for icons and emphasized text. */
 export const tagTypeTextClass: Record<TagType, string> = {
   ev_card: "text-blue-500 dark:text-blue-400",
-  keychain: "text-emerald-500 dark:text-emerald-400",
+  keytag: "text-emerald-500 dark:text-emerald-400",
   app: "text-cyan-500 dark:text-cyan-400",
   meta: "text-violet-500 dark:text-violet-400",
 };
@@ -21,7 +21,7 @@ export const tagTypeTextClass: Record<TagType, string> = {
 /** Matching soft-tint background — use for icon pills / chip fills. */
 export const tagTypeBgClass: Record<TagType, string> = {
   ev_card: "bg-blue-500/10",
-  keychain: "bg-emerald-500/10",
+  keytag: "bg-emerald-500/10",
   app: "bg-cyan-500/10",
   meta: "bg-violet-500/10",
 };
@@ -29,7 +29,7 @@ export const tagTypeBgClass: Record<TagType, string> = {
 /** Border-plus-fill variant — use for selection states in type pickers. */
 export const tagTypeBorderClass: Record<TagType, string> = {
   ev_card: "border-blue-500 bg-blue-500/5",
-  keychain: "border-emerald-500 bg-emerald-500/5",
+  keytag: "border-emerald-500 bg-emerald-500/5",
   app: "border-cyan-500 bg-cyan-500/5",
   meta: "border-violet-500 bg-violet-500/5",
 };
