@@ -206,15 +206,33 @@ export default function AccountList(props: AccountListProps) {
     return null;
   }
 
+  // Filter out cross-role entries: when the active session is admin,
+  // hide customer entries (and vice versa). Customer↔admin switching
+  // is intentionally not offered — the two surfaces have distinct
+  // privacy and trust models, and mixing them in the same picker
+  // invites accidental impersonation. The user can still log into
+  // both via the dedicated login flows on each surface.
+  const activeSession = sessions.find((r) => r.session.id === activeSessionId);
+  const activeSurface = activeSession
+    ? roleSurface(activeSession.user.role)
+    : null;
+  const visibleSessions = activeSurface
+    ? sessions.filter((r) => roleSurface(r.user.role) === activeSurface)
+    : sessions;
+
+  if (visibleSessions.length === 0) {
+    return null;
+  }
+
   // Render the active session first so it doubles as the "you are
   // here" header. Other sessions trail in the order Better Auth
   // returned them (most-recently-active-first per the plugin docs).
   const sortedSessions = activeSessionId
     ? [
-      ...sessions.filter((r) => r.session.id === activeSessionId),
-      ...sessions.filter((r) => r.session.id !== activeSessionId),
+      ...visibleSessions.filter((r) => r.session.id === activeSessionId),
+      ...visibleSessions.filter((r) => r.session.id !== activeSessionId),
     ]
-    : sessions;
+    : visibleSessions;
 
   return (
     <div
