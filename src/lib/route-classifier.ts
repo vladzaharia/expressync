@@ -102,6 +102,13 @@ const RULES: readonly RouteRule[] = [
   // admin host. iOS universal-link AASA still resolves on both hosts.
   // Migration 0043.
   { prefix: "/c/", classification: "PUBLIC", surface: "customer" },
+  // User-card landing — sticker URLs `https://example.com/u/<publicId>`,
+  // the iOS-only QR sign-in entry point. Same surface scope and AASA
+  // routing semantics as `/c/`. Register the prefix even though the
+  // handler page lands in a follow-up so any premature requests get
+  // a clean 404 from the customer surface rather than a misleading
+  // admin-host 404.
+  { prefix: "/u/", classification: "PUBLIC", surface: "customer" },
 
   // ------- ADMIN_ONLY -------
   // Admin pages live at /admin/* in the file system (post-rewrite).

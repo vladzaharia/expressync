@@ -2,7 +2,7 @@
  * GET /api/admin/qr — server-rendered QR code for the public-ID
  * popover. Encodes whatever the caller passes in (the popover only
  * ever passes the public sticker URL — `https://example.com/c/<id>`
- * or `/user/<id>`), so the rendered code is byte-identical to what the
+ * or `/u/<id>`), so the rendered code is byte-identical to what the
  * sticker would carry when printed.
  *
  * Returns `image/svg+xml`. Admin-only via the surface-vs-role guard

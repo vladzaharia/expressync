@@ -3,7 +3,7 @@
  * that surfaces the QR code an admin would print on the sticker.
  *
  * The QR encodes the public sticker URL (`/c/<publicId>` for chargers,
- * `/user/<publicId>` for users) so what's rendered here is exactly
+ * `/u/<publicId>` for users) so what's rendered here is exactly
  * what the printed sticker would carry. Source of the SVG is the
  * server-side `/api/admin/qr` endpoint, which is admin-gated by
  * middleware — non-admin viewers never reach this island, and
@@ -30,7 +30,7 @@ interface PublicIdQrPopoverProps {
   publicId: string;
   /** Override the URL the QR encodes. Defaults to the canonical
    *  sticker URL for the entity (`https://example.com/c/<id>` or
-   *  `/user/<id>`). */
+   *  `/u/<id>`). */
   url?: string;
   /** Display size for the trigger. Defaults to `md`. */
   size?: "sm" | "md" | "lg";
@@ -47,7 +47,7 @@ export default function PublicIdQrPopover({
   const stickerUrl = url ??
     (entity === "charger"
       ? `${PUBLIC_HOST}/c/${publicId}`
-      : `${PUBLIC_HOST}/user/${publicId}`);
+      : `${PUBLIC_HOST}/u/${publicId}`);
   const qrSrc = `/api/admin/qr?value=${
     encodeURIComponent(stickerUrl)
   }&size=256`;

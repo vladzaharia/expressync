@@ -1000,11 +1000,14 @@ Deno.test({
     const detail = parsed.applinks.details[0];
     assertEquals(detail.appIDs, ["ABC1234XYZ.com.example.expresscharge.ios"]);
     // /app/register/* is the PKCE callback; /c/* is the public charger
-    // sticker URL pattern (universal-link interception for Camera scans).
-    assertEquals(detail.components.length, 2);
+    // sticker URL pattern; /u/* is the user-card sticker URL pattern
+    // for the iOS-only QR sign-in flow (universal-link interception
+    // for Camera scans on both stickers).
+    assertEquals(detail.components.length, 3);
     const paths = detail.components.map((c) => c["/"]);
     assertEquals(paths.includes("/app/register/*"), true);
     assertEquals(paths.includes("/c/*"), true);
+    assertEquals(paths.includes("/u/*"), true);
   },
 });
 
