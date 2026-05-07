@@ -402,15 +402,12 @@ export const handler = define.middleware(async (ctx) => {
     );
   }
 
-  // Look up the user's role from the database (BetterAuth doesn't know
-  // about our custom role column).
-  const [dbUser] = await db
-    .select({ role: users.role })
-    .from(users)
-    .where(eq(users.id, session.user.id))
-    .limit(1);
-
-  const userRole = dbUser?.role ?? "customer";
+  // role is declared as a Better Auth `additionalFields` entry on the user
+  // table (see src/lib/auth.ts) so it rides along on session.user — no
+  // extra query needed. Fall back to "customer" only if the field is
+  // somehow missing on a legacy session.
+  const userRole =
+    (session.user as { role?: string }).role ?? "customer";
   ctx.state.user = { ...session.user, role: userRole };
   ctx.state.session = session.session;
 
@@ -444,18 +441,29 @@ export const handler = define.middleware(async (ctx) => {
   }
 
   // 8. Surface-vs-role enforcement.
+  // The /handoff/* routes are exempt: they ARE the picker shown to a
+  // visitor whose role doesn't match the current surface, so re-running
+  // the surface check here would loop. The handoff loaders themselves
+  // gate on auth state and render appropriate UI — they never leak
+  // admin data to a customer or vice versa.
+  const isHandoffPath = pathname === "/handoff/admin" ||
+    pathname === "/handoff/customer" ||
+    pathname === "/admin/handoff/customer" ||
+    pathname === "/admin/handoff/admin";
+
   if (surface === "admin") {
-    // Admin host is admin-only. A logged-in customer who lands here gets
-    // bounced to the customer surface (their cookie is shared, so the
-    // customer host will recognize them).
-    if (userRole !== "admin") {
+    // Admin host is admin-only. A logged-in customer who lands here is
+    // sent to the in-portal handoff picker, NOT cross-host bounced —
+    // the picker can either auto-switch to a customer session they
+    // already have on the device, or offer a clean choice.
+    if (userRole !== "admin" && !isHandoffPath) {
       if (pathname.startsWith("/api/")) {
         return applySecurityHeaders(notFoundResponse());
       }
       return applySecurityHeaders(
         new Response(null, {
           status: 302,
-          headers: { Location: "https://example.com/" },
+          headers: { Location: "/handoff/customer" },
         }),
       );
     }

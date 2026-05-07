@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState } from "preact/hooks";
-import { LogOut, Moon, Sun, User as UserIcon } from "lucide-preact";
+import { LogOut, Moon, Plus, Sun, User as UserIcon } from "lucide-preact";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,8 +20,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
 import { useThemeToggle } from "@/islands/ThemeToggle.tsx";
+import AccountList from "@/islands/auth/AccountList.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { signOutAndRedirect } from "@/src/lib/nav.ts";
+import { authClient } from "@/src/lib/auth-client.ts";
 
 interface UserMenuProps {
   user?: {
@@ -36,6 +38,7 @@ const STORAGE_KEY = "ev-billing-theme";
 export default function UserMenu({ user }: UserMenuProps) {
   const toggleTheme = useThemeToggle();
   const [isDark, setIsDark] = useState(true);
+  const [hasMultiple, setHasMultiple] = useState(false);
 
   // Track the actual theme on the document so the menu icon/label stay in sync.
   useEffect(() => {
@@ -58,7 +61,45 @@ export default function UserMenu({ user }: UserMenuProps) {
     };
   }, []);
 
+  // Probe device-session count once on mount so the menu can show the
+  // switcher only when there's more than one. Failure is silent — the
+  // menu still works, the switcher just doesn't appear.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authClient.multiSession.listDeviceSessions();
+        if (cancelled) return;
+        const count = (res.data ?? []).length;
+        setHasMultiple(count > 1);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleSignOut = () => signOutAndRedirect("/login");
+
+  // The "add another account" link points at the *other* portal's login.
+  // Cookie domain is shared across .example.com, so signing in there
+  // adds a session to this device which then appears in the switcher.
+  const otherPortalLoginHref = (() => {
+    if (typeof globalThis.location === "undefined") return "/login";
+    const host = globalThis.location.hostname;
+    const port = globalThis.location.port ? `:${globalThis.location.port}` : "";
+    const proto = globalThis.location.protocol;
+    if (host === "localhost" || host === "127.0.0.1") {
+      // Pure-loopback dev — same host serves both. The login page already
+      // routes by surface heuristics, so just send them to /login.
+      return "/login";
+    }
+    const isAdmin = host.startsWith("manage.");
+    const otherHost = isAdmin ? host.slice("manage.".length) : `manage.${host}`;
+    return `${proto}//${otherHost}${port}/login`;
+  })();
 
   const displayName = user?.name || user?.email || "User";
 
@@ -98,6 +139,24 @@ export default function UserMenu({ user }: UserMenuProps) {
                 )}
               </div>
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {hasMultiple && (
+              <>
+                <DropdownMenuLabel class="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Switch account
+                </DropdownMenuLabel>
+                <div class="px-1 pb-1">
+                  <AccountList />
+                </div>
+                <DropdownMenuSeparator />
+              </>
+            )}
+            <DropdownMenuItem asChild>
+              <a href={otherPortalLoginHref}>
+                <Plus className="size-4" />
+                <span>Sign in to another account</span>
+              </a>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
           </>
         )}
