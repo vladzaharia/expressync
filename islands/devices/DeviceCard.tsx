@@ -70,6 +70,7 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog.tsx";
 import { CapabilityPill } from "@/components/devices/CapabilityPill.tsx";
 import { getDeviceIcon } from "@/src/lib/utils/device-icons.ts";
 import { cn } from "@/src/lib/utils/cn.ts";
+import { FORM_FACTOR_LABEL } from "@/src/lib/charger/form-factor-labels.ts";
 import {
   DEVICE_STATUS_HALO,
   formatRelative,
@@ -226,12 +227,6 @@ function StatusPill(
 
 // ---- Charger -------------------------------------------------------------
 
-const FORM_FACTOR_LABEL: Record<string, string> = {
-  wallbox: "Wallbox",
-  tesla: "Tesla Wall Connector",
-  generic: "Generic",
-};
-
 function ChargerBody(
   { charger, activeSession, isAdmin, onAction }: {
     charger: ChargerCardDto;
@@ -318,8 +313,9 @@ function ChargerBody(
   const showChargeBoxIdSubtitle = !!charger.friendlyName?.trim() &&
     charger.friendlyName.trim() !== charger.chargeBoxId;
   const isCharging = status === "Charging";
-  const formFactorLabel = FORM_FACTOR_LABEL[charger.formFactor] ??
-    charger.formFactor;
+  const formFactorLabel =
+    (FORM_FACTOR_LABEL as Record<string, string>)[charger.formFactor] ??
+      charger.formFactor;
   const isUnmanaged = charger.managementMode === "unmanaged";
 
   const postOperation = async (

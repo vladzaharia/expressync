@@ -11,12 +11,7 @@ import { useState } from "preact/hooks";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { FORM_FACTORS, type FormFactor } from "@/src/lib/types/steve.ts";
-
-const FORM_FACTOR_LABEL: Record<FormFactor, string> = {
-  wallbox: "Wallbox",
-  tesla: "Tesla Wall Connector",
-  generic: "Generic",
-};
+import { FORM_FACTOR_LABEL } from "@/src/lib/charger/form-factor-labels.ts";
 
 const CHARGE_BOX_ID_RE = /^[A-Za-z0-9_\-.:]{1,64}$/;
 
