@@ -48,6 +48,34 @@ import { Activity } from "lucide-preact";
 import LiveSessionCard from "../../islands/charging-sessions/LiveSessionCard.tsx";
 import SessionMeterTimeline from "../../islands/customer/SessionMeterTimeline.tsx";
 import { SessionDetailCard } from "../../components/customer/SessionDetailCard.tsx";
+import { ConnectorSpec } from "../../components/shared/ConnectorSpec.tsx";
+import { PublicIdDisplay } from "../../components/shared/PublicIdDisplay.tsx";
+
+/**
+ * Thin "charger identity" row. Renders the charger's public ID + connector
+ * spec next to each other so customers can match the displayed identity
+ * with the QR-coded sticker on the physical charger. W11.
+ */
+function ChargerIdentityStrip(
+  { publicId, connectorType, maxKw }: {
+    publicId: string | null;
+    connectorType: "ccs" | "j1772" | "nacs" | "chademo" | "type2" | null;
+    maxKw: number | null;
+  },
+) {
+  return (
+    <div class="flex flex-wrap items-center gap-4 rounded-lg border bg-card/40 px-4 py-3">
+      {publicId && <PublicIdDisplay publicId={publicId} size="sm" />}
+      {(connectorType || maxKw != null) && (
+        <ConnectorSpec
+          type={connectorType}
+          kw={maxKw}
+          size="sm"
+        />
+      )}
+    </div>
+  );
+}
 
 const log = logger.child("CustomerSessionDetailPage");
 
@@ -148,6 +176,13 @@ export const handler = define.handlers({
     // non-fatal: the rest of the page still renders.
     let liveChargeBoxId: string | null = null;
     let liveFriendlyName: string | null = null;
+    // W11 — surface the public ID + connector spec on charger
+    // references so customers can match what they see on the
+    // sticker. Loaded alongside the friendly name in the
+    // chargers_cache lookup below.
+    let liveChargerPublicId: string | null = null;
+    let liveChargerConnectorType: string | null = null;
+    let liveChargerMaxKw: number | null = null;
     let liveConnectorId: number | null = null;
     let liveStartedAt: string | null = null;
     if (isLive) {
@@ -172,11 +207,22 @@ export const handler = define.handlers({
     if (liveChargeBoxId) {
       try {
         const [cacheRow] = await db
-          .select({ friendlyName: schema.chargersCache.friendlyName })
+          .select({
+            friendlyName: schema.chargersCache.friendlyName,
+            publicId: schema.chargersCache.publicId,
+            connectorTypeOverride: schema.chargersCache.connectorTypeOverride,
+            maxKwOverride: schema.chargersCache.maxKwOverride,
+          })
           .from(schema.chargersCache)
           .where(eq(schema.chargersCache.chargeBoxId, liveChargeBoxId))
           .limit(1);
         liveFriendlyName = cacheRow?.friendlyName ?? null;
+        liveChargerPublicId = cacheRow?.publicId ?? null;
+        liveChargerConnectorType = cacheRow?.connectorTypeOverride ?? null;
+        liveChargerMaxKw = cacheRow?.maxKwOverride !== null &&
+            cacheRow?.maxKwOverride !== undefined
+          ? Number(cacheRow.maxKwOverride)
+          : null;
       } catch (_err) {
         // Best-effort; the chargeBoxId fallback is fine.
       }
@@ -324,6 +370,9 @@ export const handler = define.handlers({
         invoiceId: null,
         liveChargeBoxId,
         liveFriendlyName,
+        liveChargerPublicId,
+        liveChargerConnectorType,
+        liveChargerMaxKw,
         liveConnectorId,
         liveStartedAt,
         liveInitialKwh: totalKwh,
@@ -358,6 +407,20 @@ export default define.page<typeof handler>(
             headerActions={<TransactionStatusBadge status={status} large />}
           >
             <div class="space-y-6">
+              {(data.liveChargerPublicId || data.liveChargerMaxKw != null ||
+                data.liveChargerConnectorType) && (
+                <ChargerIdentityStrip
+                  publicId={data.liveChargerPublicId}
+                  connectorType={data.liveChargerConnectorType as
+                    | "ccs"
+                    | "j1772"
+                    | "nacs"
+                    | "chademo"
+                    | "type2"
+                    | null}
+                  maxKw={data.liveChargerMaxKw}
+                />
+              )}
               {data.isLive && (
                 <LiveSessionCard
                   steveTransactionId={data.steveTransactionId}
