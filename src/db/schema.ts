@@ -578,7 +578,7 @@ export const chargersCache = pgTable("chargers_cache", {
 }, (table) => [
   check(
     "chargers_cache_form_factor_check",
-    sql`${table.formFactor} IN ('wallbox','pulsar','commander','wall_mount','generic')`,
+    sql`${table.formFactor} IN ('wallbox','pulsar','commander','wall_mount','tesla','generic')`,
   ),
   check(
     "chargers_cache_management_mode_check",

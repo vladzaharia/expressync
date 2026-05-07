@@ -17,6 +17,7 @@ const FORM_FACTOR_LABEL: Record<FormFactor, string> = {
   pulsar: "Pulsar",
   commander: "Commander",
   wall_mount: "Wall mount",
+  tesla: "Tesla Wall Connector",
   generic: "Generic",
 };
 
@@ -26,7 +27,7 @@ export default function NewUnmanagedChargerForm() {
   const [chargeBoxId, setChargeBoxId] = useState("");
   const [friendlyName, setFriendlyName] = useState("");
   const [locationDescription, setLocationDescription] = useState("");
-  const [formFactor, setFormFactor] = useState<FormFactor>("wall_mount");
+  const [formFactor, setFormFactor] = useState<FormFactor>("tesla");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

@@ -89,8 +89,8 @@ export const handler = define.handlers({
       });
     }
     const ff: FormFactor = formFactor === undefined
-      ? "wall_mount"
-      : (isFormFactor(formFactor) ? formFactor : "wall_mount");
+      ? "tesla"
+      : (isFormFactor(formFactor) ? formFactor : "tesla");
     if (formFactor !== undefined && !isFormFactor(formFactor)) {
       return jsonResponse(400, {
         error: `Invalid formFactor. Allowed: ${FORM_FACTORS.join(", ")}`,
