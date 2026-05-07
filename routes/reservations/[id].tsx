@@ -25,6 +25,8 @@ import { BackAction } from "../../components/shared/BackAction.tsx";
 import { SectionCard } from "../../components/shared/SectionCard.tsx";
 import { MetricTile } from "../../components/shared/MetricTile.tsx";
 import { ReservationStatusBadge } from "../../components/shared/ReservationStatusBadge.tsx";
+import { PublicIdDisplay } from "../../components/shared/PublicIdDisplay.tsx";
+import { ConnectorSpec } from "../../components/shared/ConnectorSpec.tsx";
 import {
   BatteryCharging,
   Calendar,
@@ -61,6 +63,14 @@ interface LoaderData {
   cardLabel: string | null;
   resultingSessionId: number | null;
   errorMessage: string | null;
+  /** W11 — public ID + connector spec for the reservation's charger,
+   *  rendered as the identity strip so customers can match the on-page
+   *  charger to the printed sticker. */
+  charger: {
+    publicId: string | null;
+    connectorType: "ccs" | "j1772" | "nacs" | "chademo" | "type2" | null;
+    maxKw: number | null;
+  } | null;
 }
 
 function parseId(raw: string | undefined): number | null {
@@ -106,6 +116,7 @@ export const handler = define.handlers({
           cardLabel: null,
           resultingSessionId: null,
           errorMessage: "Invalid reservation id",
+          charger: null,
         } satisfies LoaderData,
       };
     }
@@ -127,6 +138,7 @@ export const handler = define.handlers({
             cardLabel: null,
             resultingSessionId: null,
             errorMessage: "Reservation not found",
+            charger: null,
           } satisfies LoaderData,
         };
       }
@@ -152,6 +164,37 @@ export const handler = define.handlers({
       // The SectionCard below renders only when this is non-null.
       const resultingSessionId: number | null = null;
 
+      // W11 — best-effort charger identity lookup for the strip.
+      let charger: LoaderData["charger"] = null;
+      try {
+        const [cacheRow] = await db
+          .select({
+            publicId: schema.chargersCache.publicId,
+            connectorTypeOverride: schema.chargersCache.connectorTypeOverride,
+            maxKwOverride: schema.chargersCache.maxKwOverride,
+          })
+          .from(schema.chargersCache)
+          .where(eq(schema.chargersCache.chargeBoxId, row.chargeBoxId))
+          .limit(1);
+        if (cacheRow) {
+          const ct = cacheRow.connectorTypeOverride;
+          charger = {
+            publicId: cacheRow.publicId,
+            connectorType:
+              (["ccs", "j1772", "nacs", "chademo", "type2"] as const).includes(
+                  ct as "ccs" | "j1772" | "nacs" | "chademo" | "type2",
+                )
+                ? (ct as "ccs" | "j1772" | "nacs" | "chademo" | "type2")
+                : null,
+            maxKw: cacheRow.maxKwOverride !== null
+              ? Number(cacheRow.maxKwOverride)
+              : null,
+          };
+        }
+      } catch (_err) {
+        // Best-effort; identity strip just hides if the lookup fails.
+      }
+
       return {
         data: {
           reservation: {
@@ -172,6 +215,7 @@ export const handler = define.handlers({
           cardLabel,
           resultingSessionId,
           errorMessage: null,
+          charger,
         } satisfies LoaderData,
       };
     } catch (err) {
@@ -182,6 +226,7 @@ export const handler = define.handlers({
             cardLabel: null,
             resultingSessionId: null,
             errorMessage: "Reservation not found",
+            charger: null,
           } satisfies LoaderData,
         };
       }
@@ -192,6 +237,7 @@ export const handler = define.handlers({
           cardLabel: null,
           resultingSessionId: null,
           errorMessage: err instanceof Error ? err.message : String(err),
+          charger: null,
         } satisfies LoaderData,
       };
     }
@@ -226,6 +272,27 @@ export default define.page<typeof handler>(
               }
             >
               <div class="flex flex-col gap-6">
+                {data.charger &&
+                  (data.charger.publicId || data.charger.connectorType ||
+                    data.charger.maxKw != null) &&
+                  (
+                    <div class="flex flex-wrap items-center gap-4 rounded-lg border bg-card/40 px-4 py-3">
+                      {data.charger.publicId && (
+                        <PublicIdDisplay
+                          publicId={data.charger.publicId}
+                          size="sm"
+                        />
+                      )}
+                      {(data.charger.connectorType ||
+                        data.charger.maxKw != null) && (
+                        <ConnectorSpec
+                          type={data.charger.connectorType}
+                          kw={data.charger.maxKw}
+                          size="sm"
+                        />
+                      )}
+                    </div>
+                  )}
                 <SectionCard
                   title="Summary"
                   icon={Calendar}
