@@ -33,6 +33,13 @@ interface PageCardProps {
   cardClassName?: string;
   showGridPattern?: boolean;
   headerActions?: ComponentChildren;
+  /**
+   * Floating accessory pinned to the card's top-right corner, above the
+   * BorderBeam. Used for the public-ID watermark + QR popover on charger
+   * and user detail pages — a one-per-page identity affordance per
+   * CLAUDE.md's "one PageCard per page" rule.
+   */
+  topRightAccessory?: ComponentChildren;
   /** Animation delay in seconds */
   animationDelay?: number;
   /** Disable blur fade animation */
@@ -55,6 +62,7 @@ export function PageCard({
   cardClassName,
   showGridPattern = true,
   headerActions,
+  topRightAccessory,
   animationDelay = 0,
   disableAnimation = false,
 }: PageCardProps) {
@@ -100,6 +108,11 @@ export function PageCard({
           colorFrom={colors.from}
           colorTo={colors.to}
         />
+        {topRightAccessory && (
+          <div className="pointer-events-none absolute right-5 top-5 z-10">
+            <div className="pointer-events-auto">{topRightAccessory}</div>
+          </div>
+        )}
       </div>
     </div>
   );
