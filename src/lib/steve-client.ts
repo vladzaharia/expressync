@@ -306,6 +306,25 @@ class StEvEClient {
   }
 
   /**
+   * Delete an OCPP tag by its primary key. StEvE responds 200 with an
+   * empty body on success; 404 when the tag is already gone (idempotent
+   * caller behaviour: catch and treat as success).
+   *
+   * Caller is responsible for ensuring no children still reference this
+   * tag via `parent_id_tag` — orphaned children will fail authorization.
+   * Use `getOcppTags({ parentIdTag })` + `updateOcppTag({ parentIdTag })`
+   * to reparent first.
+   */
+  async deleteOcppTag(ocppTagPk: number): Promise<void> {
+    logger.info("StEvE", "Deleting OCPP tag", { ocppTagPk });
+    await this.request(
+      `/v1/ocppTags/${ocppTagPk}`,
+      z.object({}),
+      { method: "DELETE" },
+    );
+  }
+
+  /**
    * Fetch all charge boxes.
    *
    * The ExpresSync fork adds `GET /v1/chargeBoxes` to SteVe (see
