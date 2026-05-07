@@ -48,34 +48,7 @@ import { Activity } from "lucide-preact";
 import LiveSessionCard from "../../islands/charging-sessions/LiveSessionCard.tsx";
 import SessionMeterTimeline from "../../islands/customer/SessionMeterTimeline.tsx";
 import { SessionDetailCard } from "../../components/customer/SessionDetailCard.tsx";
-import { ConnectorSpec } from "../../components/shared/ConnectorSpec.tsx";
-import { PublicIdDisplay } from "../../components/shared/PublicIdDisplay.tsx";
-
-/**
- * Thin "charger identity" row. Renders the charger's public ID + connector
- * spec next to each other so customers can match the displayed identity
- * with the QR-coded sticker on the physical charger. W11.
- */
-function ChargerIdentityStrip(
-  { publicId, connectorType, maxKw }: {
-    publicId: string | null;
-    connectorType: "ccs" | "j1772" | "nacs" | "chademo" | "type2" | null;
-    maxKw: number | null;
-  },
-) {
-  return (
-    <div class="flex flex-wrap items-center gap-4 rounded-lg border bg-card/40 px-4 py-3">
-      {publicId && <PublicIdDisplay publicId={publicId} size="sm" />}
-      {(connectorType || maxKw != null) && (
-        <ConnectorSpec
-          type={connectorType}
-          kw={maxKw}
-          size="sm"
-        />
-      )}
-    </div>
-  );
-}
+import { ChargerIdentityStrip } from "../../components/shared/ChargerIdentityStrip.tsx";
 
 const log = logger.child("CustomerSessionDetailPage");
 
