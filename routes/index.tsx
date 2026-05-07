@@ -520,14 +520,16 @@ export const handler = define.handlers({
     if (
       ctx.state.user.role === "admin" && !ctx.state.actingAs
     ) {
-      // Cross-host redirect: admins hitting the customer root land on
-      // the admin surface, NOT a same-host `/admin` path. The customer
-      // host's middleware classifies `/admin/*` as ADMIN_ONLY → 404,
-      // which is what was happening before this fix (admins saw a
-      // bare 404 page after the implicit follow-up redirect).
+      // Admins on the customer root land on the same-host handoff
+      // picker. Its loader auto-switches to a customer session if one
+      // exists on the device (multi-session), forwarding the active-
+      // session Set-Cookie on the redirect; otherwise it renders a
+      // picker so the visitor can sign in to a customer account or go
+      // to the admin portal. Avoids the previous "hard cross-host
+      // bounce with no context" UX.
       return new Response(null, {
         status: 302,
-        headers: { Location: `${config.ADMIN_BASE_URL}/` },
+        headers: { Location: "/handoff/admin" },
       });
     }
 

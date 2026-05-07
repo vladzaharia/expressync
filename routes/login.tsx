@@ -24,6 +24,7 @@ import { GridPattern } from "../components/magicui/grid-pattern.tsx";
 import { ShineBorder } from "../components/magicui/shine-border.tsx";
 import { BlurFade } from "../components/magicui/blur-fade.tsx";
 import CustomerLoginWizard from "../islands/customer/CustomerLoginWizard.tsx";
+import AccountList from "../islands/auth/AccountList.tsx";
 
 interface CustomerLoginData {
   operatorEmail: string;
@@ -143,6 +144,15 @@ export default define.page<typeof handler>(function CustomerLoginPage(
           <div class="relative">
             <ShineBorder borderRadius={12} borderWidth={1} duration={10}>
               <div class="space-y-5 p-5 sm:p-6">
+                {/*
+                  Multi-session: if the visitor already has at least one
+                  active session on this device (either customer or admin),
+                  show a switcher above the form so they can pick an
+                  existing account rather than re-signing-in. AccountList
+                  renders nothing when the list is empty — first-time
+                  visitors see only the form below.
+                */}
+                <AccountList allowRevoke={false} />
                 {data.scanLoginEnabled || data.magicLinkEnabled
                   ? (
                     <CustomerLoginWizard

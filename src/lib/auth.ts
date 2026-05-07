@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { magicLink } from "better-auth/plugins/magic-link";
+import { multiSession } from "better-auth/plugins/multi-session";
 import { db } from "../db/index.ts";
 import * as schema from "../db/schema.ts";
 import { config } from "./config.ts";
@@ -224,6 +225,24 @@ export const auth = betterAuth({
         await jitterPromise;
       },
     }),
+
+    /**
+     * Multi-session plugin. Lets a single browser hold up to N parallel
+     * sessions on the same device — used so a staffer can be signed in to
+     * both their admin (manage.example.com) and customer
+     * (example.com) accounts at once and switch between them without
+     * a full sign-out + sign-in cycle.
+     *
+     * Endpoints exposed under /api/auth/multi-session/*:
+     *   GET  list-device-sessions
+     *   POST set-active   { sessionToken }
+     *   POST revoke       { sessionToken }
+     *
+     * The plugin reuses our existing `session` table — no migration.
+     * Cross-subdomain cookies (configured in `advanced.crossSubDomainCookies`
+     * above) cover the additional session cookie variants automatically.
+     */
+    multiSession({ maximumSessions: 5 }),
 
     /**
      * Polaris customer-session plugin — exposes

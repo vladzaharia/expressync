@@ -21,6 +21,7 @@
 
 import { define } from "../../utils.ts";
 import LoginForm from "../../islands/LoginForm.tsx";
+import AccountList from "../../islands/auth/AccountList.tsx";
 import OidcAutoSubmit from "../../islands/admin/OidcAutoSubmit.tsx";
 import ForgotPasswordForm from "../../islands/admin/ForgotPasswordForm.tsx";
 import { GridPattern } from "../../components/magicui/grid-pattern.tsx";
@@ -166,6 +167,16 @@ export default define.page<typeof handler>(function LoginPage({ data }) {
         <BlurFade delay={0.2} duration={0.5} direction="up">
           <div class="relative">
             <ShineBorder borderRadius={12} borderWidth={1} duration={10}>
+              {/*
+                Multi-session switcher — same component as the customer
+                login page. Renders nothing on first paint when the
+                visitor has no device sessions; otherwise lists them
+                above the form so the visitor can pick an existing
+                account instead of re-authenticating.
+              */}
+              <div class="px-6 pt-6">
+                <AccountList allowRevoke={false} />
+              </div>
               {data.mode === "password" && <LoginForm />}
               {data.mode === "oidc-only" && (
                 <div class="w-full max-w-md mx-auto p-6">
