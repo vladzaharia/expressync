@@ -228,6 +228,10 @@ export async function ensureCustomerMetaTag(
             lagoSubscriptionExternalId: subExternalId,
             displayName: existingRow.displayName ?? displayName ?? null,
             isActive,
+            // Force tagType=meta on the canonical META- row in case the
+            // pre-rename value was 'other'. The check constraint
+            // accepts only the four-value enum post-0048 anyway.
+            tagType: "meta",
             // Only fill userId when missing — never clobber an admin-set value.
             userId: existingRow.userId ?? ownerUserId,
             updatedAt: new Date(),
@@ -240,7 +244,7 @@ export async function ensureCustomerMetaTag(
           lagoCustomerExternalId: externalId,
           lagoSubscriptionExternalId: subExternalId,
           displayName: displayName ?? null,
-          tagType: "other",
+          tagType: "meta",
           isActive,
           userId: ownerUserId,
         });
@@ -487,7 +491,7 @@ export async function ensureDeviceTag(
             userId: existingRow.userId ?? userId,
             deviceId: existingRow.deviceId ?? deviceId,
             steveParentIdTag: parentIdTag,
-            tagType: "phone_nfc",
+            tagType: "app",
             updatedAt: new Date(),
           })
           .where(eq(schema.userMappings.id, existingRow.id));

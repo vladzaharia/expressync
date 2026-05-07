@@ -102,7 +102,18 @@ async function main() {
   let reparented = 0;
   for (const m of linked) {
     if (!m.lagoCustomerExternalId) continue;
-    if (m.steveOcppIdTag.startsWith("OCPP-")) continue; // skip meta-tags themselves
+    // Skip meta-tag rows themselves — they're PARENTS, they don't have
+    // a parent. Detection by prefix:
+    //   META-*       — current canonical meta-tag
+    //   OCPP-<id>    — legacy Gen-1 (lagoExternalId) and Gen-2
+    //                  (publicId) meta-tags. Both are short two-segment
+    //                  forms; per-device tags follow `OCPP-D-*` so we
+    //                  don't accidentally skip those.
+    if (m.steveOcppIdTag.startsWith("META-")) continue;
+    if (
+      m.steveOcppIdTag.startsWith("OCPP-") &&
+      !m.steveOcppIdTag.startsWith("OCPP-D-")
+    ) continue;
     // Prefer the new format. Fall back to the legacy format only if a
     // customer somehow has no associated user (shouldn't happen post-
     // migration 0046, but defensive).
@@ -136,6 +147,49 @@ async function main() {
     }
   }
   console.log(`Re-parent pass: ${reparented} mappings adjusted.`);
+
+  // ---- Repair pass: clear accidental self-parenting on META- rows ---
+  //
+  // An earlier version of this script's skip check used `OCPP-` only,
+  // so after the rename the loop happily wrote `parent = META-<id>`
+  // onto rows whose `steveOcppIdTag` was the META- tag itself. The
+  // result: META rows referencing themselves as parent, and the same
+  // self-reference pushed to StEvE. Fix is straightforward — null the
+  // parent on any META row whose parent is the row's own idTag, then
+  // sync to StEvE so the on-wire shape converges.
+  const selfParented = await db
+    .select()
+    .from(schema.userMappings)
+    .where(
+      eq(
+        schema.userMappings.steveParentIdTag,
+        schema.userMappings.steveOcppIdTag,
+      ),
+    );
+  console.log(`Found ${selfParented.length} self-parented rows to repair.`);
+  let repaired = 0;
+  for (const m of selfParented) {
+    if (!APPLY) {
+      console.log(
+        `  would clear self-parent on ${m.steveOcppIdTag} (pk=${m.steveOcppTagPk})`,
+      );
+      repaired++;
+      continue;
+    }
+    try {
+      const [updated] = await db
+        .update(schema.userMappings)
+        .set({ steveParentIdTag: null, updatedAt: new Date() })
+        .where(eq(schema.userMappings.id, m.id))
+        .returning();
+      await syncSingleTagToSteve(updated);
+      console.log(`  cleared self-parent on ${updated.steveOcppIdTag}`);
+      repaired++;
+    } catch (err) {
+      console.error(`  FAILED self-parent repair ${m.steveOcppIdTag}:`, err);
+    }
+  }
+  console.log(`Self-parent repair pass: ${repaired} rows fixed.`);
 
   console.log(APPLY ? "Done." : "Dry-run complete. Re-run with --apply.");
 }

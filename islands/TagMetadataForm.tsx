@@ -10,6 +10,7 @@ import {
   TAG_TYPES,
   type TagType,
   tagTypeLabels,
+  USER_SELECTABLE_TAG_TYPES,
 } from "@/src/lib/types/tags.ts";
 import { isMetaTag } from "@/src/lib/tag-hierarchy.ts";
 
@@ -32,7 +33,7 @@ import { tagTypeBgClass, tagTypeTextClass } from "@/src/lib/tag-visuals.ts";
 function coerceTagType(value: string | null | undefined): TagType {
   return value && (TAG_TYPES as readonly string[]).includes(value)
     ? (value as TagType)
-    : "other";
+    : "ev_card";
 }
 
 /**
@@ -40,8 +41,12 @@ function coerceTagType(value: string | null | undefined): TagType {
  * fields: display name, type, notes, active flag. Deliberately does not
  * touch Lago linkage (that lives on `/links/[id]` via `MappingForm`).
  *
- * Meta-tags (`OCPP-*`) are auto-classified — the type selector is
- * disabled and a badge is shown in its place.
+ * "Managed" tag categories are read-only: meta-tags (`META-*` /
+ * legacy `OCPP-*`) and app-mediated device tags (`OCPP-D-*`). Both
+ * are minted automatically by the server (`ensureCustomerMetaTag` /
+ * `ensureDeviceTag`) so any human edit would diverge the on-card
+ * label from the actual tag origin. The form switches every input to
+ * read-only and hides the Save button when `managed` is true.
  */
 export default function TagMetadataForm({
   ocppTagPk,
@@ -49,10 +54,17 @@ export default function TagMetadataForm({
   initial,
 }: Props) {
   const meta = isMetaTag(ocppIdTag);
+  // App / device tags share the OCPP-D- prefix that `ensureDeviceTag`
+  // mints. They're auto-managed for the same reason as meta — edits
+  // would drift from the tag origin.
+  const isAppDeviceTag = ocppIdTag.startsWith("OCPP-D-");
+  const initialTagType = coerceTagType(initial?.tagType);
+  const managed = meta || isAppDeviceTag || initialTagType === "app" ||
+    initialTagType === "meta";
 
   const displayName = useSignal(initial?.displayName ?? "");
   const notes = useSignal(initial?.notes ?? "");
-  const tagType = useSignal<TagType>(coerceTagType(initial?.tagType));
+  const tagType = useSignal<TagType>(initialTagType);
   const isActive = useSignal(initial?.isActive ?? true);
 
   const saving = useSignal(false);
@@ -127,7 +139,7 @@ export default function TagMetadataForm({
             e,
           ) => (displayName.value =
             (e.currentTarget as HTMLInputElement).value)}
-          disabled={saving.value}
+          disabled={saving.value || managed}
         />
         <p class="text-xs text-muted-foreground">
           {meta
@@ -136,19 +148,23 @@ export default function TagMetadataForm({
         </p>
       </div>
 
-      {/* Tag type — disabled for meta-tags */}
+      {/* Tag type — disabled for managed (meta + app/device) tags. */}
       <div class="space-y-1">
         <Label>EV Card type</Label>
-        {meta
+        {managed
           ? (
             <div class="flex items-center gap-3 rounded-md border border-dashed border-input bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
               <Layers class="h-4 w-4" />
-              <span>Auto-classified as Meta-EV Card (OCPP-* prefix)</span>
+              <span>
+                {meta
+                  ? "Auto-classified as Meta-EV Card"
+                  : "Auto-classified as App (device-issued)"}
+              </span>
             </div>
           )
           : (
             <div class="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-7">
-              {TAG_TYPES.map((t) => {
+              {USER_SELECTABLE_TAG_TYPES.map((t) => {
                 const Icon = tagTypeIcons[t];
                 const selected = tagType.value === t;
                 return (
@@ -156,7 +172,7 @@ export default function TagMetadataForm({
                     key={t}
                     type="button"
                     onClick={() => (tagType.value = t)}
-                    disabled={saving.value}
+                    disabled={saving.value || managed}
                     aria-pressed={selected}
                     class={cn(
                       "flex flex-col items-center gap-1.5 rounded-md border px-2 py-3 text-xs font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50",
@@ -191,7 +207,7 @@ export default function TagMetadataForm({
           onInput={(
             e,
           ) => (notes.value = (e.currentTarget as HTMLTextAreaElement).value)}
-          disabled={saving.value}
+          disabled={saving.value || managed}
           class="flex min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         />
       </div>
@@ -202,7 +218,7 @@ export default function TagMetadataForm({
           id="tm-is-active"
           checked={isActive.value}
           onCheckedChange={(checked) => (isActive.value = checked === true)}
-          disabled={saving.value}
+          disabled={saving.value || managed}
         />
         <Label for="tm-is-active" class="text-sm font-normal">
           Active (EV Card may authorize at a charger)
@@ -217,19 +233,32 @@ export default function TagMetadataForm({
         )
         : null}
 
-      <div class="flex items-center justify-end gap-2">
-        {savedTick.value
-          ? (
-            <span class="flex items-center gap-1 text-sm text-emerald-500">
-              <Check class="h-4 w-4" /> Saved
-            </span>
-          )
-          : null}
-        <Button onClick={onSave} disabled={saving.value}>
-          {saving.value ? <Loader2 class="mr-2 h-4 w-4 animate-spin" /> : null}
-          Save metadata
-        </Button>
-      </div>
+      {managed && (
+        <div class="rounded-md border border-violet-500/30 bg-violet-500/5 p-3 text-xs text-violet-700 dark:text-violet-300">
+          This tag is auto-managed by the system{" "}
+          ({meta ? "customer parent meta-tag" : "app-issued device tag"}). Edits
+          would diverge the on-card label from the actual origin, so the form is
+          read-only here.
+        </div>
+      )}
+
+      {!managed && (
+        <div class="flex items-center justify-end gap-2">
+          {savedTick.value
+            ? (
+              <span class="flex items-center gap-1 text-sm text-emerald-500">
+                <Check class="h-4 w-4" /> Saved
+              </span>
+            )
+            : null}
+          <Button onClick={onSave} disabled={saving.value}>
+            {saving.value
+              ? <Loader2 class="mr-2 h-4 w-4 animate-spin" />
+              : null}
+            Save metadata
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

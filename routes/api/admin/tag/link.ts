@@ -66,10 +66,11 @@ export const handler = define.handlers({
       }
 
       // Phase I: validate optional tag_type against TAG_TYPES allowlist.
-      // Accept both snake_case (`tag_type`) and camelCase (`tagType`) keys for
-      // flexibility; default to "other" if unset.
+      // Accept both snake_case (`tag_type`) and camelCase (`tagType`) keys
+      // for flexibility; default to "ev_card" (the dominant physical
+      // category post-0048).
       const rawTagType = body.tag_type ?? body.tagType;
-      let tagType: TagType = "other";
+      let tagType: TagType = "ev_card";
       if (rawTagType !== undefined && rawTagType !== null) {
         if (!isTagType(rawTagType)) {
           return new Response(

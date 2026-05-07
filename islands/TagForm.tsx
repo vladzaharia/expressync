@@ -27,9 +27,9 @@ import { cn } from "@/src/lib/utils/cn.ts";
 import { tagTypeIcons } from "@/components/brand/tags/index.ts";
 import {
   inferTagType,
-  TAG_TYPES,
   type TagType,
   tagTypeLabels,
+  USER_SELECTABLE_TAG_TYPES,
 } from "@/src/lib/types/tags.ts";
 import { isMetaTag, META_TAG_PREFIX } from "@/src/lib/tag-hierarchy.ts";
 import { tagTypeBgClass, tagTypeTextClass } from "@/src/lib/tag-visuals.ts";
@@ -80,7 +80,7 @@ function TagFormInner(
   const idTag = useSignal(initial?.idTag ?? "");
   const tagType = useSignal<TagType>(
     initial?.tagType ??
-      (initial?.idTag ? inferTagType(initial.idTag) : "other"),
+      (initial?.idTag ? inferTagType(initial.idTag) : "ev_card"),
   );
   const tagTypeUserEdited = useSignal(initial?.tagType != null);
   const displayName = useSignal(initial?.displayName ?? "");
@@ -172,7 +172,7 @@ function TagFormInner(
               : undefined,
             displayName: displayName.value.trim() || undefined,
             notes: notes.value.trim() || undefined,
-            tagType: meta ? "other" : tagType.value,
+            tagType: meta ? "meta" : tagType.value,
             isActive: isActive.value,
           }),
         });
@@ -191,7 +191,7 @@ function TagFormInner(
             ocppIdTag: trimmed,
             displayName: displayName.value.trim() || null,
             notes: notes.value.trim() || null,
-            tagType: meta ? "other" : tagType.value,
+            tagType: meta ? "meta" : tagType.value,
             isActive: isActive.value,
           }),
         });
@@ -264,7 +264,7 @@ function TagFormInner(
           )
           : (
             <p class="text-xs text-muted-foreground">
-              Exact string sent by the physical card/keytag/sticker. Use the
+              Exact string sent by the physical EV card or keychain. Use the
               {" "}
               <code>{META_TAG_PREFIX}</code>{" "}
               prefix to create a meta-EV Card (a rollup parent for grouping
@@ -287,12 +287,16 @@ function TagFormInner(
           : null}
       </div>
 
-      {/* Tag type — hidden for meta-tags */}
+      {
+        /* Tag type — hidden for meta-tags. Picker shows only the user-
+          selectable subset (ev_card, keychain); `app` and `meta` are
+          auto-assigned and never user-pickable. */
+      }
       {!meta && (
         <div class="space-y-1">
           <Label>EV Card type</Label>
           <div class="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-7">
-            {TAG_TYPES.map((t) => {
+            {USER_SELECTABLE_TAG_TYPES.map((t) => {
               const Icon = tagTypeIcons[t];
               const selected = tagType.value === t;
               return (

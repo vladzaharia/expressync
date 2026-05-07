@@ -58,7 +58,7 @@ export interface TagListCardProps {
 function coerceTagType(value: string | null | undefined): TagType {
   return value && (TAG_TYPES as readonly string[]).includes(value)
     ? (value as TagType)
-    : "other";
+    : "ev_card";
 }
 
 export function TagListCard(props: TagListCardProps) {
