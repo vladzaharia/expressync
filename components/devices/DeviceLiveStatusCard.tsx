@@ -21,13 +21,7 @@
  * older client still produces a coherent readout.
  */
 
-import {
-  AlertCircle,
-  Bell,
-  BellOff,
-  Radio,
-  ScanLine,
-} from "lucide-preact";
+import { AlertCircle, Bell, BellOff, Radio, ScanLine } from "lucide-preact";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { formatRelative } from "@/islands/shared/device-visuals.ts";
 

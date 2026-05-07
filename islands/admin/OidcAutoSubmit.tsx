@@ -56,7 +56,7 @@ export default function OidcAutoSubmit(
       }
       const data = await res.json() as { url?: string; redirect?: boolean };
       if (data?.url) {
-        window.location.href = data.url;
+        globalThis.location.href = data.url;
         return;
       }
       startedRef.current = false;

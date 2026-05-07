@@ -27,8 +27,7 @@ export const TERMS_CARDS: LegalCard[] = [
     id: "your-account",
     icon: "UserCheck",
     title: "Your Account",
-    summary:
-      "Keep your information accurate and your sign-in to yourself.",
+    summary: "Keep your information accurate and your sign-in to yourself.",
     body:
       "You're responsible for keeping the email and any other info on your account up to date, and for anything done under your account. Don't share your sign-in. Don't use someone else's account or charging card.\n\nIf you think someone else is using your account, email support@example.com right away and we'll lock it.",
   },
@@ -45,8 +44,7 @@ export const TERMS_CARDS: LegalCard[] = [
     id: "acceptable-use",
     icon: "ShieldAlert",
     title: "Acceptable Use",
-    summary:
-      "Use the app and stations the way they're meant to be used.",
+    summary: "Use the app and stations the way they're meant to be used.",
     body:
       "We give you permission to use the iOS app and the website for the ordinary purpose of charging your vehicle. That permission is personal to you, isn't transferable, and we can withdraw it.\n\nIn particular, you agree not to:",
     bullets: [
@@ -79,8 +77,7 @@ export const TERMS_CARDS: LegalCard[] = [
     id: "safety-equipment",
     icon: "AlertTriangle",
     title: "Safety & Equipment",
-    summary:
-      "Follow on-site instructions and don't damage the stations.",
+    summary: "Follow on-site instructions and don't damage the stations.",
     body:
       "Polaris Express owns and maintains the charging stations. When you use one, please follow the on-site signage, our safety instructions, and any applicable law.\n\nUse only equipment that's in good working order, and only with a vehicle whose port matches the connector. You're responsible for damage you cause to a station through misuse, negligence, or unauthorized modification.",
   },

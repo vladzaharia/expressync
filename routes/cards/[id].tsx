@@ -125,6 +125,10 @@ export const handler = define.handlers({
       meterValueTo: r.event.meterValueTo,
       isFinal: r.event.isFinal ?? false,
       syncedAt: r.event.syncedAt ? r.event.syncedAt.toISOString() : null,
+      // Per-card session list doesn't compute costs server-side here —
+      // the Sessions page is the canonical surface for that.
+      costCents: null,
+      costCoverage: "unknown",
     }));
 
     return {

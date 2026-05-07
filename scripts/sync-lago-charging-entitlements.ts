@@ -57,7 +57,11 @@ const FEATURE_PAYLOAD = {
   name: "EV Charging",
   description: "Access to EV charging",
   privileges: [
-    { code: EV_PRIVILEGE_MAX_AMPS, name: "Max Amperage", value_type: "integer" },
+    {
+      code: EV_PRIVILEGE_MAX_AMPS,
+      name: "Max Amperage",
+      value_type: "integer",
+    },
     {
       code: EV_PRIVILEGE_RAMPED_CHARGE,
       name: "Ramped Charge",
@@ -120,7 +124,9 @@ async function syncPlan(p: PlanPolicy): Promise<void> {
   const ok = eff.maxAmps === p.maxAmps && eff.rampedCharge === p.rampedCharge;
   const status = ok ? "OK" : "MISMATCH";
   console.log(
-    `[plan] ${p.code.padEnd(20)} max_amps=${eff.maxAmps} ramped_charge=${eff.rampedCharge} (${status})`,
+    `[plan] ${
+      p.code.padEnd(20)
+    } max_amps=${eff.maxAmps} ramped_charge=${eff.rampedCharge} (${status})`,
   );
   if (!ok) {
     throw new Error(

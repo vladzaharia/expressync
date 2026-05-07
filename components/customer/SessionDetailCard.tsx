@@ -93,9 +93,7 @@ function renderCostValue(
   currency: string | null,
 ) {
   if (coverage === "included") {
-    return (
-      <span class="text-emerald-600 dark:text-emerald-400">Included</span>
-    );
+    return <span class="text-emerald-600 dark:text-emerald-400">Included</span>;
   }
   if (coverage === "billed" && cents != null) {
     return <span class="tabular-nums">{formatCost(cents, currency)}</span>;

@@ -86,7 +86,7 @@ export const handler = define.handlers({
 
       allCards = rows
         .filter((r) => livePkSet.has(r.steveOcppTagPk)) // drop StEvE-orphans
-        .filter((r) => !isMetaTag(r.steveOcppIdTag))   // hide meta-tags
+        .filter((r) => !isMetaTag(r.steveOcppIdTag)) // hide meta-tags
         .map((r) => ({
           id: r.id,
           displayName: r.displayName ?? null,

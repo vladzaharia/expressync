@@ -92,12 +92,14 @@ export default define.page<typeof handler>(function SwitchPage({ data }) {
                 </p>
               </div>
 
-              {/*
+              {
+                /*
                 AccountList renders nothing when there are zero sessions,
                 so signed-out visitors see the divider + buttons only.
                 The divider is gated on a non-empty list so it doesn't
                 float on its own.
-              */}
+              */
+              }
               <AccountList allowRevoke={false} className="min-w-0" />
 
               <SwitchDivider />

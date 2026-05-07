@@ -27,8 +27,7 @@ export const PRIVACY_CARDS: LegalCard[] = [
     id: "who-this-applies-to",
     icon: "Users",
     title: "Who This Covers",
-    summary:
-      "Customers using our website, app, or charging stations.",
+    summary: "Customers using our website, app, or charging stations.",
     body:
       "This policy is for customers — anyone who holds a charging card, reserves a charger, or signs in to example.com. Polaris team members and admins sign in through a separate system with its own access policy.\n\nExpressCharge isn't built for kids. We don't intentionally collect data from anyone under 16, and if we find out we did, we'll delete it.",
   },
@@ -36,8 +35,7 @@ export const PRIVACY_CARDS: LegalCard[] = [
     id: "account-data",
     icon: "MailOpen",
     title: "Your Account",
-    summary:
-      "Your email signs you in. Name and avatar are optional.",
+    summary: "Your email signs you in. Name and avatar are optional.",
     body:
       "When you create an account, we keep your email address and your role on the service. You can add a display name and an avatar URL if you want.\n\nWe also set a session cookie on example.com so you stay signed in. Without it the service can't recognize you between page loads. We hold onto your account data for as long as your account is open.",
   },
@@ -99,8 +97,7 @@ export const PRIVACY_CARDS: LegalCard[] = [
     id: "what-we-dont-do",
     icon: "Ban",
     title: "What We Don't Do",
-    summary:
-      "No analytics. No ad trackers. No selling. No location tracking.",
+    summary: "No analytics. No ad trackers. No selling. No location tracking.",
     body:
       "We don't run third-party analytics, error-tracking, or advertising SDKs. We don't collect your device's location — the only location implied by your data is whichever station you actually charged at. We don't sell your data, and we don't trade it with advertisers for cross-app or cross-site profiling.",
   },

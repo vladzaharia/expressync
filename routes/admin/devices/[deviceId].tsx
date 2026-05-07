@@ -382,8 +382,14 @@ export default define.page<typeof handler>(
             const liveStatus: DeviceLiveStatus = {
               isOnline,
               lastSeenAtIso: device.lastSeenAtIso,
-              reconnectCount: Math.max(0, Math.floor(num("reconnectCount") ?? 0)),
-              pendingUploads: Math.max(0, Math.floor(num("pendingUploads") ?? 0)),
+              reconnectCount: Math.max(
+                0,
+                Math.floor(num("reconnectCount") ?? 0),
+              ),
+              pendingUploads: Math.max(
+                0,
+                Math.floor(num("pendingUploads") ?? 0),
+              ),
               pushPermission: isPushPerm(ls.pushPermission)
                 ? ls.pushPermission
                 : null,
