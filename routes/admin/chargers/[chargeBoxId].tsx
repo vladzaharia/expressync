@@ -40,6 +40,7 @@ import {
 
 import { ChargerHeaderStrip } from "../../../components/chargers/ChargerHeaderStrip.tsx";
 import PublicIdQrPopover from "../../../islands/shared/PublicIdQrPopover.tsx";
+import ChargerLocationEditor from "../../../islands/charger-actions/ChargerLocationEditor.tsx";
 import ChargerIdentityCard from "../../../islands/ChargerIdentityCard.tsx";
 import ChargerLiveStatusCard from "../../../islands/ChargerLiveStatusCard.tsx";
 import ConnectorsSection from "../../../islands/ConnectorsSection.tsx";
@@ -85,6 +86,17 @@ interface ChargerDetailLoaderData {
     chargeBoxPk: number | null;
     friendlyName: string | null;
     formFactor: string;
+    // W8-rest — structured address + coordinates surfaced into the
+    // inline ChargerLocationEditor. All optional; the editor's
+    // read-only view collapses to "no address set" when blank.
+    addressLine1: string | null;
+    addressLine2: string | null;
+    addressCity: string | null;
+    addressRegion: string | null;
+    addressPostalCode: string | null;
+    addressCountry: string | null;
+    latitude: number | null;
+    longitude: number | null;
     firstSeenAtIso: string;
     lastSeenAtIso: string;
     lastStatus: string | null;
@@ -485,6 +497,16 @@ export const handler = define.handlers({
           ? "unmanaged"
           : "ocpp",
         locationDescription: cacheRow.locationDescription,
+        addressLine1: cacheRow.addressLine1,
+        addressLine2: cacheRow.addressLine2,
+        addressCity: cacheRow.addressCity,
+        addressRegion: cacheRow.addressRegion,
+        addressPostalCode: cacheRow.addressPostalCode,
+        addressCountry: cacheRow.addressCountry,
+        latitude: cacheRow.latitude !== null ? Number(cacheRow.latitude) : null,
+        longitude: cacheRow.longitude !== null
+          ? Number(cacheRow.longitude)
+          : null,
       },
       connectors,
       recentTransactions,
@@ -621,6 +643,23 @@ export default define.page<typeof handler>(
                 steveFetchFailed={data.steveFetchFailed}
               />
             </div>
+
+            {/* Row 1.5: structured location editor — inline edit. */}
+            <SectionCard title="Location" accent="orange" icon={MapPin}>
+              <ChargerLocationEditor
+                chargeBoxId={charger.chargeBoxId}
+                initial={{
+                  addressLine1: charger.addressLine1,
+                  addressLine2: charger.addressLine2,
+                  addressCity: charger.addressCity,
+                  addressRegion: charger.addressRegion,
+                  addressPostalCode: charger.addressPostalCode,
+                  addressCountry: charger.addressCountry,
+                  latitude: charger.latitude,
+                  longitude: charger.longitude,
+                }}
+              />
+            </SectionCard>
 
             {/* Row 2: connector cards */}
             <ConnectorsSection
@@ -802,6 +841,22 @@ function UnmanagedChargerDetailLayout(
               </p>
             </SectionCard>
           </div>
+
+          <SectionCard title="Location" accent="blue" icon={MapPin}>
+            <ChargerLocationEditor
+              chargeBoxId={charger.chargeBoxId}
+              initial={{
+                addressLine1: charger.addressLine1,
+                addressLine2: charger.addressLine2,
+                addressCity: charger.addressCity,
+                addressRegion: charger.addressRegion,
+                addressPostalCode: charger.addressPostalCode,
+                addressCountry: charger.addressCountry,
+                latitude: charger.latitude,
+                longitude: charger.longitude,
+              }}
+            />
+          </SectionCard>
 
           <SectionCard title="User instructions preview" accent="blue">
             <p class="text-xs uppercase tracking-wide text-muted-foreground">
