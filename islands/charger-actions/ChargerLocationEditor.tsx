@@ -36,7 +36,7 @@ import { toast } from "sonner";
 // 200KB+ data cost on the initial page render.
 import { State } from "country-state-city";
 import { ISO_COUNTRIES } from "@/src/lib/utils/iso-countries.ts";
-import LeafletPinDrop from "./LeafletPinDrop.tsx";
+import PinMap from "../maps/PinMap.tsx";
 
 interface ChargerLocationEditorProps {
   chargeBoxId: string;
@@ -415,7 +415,8 @@ export default function ChargerLocationEditor(
 
       <div class="space-y-1">
         <Label>Pin on map</Label>
-        <LeafletPinDrop
+        <PinMap
+          mode="edit"
           latitude={form.latitude.trim() === "" ? null : Number(form.latitude)}
           longitude={form.longitude.trim() === ""
             ? null

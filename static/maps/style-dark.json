@@ -1,0 +1,85 @@
+{
+  "version": 8,
+  "name": "ExpresScan Dark",
+  "metadata": {
+    "comment": "Dark variant of the brand-tinted MapLibre style. See style-light.json for the rationale + key-injection mechanism."
+  },
+  "sources": {
+    "openmaptiles": {
+      "type": "vector",
+      "url": "https://api.maptiler.com/tiles/v3/tiles.json?key=__MAPTILER_KEY__"
+    }
+  },
+  "sprite": "https://api.maptiler.com/maps/streets-v2-dark/sprite",
+  "glyphs": "https://api.maptiler.com/fonts/{fontstack}/{range}.pbf?key=__MAPTILER_KEY__",
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": { "background-color": "#0f172a" }
+    },
+    {
+      "id": "water",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "water",
+      "paint": { "fill-color": "#1e293b" }
+    },
+    {
+      "id": "landuse-park",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "landuse",
+      "filter": ["==", ["get", "class"], "park"],
+      "paint": { "fill-color": "#14532d", "fill-opacity": 0.4 }
+    },
+    {
+      "id": "buildings",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "building",
+      "minzoom": 13,
+      "paint": { "fill-color": "#1e293b", "fill-outline-color": "#334155" }
+    },
+    {
+      "id": "roads-minor",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "filter": [
+        "in",
+        ["get", "class"],
+        ["literal", ["minor", "service", "tertiary"]]
+      ],
+      "paint": { "line-color": "#334155", "line-width": 1 }
+    },
+    {
+      "id": "roads-major",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "filter": [
+        "in",
+        ["get", "class"],
+        ["literal", ["primary", "secondary", "trunk", "motorway"]]
+      ],
+      "paint": { "line-color": "#475569", "line-width": 2.5 }
+    },
+    {
+      "id": "place-labels",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "place",
+      "layout": {
+        "text-field": ["get", "name"],
+        "text-font": ["Noto Sans Regular"],
+        "text-size": 12
+      },
+      "paint": {
+        "text-color": "#cbd5e1",
+        "text-halo-color": "#0f172a",
+        "text-halo-width": 1.5
+      }
+    }
+  ]
+}
