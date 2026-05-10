@@ -34,6 +34,8 @@
  *   log.info("synced", { device_id, count: 10 });
  */
 
+import { scrubAttributes, scrubString } from "./log_scrubber.ts";
+
 export type LogLevel = "ERROR" | "WARN" | "INFO" | "DEBUG";
 
 export interface LogContext {
@@ -137,13 +139,17 @@ class Logger {
       }
     }
 
+    // Defence-in-depth PII redaction — applied AFTER attributes are
+    // assembled so callers that pass `{ Authorization: "Bearer …" }` or
+    // free-form messages with embedded emails/JWTs get scrubbed before
+    // the record reaches stdout. Mirror of the iOS-side LogScrubber.
     const record = {
       timestamp: nowNs.toString(),
       observed_timestamp: nowNs.toString(),
       severity_text: SEVERITY_TEXT[level],
       severity_number: SEVERITY_NUMBER[level],
-      body: message,
-      attributes,
+      body: scrubString(message),
+      attributes: scrubAttributes(attributes),
       resource: RESOURCE,
     };
 
