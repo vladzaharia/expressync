@@ -3,12 +3,14 @@ import {
   bigint,
   boolean,
   check,
+  doublePrecision,
   index,
   integer,
   jsonb,
   numeric,
   pgTable,
   primaryKey,
+  real,
   serial,
   text,
   timestamp,
@@ -1528,6 +1530,15 @@ export const devices = pgTable("devices", {
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
   /** Free-form last-known status JSON (battery, network, etc.). Best-effort. */
   lastStatus: jsonb("last_status"),
+  // Phase 2 Bundle 2a — managed-fleet last-known location.
+  // Populated by the sync route ONLY when the device carries the
+  // `managed` capability AND the `device.location.upload` feature flag
+  // is on. Customer-account devices can never have these fields
+  // populated (capability is admin-only at the toggle endpoint).
+  lastLocationLat: doublePrecision("last_location_lat"),
+  lastLocationLon: doublePrecision("last_location_lon"),
+  lastLocationAccuracyM: real("last_location_accuracy_m"),
+  lastLocationAt: timestamp("last_location_at", { withTimezone: true }),
   registeredAt: timestamp("registered_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
