@@ -334,14 +334,16 @@ export const handler = define.handlers({
         // capability revocation between sync ticks doesn't leave us
         // storing location for a device that shouldn't be tracked.
         if (parsed.location) {
-          // Read capabilities + feature flag inline. We can do this
-          // cheaply because the device row is already in scope.
-          const [{ capabilities }] = await db
+          // Read capabilities inline. The device row was just verified
+          // upstream of step 4, but harden against an empty result so a
+          // race never crashes the whole sync.
+          const capRows = await db
             .select({ capabilities: devices.capabilities })
             .from(devices)
             .where(eq(devices.id, device.id))
-            .limit(1) as { capabilities: string[] }[];
-          const hasManaged = (capabilities ?? []).includes("managed");
+            .limit(1) as { capabilities: string[] | null }[];
+          const capabilities = capRows[0]?.capabilities ?? [];
+          const hasManaged = capabilities.includes("managed");
           if (hasManaged) {
             const capturedAtMs = Date.parse(parsed.location.capturedAt);
             const nowMs = now.getTime();

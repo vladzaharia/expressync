@@ -46,10 +46,12 @@ import type { DeviceLiveStatus } from "../../../components/devices/DeviceLiveSta
 import { DeviceStateSyncList } from "../../../components/devices/DeviceStateSyncList.tsx";
 import type { DeviceSyncEntry } from "../../../components/devices/DeviceStateSyncList.tsx";
 import AppConfigurationForm from "../../../islands/devices/AppConfigurationForm.tsx";
+import DeviceLocationCard from "../../../islands/admin/DeviceLocationCard.tsx";
 import DeviceLogsCard from "../../../islands/admin/DeviceLogsCard.tsx";
 import {
   ClipboardList,
   History as HistoryIcon,
+  MapPin,
   Settings2,
 } from "lucide-preact";
 import { deviceSettings as deviceSettingsTable } from "../../../src/db/schema.ts";
@@ -85,6 +87,13 @@ interface DeviceDetail {
   >;
   pickerEditable: DeviceCapability[];
   pickerReadOnly: DeviceCapability[];
+  // Phase 2 Bundle 2a — managed-device last-known location. Populated
+  // by the device-state sync route only when the device carries the
+  // `managed` capability.
+  lastLocationLat: number | null;
+  lastLocationLon: number | null;
+  lastLocationAccuracyM: number | null;
+  lastLocationAtIso: string | null;
 }
 
 interface DeviceDetailPageData {
@@ -163,6 +172,10 @@ export const handler = define.handlers({
           registeredAt: devices.registeredAt,
           deletedAt: devices.deletedAt,
           revokedAt: devices.revokedAt,
+          lastLocationLat: devices.lastLocationLat,
+          lastLocationLon: devices.lastLocationLon,
+          lastLocationAccuracyM: devices.lastLocationAccuracyM,
+          lastLocationAt: devices.lastLocationAt,
         })
         .from(devices)
         .leftJoin(users, eq(users.id, devices.ownerUserId))
@@ -237,6 +250,10 @@ export const handler = define.handlers({
           appConfigSettings,
           pickerEditable: [...pickerOpts.editable] as DeviceCapability[],
           pickerReadOnly: [...pickerOpts.readOnly] as DeviceCapability[],
+          lastLocationLat: row.lastLocationLat ?? null,
+          lastLocationLon: row.lastLocationLon ?? null,
+          lastLocationAccuracyM: row.lastLocationAccuracyM ?? null,
+          lastLocationAtIso: isoOrNull(row.lastLocationAt),
         };
       }
     } catch (error) {
@@ -503,6 +520,22 @@ export default define.page<typeof handler>(
                     accent="teal"
                   >
                     <RecentScansEmpty />
+                  </SectionCard>
+
+                  <SectionCard
+                    title="Location"
+                    description="Last-known location for managed devices. The device reports significant-change updates on every sync; admins can request an on-demand fix via Locate now."
+                    icon={MapPin}
+                    accent="teal"
+                  >
+                    <DeviceLocationCard
+                      deviceId={device.deviceId}
+                      enabled={device.capabilities.includes("managed")}
+                      initialLat={device.lastLocationLat}
+                      initialLon={device.lastLocationLon}
+                      initialAccuracyM={device.lastLocationAccuracyM}
+                      initialAtIso={device.lastLocationAtIso}
+                    />
                   </SectionCard>
 
                   <SectionCard
