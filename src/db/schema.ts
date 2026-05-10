@@ -1624,3 +1624,66 @@ export const deviceSettings = pgTable("device_settings", {
 
 export type DeviceSetting = typeof deviceSettings.$inferSelect;
 export type NewDeviceSetting = typeof deviceSettings.$inferInsert;
+
+// ============================================================================
+// === Phase 3c: device logs (OpenTelemetry-shaped) ===
+// ============================================================================
+//
+// One row per OTel `LogRecord` shipped from a device via the sync
+// envelope. Migration `0053_device_logs.sql` creates the table; this
+// schema mirrors the SQL exactly. Wire format is documented in
+// `docs/logging/contract.md`.
+//
+// PK `(device_id, seq)` makes the sync route's bulk insert idempotent
+// via `ON CONFLICT DO NOTHING` — replays of the same sync request
+// don't double-insert. `seq` is the per-device monotonic UInt64
+// `expressync.seq` allocated client-side; it lives in `attributes` on
+// the wire (string-encoded to defeat JS Number precision loss) but is
+// promoted to its own column here so the PK can use a real index type.
+//
+// Storage: `numeric(20,0)` for `seq` because UInt64 doesn't fit in
+// PostgreSQL `bigint` (signed, max 9.2e18). `attributes` and
+// `resource` are JSONB; `category` is denormalised out of `attributes`
+// for the admin-UI severity/category filter to use a btree index
+// instead of a JSONB containment scan.
+export const deviceLogs = pgTable("device_logs", {
+  deviceId: uuid("device_id")
+    .notNull()
+    .references(() => devices.id, { onDelete: "cascade" }),
+  seq: numeric("seq", { precision: 20, scale: 0 }).notNull(),
+  timestampNs: bigint("timestamp_ns", { mode: "bigint" }).notNull(),
+  observedTs: timestamp("observed_ts", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  severityText: text("severity_text").notNull(),
+  severityNumber: integer("severity_number").notNull(),
+  body: text("body").notNull(),
+  category: text("category"),
+  traceId: text("trace_id"),
+  spanId: text("span_id"),
+  attributes: jsonb("attributes").notNull().default(sql`'{}'::jsonb`),
+  resource: jsonb("resource").notNull().default(sql`'{}'::jsonb`),
+}, (table) => [
+  primaryKey({ columns: [table.deviceId, table.seq] }),
+  index("device_logs_device_observed_idx").on(
+    table.deviceId,
+    table.observedTs.desc(),
+  ),
+  index("device_logs_device_severity_idx").on(
+    table.deviceId,
+    table.severityNumber,
+    table.observedTs.desc(),
+  ),
+  index("device_logs_device_category_idx").on(
+    table.deviceId,
+    table.category,
+    table.observedTs.desc(),
+  ),
+  index("device_logs_observed_ts_idx").on(table.observedTs),
+  // The GIN index on `attributes` is created in raw SQL inside the
+  // migration; Drizzle's `index().using("gin", ...)` doesn't expose
+  // `jsonb_path_ops` directly. The DB has the index either way.
+]);
+
+export type DeviceLog = typeof deviceLogs.$inferSelect;
+export type NewDeviceLog = typeof deviceLogs.$inferInsert;

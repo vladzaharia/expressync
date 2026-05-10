@@ -2,7 +2,7 @@ import type { LegalCard, LegalDocumentMeta } from "./types.ts";
 
 export const PRIVACY_META: LegalDocumentMeta = {
   title: "Privacy Policy",
-  effectiveDate: "2026-05-07",
+  effectiveDate: "2026-05-10",
   contactEmail: "privacy@example.com",
 };
 
@@ -80,6 +80,22 @@ export const PRIVACY_CARDS: LegalCard[] = [
       "Approximate location, while the app is open, is used only to order chargers by distance — not stored on our servers",
       "What we don't collect: contacts, photos, microphone, camera, advertising identifier, or any on-device session history",
       "What we tell Apple: this data is linked to your account, but we don't use it to track you across other apps or websites",
+    ],
+  },
+  {
+    id: "diagnostic-logs",
+    icon: "ClipboardList",
+    title: "Diagnostic Logs",
+    summary:
+      "The iOS app keeps a short log of internal events to help us debug problems, and uploads it with the regular sync. Personal details are removed before anything is written down.",
+    body:
+      'The ExpressCharge iOS app records a structured log of internal events — things like "sync completed", "charger list refreshed", or "NFC scan failed" — plus the relevant code path, severity, and timestamp. That log rides on the same once-a-minute status update we already send. We use it to trace bugs that the app can\'t tell us about by itself.\n\nBefore the app writes anything to disk OR sends it to us, it runs the message through a redaction pass that strips email addresses, phone numbers, login tokens, and card identifiers. The redaction is local to your phone and applies before the entry ever leaves your device.\n\nWhat we keep on the server is bounded: 7 days, then it\'s automatically deleted. Only Polaris admins (not other customers) can read your device\'s logs through our admin tools. The buffer on your phone is bounded too — about 5 MB, oldest entries dropped first — and is wiped when you sign out.',
+    bullets: [
+      'What\'s in a log entry: severity (debug / info / warn / error), category (e.g. "network" or "scan"), the redacted message, ISO-8601 timestamp, app version, OS version, and your device id',
+      "What's redacted on-device before logging: email addresses, JWTs, bearer tokens, attribute keys starting with `card_`, `Authorization` headers, E.164 phone numbers",
+      "Server retention: 7 days, deleted automatically by a scheduled job",
+      "Who can read it: Polaris admins via our internal admin tools — never other customers, never third parties, never advertisers",
+      "On-device retention: ~5 MB ring buffer; oldest entries drop when full; entire buffer wiped on sign-out",
     ],
   },
   {

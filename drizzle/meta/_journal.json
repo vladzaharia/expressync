@@ -358,6 +358,13 @@
       "when": 1778332800000,
       "tag": "0050_chargers_and_connectors",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1778683200000,
+      "tag": "0053_device_logs",
+      "breakpoints": true
     }
   ]
 }
