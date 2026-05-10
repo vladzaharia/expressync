@@ -46,7 +46,12 @@ import type { DeviceLiveStatus } from "../../../components/devices/DeviceLiveSta
 import { DeviceStateSyncList } from "../../../components/devices/DeviceStateSyncList.tsx";
 import type { DeviceSyncEntry } from "../../../components/devices/DeviceStateSyncList.tsx";
 import AppConfigurationForm from "../../../islands/devices/AppConfigurationForm.tsx";
-import { History as HistoryIcon, Settings2 } from "lucide-preact";
+import DeviceLogsCard from "../../../islands/admin/DeviceLogsCard.tsx";
+import {
+  ClipboardList,
+  History as HistoryIcon,
+  Settings2,
+} from "lucide-preact";
 import { deviceSettings as deviceSettingsTable } from "../../../src/db/schema.ts";
 import { pickerOptionsForKind } from "../../../src/lib/devices/capability-metadata.ts";
 import type { DeviceCapability } from "../../../src/lib/types/devices.ts";
@@ -498,6 +503,15 @@ export default define.page<typeof handler>(
                     accent="teal"
                   >
                     <RecentScansEmpty />
+                  </SectionCard>
+
+                  <SectionCard
+                    title="Device logs"
+                    description="OpenTelemetry-shaped log records shipped from this device on every sync. Last 7 days; PII scrubbed on-device before write."
+                    icon={ClipboardList}
+                    accent="teal"
+                  >
+                    <DeviceLogsCard deviceId={device.deviceId} />
                   </SectionCard>
                 </div>
               </div>

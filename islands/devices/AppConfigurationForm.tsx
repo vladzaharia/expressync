@@ -24,6 +24,7 @@ import {
   Bell,
   Loader2,
   Lock,
+  MapPin,
   Save,
   Smartphone,
   User,
@@ -71,6 +72,8 @@ function iconFor(c: DeviceCapability) {
       return User;
     case "kiosk":
       return Lock;
+    case "managed":
+      return MapPin;
   }
 }
 

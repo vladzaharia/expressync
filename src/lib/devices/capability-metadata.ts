@@ -36,7 +36,7 @@ export interface CapabilityMetadata {
   /** One-sentence description for the picker tooltip / row sub-text. */
   description: string;
   /** Lookup key for the lucide icon — picker maps it to an icon component. */
-  iconKey: "scanner" | "charger" | "user" | "kiosk";
+  iconKey: "scanner" | "charger" | "user" | "kiosk" | "managed";
 }
 
 /**
@@ -73,6 +73,13 @@ export const CAPABILITY_METADATA: Record<DeviceCapability, CapabilityMetadata> =
         "Single-screen appliance mode — no chrome. Legal only with exactly one of {scanner, user}.",
       iconKey: "kiosk",
     },
+    managed: {
+      capability: "managed",
+      label: "Managed device",
+      description:
+        "Allows admins to read this device's last-known location and request an on-demand fix. Admin-fleet only — customer-owned devices can never carry this.",
+      iconKey: "managed",
+    },
   };
 
 /**
@@ -84,6 +91,7 @@ export const APP_REGISTRATION_OPTIONS: readonly DeviceCapability[] = [
   "scanner",
   "user",
   "kiosk",
+  "managed",
 ] as const;
 
 /**
