@@ -25,6 +25,7 @@ import { config, validateSyncWorkerConfig } from "./src/lib/config.ts";
 import { runSync, type SyncResult } from "./src/services/sync.service.ts";
 import { SyncScheduler } from "./src/services/sync-scheduler.ts";
 import { ensureLagoMetricSafety } from "./src/services/lago-safety.service.ts";
+import { resolvePendingReservations } from "./src/services/reservation-resolver.service.ts";
 import { pruneExpiredIdempotencyKeys } from "./src/lib/idempotency.ts";
 import { db } from "./src/db/index.ts";
 import {
@@ -317,6 +318,36 @@ console.log(
   }`,
 );
 
+// Reservation status resolver — every minute, poll any pending
+// reservation whose `steve_reservation_id` is set. StEvE 3.12.0 returns
+// 404 for the task endpoint; the resolver no-ops cleanly until StEvE is
+// upgraded past 3.12.0 and starts returning task statuses. Once the
+// OCPP StatusNotification stream is wired into recordChargerStatus
+// with connector context, the side-channel `tryConfirmFromStatusNotification`
+// will close the loop without waiting on this poll.
+const reservationResolverJob = new Cron(
+  "* * * * *",
+  { protect: true, timezone: "UTC" },
+  async () => {
+    try {
+      const result = await resolvePendingReservations();
+      if (result.confirmed > 0 || result.conflicted > 0) {
+        console.log(
+          `[Sync Worker] reservation resolver: polled=${result.polled} ` +
+            `confirmed=${result.confirmed} conflicted=${result.conflicted}`,
+        );
+      }
+    } catch (err) {
+      console.error("[Sync Worker] reservation resolver failed:", err);
+    }
+  },
+);
+console.log(
+  `[Sync Worker] reservation resolver cron scheduled; next run: ${
+    reservationResolverJob.nextRun()?.toISOString() ?? "unknown"
+  }`,
+);
+
 // Start the adaptive scheduler (replaces the old fixed Cron).
 await SyncScheduler.start(handleSync);
 console.log("[Sync Worker] Adaptive scheduler started");
@@ -387,6 +418,9 @@ const shutdown = async () => {
   console.log("[Sync Worker] Shutting down gracefully...");
   SyncScheduler.stop();
   rateLimitCleanupJob.stop();
+  reservationResolverJob.stop();
+  deviceLogsRetentionJob.stop();
+  deviceLogsSizeAlarmJob.stop();
   console.log("[Sync Worker] Scheduler stopped");
 
   if (currentSyncPromise) {

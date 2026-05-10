@@ -25,9 +25,11 @@
  */
 
 import {
+  Bell,
   CalendarClock,
   CreditCard,
   FileText,
+  Flag,
   type LucideIcon,
   Receipt,
   RefreshCw,
@@ -150,6 +152,24 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
         icon: RefreshCw,
         accentColor: "blue",
         keywords: ["sync run", "history"],
+      },
+      {
+        id: "nav:/admin/feature-flags",
+        title: "Feature Flags",
+        path: "/admin/feature-flags",
+        icon: Flag,
+        accentColor: "indigo",
+        keywords: ["flags", "toggles", "rollout", "experiments"],
+        adminOnly: true,
+      },
+      {
+        id: "nav:/admin/notifications",
+        title: "Notifications",
+        path: "/admin/notifications",
+        icon: Bell,
+        accentColor: "sky",
+        keywords: ["bell", "alerts", "archive", "feed"],
+        adminOnly: true,
       },
       {
         id: "nav:/admin/webhook-events",
