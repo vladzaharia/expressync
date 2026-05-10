@@ -79,7 +79,7 @@ export type AuthAuditEvent =
   // Emitted by `/api/admin/devices/{id}/{start,stop,cancel-reservation}`
   // when an iOS device with the `user` capability invokes the charger
   // control surface. `metadata.deviceId` is the *caller* device id;
-  // `metadata.chargerId` is the target `chargers_cache.charge_box_id`.
+  // `metadata.chargerId` is the target `chargers.charge_box_id`.
   | "device.user.start_charge"
   | "device.user.stop_charge"
   | "device.user.cancel_reservation";
