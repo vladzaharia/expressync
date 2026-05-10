@@ -1637,6 +1637,73 @@ export type DeviceSetting = typeof deviceSettings.$inferSelect;
 export type NewDeviceSetting = typeof deviceSettings.$inferInsert;
 
 // ============================================================================
+// === Feature flags: per-user values + per-device overrides ===
+// ============================================================================
+//
+// Mirrors `drizzle/0051_feature_flags.sql`. Two tables, both composite-PK
+// on (owner, flag_key) + JSONB value + LWW metadata. Distinct from
+// `device_settings` because flags are admin-write-only (the device sync
+// envelope cannot push flag values), and because charger-kind devices are
+// forbidden from carrying overrides (enforced by a Postgres trigger;
+// drizzle-kit doesn't model triggers — they live only in the SQL).
+//
+// Effective value precedence (resolver):
+//   device_override ?? user_value ?? registry.defaultValue
+//
+// Stale rows for keys no longer in the registry are harmless — the
+// resolver in `src/lib/devices/feature-flag-resolver.ts` skips unknown
+// keys.
+
+export const userFeatureFlagValues = pgTable("user_feature_flag_values", {
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  flagKey: text("flag_key").notNull(),
+  valueJson: jsonb("value_json").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedBy: text("updated_by").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.userId, table.flagKey] }),
+  index("idx_user_feature_flag_values_updated_at").on(
+    table.userId,
+    table.updatedAt.desc(),
+  ),
+]);
+
+export type UserFeatureFlagValue = typeof userFeatureFlagValues.$inferSelect;
+export type NewUserFeatureFlagValue =
+  typeof userFeatureFlagValues.$inferInsert;
+
+export const deviceFeatureFlagOverrides = pgTable(
+  "device_feature_flag_overrides",
+  {
+    deviceId: uuid("device_id")
+      .notNull()
+      .references(() => devices.id, { onDelete: "cascade" }),
+    flagKey: text("flag_key").notNull(),
+    valueJson: jsonb("value_json").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedBy: text("updated_by").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.deviceId, table.flagKey] }),
+    index("idx_device_feature_flag_overrides_updated_at").on(
+      table.deviceId,
+      table.updatedAt.desc(),
+    ),
+  ],
+);
+
+export type DeviceFeatureFlagOverride =
+  typeof deviceFeatureFlagOverrides.$inferSelect;
+export type NewDeviceFeatureFlagOverride =
+  typeof deviceFeatureFlagOverrides.$inferInsert;
+
+// ============================================================================
 // === Phase 3c: device logs (OpenTelemetry-shaped) ===
 // ============================================================================
 //

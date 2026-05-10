@@ -10,6 +10,7 @@
 import { assertEquals } from "@std/assert";
 import {
   publishDeviceCapabilitiesChanged,
+  publishDeviceFeatureFlagsChanged,
   publishDeviceSettingsChanged,
 } from "./sse-publishers.ts";
 import { eventBus } from "../../services/event-bus.service.ts";
@@ -72,6 +73,43 @@ Deno.test({
       "notifications.scanRequest",
     ]);
     assertEquals(captured, ["device.label", "notifications.scanRequest"]);
+    unsub();
+  },
+});
+
+Deno.test({
+  name:
+    "sse-publishers — feature-flags event reaches matching subscriber, filtered by deviceId",
+  sanitizeResources: false,
+  sanitizeOps: false,
+  fn: () => {
+    eventBus._reset();
+    const targetDevice = crypto.randomUUID();
+    const otherDevice = crypto.randomUUID();
+    const observed: { type: string; deviceId: string; keys: string[] }[] = [];
+
+    const unsub = eventBus.subscribe(
+      ["device.feature-flags.changed"],
+      (ev) => {
+        const p = ev.payload as { deviceId: string; keys: string[] };
+        if (p.deviceId !== targetDevice) return;
+        observed.push({ type: ev.type, deviceId: p.deviceId, keys: p.keys });
+      },
+    );
+
+    publishDeviceFeatureFlagsChanged(targetDevice, [
+      "customer.connectivityCheck.enabled",
+      "demo.flag",
+    ]);
+    publishDeviceFeatureFlagsChanged(otherDevice, ["demo.flag"]);
+
+    assertEquals(observed.length, 1);
+    assertEquals(observed[0].type, "device.feature-flags.changed");
+    assertEquals(observed[0].deviceId, targetDevice);
+    assertEquals(observed[0].keys, [
+      "customer.connectivityCheck.enabled",
+      "demo.flag",
+    ]);
     unsub();
   },
 });
