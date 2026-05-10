@@ -16,6 +16,7 @@ import { Ban, Lock, Play, Square, Timer, X } from "lucide-preact";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
+import { formatKw } from "@/src/lib/utils/format.ts";
 import { BorderBeam } from "@/components/magicui/border-beam.tsx";
 import { subscribeSse } from "@/islands/shared/SseProvider.tsx";
 import { formatSessionDuration } from "./shared/device-visuals.ts";
@@ -335,7 +336,9 @@ export default function ConnectorCard(
           )
           : (
             <span class="text-foreground">
-              {connector.maxKw !== null ? `${connector.maxKw} kW` : "—"}
+              {connector.maxKw !== null
+                ? `${formatKw(connector.maxKw)} kW`
+                : "—"}
             </span>
           )}
       </div>

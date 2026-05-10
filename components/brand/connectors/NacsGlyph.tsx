@@ -1,9 +1,13 @@
 /**
- * NACS / Tesla connector silhouette — web port of
- * `ExpresScan/App/Design/Components/NACSIcon.swift`. A smooth circle
- * (no release-latch tab), centred and radiused identically to the
- * J1772 body so the two glyphs sit at the same y-position when used
- * adjacent in lists.
+ * NACS / SAE J3400 (Tesla) connector face — web port of
+ * `ExpresScan/App/Design/Components/NACSIcon.swift`. Distinguished
+ * from J1772 by:
+ *   - slightly wider-than-tall outer silhouette (no latch tab), and
+ *   - two large filled pin holes side-by-side in the upper half of
+ *     the face (DC+/DC− on DC, L1/L2 on AC). The three smaller pins
+ *     (CP, PP, G) are intentionally omitted at icon scale.
+ *
+ * Centre matches J1772's so adjacent glyphs sit at the same y.
  */
 
 interface NacsGlyphProps {
@@ -28,8 +32,13 @@ export function NacsGlyph(
       fill="none"
       stroke={color}
       stroke-width={3}
+      stroke-linejoin="round"
     >
-      <circle cx={50} cy={60} r={32} />
+      {/* Body — wider-than-tall ellipse, no latch tab */}
+      <ellipse cx={50} cy={60} rx={34} ry={30} />
+      {/* Two large filled pins in the upper half */}
+      <circle cx={39} cy={53} r={7} fill={color} stroke="none" />
+      <circle cx={61} cy={53} r={7} fill={color} stroke="none" />
     </svg>
   );
 }
