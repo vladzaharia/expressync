@@ -85,15 +85,16 @@ export function PageCard({
             <CardHeader
               className={cn(
                 "border-b border-border/50",
-                // Reserve vertical room + right padding when the
-                // top-right accessory is mounted (e.g.
-                // PublicIdQrPopover renders a 2-row stack ~48px tall
-                // that would otherwise overlap the body content).
-                topRightAccessory && "min-h-[5rem] pr-20",
+                // Right padding reserves room for the absolutely-positioned
+                // topRightAccessory (e.g. PublicIdQrPopover's 2-row stack)
+                // so the title doesn't slide under it. Header keeps its
+                // default vertical padding; the inner row centers the
+                // title against the taller accessory.
+                topRightAccessory && "min-h-[4rem] pr-20",
                 headerClassName,
               )}
             >
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   {title && (
                     <CardTitle className="break-words">{title}</CardTitle>

@@ -17,10 +17,16 @@
  *   - 410 (gone) — race between middleware lookup and the SELECT here.
  */
 
-import { eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { define } from "../../../utils.ts";
 import { db } from "../../../src/db/index.ts";
-import { devices, deviceTokens, users } from "../../../src/db/schema.ts";
+import {
+  devices,
+  deviceTokens,
+  lagoPlans,
+  lagoSubscriptions,
+  users,
+} from "../../../src/db/schema.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
 
 const log = logger.child("DeviceMe");
@@ -43,6 +49,8 @@ export const handler = define.handlers({
       | {
         id: string;
         ownerUserId: string;
+        ownerRole: string;
+        ownerLagoExternalId: string | null;
         capabilities: string[] | null;
         label: string;
         registeredAt: Date | string | null;
@@ -57,6 +65,8 @@ export const handler = define.handlers({
         .select({
           id: devices.id,
           ownerUserId: devices.ownerUserId,
+          ownerRole: users.role,
+          ownerLagoExternalId: users.lagoCustomerExternalId,
           capabilities: devices.capabilities,
           label: devices.label,
           registeredAt: devices.registeredAt,
@@ -104,6 +114,54 @@ export const handler = define.handlers({
       row.ownerEmail ??
       row.ownerUserId;
 
+    // Phase 2 polish — surface the owner's plan tier so the iOS
+    // Settings AccountIdentityCard can render a brand-tinted badge
+    // ("ExpressCharge", "ExpressCharge+", "Admin", etc.). For admins
+    // the role itself is the badge — skip the Lago lookup. For
+    // customers, take the most-recently-active subscription's
+    // planCode + the matching plan name.
+    let planCode: string | null = null;
+    let planName: string | null = null;
+    if (row.ownerRole !== "admin" && row.ownerLagoExternalId) {
+      try {
+        const subRows = await db
+          .select({
+            planCode: lagoSubscriptions.planCode,
+            startedAt: lagoSubscriptions.startedAt,
+          })
+          .from(lagoSubscriptions)
+          .where(
+            and(
+              eq(
+                lagoSubscriptions.externalCustomerId,
+                row.ownerLagoExternalId,
+              ),
+              isNull(lagoSubscriptions.deletedAt),
+              eq(lagoSubscriptions.status, "active"),
+            ),
+          )
+          .orderBy(desc(lagoSubscriptions.startedAt))
+          .limit(1);
+        const code = subRows[0]?.planCode ?? null;
+        if (code) {
+          planCode = code;
+          const planRows = await db
+            .select({ name: lagoPlans.name })
+            .from(lagoPlans)
+            .where(eq(lagoPlans.code, code))
+            .limit(1);
+          planName = planRows[0]?.name ?? null;
+        }
+      } catch (err) {
+        // Plan lookup is best-effort — never fail the whole `/me`
+        // response on a Lago-side schema quirk.
+        log.warn("plan lookup failed", {
+          deviceId: device.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     return jsonResponse(200, {
       ok: true,
       deviceId: row.id,
@@ -111,6 +169,9 @@ export const handler = define.handlers({
       ownerDisplayName,
       ownerName: row.ownerName,
       ownerEmail: row.ownerEmail,
+      ownerRole: row.ownerRole,
+      planCode,
+      planName,
       capabilities: row.capabilities ?? [],
       label: row.label,
       registeredAtIso,
