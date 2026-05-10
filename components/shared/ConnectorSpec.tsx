@@ -12,6 +12,7 @@
  */
 
 import { cn } from "@/src/lib/utils/cn.ts";
+import { formatKw } from "@/src/lib/utils/format.ts";
 import {
   CONNECTOR_TYPE_LABEL,
   connectorGlyphFor,
@@ -62,7 +63,7 @@ export function ConnectorSpec({
   const Glyph = connectorGlyphFor(type);
   const labelText = label ??
     (type ? CONNECTOR_TYPE_LABEL[type] : "Unknown");
-  const kwText = kw != null ? `${kw} kW` : "—";
+  const kwText = kw != null ? `${formatKw(kw)} kW` : "—";
 
   return (
     <div

@@ -58,6 +58,7 @@ export const handler = define.handlers({
         tokenExpiresAt: Date | string | null;
         ownerName: string | null;
         ownerEmail: string | null;
+        ownerPublicId: string | null;
       }
       | undefined;
     try {
@@ -79,6 +80,7 @@ export const handler = define.handlers({
           // `displayName`; we synthesize one server-side below.
           ownerName: users.name,
           ownerEmail: users.email,
+          ownerPublicId: users.publicId,
         })
         .from(devices)
         .innerJoin(deviceTokens, eq(deviceTokens.id, device.tokenId))
@@ -169,6 +171,7 @@ export const handler = define.handlers({
       ownerDisplayName,
       ownerName: row.ownerName,
       ownerEmail: row.ownerEmail,
+      ownerPublicId: row.ownerPublicId,
       ownerRole: row.ownerRole,
       planCode,
       planName,

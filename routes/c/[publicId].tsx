@@ -36,7 +36,6 @@ import {
   DUMB_CHARGER_HEADLINE,
   DUMB_CHARGER_STEPS,
   DUMB_CHARGER_SUPPORT_EMAIL,
-  DUMB_CHARGER_TAGLINE,
 } from "../../src/lib/content/dumb-charger-instructions.ts";
 import { isValidPublicId } from "../../src/lib/utils/public-id.ts";
 import { getPrimaryConnectorSpec } from "../../src/services/charger-connectors.service.ts";
@@ -281,7 +280,6 @@ function InstructionsCard({ isUnmanaged }: { isUnmanaged: boolean }) {
         <ol class="mt-4 list-decimal space-y-2 pl-6 text-base text-foreground">
           {DUMB_CHARGER_STEPS.map((step) => <li key={step}>{step}</li>)}
         </ol>
-        <p class="mt-4 text-sm text-muted-foreground">{DUMB_CHARGER_TAGLINE}</p>
       </section>
     );
   }

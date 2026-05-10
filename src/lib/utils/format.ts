@@ -21,3 +21,15 @@ export function formatDuration(start: Date, end: Date | null): string {
   if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
   return `${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`;
 }
+
+/**
+ * Format a kW value for display. Preserves one decimal place but trims
+ * a trailing `.0` so whole-number ratings read cleanly: 7.68 → "7.7",
+ * 11.0 → "11", 11.5 → "11.5". Never rounds to integers — a 7.68 kW
+ * charger should not display as "8 kW", since that loses real info
+ * users compare against onboard charger specs.
+ */
+export function formatKw(kw: number): string {
+  const rounded = Math.round(kw * 10) / 10;
+  return Number.isInteger(rounded) ? `${rounded}` : rounded.toFixed(1);
+}
