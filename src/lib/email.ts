@@ -127,6 +127,50 @@ export function isEmailEnabled(): boolean {
   );
 }
 
+/**
+ * Boot-time validation of the email-worker configuration. Called once
+ * from `prod-server.ts` and `main.ts` so a misconfigured prod deploy
+ * (URL set, secret missing — or vice-versa) emits a loud structured
+ * `error` log immediately on startup instead of waiting for the first
+ * magic-link request to silently no-op.
+ *
+ * Never throws — silent failure on auth flows is bad, but a hard crash
+ * on boot is worse. Operations should alert on
+ * `metric=email_worker_misconfigured` (the metric tag emitted below)
+ * or on the `[Email] worker_misconfigured_at_boot` log line.
+ *
+ * No-op in dev (the dev fallback is the intended path when secrets
+ * are absent).
+ */
+export function validateEmailConfigAtStartup(): void {
+  if (isDevModeFallback()) {
+    log.info("Email worker dev fallback active — sends will be logged", {
+      reason: !config.CF_EMAIL_WORKER_URL
+        ? "no_worker_url"
+        : "dev_env_no_secret",
+    });
+    return;
+  }
+  // Production path: both URL and secret must be set.
+  const hasUrl = Boolean(config.CF_EMAIL_WORKER_URL);
+  const hasSecret = Boolean(config.CF_EMAIL_WORKER_SECRET);
+  if (hasUrl && hasSecret) {
+    log.info("Email worker configured", {
+      worker_host: new URL(config.CF_EMAIL_WORKER_URL!).host,
+    });
+    return;
+  }
+  // Misconfigured: URL or secret missing. Magic-link auth, password
+  // reset, and reservation/session emails will all silently no-op until
+  // this is fixed. Loud error so ops alerts fire.
+  log.error("worker_misconfigured_at_boot — email auth flows will fail", {
+    metric: "email_worker_misconfigured",
+    has_url: hasUrl,
+    has_secret: hasSecret,
+    deno_env: config.DENO_ENV,
+  });
+}
+
 /** Outcome of an outbound email attempt. Helpers NEVER throw. */
 export type SendEmailResult =
   | { ok: true; status: "sent" | "logged_dev" }

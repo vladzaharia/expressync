@@ -57,6 +57,34 @@ interface AccountPageData {
   operatorEmail: string;
 }
 
+/**
+ * Build a `mailto:` URL prefilled with the subject + body the operator
+ * needs to route a delete-account request quickly. Including the user's
+ * id (and email if known) saves a round-trip — the operator can pull
+ * the customer record straight away without asking for clarification.
+ *
+ * The user can still edit the body before sending; we only seed it.
+ */
+function buildDeleteAccountMailto(
+  operatorEmail: string,
+  userId: string | null,
+  userEmail: string | null,
+): string {
+  const subject = "Account deletion request";
+  const lines = [
+    "Hello,",
+    "",
+    "I'd like to delete my Polaris account.",
+    "",
+    userEmail ? `Account email: ${userEmail}` : null,
+    userId ? `Account id: ${userId}` : null,
+    "",
+    "Thanks.",
+  ].filter((l): l is string => l !== null).join("\n");
+  return `mailto:${operatorEmail}?subject=${encodeURIComponent(subject)}` +
+    `&body=${encodeURIComponent(lines)}`;
+}
+
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -249,9 +277,10 @@ export default define.page<typeof handler>(
               <div class="flex flex-col gap-3 rounded-md border border-rose-500/30 bg-rose-500/5 p-4">
                 <p class="text-sm font-medium">Delete account</p>
                 <p class="text-xs text-muted-foreground">
-                  Account deletion is currently handled by your operator.
-                  Contact them to start the process — they'll soft-delete your
-                  account with a 30-day recovery window.
+                  Self-serve deletion isn't available yet. Email your operator
+                  to start the process — they'll confirm your identity and
+                  retire the account with a 30-day recovery window so anything
+                  done in error can be undone.
                 </p>
                 <div>
                   <Button
@@ -259,7 +288,13 @@ export default define.page<typeof handler>(
                     size="sm"
                     asChild
                   >
-                    <a href={`mailto:${data.operatorEmail}`}>
+                    <a
+                      href={buildDeleteAccountMailto(
+                        data.operatorEmail,
+                        profile?.id ?? null,
+                        profile?.email ?? null,
+                      )}
+                    >
                       Contact operator to delete account
                     </a>
                   </Button>

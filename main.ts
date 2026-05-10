@@ -8,6 +8,12 @@ import {
   isShellOrApiPath,
   rewriteRequestForSurface,
 } from "./src/lib/hostname-dispatch.ts";
+import { validateEmailConfigAtStartup } from "./src/lib/email.ts";
+
+// Boot-time config validation. Loud structured `error` log on
+// misconfiguration so prod outages don't hide behind a silent no-op
+// when magic-link auth is invoked. Never throws.
+validateEmailConfigAtStartup();
 
 export const app = new App<State>();
 
