@@ -38,7 +38,7 @@
 import { sql } from "drizzle-orm";
 import { define } from "../../../utils.ts";
 import { db } from "../../../src/db/index.ts";
-import { chargersCache } from "../../../src/db/schema.ts";
+import { chargers } from "../../../src/db/schema.ts";
 import { checkRateLimit } from "../../../src/lib/utils/rate-limit.ts";
 import { logAuthEvent } from "../../../src/lib/audit.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
@@ -87,7 +87,7 @@ function jsonResponse(status: number, body: unknown): Response {
 
 /**
  * Resolve `chargeBoxId` either from the body or by picking the unique
- * online charger from `chargers_cache`.
+ * online charger from `chargers`.
  */
 async function resolveChargeBoxId(
   bodyChargeBoxId: string | null,
@@ -102,12 +102,12 @@ async function resolveChargeBoxId(
   try {
     rows = await db
       .select({
-        chargeBoxId: chargersCache.chargeBoxId,
-        lastSeenAt: chargersCache.lastSeenAt,
+        chargeBoxId: chargers.chargeBoxId,
+        lastSeenAt: chargers.lastSeenAt,
       })
-      .from(chargersCache);
+      .from(chargers);
   } catch (err) {
-    log.error("Failed to query chargers_cache for auto-pick", {
+    log.error("Failed to query chargers for auto-pick", {
       error: err instanceof Error ? err.message : String(err),
     });
     return { ok: false, status: 500, error: "internal" };

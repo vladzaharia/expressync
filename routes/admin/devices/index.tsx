@@ -1,7 +1,7 @@
 /**
  * /admin/devices — unified admin Devices listing.
  *
- * Single surface that lists BOTH OCPP chargers (from `chargers_cache`) AND
+ * Single surface that lists BOTH OCPP chargers (from `chargers`) AND
  * iOS/macOS NFC scanners (from `devices`) in one responsive card grid. The
  * old `/admin/chargers` index route 302-redirects here with `?type=charger`.
  *
@@ -12,7 +12,7 @@
  *       DeviceFiltersBar      (type · kind · online · owner)
  *       DeviceCard[]          (responsive 1/2/3-col grid, mixed charger+scanner)
  *
- * Loader strategy: query `chargers_cache` and `devices` independently with
+ * Loader strategy: query `chargers` and `devices` independently with
  * the typed Drizzle query builder (avoids the brittle `tappable_devices`
  * view + LEFT JOIN that was failing in production), build a discriminated
  * union DTO, then merge + sort by `lastSeenAt`. Filters apply server-side
@@ -24,10 +24,7 @@
 import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
 import { define } from "../../../utils.ts";
 import { db } from "../../../src/db/index.ts";
-import {
-  chargersCache,
-  devices as devicesTable,
-} from "../../../src/db/schema.ts";
+import { chargers, devices as devicesTable } from "../../../src/db/schema.ts";
 import { logger } from "../../../src/lib/utils/logger.ts";
 import {
   DEVICE_CAPABILITIES,
@@ -159,8 +156,8 @@ export const handler = define.handlers({
       try {
         const rows = await db
           .select()
-          .from(chargersCache)
-          .orderBy(desc(chargersCache.lastSeenAt))
+          .from(chargers)
+          .orderBy(desc(chargers.lastSeenAt))
           .limit(ROW_LIMIT);
         chargerEntries = rows.map((r): UnifiedDeviceEntry => ({
           type: "charger",
@@ -173,7 +170,7 @@ export const handler = define.handlers({
             lastSeenAtIso: (r.lastSeenAt ?? new Date(0)).toISOString(),
             lastStatus: r.lastStatus,
             lastStatusAtIso: isoOrNull(r.lastStatusAt),
-            // The DB CHECK on `chargers_cache.capabilities` (slice O —
+            // The DB CHECK on `chargers.capabilities` (slice O —
             // migration 0039) guarantees `'charger'` is present on every
             // row, but defensively force it on so a misconfigured row
             // can't blank out the pill in the listing.
@@ -200,7 +197,7 @@ export const handler = define.handlers({
         }
       } catch (error) {
         errored = true;
-        log.error("Failed to load chargers_cache", error as Error);
+        log.error("Failed to load chargers", error as Error);
       }
     }
 

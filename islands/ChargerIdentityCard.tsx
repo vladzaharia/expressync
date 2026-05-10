@@ -1,17 +1,24 @@
 /**
  * Charger Identity card (island).
  *
- * Lightweight — almost all fields are read-only. The `ChargerFormFactorSelect`
- * nested island handles the one admin-editable field. We keep this component
- * as an island so the "copy chargeBoxId" button can use the browser clipboard
- * API without needing a second island just for the copy.
+ * Slim hero card after the 2026-05 redesign:
+ *   - Form factor (smart-select; drives the brand icon)
+ *   - Friendly name (smart-text; falls back to chargeBoxId)
+ *   - Vendor / Model / Firmware — admin-editable overrides that take
+ *     precedence over StEvE-reported values; clearing the override
+ *     reverts to the StEvE value (if any).
+ *   - First seen / Last seen
+ *
+ * Removed in the redesign: chargeBoxPk, OCPP protocol, ICCID, the
+ * per-charger connector type / max-kW (now lives on each connector card
+ * as part of the per-connector spec).
  */
 
 import { useState } from "preact/hooks";
 import { Check, Copy } from "lucide-preact";
-import ChargerFormFactorSelect from "./ChargerFormFactorSelect.tsx";
-import ChargerConnectorOverrideSelect from "./ChargerConnectorOverrideSelect.tsx";
-import { FORM_FACTORS } from "@/src/lib/types/steve.ts";
+import SmartTextField from "./shared/SmartTextField.tsx";
+import SmartSelectField from "./shared/SmartSelectField.tsx";
+import { FORM_FACTOR_LABELS, FORM_FACTORS } from "@/src/lib/types/steve.ts";
 import {
   chargerFormFactorIcons,
   GenericChargerIcon,
@@ -21,21 +28,22 @@ import { STATUS_HALO, type UiStatus } from "./shared/device-visuals.ts";
 
 interface Props {
   chargeBoxId: string;
-  chargeBoxPk: number | null;
+  /** Current friendly name (admin-editable). */
   friendlyName: string | null;
+  /** Current form-factor enum value (admin-editable). */
   formFactor: string;
   firstSeenAtIso: string;
   lastSeenAtIso: string;
-  ocppProtocol: string | null;
+  /** Override-aware display values. The page route resolves
+   *  `override ?? steveValue ?? null` before passing them in, so the
+   *  card just renders. The `*Override` props carry the raw override
+   *  for the smart-text input's source-of-truth. */
   vendor: string | null;
+  vendorOverride: string | null;
   model: string | null;
+  modelOverride: string | null;
   firmwareVersion: string | null;
-  iccid: string | null;
-  /** Migration 0040 — admin override when StEvE doesn't surface
-   *  connector/kW. `null` = no override; falls back to whatever the
-   *  vendor reports (or the `—` placeholder when nothing reported). */
-  connectorTypeOverride: string | null;
-  maxKwOverride: number | null;
+  firmwareVersionOverride: string | null;
   uiStatus: UiStatus;
   isAdmin: boolean;
   class?: string;
@@ -50,20 +58,38 @@ function formatAbs(iso: string | null): string {
   }
 }
 
+async function patchCharger(
+  chargeBoxId: string,
+  body: Record<string, unknown>,
+): Promise<void> {
+  const res = await fetch(`/api/admin/charger/${chargeBoxId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error ?? `Save failed (HTTP ${res.status})`);
+  }
+}
+
+const FORM_FACTOR_OPTIONS = FORM_FACTORS.map((value) => ({
+  value,
+  label: FORM_FACTOR_LABELS[value] ?? value,
+}));
+
 export default function ChargerIdentityCard({
   chargeBoxId,
-  chargeBoxPk,
   friendlyName,
   formFactor,
   firstSeenAtIso,
   lastSeenAtIso,
-  ocppProtocol,
   vendor,
+  vendorOverride,
   model,
+  modelOverride,
   firmwareVersion,
-  iccid,
-  connectorTypeOverride,
-  maxKwOverride,
+  firmwareVersionOverride,
   uiStatus,
   isAdmin,
   class: className,
@@ -84,6 +110,19 @@ export default function ChargerIdentityCard({
     formFactor as keyof typeof chargerFormFactorIcons
   ] ?? GenericChargerIcon;
 
+  // For override fields the smart-text edits the override directly; the
+  // displayed value (when the override is null) is the StEvE value, but
+  // editing always replaces the override. This matches the user's
+  // mental model: "I'm overriding StEvE."
+  const onSaveOverride =
+    (key: "vendorOverride" | "modelOverride" | "firmwareVersionOverride") =>
+    async (next: string | null) => {
+      await patchCharger(chargeBoxId, { [key]: next });
+      // Reload so the page picks up the new effective value (override
+      // ?? steveValue) and renders the cleared state correctly.
+      globalThis.location.reload();
+    };
+
   return (
     <div
       class={cn(
@@ -96,11 +135,24 @@ export default function ChargerIdentityCard({
           <IconComponent size="lg" haloColor={STATUS_HALO[uiStatus]} />
         </div>
         <div class="min-w-0 flex-1">
-          <div class="text-base font-semibold truncate">
-            {friendlyName ?? chargeBoxId}
+          <div class="text-base font-semibold">
+            {isAdmin
+              ? (
+                <SmartTextField
+                  value={friendlyName}
+                  placeholder={chargeBoxId}
+                  ariaLabel="Edit friendly name"
+                  onSave={async (next) => {
+                    await patchCharger(chargeBoxId, { friendlyName: next });
+                    globalThis.location.reload();
+                  }}
+                  class="text-base font-semibold"
+                />
+              )
+              : <span class="truncate">{friendlyName ?? chargeBoxId}</span>}
           </div>
           <div class="mt-1 flex items-center gap-1.5">
-            <code class="truncate rounded border bg-muted/40 px-2 py-0.5 font-mono text-xs">
+            <code class="break-all rounded border bg-muted/40 px-2 py-0.5 font-mono text-xs">
               {chargeBoxId}
             </code>
             <button
@@ -126,81 +178,111 @@ export default function ChargerIdentityCard({
           <dd>
             {isAdmin
               ? (
-                <ChargerFormFactorSelect
-                  chargeBoxId={chargeBoxId}
+                <SmartSelectField
                   value={formFactor}
-                  options={[...FORM_FACTORS]}
+                  options={FORM_FACTOR_OPTIONS}
+                  nullLabel={false}
+                  ariaLabel="Edit form factor"
+                  onSave={async (next) => {
+                    if (!next) return;
+                    await patchCharger(chargeBoxId, { formFactor: next });
+                    globalThis.location.reload();
+                  }}
+                  class="font-medium"
                 />
               )
-              : <span class="font-medium">{formFactor}</span>}
+              : (
+                <span class="font-medium">
+                  {FORM_FACTOR_LABELS[
+                    formFactor as keyof typeof FORM_FACTOR_LABELS
+                  ] ?? formFactor}
+                </span>
+              )}
           </dd>
         </div>
 
-        {isAdmin
-          ? (
-            <ChargerConnectorOverrideSelect
-              chargeBoxId={chargeBoxId}
-              connectorTypeOverride={connectorTypeOverride}
-              maxKwOverride={maxKwOverride}
-            />
-          )
-          : (
-            <>
-              <div class="flex items-center justify-between gap-2">
-                <dt class="text-muted-foreground">Connector type</dt>
-                <dd class="font-medium">
-                  {connectorTypeOverride ?? "—"}
-                </dd>
-              </div>
-              <div class="flex items-center justify-between gap-2">
-                <dt class="text-muted-foreground">Max kW</dt>
-                <dd class="font-medium">
-                  {maxKwOverride !== null ? `${maxKwOverride} kW` : "—"}
-                </dd>
-              </div>
-            </>
-          )}
+        <IdentityRow
+          label="Vendor"
+          value={vendor}
+          override={vendorOverride}
+          isAdmin={isAdmin}
+          onSave={onSaveOverride("vendorOverride")}
+        />
+        <IdentityRow
+          label="Model"
+          value={model}
+          override={modelOverride}
+          isAdmin={isAdmin}
+          onSave={onSaveOverride("modelOverride")}
+        />
+        <IdentityRow
+          label="Firmware"
+          value={firmwareVersion}
+          override={firmwareVersionOverride}
+          isAdmin={isAdmin}
+          mono
+          onSave={onSaveOverride("firmwareVersionOverride")}
+        />
 
-        <div class="flex items-center justify-between gap-2">
-          <dt class="text-muted-foreground">StEvE PK</dt>
-          <dd class="font-mono text-xs">{chargeBoxPk ?? "—"}</dd>
-        </div>
-
-        <div class="flex items-center justify-between gap-2">
-          <dt class="text-muted-foreground">OCPP protocol</dt>
-          <dd class="font-mono text-xs">{ocppProtocol ?? "—"}</dd>
-        </div>
-
-        <div class="flex items-center justify-between gap-2">
-          <dt class="text-muted-foreground">Vendor</dt>
-          <dd class="font-medium">{vendor ?? "—"}</dd>
-        </div>
-
-        <div class="flex items-center justify-between gap-2">
-          <dt class="text-muted-foreground">Model</dt>
-          <dd>{model ?? "—"}</dd>
-        </div>
-
-        <div class="flex items-center justify-between gap-2">
-          <dt class="text-muted-foreground">Firmware</dt>
-          <dd class="font-mono text-xs">{firmwareVersion ?? "—"}</dd>
-        </div>
-
-        <div class="flex items-center justify-between gap-2">
-          <dt class="text-muted-foreground">ICCID</dt>
-          <dd class="font-mono text-xs">{iccid ?? "—"}</dd>
-        </div>
-
-        <div class="flex items-center justify-between gap-2 pt-1 border-t mt-1">
+        <div class="mt-1 flex items-center justify-between gap-2 border-t pt-1">
           <dt class="text-muted-foreground">First seen</dt>
           <dd class="text-xs">{formatAbs(firstSeenAtIso)}</dd>
         </div>
-
         <div class="flex items-center justify-between gap-2">
           <dt class="text-muted-foreground">Last seen</dt>
           <dd class="text-xs">{formatAbs(lastSeenAtIso)}</dd>
         </div>
       </dl>
+    </div>
+  );
+}
+
+function IdentityRow({
+  label,
+  value,
+  override,
+  isAdmin,
+  mono,
+  onSave,
+}: {
+  label: string;
+  /** Effective display value: override ?? steveValue ?? null. */
+  value: string | null;
+  /** The raw override; when non-null the field shows a small "(override)" hint. */
+  override: string | null;
+  isAdmin: boolean;
+  mono?: boolean;
+  onSave: (next: string | null) => Promise<void>;
+}) {
+  return (
+    <div class="flex items-center justify-between gap-2">
+      <dt class="text-muted-foreground">{label}</dt>
+      <dd
+        class={cn(
+          "flex items-center gap-1",
+          mono ? "font-mono text-xs" : "font-medium",
+        )}
+      >
+        {isAdmin
+          ? (
+            <SmartTextField
+              value={override ?? value}
+              placeholder="—"
+              ariaLabel={`Edit ${label.toLowerCase()} override`}
+              onSave={onSave}
+              class={mono ? "font-mono text-xs" : ""}
+            />
+          )
+          : <span>{value ?? "—"}</span>}
+        {override !== null && (
+          <span
+            class="text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-400"
+            title="Admin override of the StEvE-reported value"
+          >
+            override
+          </span>
+        )}
+      </dd>
     </div>
   );
 }

@@ -351,6 +351,13 @@
       "when": 1778160000000,
       "tag": "0049_tag_type_keychain_to_keytag",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1778332800000,
+      "tag": "0050_chargers_and_connectors",
+      "breakpoints": true
     }
   ]
 }

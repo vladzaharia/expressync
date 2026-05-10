@@ -122,15 +122,15 @@ export async function loadDashboardOverview(): Promise<DashboardOverview> {
         total: count(),
         online: sql<
           number
-        >`COUNT(*) FILTER (WHERE ${schema.chargersCache.lastStatusAt} >= ${min10Ago.toISOString()})`,
+        >`COUNT(*) FILTER (WHERE ${schema.chargers.lastStatusAt} >= ${min10Ago.toISOString()})`,
         dim: sql<
           number
-        >`COUNT(*) FILTER (WHERE ${schema.chargersCache.lastStatusAt} < ${min10Ago.toISOString()} AND ${schema.chargersCache.lastStatusAt} >= ${hr1Ago.toISOString()})`,
+        >`COUNT(*) FILTER (WHERE ${schema.chargers.lastStatusAt} < ${min10Ago.toISOString()} AND ${schema.chargers.lastStatusAt} >= ${hr1Ago.toISOString()})`,
         offline: sql<
           number
-        >`COUNT(*) FILTER (WHERE ${schema.chargersCache.lastStatusAt} IS NULL OR ${schema.chargersCache.lastStatusAt} < ${hr1Ago.toISOString()})`,
+        >`COUNT(*) FILTER (WHERE ${schema.chargers.lastStatusAt} IS NULL OR ${schema.chargers.lastStatusAt} < ${hr1Ago.toISOString()})`,
       })
-      .from(schema.chargersCache),
+      .from(schema.chargers),
     db
       .select({ value: count() })
       .from(schema.reservations)

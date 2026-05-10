@@ -10,7 +10,7 @@
  *
  * Bearer-auth'd device-API endpoint (the iOS Tag Picker sheet calls this
  * to populate the start-charging tag list). `[deviceId]` is the **charger**
- * id — i.e. `chargers_cache.charge_box_id`. App-side device IDs are
+ * id — i.e. `chargers.charge_box_id`. App-side device IDs are
  * uuid-shaped; charger IDs are the StEvE chargeBoxId string.
  *
  * Returns a flat list of `idTag` rows (one per active `user_mappings`
@@ -35,7 +35,7 @@
  * Auth + gates:
  *   - Bearer (`/api/admin/devices/{id}/tags` is bearer per `selectAuth`).
  *   - `requireCapability(ctx, "user")` — 403 on miss.
- *   - 404 if `deviceId` is not a charger row in `chargers_cache`. We
+ *   - 404 if `deviceId` is not a charger row in `chargers`. We
  *     don't 404 to confirm "this is an app device" — anti-enumeration.
  */
 
@@ -43,7 +43,7 @@ import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { define } from "../../../../../utils.ts";
 import { db } from "../../../../../src/db/index.ts";
 import {
-  chargersCache,
+  chargers,
   syncedTransactionEvents,
   userMappings,
   users,
@@ -103,9 +103,9 @@ const defaultOwnerLagoLoader: OwnerLagoLoader = async (userId) => {
 
 const defaultChargerExistsCheck: ChargerExistsCheck = async (chargeBoxId) => {
   const [row] = await db
-    .select({ chargeBoxId: chargersCache.chargeBoxId })
-    .from(chargersCache)
-    .where(eq(chargersCache.chargeBoxId, chargeBoxId))
+    .select({ chargeBoxId: chargers.chargeBoxId })
+    .from(chargers)
+    .where(eq(chargers.chargeBoxId, chargeBoxId))
     .limit(1);
   return !!row;
 };

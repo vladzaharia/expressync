@@ -1,7 +1,7 @@
 /**
  * New reservation — wizard entrypoint.
  *
- * Loader fetches the chargers roster (from `chargers_cache`) plus the StEvE
+ * Loader fetches the chargers roster (from `chargers`) plus the StEvE
  * OCPP tag list (best-effort). The wizard island takes over from there.
  */
 
@@ -43,8 +43,8 @@ export const handler = define.handlers({
     try {
       const rows = await db
         .select()
-        .from(schema.chargersCache)
-        .orderBy(desc(schema.chargersCache.lastSeenAt));
+        .from(schema.chargers)
+        .orderBy(desc(schema.chargers.lastSeenAt));
       chargers = rows.map((r) => ({
         chargeBoxId: r.chargeBoxId,
         friendlyName: r.friendlyName,
@@ -57,7 +57,7 @@ export const handler = define.handlers({
     } catch (error) {
       logger.error(
         "Reservations",
-        "Failed to load chargers_cache for wizard",
+        "Failed to load chargers for wizard",
         error as Error,
       );
     }

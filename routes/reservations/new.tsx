@@ -4,7 +4,7 @@
  * Polaris Track G3 — wraps the existing `ReservationWizard` island with
  * customer-scoped data:
  *
- *   - chargers      — pulled from `chargers_cache` (the friends-and-family
+ *   - chargers      — pulled from `chargers` (the friends-and-family
  *                     deployment model assumes every cached charger is
  *                     reachable; per-user charger ACLs are not yet a
  *                     first-class concept). Customers without an active
@@ -72,8 +72,8 @@ export const handler = define.handlers({
       try {
         const rows = await db
           .select()
-          .from(schema.chargersCache)
-          .orderBy(desc(schema.chargersCache.lastSeenAt));
+          .from(schema.chargers)
+          .orderBy(desc(schema.chargers.lastSeenAt));
         chargers = rows.map((r) => ({
           chargeBoxId: r.chargeBoxId,
           friendlyName: r.friendlyName,
@@ -82,7 +82,7 @@ export const handler = define.handlers({
           lastStatus: r.lastStatus,
         }));
       } catch (error) {
-        log.error("Failed to load chargers_cache", error as Error);
+        log.error("Failed to load chargers", error as Error);
       }
 
       // Tags scoped to the customer's own active mappings only. We pull

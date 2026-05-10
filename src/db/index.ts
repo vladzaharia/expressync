@@ -4,6 +4,11 @@ import * as schema from "./schema.ts";
 
 type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
 
+/** Public alias for the drizzle handle. Services accept `Db = db` so
+ *  test code can pass an in-memory or transactional handle without
+ *  rewiring imports. */
+export type Db = DrizzleDb;
+
 // Lazy initialisation so modules that transitively import `db` can still load
 // in environments without DATABASE_URL (e.g. unit tests that exercise
 // fail-open branches without touching the database). The error is deferred

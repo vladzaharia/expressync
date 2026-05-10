@@ -11,7 +11,7 @@
  * have the `user` capability cannot see the list at all (403).
  *
  * Source: the `tappable_devices` view (chargers + apps unioned)
- * filtered to `kind = 'charger'`, left-joined to `chargers_cache` for
+ * filtered to `kind = 'charger'`, left-joined to `chargers` for
  * `friendly_name` + `form_factor` + `last_status` / `last_status_at`.
  *
  * Online window: 90 s — mirrors `requireOnlineCharger` so the UI's
@@ -77,7 +77,7 @@ const ChargerRowSchema = z.object({
   address: z.string().nullable().optional(),
   latitude: z.number().nullable().optional(),
   longitude: z.number().nullable().optional(),
-  /** Per-row capability set from `chargers_cache.capabilities`.
+  /** Per-row capability set from `chargers.capabilities`.
    *  Always carries `'charger'` (auto-managed by StEvE sync); may also
    *  carry `'scanner'` when the charger has built-in NFC. The iOS
    *  Chargers list reads this to render the NFC pill on rows that
@@ -187,7 +187,7 @@ function normalizeFormFactor(v: string | null): ChargerRow["formFactor"] {
 }
 
 /** Wire the override-or-null connector type. The CHECK constraint
- *  on `chargers_cache.connector_type_override` already pins valid
+ *  on `chargers.connector_type_override` already pins valid
  *  values; this guard is defence in depth in case the column is
  *  ever loosened. */
 function normalizeConnectorType(
@@ -246,7 +246,7 @@ const defaultLoader: ChargerListLoader = async () => {
       cc.latitude,
       cc.longitude
     FROM tappable_devices tv
-    LEFT JOIN chargers_cache cc
+    LEFT JOIN chargers cc
       ON tv.kind = 'charger' AND cc.charge_box_id = tv.id
     WHERE tv.kind = 'charger'
       AND tv.deleted_at IS NULL
@@ -328,7 +328,7 @@ export const handler = define.handlers({
           formFactor: normalizeFormFactor(r.form_factor),
           // StEvE doesn't reliably surface connector type or kW
           // rating, so we surface admin-set overrides from
-          // chargers_cache. Both fields stay nullable on the wire
+          // chargers. Both fields stay nullable on the wire
           // when no override is set; iOS renders `—` in that case.
           connectorType: normalizeConnectorType(r.connector_type_override),
           maxKw: parseMaxKw(r.max_kw_override),

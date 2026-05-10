@@ -556,7 +556,7 @@ export type TagChangeType = "activated" | "deactivated" | "updated" | "created";
  * `last_status`/`last_status_at` are stamped when a TriggerMessage response
  * arrives; beyond 10m the UI dims the status dot, beyond 1h it shows "Offline".
  */
-export const chargersCache = pgTable("chargers_cache", {
+export const chargers = pgTable("chargers", {
   chargeBoxId: text("charge_box_id").primaryKey(),
   chargeBoxPk: integer("charge_box_pk"),
   // 8-char Crockford-ish public ID — sticker-printable, used in the
@@ -586,15 +586,13 @@ export const chargersCache = pgTable("chargers_cache", {
     .array()
     .notNull()
     .default(sql`ARRAY['charger']::text[]`),
-  /// Admin override for the connector type when StEvE doesn't
-  /// surface it (or surfaces it incorrectly). Pinned to the
-  /// canonical wire enum {ccs, j1772, nacs, chademo, type2} by a
-  /// CHECK constraint. Migration 0040.
-  connectorTypeOverride: text("connector_type_override"),
-  /// Admin override for the AC/DC kW rating when StEvE doesn't
-  /// surface it. Stored as numeric so values like 11.5 round-trip
-  /// without floating-point hash. Migration 0040.
-  maxKwOverride: numeric("max_kw_override", { precision: 6, scale: 2 }),
+  /// Admin overrides for the identity fields StEvE surfaces. When
+  /// any of these is non-null the UI shows it instead of the StEvE-
+  /// reported value. Useful when StEvE returns wrong / stale values
+  /// for long-tail charger firmwares. Migration 0050.
+  vendorOverride: text("vendor_override"),
+  modelOverride: text("model_override"),
+  firmwareVersionOverride: text("firmware_version_override"),
   /// Distinguishes OCPP-managed chargers (the StEvE-synced default) from
   /// "unmanaged" chargers like Tesla Wall Connectors that don't speak
   /// OCPP. Unmanaged rows are admin-created via /admin/devices/new-unmanaged
@@ -626,32 +624,32 @@ export const chargersCache = pgTable("chargers_cache", {
   deactivatedAt: timestamp("deactivated_at", { withTimezone: true }),
 }, (table) => [
   check(
-    "chargers_cache_form_factor_check",
+    "chargers_form_factor_check",
     sql`${table.formFactor} IN ('wallbox','tesla','generic')`,
   ),
   check(
-    "chargers_cache_public_id_format_check",
+    "chargers_public_id_format_check",
     sql`${table.publicId} ~ '^[23456789ABCDEFGHJKMNPQRSTVWXYZ]{8}$'`,
   ),
   check(
-    "chargers_cache_latitude_range_check",
+    "chargers_latitude_range_check",
     sql`${table.latitude}  IS NULL OR (${table.latitude}  BETWEEN  -90 AND  90)`,
   ),
   check(
-    "chargers_cache_longitude_range_check",
+    "chargers_longitude_range_check",
     sql`${table.longitude} IS NULL OR (${table.longitude} BETWEEN -180 AND 180)`,
   ),
   check(
-    "chargers_cache_address_country_format_check",
+    "chargers_address_country_format_check",
     sql`${table.addressCountry} IS NULL OR ${table.addressCountry} ~ '^[A-Z]{2}$'`,
   ),
-  uniqueIndex("chargers_cache_public_id_key").on(table.publicId),
+  uniqueIndex("chargers_public_id_key").on(table.publicId),
   check(
-    "chargers_cache_management_mode_check",
+    "chargers_management_mode_check",
     sql`${table.managementMode} IN ('ocpp','unmanaged')`,
   ),
   check(
-    "chargers_cache_capabilities_invariants_check",
+    "chargers_capabilities_invariants_check",
     sql`('charger' = ANY(${table.capabilities}))
       AND NOT ('user' = ANY(${table.capabilities}))
       AND NOT ('kiosk' = ANY(${table.capabilities}))
@@ -659,21 +657,55 @@ export const chargersCache = pgTable("chargers_cache", {
       AND NOT ('tap' = ANY(${table.capabilities}))
       AND NOT ('ev' = ANY(${table.capabilities}))`,
   ),
-  check(
-    "chargers_cache_connector_type_override_check",
-    sql`${table.connectorTypeOverride} IS NULL
-      OR ${table.connectorTypeOverride} IN ('ccs','j1772','nacs','chademo','type2')`,
-  ),
-  check(
-    "chargers_cache_max_kw_override_check",
-    sql`${table.maxKwOverride} IS NULL
-      OR (${table.maxKwOverride} > 0 AND ${table.maxKwOverride} <= 1000)`,
-  ),
-  index("idx_chargers_cache_last_seen").on(table.lastSeenAt.desc()),
+  index("idx_chargers_last_seen").on(table.lastSeenAt.desc()),
 ]);
 
-export type ChargerCache = typeof chargersCache.$inferSelect;
-export type NewChargerCache = typeof chargersCache.$inferInsert;
+export type Charger = typeof chargers.$inferSelect;
+export type NewCharger = typeof chargers.$inferInsert;
+
+/**
+ * Per-connector spec — replaces the `connector_type_override` /
+ * `max_kw_override` columns that used to live on the charger row. PK is
+ * `(chargeBoxId, connectorId)`. For unmanaged chargers this table is the
+ * canonical connector list; for managed chargers, rows are auto-inserted
+ * the first time a connector is observed via StEvE. Migration 0050.
+ */
+export const chargerConnectors = pgTable("charger_connectors", {
+  chargeBoxId: text("charge_box_id")
+    .notNull()
+    .references(() => chargers.chargeBoxId, { onDelete: "cascade" }),
+  connectorId: integer("connector_id").notNull(),
+  /// Pinned to {ccs, j1772, nacs, chademo, type2} by CHECK; null = unset
+  /// (renders as "—" in the UI).
+  connectorType: text("connector_type"),
+  /// AC/DC kW rating. Numeric so 11.5-style values round-trip cleanly.
+  maxKw: numeric("max_kw", { precision: 6, scale: 2 }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.chargeBoxId, table.connectorId] }),
+  check(
+    "charger_connectors_connector_id_check",
+    sql`${table.connectorId} >= 0`,
+  ),
+  check(
+    "charger_connectors_connector_type_check",
+    sql`${table.connectorType} IS NULL
+      OR ${table.connectorType} IN ('ccs','j1772','nacs','chademo','type2')`,
+  ),
+  check(
+    "charger_connectors_max_kw_check",
+    sql`${table.maxKw} IS NULL
+      OR (${table.maxKw} > 0 AND ${table.maxKw} <= 1000)`,
+  ),
+]);
+
+export type ChargerConnector = typeof chargerConnectors.$inferSelect;
+export type NewChargerConnector = typeof chargerConnectors.$inferInsert;
 
 // ============================================================================
 // === Phase A: charger operation log ===
@@ -891,7 +923,7 @@ export interface ReservationRowDTO {
   chargeBoxId: string;
   /**
    * Operator-set friendly name (mirrored from StEvE description into
-   * `chargers_cache.friendly_name`). May be null when the operator has not
+   * `chargers.friendly_name`). May be null when the operator has not
    * supplied one — UIs must fall back to `chargeBoxId`.
    */
   friendlyName?: string | null;
@@ -1461,7 +1493,7 @@ export const LAGO_RECONCILE_SEGMENTS: readonly LagoReconcileSegment[] = [
 // The iOS / future-laptop NFC reader devices that scan tap targets. Mirrors
 // the migration in `drizzle/0034_devices_and_tokens.sql` exactly. The
 // `tappable_devices` view (migration 0035) unions this table with
-// `chargers_cache` so the scan-modal picker sees one tap-target list.
+// `chargers` so the scan-modal picker sees one tap-target list.
 //
 // Owner-role enforcement: a Postgres trigger (created in 0034) rejects
 // rows whose `owner_user_id` does not reference a user with role='admin'.

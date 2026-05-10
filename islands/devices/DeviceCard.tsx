@@ -93,7 +93,7 @@ export interface ChargerCardDto {
   lastSeenAtIso: string;
   lastStatus: string | null;
   lastStatusAtIso: string | null;
-  /** Per-row capability set from `chargers_cache.capabilities`. Always
+  /** Per-row capability set from `chargers.capabilities`. Always
    *  contains `'charger'` (auto-managed by the StEvE sync); may also
    *  carry `'scanner'` when the charger has built-in NFC. Surfaced as
    *  pills so the Devices listing has the same vocabulary on both

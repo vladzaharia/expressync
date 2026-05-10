@@ -39,7 +39,7 @@ import type { FormFactor } from "@/src/lib/types/steve.ts";
  * picker component that was removed in Wave 4 D3; it now lives here so
  * the dashboard can keep its loader prop typed without depending on
  * scan-modal internals. Fields mirror what the loader actually
- * populates from `chargers_cache` — no behavior change.
+ * populates from `chargers` — no behavior change.
  */
 interface ChargerPickerCharger {
   chargeBoxId: string;

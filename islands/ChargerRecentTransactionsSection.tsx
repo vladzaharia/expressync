@@ -11,7 +11,9 @@
 
 import { Badge } from "@/components/ui/badge.tsx";
 import { TagChip } from "@/components/tags/TagChip.tsx";
-import { Activity, Calendar, Hash, Zap } from "lucide-preact";
+import { Activity, Calendar, Hash, History, Zap } from "lucide-preact";
+import { SectionCard } from "@/components/shared/SectionCard.tsx";
+import { type AccentColor } from "@/src/lib/colors.ts";
 import { formatRelative } from "./shared/device-visuals.ts";
 
 export interface ChargerRecentTxRow {
@@ -31,26 +33,26 @@ interface Props {
   chargeBoxId: string;
   rows: ChargerRecentTxRow[];
   steveFetchFailed: boolean;
+  accent?: AccentColor;
 }
 
 export default function ChargerRecentTransactionsSection(
-  { chargeBoxId, rows, steveFetchFailed }: Props,
+  { chargeBoxId, rows, steveFetchFailed, accent = "orange" }: Props,
 ) {
   return (
-    <section
-      aria-label="Recent transactions"
-      class="flex flex-col gap-3 rounded-xl border bg-card p-4"
-    >
-      <div class="flex items-center justify-between">
-        <h2 class="text-sm font-semibold">Recent transactions</h2>
+    <SectionCard
+      title="Recent transactions"
+      icon={History}
+      accent={accent}
+      actions={
         <a
           href={`/transactions?chargeBoxId=${encodeURIComponent(chargeBoxId)}`}
           class="text-xs text-primary underline-offset-4 hover:underline"
         >
           View all →
         </a>
-      </div>
-
+      }
+    >
       {steveFetchFailed && (
         <div
           role="alert"
@@ -171,6 +173,6 @@ export default function ChargerRecentTransactionsSection(
             </table>
           </div>
         )}
-    </section>
+    </SectionCard>
   );
 }

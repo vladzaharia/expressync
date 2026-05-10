@@ -49,6 +49,7 @@ import LiveSessionCard from "../../islands/charging-sessions/LiveSessionCard.tsx
 import SessionMeterTimeline from "../../islands/customer/SessionMeterTimeline.tsx";
 import { SessionDetailCard } from "../../components/customer/SessionDetailCard.tsx";
 import { ChargerIdentityStrip } from "../../components/shared/ChargerIdentityStrip.tsx";
+import { getPrimaryConnectorSpec } from "../../src/services/charger-connectors.service.ts";
 
 const log = logger.child("CustomerSessionDetailPage");
 
@@ -152,7 +153,7 @@ export const handler = define.handlers({
     // W11 — surface the public ID + connector spec on charger
     // references so customers can match what they see on the
     // sticker. Loaded alongside the friendly name in the
-    // chargers_cache lookup below.
+    // chargers lookup below.
     let liveChargerPublicId: string | null = null;
     let liveChargerConnectorType: string | null = null;
     let liveChargerMaxKw: number | null = null;
@@ -181,21 +182,19 @@ export const handler = define.handlers({
       try {
         const [cacheRow] = await db
           .select({
-            friendlyName: schema.chargersCache.friendlyName,
-            publicId: schema.chargersCache.publicId,
-            connectorTypeOverride: schema.chargersCache.connectorTypeOverride,
-            maxKwOverride: schema.chargersCache.maxKwOverride,
+            friendlyName: schema.chargers.friendlyName,
+            publicId: schema.chargers.publicId,
           })
-          .from(schema.chargersCache)
-          .where(eq(schema.chargersCache.chargeBoxId, liveChargeBoxId))
+          .from(schema.chargers)
+          .where(eq(schema.chargers.chargeBoxId, liveChargeBoxId))
           .limit(1);
         liveFriendlyName = cacheRow?.friendlyName ?? null;
         liveChargerPublicId = cacheRow?.publicId ?? null;
-        liveChargerConnectorType = cacheRow?.connectorTypeOverride ?? null;
-        liveChargerMaxKw = cacheRow?.maxKwOverride !== null &&
-            cacheRow?.maxKwOverride !== undefined
-          ? Number(cacheRow.maxKwOverride)
-          : null;
+        if (cacheRow) {
+          const spec = await getPrimaryConnectorSpec(liveChargeBoxId);
+          liveChargerConnectorType = spec.connectorType;
+          liveChargerMaxKw = spec.maxKw;
+        }
       } catch (_err) {
         // Best-effort; the chargeBoxId fallback is fine.
       }

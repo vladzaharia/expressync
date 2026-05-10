@@ -23,7 +23,7 @@ export type DeviceKind = typeof DEVICE_KINDS[number];
  *
  *   - `scanner` (was `tap`): device has an NFC tap reader.
  *   - `charger` (was `ev`): device IS an EV charging station. Auto-managed
- *     on `chargers_cache`-derived rows; never editable, never present on
+ *     on `chargers`-derived rows; never editable, never present on
  *     `devices` rows. Surfaced via the `tappable_devices` view.
  *   - `user`: app device unlocks the Chargers tab (list + start/stop +
  *     reservations). Future: customer-role tokens get this with per-row

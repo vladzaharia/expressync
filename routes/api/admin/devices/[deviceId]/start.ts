@@ -18,7 +18,7 @@
  *   401 unauthorized        — no bearer / no `ctx.state.device`
  *   403 capability_denied   — caller lacks `user` capability
  *   400 invalid_body        — body fails the strict Zod schema
- *   404 charger_not_found   — `chargeBoxId` not in `chargers_cache`
+ *   404 charger_not_found   — `chargeBoxId` not in `chargers`
  *   409 charger_offline     — `lastStatusAt` outside the 90s window
  *
  * Idempotency: wraps in `withIdempotency`. A retry with the same

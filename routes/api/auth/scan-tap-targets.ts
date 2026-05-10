@@ -4,7 +4,7 @@
  * GET /api/auth/scan-tap-targets
  *
  * Replaces the legacy `/api/auth/scan-charger-list` endpoint. Returns a
- * unified roster of tap-capable targets — chargers from `chargers_cache`
+ * unified roster of tap-capable targets — chargers from `chargers`
  * AND phones from `devices` — so the scan-modal picker (D3 in Wave 4) can
  * present one list instead of two.
  *
@@ -50,7 +50,7 @@ const RATE_LIMIT_PER_IP = 30;
  * Online cutoff for chargers — matches `OFFLINE_AFTER_MS` in
  * `islands/shared/device-visuals.ts` so the picker, the chargers grid,
  * and the charger detail page agree on what "Offline" means. The
- * timestamp consulted is `chargers_cache.last_status_at` (the OCPP status
+ * timestamp consulted is `chargers.last_status_at` (the OCPP status
  * timestamp), NOT `last_seen_at` — the latter is bumped by hourly sync
  * polls regardless of charger connectivity, which used to make the
  * picker present a stale charger as online.
@@ -72,7 +72,7 @@ type ViewRow = {
   last_status: string | null;
   /**
    * Charger-only: the truly admin-set friendly name from
-   * `chargers_cache.friendly_name`. The view's `label` already
+   * `chargers.friendly_name`. The view's `label` already
    * COALESCEs to `chargeBoxId` when this is null, but the picker
    * needs the unCOALESCEd value so it can distinguish "no name set"
    * (render kind-prefixed fallback) from "name happens to equal the
@@ -159,10 +159,10 @@ export const handler = define.handlers({
       // side. The view already excludes soft-deleted devices via its WHERE
       // clause (see migration 0035), but we keep the redundant guard so a
       // future view rewrite can't accidentally surface revoked rows.
-      // Left-join chargers_cache to surface `last_status_at` + `last_status`
+      // Left-join chargers to surface `last_status_at` + `last_status`
       // for charger rows; scanner rows get NULL for both columns and fall
       // through to the heartbeat-based online check. The join key is the
-      // view's id (== chargers_cache.charge_box_id for charger rows).
+      // view's id (== chargers.charge_box_id for charger rows).
       // The view's `label` column COALESCEs charger friendly_name to
       // chargeBoxId, which loses the "no name set" signal. We re-derive
       // the truly admin-set friendly name client-side: for chargers,
@@ -184,7 +184,7 @@ export const handler = define.handlers({
             ELSE tv.label
           END AS friendly_name
         FROM tappable_devices tv
-        LEFT JOIN chargers_cache cc
+        LEFT JOIN chargers cc
           ON tv.kind = 'charger' AND cc.charge_box_id = tv.id
         WHERE 'scanner' = ANY(tv.capabilities)
           AND tv.deleted_at IS NULL

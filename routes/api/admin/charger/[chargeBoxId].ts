@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { define } from "../../../../utils.ts";
 import { db } from "../../../../src/db/index.ts";
-import { chargersCache } from "../../../../src/db/schema.ts";
+import { chargers } from "../../../../src/db/schema.ts";
 import {
   FORM_FACTORS,
   type FormFactor,
@@ -10,14 +10,6 @@ import { logger } from "../../../../src/lib/utils/logger.ts";
 
 const isFormFactor = (v: unknown): v is FormFactor =>
   typeof v === "string" && (FORM_FACTORS as readonly string[]).includes(v);
-
-/** Connector types accepted on the wire — must match the iOS
- *  `ChargerListEntry.ConnectorType` enum and the migration 0040
- *  CHECK constraint. */
-const CONNECTOR_TYPES = ["ccs", "j1772", "nacs", "chademo", "type2"] as const;
-type ConnectorType = typeof CONNECTOR_TYPES[number];
-const isConnectorType = (v: unknown): v is ConnectorType =>
-  typeof v === "string" && (CONNECTOR_TYPES as readonly string[]).includes(v);
 
 /**
  * PATCH /api/charger/{chargeBoxId}
@@ -80,43 +72,27 @@ export const handler = define.handlers({
       patch.locationDescription = v;
     }
 
-    if ("connectorTypeOverride" in body) {
-      if (
-        body.connectorTypeOverride !== null &&
-        !isConnectorType(body.connectorTypeOverride)
-      ) {
-        return new Response(
-          JSON.stringify({
-            error: `Invalid connectorTypeOverride. Allowed: ${
-              CONNECTOR_TYPES.join(", ")
-            }, or null`,
-          }),
-          { status: 400, headers: { "Content-Type": "application/json" } },
-        );
-      }
-      patch.connectorTypeOverride = body.connectorTypeOverride;
-    }
-
-    if ("maxKwOverride" in body) {
-      // Accept null (clear), a positive finite number, or a numeric
-      // string the drizzle numeric column will coerce. The CHECK
-      // constraint pins range, so validate finiteness here only.
-      const v = body.maxKwOverride;
-      if (v === null) {
-        patch.maxKwOverride = null;
-      } else {
-        const num = typeof v === "number" ? v : Number(v);
-        if (!Number.isFinite(num) || num <= 0 || num > 1000) {
+    // Identity overrides — admin-supplied values that override what
+    // StEvE reports for vendor / model / firmware (or fill in the gap
+    // when StEvE has nothing). Free-text, length-capped to 200.
+    for (
+      const key of [
+        "vendorOverride",
+        "modelOverride",
+        "firmwareVersionOverride",
+      ] as const
+    ) {
+      if (key in body) {
+        const v = body[key];
+        if (v !== null && (typeof v !== "string" || v.length > 200)) {
           return new Response(
             JSON.stringify({
-              error: "maxKwOverride must be a positive number ≤ 1000, or null",
+              error: `${key} must be string ≤200 chars or null`,
             }),
             { status: 400, headers: { "Content-Type": "application/json" } },
           );
         }
-        // Drizzle's `numeric` column expects a string round-trip to
-        // avoid float drift on values like 11.5.
-        patch.maxKwOverride = num.toFixed(2);
+        patch[key] = v;
       }
     }
 
@@ -190,9 +166,9 @@ export const handler = define.handlers({
 
     try {
       const result = await db
-        .update(chargersCache)
+        .update(chargers)
         .set(patch)
-        .where(eq(chargersCache.chargeBoxId, chargeBoxId))
+        .where(eq(chargers.chargeBoxId, chargeBoxId))
         .returning();
 
       if (result.length === 0) {

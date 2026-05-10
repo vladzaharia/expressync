@@ -303,7 +303,7 @@ Deno.test({
     // No DATABASE_URL → DB query throws → handler returns 500 OR the
     // resolveChargeBoxId helper falls through to 400 "chargeBoxId required".
     // We assert the handler returns a 4xx/5xx (NOT 200) since auto-pick
-    // isn't possible without a chargers_cache row.
+    // isn't possible without a chargers row.
     const res = await callScanPair({});
     const status = res.status;
     const isExpected = status >= 400 && status < 600;

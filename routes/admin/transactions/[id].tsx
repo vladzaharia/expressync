@@ -148,9 +148,9 @@ export const handler = define.handlers({
     if (liveChargeBoxId) {
       try {
         const [cacheRow] = await db
-          .select({ friendlyName: schema.chargersCache.friendlyName })
-          .from(schema.chargersCache)
-          .where(eq(schema.chargersCache.chargeBoxId, liveChargeBoxId))
+          .select({ friendlyName: schema.chargers.friendlyName })
+          .from(schema.chargers)
+          .where(eq(schema.chargers.chargeBoxId, liveChargeBoxId))
           .limit(1);
         liveFriendlyName = cacheRow?.friendlyName ?? null;
       } catch {
