@@ -219,16 +219,21 @@ export async function createReservation(
     reservation = updated ?? inserted;
   }
 
-  // Dispatch ReserveNow to StEvE. Non-blocking — a StEvE outage must not
-  // break local reservation creation, so we log+swallow failures and leave
-  // `steve_reservation_id = null`. The row stays at `status='pending'`
-  // until `reservation-resolver.service.ts` flips it to `confirmed` /
-  // `conflicted`: a per-minute cron polls `steveClient.operations
-  // .getTask(taskId)` (no-op until StEvE is upgraded past 3.12.0), and
-  // `tryConfirmFromStatusNotification` provides a side-channel that
-  // closes the loop the moment the connector reports `Reserved` (wired
-  // when the OCPP StatusNotification stream surfaces connector-level
-  // status into `recordChargerStatus`).
+  // Dispatch ReserveNow to StEvE. Non-blocking from the caller's POV: a
+  // StEvE outage must not break local reservation creation, so failures
+  // are logged + swallowed and the row stays at `status='pending'`.
+  //
+  // StEvE's REST `OcppOperationResponse<ReservationStatus>` blocks
+  // synchronously up to `timeoutDuration` (default ~30s) for the
+  // charger's CallResult. The response carries:
+  //   - `taskFinished: boolean`        true ⇒ charger responded within timeout
+  //   - `successResponses: [{ chargeBoxId, response: "ACCEPTED" | ... }]`
+  //   - `errorResponses: [...]`         OCPP CallError responses
+  //   - `exceptions: [...]`             transport-level failures
+  //
+  // We interpret the response inline and write the final status right
+  // away. The per-minute resolver cron only matters for the rare case
+  // where `taskFinished=false` (charger didn't respond in time).
   try {
     const taskResult = await steveClient.operations.reserveNow({
       chargeBoxId: reservation.chargeBoxId,
@@ -236,17 +241,63 @@ export async function createReservation(
       expiry: (reservation.endAt ?? input.endAt).toISOString(),
       idTag: reservation.steveOcppIdTag,
     });
-    if (taskResult && typeof taskResult.taskId === "number") {
+
+    const taskId = typeof taskResult?.taskId === "number"
+      ? taskResult.taskId
+      : null;
+
+    // Resolve the synchronous outcome. `successResponses[0].response`
+    // is the OCPP `ReservationStatus` value as a string. ACCEPTED is
+    // the only "reserved" answer; everything else (FAULTED, OCCUPIED,
+    // REJECTED, UNAVAILABLE) is a refusal that we surface as
+    // `conflicted`.
+    const successForUs = (taskResult?.successResponses ?? []).find(
+      (r) => r.chargeBoxId === reservation.chargeBoxId,
+    );
+    const errorForUs = (taskResult?.errorResponses ?? []).find(
+      (r) => r.chargeBoxId === reservation.chargeBoxId,
+    );
+    const exceptionForUs = (taskResult?.exceptions ?? []).find(
+      (r) => r.chargeBoxId === reservation.chargeBoxId,
+    );
+
+    let resolvedStatus: "confirmed" | "conflicted" | null = null;
+    if (successForUs) {
+      const resp = String(successForUs.response ?? "").toUpperCase();
+      resolvedStatus = resp === "ACCEPTED" ? "confirmed" : "conflicted";
+    } else if (errorForUs || exceptionForUs) {
+      resolvedStatus = "conflicted";
+    } else if (taskResult?.taskFinished === false) {
+      // Charger never responded within the timeout window. Leave as
+      // pending; the resolver cron will pick it up if a future StEvE
+      // version exposes per-task lookup.
+      resolvedStatus = null;
+    }
+
+    if (taskId !== null || resolvedStatus !== null) {
+      const updates: Partial<typeof schema.reservations.$inferInsert> = {
+        updatedAt: new Date(),
+      };
+      if (taskId !== null) updates.steveReservationId = taskId;
+      if (resolvedStatus !== null) updates.status = resolvedStatus;
       const [updated] = await db
         .update(schema.reservations)
-        .set({
-          steveReservationId: taskResult.taskId,
-          updatedAt: new Date(),
-        })
+        .set(updates)
         .where(eq(schema.reservations.id, reservation.id))
         .returning();
       reservation = updated ?? reservation;
     }
+
+    logger.info("Reservations", "StEvE ReserveNow dispatched", {
+      reservationId: reservation.id,
+      chargeBoxId: reservation.chargeBoxId,
+      taskId,
+      taskFinished: taskResult?.taskFinished ?? null,
+      ocppStatus: successForUs ? String(successForUs.response) : null,
+      resolvedStatus,
+      errorCount: (taskResult?.errorResponses ?? []).length,
+      exceptionCount: (taskResult?.exceptions ?? []).length,
+    });
   } catch (err) {
     logger.warn("Reservations", "StEvE ReserveNow dispatch failed", {
       reservationId: reservation.id,
