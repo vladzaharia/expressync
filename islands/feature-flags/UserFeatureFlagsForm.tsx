@@ -327,8 +327,7 @@ function FlagRow(props: RowProps) {
           </span>
           <span class="text-xs text-muted-foreground">{spec.description}</span>
           <span class="text-[11px] text-muted-foreground">
-            scope: {spec.scope} · default:{" "}
-            <code>{valueToString(spec.defaultValue)}</code>
+            default: <code>{valueToString(spec.defaultValue)}</code>
             {!inheritedDefault && <span class="ml-2">· override active</span>}
           </span>
         </div>

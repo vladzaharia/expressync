@@ -31,12 +31,23 @@ import { type DeviceCapability, type DeviceKind } from "../types/devices.ts";
 /** Friendly metadata for a single capability — shown in the picker. */
 export interface CapabilityMetadata {
   capability: DeviceCapability;
-  /** Short title — "Scanner", "Kiosk mode", etc. */
+  /** Short title — "Scanner", "Kiosk", etc. */
   label: string;
   /** One-sentence description for the picker tooltip / row sub-text. */
   description: string;
   /** Lookup key for the lucide icon — picker maps it to an icon component. */
   iconKey: "scanner" | "charger" | "user" | "kiosk" | "managed";
+  /**
+   * Picker grouping. App-wide cuts (mode/fleet posture) render together;
+   * feature gates render together. UI renders one group above the other
+   * with a visible separator so admins distinguish "what kind of device
+   * is this?" from "which features are turned on?".
+   *
+   * - `mode`: app-wide cutting concerns — kiosk shell, fleet management.
+   * - `feature`: large feature gates — scanner stack, user-charger UI.
+   * - `system`: chrome-less, auto-managed read-only chips (e.g. charger).
+   */
+  group: "mode" | "feature" | "system";
 }
 
 /**
@@ -51,6 +62,7 @@ export const CAPABILITY_METADATA: Record<DeviceCapability, CapabilityMetadata> =
       description:
         "Reads NFC tags for admin-arm scans, customer logins, and card link flows.",
       iconKey: "scanner",
+      group: "feature",
     },
     charger: {
       capability: "charger",
@@ -58,6 +70,7 @@ export const CAPABILITY_METADATA: Record<DeviceCapability, CapabilityMetadata> =
       description:
         "Auto-managed by StEvE sync. Indicates this row is an EV charging station, not an app device.",
       iconKey: "charger",
+      group: "system",
     },
     user: {
       capability: "user",
@@ -65,6 +78,7 @@ export const CAPABILITY_METADATA: Record<DeviceCapability, CapabilityMetadata> =
       description:
         "Unlocks the Chargers tab — list, start/stop sessions, and cancel reservations.",
       iconKey: "user",
+      group: "feature",
     },
     kiosk: {
       capability: "kiosk",
@@ -72,13 +86,15 @@ export const CAPABILITY_METADATA: Record<DeviceCapability, CapabilityMetadata> =
       description:
         "Single-screen appliance mode — no chrome. Legal only with exactly one of {scanner, user}.",
       iconKey: "kiosk",
+      group: "mode",
     },
     managed: {
       capability: "managed",
-      label: "Managed device",
+      label: "Managed",
       description:
-        "Allows admins to read this device's last-known location and request an on-demand fix. Admin-fleet only — customer-owned devices can never carry this.",
+        "Admin-fleet posture. Admins can read this device's last-known location and request an on-demand fix. Customer-owned devices can never carry this.",
       iconKey: "managed",
+      group: "mode",
     },
   };
 

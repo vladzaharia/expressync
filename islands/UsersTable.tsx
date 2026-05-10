@@ -192,8 +192,17 @@ export default function UsersTable({
                     isCurrentUser && "border-amber-500/30",
                   )}
                 >
-                  {/* User Info */}
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                  {/* User Info — clickable link to detail page. The
+                      role-select / delete actions stay click-isolated
+                      in their own region to the right so they don't
+                      navigate accidentally. */}
+                  <a
+                    href={`/admin/users/${encodeURIComponent(user.id)}`}
+                    className="flex items-center gap-3 flex-1 min-w-0 rounded-md -m-1 p-1 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40"
+                    aria-label={`View details for ${
+                      user.name || user.email || user.id
+                    }`}
+                  >
                     <div className="flex size-10 items-center justify-center rounded-lg bg-amber-500/10 shrink-0">
                       <User className="size-5 text-amber-500" />
                     </div>
@@ -215,7 +224,7 @@ export default function UsersTable({
                         {user.email ?? "—"}
                       </p>
                     </div>
-                  </div>
+                  </a>
 
                   {/* Role Badge + Date */}
                   <div className="flex items-center gap-3 shrink-0">

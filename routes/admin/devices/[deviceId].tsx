@@ -479,14 +479,22 @@ export default define.page<typeof handler>(
                     lastSeenAtIso={device.lastSeenAtIso}
                     registeredAtIso={device.registeredAtIso}
                     locationSlot={
-                      <DeviceLocationCard
-                        deviceId={device.deviceId}
-                        enabled={device.capabilities.includes("managed")}
-                        initialLat={device.lastLocationLat}
-                        initialLon={device.lastLocationLon}
-                        initialAccuracyM={device.lastLocationAccuracyM}
-                        initialAtIso={device.lastLocationAtIso}
-                      />
+                      // Only render the Location section for managed
+                      // devices. The DeviceLocationCard's internal
+                      // "not enabled" hint is redundant when the whole
+                      // section can just be hidden.
+                      device.capabilities.includes("managed")
+                        ? (
+                          <DeviceLocationCard
+                            deviceId={device.deviceId}
+                            enabled
+                            initialLat={device.lastLocationLat}
+                            initialLon={device.lastLocationLon}
+                            initialAccuracyM={device.lastLocationAccuracyM}
+                            initialAtIso={device.lastLocationAtIso}
+                          />
+                        )
+                        : undefined
                     }
                   />
                   <DeviceLiveStatusCard

@@ -11,7 +11,7 @@
 import type { FormFactor } from "@/src/lib/types/steve.ts";
 
 export const FORM_FACTOR_LABEL: Record<FormFactor, string> = {
-  wallbox: "Wallbox",
+  wallbox: "Wallbox Pulsar",
   tesla: "Tesla Wall Connector",
   generic: "Charger",
 };

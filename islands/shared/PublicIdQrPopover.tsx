@@ -62,7 +62,20 @@ export default function PublicIdQrPopover({
           interactive
         />
       </PopoverTrigger>
-      <PopoverContent class="w-72" align="end">
+      <PopoverContent
+        class="w-80 bg-card"
+        // Overlay the trigger: `side="bottom"` + a negative
+        // `sideOffset` lifts the panel up so its top edge aligns with
+        // the trigger's top edge (the trigger chip is ~32px tall).
+        // `align="center"` keeps it horizontally centered over the
+        // trigger. `avoidCollisions={false}` keeps Radix from
+        // flipping it away from the trigger near viewport edges —
+        // covering the trigger is the intended layout.
+        side="bottom"
+        sideOffset={-40}
+        align="center"
+        avoidCollisions={false}
+      >
         <div class="flex flex-col gap-3">
           <div class="flex justify-center">
             <img
@@ -70,16 +83,23 @@ export default function PublicIdQrPopover({
               width={224}
               height={224}
               alt={`QR code that links to ${stickerUrl}`}
-              class="block bg-white rounded-md p-2"
+              // Transparent background so the popover's card surface
+              // shows through and the themed (blue/green) QR reads
+              // against the chrome instead of a white rectangle.
+              class="block rounded-md"
             />
           </div>
           <div class="flex flex-col items-center gap-2">
-            <PublicIdDisplay publicId={publicId} size="md" />
+            {/* Larger nanoid display so the popover doubles as a
+                quick visual confirmation of the id before scanning. */}
+            <PublicIdDisplay publicId={publicId} size="xl" />
             <code class="text-xs text-muted-foreground break-all text-center">
               {stickerUrl}
             </code>
           </div>
-          <div class="flex gap-2">
+          {/* `w-full` on the row + `flex-1` on each button → the pair
+              spans the entire popover width with no trailing gap. */}
+          <div class="flex w-full gap-2">
             <CopyButton label="Copy URL" value={stickerUrl} />
             <CopyButton label="Copy ID" value={publicId} />
           </div>

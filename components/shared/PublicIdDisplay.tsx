@@ -19,7 +19,7 @@ import {
 
 interface PublicIdDisplayProps {
   publicId: string;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
   /** Mark the layout as interactive (used by PublicIdQrPopover to
    *  size the trigger correctly without changing visuals). */
   interactive?: boolean;
@@ -30,6 +30,9 @@ const SIZE_CLASSES = {
   sm: "text-xs gap-x-1 gap-y-0.5",
   md: "text-base gap-x-1.5 gap-y-0.5",
   lg: "text-2xl gap-x-2 gap-y-1",
+  // Hero-size for the QR popover: dominates the layout without
+  // wrapping for a standard 8-char public ID (4+4 split).
+  xl: "text-4xl gap-x-3 gap-y-1.5",
 } as const;
 
 const CHAR_CLASS = "tabular-nums leading-none";

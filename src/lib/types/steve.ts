@@ -174,7 +174,7 @@ export type FormFactor = typeof FORM_FACTORS[number];
  *  values are wire-pinned by the `chargers_form_factor_check` CHECK; the
  *  UI uses these labels exclusively. */
 export const FORM_FACTOR_LABELS: Record<FormFactor, string> = {
-  wallbox: "Wallbox",
+  wallbox: "Wallbox Pulsar",
   tesla: "Tesla Wall Connector",
   generic: "Generic",
 };

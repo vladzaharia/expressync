@@ -340,8 +340,7 @@ function FlagRow(p: RowProps) {
             {p.spec.description}
           </span>
           <span class="text-[11px] text-muted-foreground">
-            scope: {p.spec.scope} · default:{" "}
-            <code>{valueToString(p.spec.defaultValue)}</code>
+            default: <code>{valueToString(p.spec.defaultValue)}</code>
             {p.userHasValue && (
               <span class="ml-2">
                 · user value: <code>{valueToString(p.inherited)}</code>

@@ -42,6 +42,12 @@ interface FakeReaderState {
     updatedAt: Date;
     updatedBy: string;
   }[];
+  globalRows?: {
+    flagKey: string;
+    valueJson: unknown;
+    updatedAt: Date;
+    updatedBy: string;
+  }[];
   /** Increments every time loadDeviceFlags is called. */
   deviceLoads: number;
 }
@@ -54,6 +60,7 @@ function installReader(s: FakeReaderState) {
       s.deviceLoads++;
       return Promise.resolve(s.deviceRows ?? []);
     },
+    loadGlobalFlags: () => Promise.resolve(s.globalRows ?? []),
   });
 }
 
@@ -83,13 +90,13 @@ Deno.test({
   sanitizeResources: false,
   sanitizeOps: false,
   fn: async () => {
-    // demo.flag default is `false`; user sets it to `true`.
+    // customer.connectivityCheck default is `true`; user disables it.
     const state: FakeReaderState = {
       deviceKind: { kind: "phone_nfc", deletedAt: null },
       userRows: [
         {
-          flagKey: "demo.flag",
-          valueJson: true,
+          flagKey: "customer.connectivityCheck",
+          valueJson: false,
           updatedAt: T0,
           updatedBy: "admin:adm-1",
         },
@@ -99,10 +106,10 @@ Deno.test({
     installReader(state);
     try {
       const out = await resolveFlags(USER, PHONE);
-      assertEquals(Object.keys(out), ["demo.flag"]);
-      assertEquals(out["demo.flag"].value, true);
-      assertEquals(out["demo.flag"].updatedBy, "admin:adm-1");
-      assertEquals(out["demo.flag"].updatedAt, T0.toISOString());
+      assertEquals(Object.keys(out), ["customer.connectivityCheck"]);
+      assertEquals(out["customer.connectivityCheck"].value, false);
+      assertEquals(out["customer.connectivityCheck"].updatedBy, "admin:adm-1");
+      assertEquals(out["customer.connectivityCheck"].updatedAt, T0.toISOString());
     } finally {
       _resetFeatureFlagResolverTestSeams();
     }
@@ -115,20 +122,22 @@ Deno.test({
   sanitizeOps: false,
   fn: async () => {
     const T1 = new Date("2026-05-02T00:00:00.000Z");
+    // customer.connectivityCheck default is `true`. User disables (`false`)
+    // but device re-enables (`true`) — device write equals default ⇒ omit.
     const state: FakeReaderState = {
       deviceKind: { kind: "phone_nfc", deletedAt: null },
       userRows: [
         {
-          flagKey: "demo.flag",
-          valueJson: true,
+          flagKey: "customer.connectivityCheck",
+          valueJson: false,
           updatedAt: T0,
           updatedBy: "admin:adm-1",
         },
       ],
       deviceRows: [
         {
-          flagKey: "demo.flag",
-          valueJson: false, // back to default — but "device override → equals default → omit"
+          flagKey: "customer.connectivityCheck",
+          valueJson: true, // back to default — but "device override → equals default → omit"
           updatedAt: T1,
           updatedBy: "admin:adm-2",
         },
@@ -138,7 +147,7 @@ Deno.test({
     installReader(state);
     try {
       const out = await resolveFlags(USER, PHONE);
-      // Device value `false` equals registry default → omitted.
+      // Device value `true` equals registry default → omitted.
       assertEquals(out, {});
       assertEquals(state.deviceLoads, 1);
     } finally {
@@ -157,11 +166,11 @@ Deno.test({
     const state: FakeReaderState = {
       deviceKind: { kind: "phone_nfc", deletedAt: null },
       userRows: [
-        // `customer.connectivityCheck.enabled` default is true; user
+        // `customer.connectivityCheck` default is true; user
         // disables it — but device re-enables (and we want to verify
         // the device row's provenance wins, not just the value).
         {
-          flagKey: "customer.connectivityCheck.enabled",
+          flagKey: "customer.connectivityCheck",
           valueJson: false,
           updatedAt: T0,
           updatedBy: "admin:adm-user",
@@ -169,7 +178,7 @@ Deno.test({
       ],
       deviceRows: [
         {
-          flagKey: "customer.connectivityCheck.enabled",
+          flagKey: "customer.connectivityCheck",
           valueJson: false, // also disabled at device level
           updatedAt: T1,
           updatedBy: "admin:adm-device",
@@ -181,19 +190,19 @@ Deno.test({
     try {
       const out = await resolveFlags(USER, PHONE);
       assertEquals(Object.keys(out), [
-        "customer.connectivityCheck.enabled",
+        "customer.connectivityCheck",
       ]);
       assertEquals(
-        out["customer.connectivityCheck.enabled"].value,
+        out["customer.connectivityCheck"].value,
         false,
       );
       // Device-level provenance must win (later timestamp + device admin).
       assertEquals(
-        out["customer.connectivityCheck.enabled"].updatedBy,
+        out["customer.connectivityCheck"].updatedBy,
         "admin:adm-device",
       );
       assertEquals(
-        out["customer.connectivityCheck.enabled"].updatedAt,
+        out["customer.connectivityCheck"].updatedAt,
         T1.toISOString(),
       );
     } finally {
@@ -216,9 +225,10 @@ Deno.test({
     const state: FakeReaderState = {
       deviceKind: { kind: "charger", deletedAt: null },
       userRows: [
+        // User disables (differs from default-true) so the row surfaces.
         {
-          flagKey: "demo.flag",
-          valueJson: true,
+          flagKey: "customer.connectivityCheck",
+          valueJson: false,
           updatedAt: T0,
           updatedBy: "admin:adm-1",
         },
@@ -226,8 +236,8 @@ Deno.test({
       deviceRows: [
         // Should NEVER be read for a charger.
         {
-          flagKey: "demo.flag",
-          valueJson: false,
+          flagKey: "customer.connectivityCheck",
+          valueJson: true,
           updatedAt: T0,
           updatedBy: "admin:should-not-win",
         },
@@ -237,9 +247,9 @@ Deno.test({
     installReader(state);
     try {
       const out = await resolveFlags(USER, CHARGER);
-      // User value (true) wins because device override read was skipped.
-      assertEquals(out["demo.flag"].value, true);
-      assertEquals(out["demo.flag"].updatedBy, "admin:adm-1");
+      // User value (false) wins because device override read was skipped.
+      assertEquals(out["customer.connectivityCheck"].value, false);
+      assertEquals(out["customer.connectivityCheck"].updatedBy, "admin:adm-1");
       assertEquals(state.deviceLoads, 0); // never touched
     } finally {
       _resetFeatureFlagResolverTestSeams();

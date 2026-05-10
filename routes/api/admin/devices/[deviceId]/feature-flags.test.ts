@@ -94,7 +94,7 @@ Deno.test({
     _resetDeviceFeatureFlagsTestSeams();
     const res = await callPatch({
       state: {},
-      body: { flags: [{ key: "demo.flag", value: true }] },
+      body: { flags: [{ key: "customer.connectivityCheck", value: true }] },
     });
     assertEquals(res.status, 401);
   },
@@ -108,7 +108,7 @@ Deno.test({
     _resetDeviceFeatureFlagsTestSeams();
     const res = await callPatch({
       state: customerState(),
-      body: { flags: [{ key: "demo.flag", value: true }] },
+      body: { flags: [{ key: "customer.connectivityCheck", value: true }] },
     });
     assertEquals(res.status, 403);
   },
@@ -143,7 +143,7 @@ Deno.test({
     );
     const res = await callPatch({
       state: adminState(),
-      body: { flags: [{ key: "demo.flag", value: true }] },
+      body: { flags: [{ key: "customer.connectivityCheck", value: true }] },
     });
     assertEquals(res.status, 422);
     const body = await res.json();
@@ -161,7 +161,7 @@ Deno.test({
     _setDeviceLoaderForTests(() => Promise.resolve(null));
     const res = await callPatch({
       state: adminState(),
-      body: { flags: [{ key: "demo.flag", value: true }] },
+      body: { flags: [{ key: "customer.connectivityCheck", value: true }] },
     });
     assertEquals(res.status, 404);
     _resetDeviceFeatureFlagsTestSeams();
@@ -184,7 +184,7 @@ Deno.test({
     );
     const res = await callPatch({
       state: adminState(),
-      body: { flags: [{ key: "demo.flag", value: true }] },
+      body: { flags: [{ key: "customer.connectivityCheck", value: true }] },
     });
     assertEquals(res.status, 410);
     _resetDeviceFeatureFlagsTestSeams();
@@ -232,7 +232,7 @@ Deno.test({
     );
     const res = await callPatch({
       state: adminState(),
-      body: { flags: [{ key: "demo.flag", value: 42 }] },
+      body: { flags: [{ key: "customer.connectivityCheck", value: 42 }] },
     });
     assertEquals(res.status, 400);
     const body = await res.json();
@@ -261,7 +261,7 @@ Deno.test({
       upserted = rows.map((r) => ({ key: r.key, value: r.value }));
       return Promise.resolve();
     });
-    _setFlagResolverForTests(() => Promise.resolve({ "demo.flag": true }));
+    _setFlagResolverForTests(() => Promise.resolve({ "customer.connectivityCheck": true }));
 
     const seen: string[] = [];
     const unsub = eventBus.subscribe(
@@ -273,13 +273,13 @@ Deno.test({
     );
     const res = await callPatch({
       state: adminState(),
-      body: { flags: [{ key: "demo.flag", value: true }] },
+      body: { flags: [{ key: "customer.connectivityCheck", value: true }] },
     });
     assertEquals(res.status, 200);
     const body = await res.json();
     assertEquals(body.ok, true);
-    assertEquals(body.flags, { "demo.flag": true });
-    assertEquals(upserted, [{ key: "demo.flag", value: true }]);
+    assertEquals(body.flags, { "customer.connectivityCheck": true });
+    assertEquals(upserted, [{ key: "customer.connectivityCheck", value: true }]);
     assertEquals(seen, [DEVICE_UUID]);
     unsub();
     _resetDeviceFeatureFlagsTestSeams();
@@ -309,10 +309,10 @@ Deno.test({
     _setFlagResolverForTests(() => Promise.resolve({}));
     const res = await callPatch({
       state: adminState(),
-      body: { flags: [{ key: "demo.flag", value: null }] },
+      body: { flags: [{ key: "customer.connectivityCheck", value: null }] },
     });
     assertEquals(res.status, 200);
-    assertEquals(deleted, ["demo.flag"]);
+    assertEquals(deleted, ["customer.connectivityCheck"]);
     _resetDeviceFeatureFlagsTestSeams();
   },
 });

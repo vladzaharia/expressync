@@ -27,7 +27,7 @@
 
 import { z } from "zod";
 
-/** A single flag's schema + default + scope. */
+/** A single flag's schema + default. */
 export interface FeatureFlagSpec<V = unknown> {
   /** Display name (used in admin UI pickers). */
   name: string;
@@ -37,43 +37,29 @@ export interface FeatureFlagSpec<V = unknown> {
   defaultValue: V;
   /** Free-text description — used by admin UI tooltip. */
   description: string;
-  /**
-   * Scope: `"user"` (user-level only), `"device"` (device-level only),
-   * or `"both"` (user + device, with device override winning).
-   */
-  scope: "user" | "device" | "both";
 }
 
 /**
  * Canonical registry. Keys use dot-namespacing (`scope.feature`) so
  * future grouping (e.g. all `customer.*` flags) is trivial.
+ *
+ * Scope is always "both" (user-settable + device-overridable) at the
+ * model level. The resolver also reads a global-tier row before the
+ * user value, so the effective precedence is:
+ *   device override > user value > global default > registry default
  */
 export const FEATURE_FLAGS = {
   /**
-   * Whether the in-app Connectivity Check card is rendered for
-   * customer accounts. Default `true` so a customer's first launch
-   * surfaces a self-service diagnostic; admins can flip to `false`
-   * per-user / per-device when a known issue would have the check
-   * stuck red.
+   * Whether the in-app Connectivity Check card is rendered. Default
+   * `true` so first launch surfaces a self-service diagnostic; admins
+   * can flip to `false` globally / per-user / per-device when a known
+   * issue would have the check stuck red.
    */
-  "customer.connectivityCheck.enabled": {
-    name: "Connectivity Check (customer)",
+  "customer.connectivityCheck": {
+    name: "Connectivity Check",
     schema: z.boolean(),
     defaultValue: true,
-    description: "Show the customer-mode Connectivity Check card in Settings.",
-    scope: "both",
-  },
-  /**
-   * Demo flag used to verify the end-to-end feature-flag path
-   * (registry → resolver → envelope → SSE → iOS reader). No
-   * production consumer; safe to toggle freely.
-   */
-  "demo.flag": {
-    name: "Demo Flag",
-    schema: z.boolean(),
-    defaultValue: false,
-    description: "End-to-end verification toggle. No production consumer.",
-    scope: "both",
+    description: "Show the Connectivity Check card in Settings.",
   },
 } as const satisfies Record<string, FeatureFlagSpec>;
 
@@ -99,11 +85,17 @@ export function getFeatureFlagDefault<K extends FeatureFlag>(
   return FEATURE_FLAGS[key].defaultValue;
 }
 
-/** Check if a flag is scoped to users, devices, or both. */
+/**
+ * Flag scope. Kept as a function returning the literal `"both"` so
+ * existing callers (admin UI, PATCH endpoints) compile without
+ * touching every site. Every registered flag is settable at every
+ * tier (global / user / device override). The picker UI no longer
+ * surfaces a scope selector.
+ */
 export function getFeatureFlagScope(
-  key: FeatureFlag,
-): "user" | "device" | "both" {
-  return FEATURE_FLAGS[key].scope;
+  _key: FeatureFlag,
+): "both" {
+  return "both";
 }
 
 /**
