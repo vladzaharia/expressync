@@ -47,6 +47,13 @@ import {
   type SettingDelta,
   type SettingRow,
 } from "../../../../../src/lib/devices/lww.ts";
+import {
+  clampLogTimestampNs,
+  extractCategory,
+  extractSeq,
+  MAX_LOGS_PER_SYNC,
+  otelLogRecordSchema,
+} from "../../../../../src/lib/devices/log-schemas.ts";
 import { parseSettingDelta } from "../../../../../src/lib/devices/settings-keys.ts";
 import { withIdempotency } from "../../../../../src/lib/idempotency.ts";
 import { logger } from "../../../../../src/lib/utils/logger.ts";
@@ -130,6 +137,10 @@ const diagnosticsSchema = z.object({
 const syncBodySchema = z.object({
   pendingSettings: z.array(z.unknown()),
   diagnostics: diagnosticsSchema,
+  // Phase 3c — optional structured-log batch. Older clients don't
+  // send these fields; the server tolerates absence.
+  logs: z.array(otelLogRecordSchema).max(MAX_LOGS_PER_SYNC).optional(),
+  logCursor: z.string().regex(/^\d+$/).optional(),
 }).strict();
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -309,10 +320,100 @@ export const handler = define.handlers({
         return jsonResponse(500, { error: "internal" });
       }
 
+      // ---- 6b. Phase 3c — bulk-insert OTel-shaped log records ----------
+      // Records ride on top of the existing sync envelope and dedupe via
+      // (device_id, seq). Drops on conflict — retried syncs (same
+      // Idempotency-Key OR different Idempotency-Key with overlapping
+      // seqs) are safe.
+      let logsAckedSeq: bigint | null = null;
+      let logsDroppedDuplicates = 0;
+      if (parsed.logs && parsed.logs.length > 0) {
+        const nowMs = now.getTime();
+        const insertedSeqs = new Set<string>();
+        for (const record of parsed.logs) {
+          const seq = extractSeq(record);
+          if (seq === null) continue; // No seq → can't dedupe → skip.
+          const tsNs = clampLogTimestampNs(record.timestamp, nowMs);
+          const category = extractCategory(record);
+          try {
+            const inserted = await db.execute<{ seq: string }>(sql`
+              INSERT INTO device_logs (
+                device_id, seq, timestamp_ns, severity_text,
+                severity_number, body, category, trace_id, span_id,
+                attributes, resource
+              )
+              VALUES (
+                ${device.id}::uuid,
+                ${seq.toString()}::numeric(20,0),
+                ${tsNs.toString()}::bigint,
+                ${record.severity_text},
+                ${record.severity_number},
+                ${
+              record.body.length > 4096
+                ? record.body.slice(0, 4096)
+                : record.body
+            },
+                ${category},
+                ${record.trace_id ?? null},
+                ${record.span_id ?? null},
+                ${JSON.stringify(record.attributes)}::jsonb,
+                ${JSON.stringify(record.resource)}::jsonb
+              )
+              ON CONFLICT (device_id, seq) DO NOTHING
+              RETURNING seq::text AS seq
+            `);
+            const rows = (Array.isArray(inserted)
+              ? inserted
+              : (inserted as { rows?: { seq: string }[] }).rows ?? []) as {
+                seq: string;
+              }[];
+            if (rows.length > 0) {
+              insertedSeqs.add(rows[0].seq);
+              if (logsAckedSeq === null || seq > logsAckedSeq) {
+                logsAckedSeq = seq;
+              }
+            } else {
+              logsDroppedDuplicates += 1;
+              // Even duplicates count as "acked" — the server already
+              // has them, so the iOS client should advance past them.
+              if (logsAckedSeq === null || seq > logsAckedSeq) {
+                logsAckedSeq = seq;
+              }
+            }
+          } catch (err) {
+            // Per-record DB failure — log and continue. The whole
+            // batch shouldn't fail because one record is malformed.
+            log.warn("device_logs insert failed", {
+              deviceId: device.id,
+              seq: seq.toString(),
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+        log.debug("device_logs batch", {
+          deviceId: device.id,
+          received: parsed.logs.length,
+          inserted: insertedSeqs.size,
+          dropped: logsDroppedDuplicates,
+          ackedSeq: logsAckedSeq?.toString() ?? null,
+        });
+      }
+
       // ---- 7. Return the post-merge envelope -----------------------------
       try {
         const envelope = await buildDeviceStateEnvelope(device.id);
-        return jsonResponse(200, envelope);
+        // Augment the envelope with the log-ingest summary so the iOS
+        // `LogDrain` knows what to ack. Older clients ignore the new key.
+        const augmented = parsed.logs
+          ? {
+            ...(envelope as Record<string, unknown>),
+            logs: {
+              ackedSeq: logsAckedSeq?.toString() ?? null,
+              droppedDuplicates: logsDroppedDuplicates,
+            },
+          }
+          : envelope;
+        return jsonResponse(200, augmented);
       } catch (err) {
         if (err instanceof DeviceDeletedError) {
           return jsonResponse(410, { error: "device_deleted" });

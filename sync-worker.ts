@@ -29,6 +29,7 @@ import { pruneExpiredIdempotencyKeys } from "./src/lib/idempotency.ts";
 import { db } from "./src/db/index.ts";
 import {
   authAudit,
+  deviceLogs,
   magicLinkAudit,
   rateLimits,
   verifications,
@@ -233,6 +234,86 @@ const rateLimitCleanupJob = new Cron(
 console.log(
   `[Sync Worker] Rate-limit + audit cleanup cron scheduled; next run: ${
     rateLimitCleanupJob.nextRun()?.toISOString() ?? "unknown"
+  }`,
+);
+
+// Phase 3c — device_logs retention. 7-day hot retention; pruned every
+// 6 h in 10k-row batches so the DELETE doesn't grab a long lock. The
+// 1 GB size alarm runs daily as a coarse early-warning before we
+// outgrow Postgres and migrate to Loki.
+const deviceLogsRetentionJob = new Cron(
+  "0 */6 * * *",
+  { protect: true, timezone: "UTC" },
+  async () => {
+    let totalRemoved = 0;
+    // Loop in capped batches so we don't hold an exclusive lock on the
+    // index for the duration of one giant DELETE.
+    for (let batch = 0; batch < 100; batch++) {
+      try {
+        const result = await db.execute(sql`
+          DELETE FROM device_logs
+          WHERE (device_id, seq) IN (
+            SELECT device_id, seq FROM device_logs
+            WHERE observed_ts < now() - interval '7 days'
+            LIMIT 10000
+          )
+        `);
+        const removed =
+          (result as unknown as { rowCount?: number; count?: number })
+            ?.rowCount ??
+            (result as unknown as { count?: number })?.count ??
+            0;
+        totalRemoved += removed;
+        if (removed === 0) break;
+      } catch (err) {
+        console.error("[Sync Worker] device_logs prune failed:", err);
+        break;
+      }
+    }
+    if (totalRemoved > 0) {
+      console.log(
+        `[Sync Worker] device_logs retention prune ok; rows removed: ${totalRemoved}`,
+      );
+    }
+  },
+);
+console.log(
+  `[Sync Worker] device_logs retention cron scheduled; next run: ${
+    deviceLogsRetentionJob.nextRun()?.toISOString() ?? "unknown"
+  }`,
+);
+
+const deviceLogsSizeAlarmJob = new Cron(
+  "0 6 * * *",
+  { protect: true, timezone: "UTC" },
+  async () => {
+    try {
+      const result = await db.execute<{ size_bytes: string }>(sql`
+        SELECT pg_total_relation_size('device_logs')::text AS size_bytes
+      `);
+      const rows = (Array.isArray(result)
+        ? result
+        : (result as { rows?: { size_bytes: string }[] }).rows ?? []) as {
+          size_bytes: string;
+        }[];
+      const sizeBytes = BigInt(rows[0]?.size_bytes ?? "0");
+      const oneGiB = 1_073_741_824n;
+      if (sizeBytes > oneGiB) {
+        console.warn(
+          `[Sync Worker] device_logs size alarm: ${sizeBytes} bytes > 1 GiB. ` +
+            `Time to consider Loki/VictoriaLogs migration — see docs/logging/contract.md.`,
+        );
+      }
+      // Reference deviceLogs so the import isn't pruned by the linter.
+      void deviceLogs;
+    } catch (err) {
+      console.error("[Sync Worker] device_logs size alarm failed:", err);
+    }
+  },
+);
+console.log(
+  `[Sync Worker] device_logs size-alarm cron scheduled; next run: ${
+    deviceLogsSizeAlarmJob.nextRun()?.toISOString() ?? "unknown"
   }`,
 );
 

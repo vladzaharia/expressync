@@ -1,0 +1,106 @@
+{
+  "comment": "Shared PII-redaction fixtures consumed by both the iOS LogScrubber (Sources/DeviceLogging/LogScrubber.swift) and the server log_scrubber (expressync/src/lib/utils/log_scrubber.ts). Each fixture lists an `input` and the `expectedBody` after scrubbing. `inputAttributes` and `expectedAttributes` cover the structured-attribute redaction path. When you add a new pattern to the scrubber, add a fixture here and update both implementations in lockstep.",
+  "version": 1,
+  "bodyFixtures": [
+    {
+      "name": "email-in-body",
+      "input": "user accounts@vlad.gg signed in",
+      "expectedBody": "user <email> signed in"
+    },
+    {
+      "name": "email-with-plus-tag",
+      "input": "alert: bounce on accounts+notify@vlad.gg",
+      "expectedBody": "alert: bounce on <email>"
+    },
+    {
+      "name": "bearer-token-in-body",
+      "input": "Authorization: Bearer abcd1234efgh5678",
+      "expectedBody": "Authorization: Bearer <token>"
+    },
+    {
+      "name": "jwt-in-body",
+      "input": "header eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.signaturepart trailing",
+      "expectedBody": "header <jwt> trailing"
+    },
+    {
+      "name": "phone-e164-in-body",
+      "input": "ring +14155551234 now",
+      "expectedBody": "ring <phone> now"
+    },
+    {
+      "name": "phone-domestic-format-not-redacted",
+      "comment": "Domestic formats are too easy to false-positive (timestamps, IDs). Only E.164-shaped numbers redact.",
+      "input": "ring 415-555-1234 now",
+      "expectedBody": "ring 415-555-1234 now"
+    },
+    {
+      "name": "no-sensitive-content",
+      "input": "scan completed in 412 ms",
+      "expectedBody": "scan completed in 412 ms"
+    },
+    {
+      "name": "multiple-emails-in-body",
+      "input": "merging accounts@vlad.gg and ops@example.com",
+      "expectedBody": "merging <email> and <email>"
+    }
+  ],
+  "attributeFixtures": [
+    {
+      "name": "authorization-header-wholesale-redacted",
+      "inputAttributes": {
+        "Authorization": { "string": "Bearer abcd1234efgh5678" }
+      },
+      "expectedAttributes": { "Authorization": { "string": "<redacted>" } }
+    },
+    {
+      "name": "card-prefix-key-wholesale-redacted",
+      "inputAttributes": { "card_uid": { "string": "0411AABB12CC80" } },
+      "expectedAttributes": { "card_uid": { "string": "<redacted>" } }
+    },
+    {
+      "name": "cookie-key-wholesale-redacted",
+      "inputAttributes": { "cookie": { "string": "session=abc123" } },
+      "expectedAttributes": { "cookie": { "string": "<redacted>" } }
+    },
+    {
+      "name": "regular-attribute-string-content-scrubbed",
+      "inputAttributes": { "user_email": { "string": "accounts@vlad.gg" } },
+      "expectedAttributes": { "user_email": { "string": "<email>" } }
+    },
+    {
+      "name": "nested-object-string-recursively-scrubbed",
+      "inputAttributes": {
+        "context": {
+          "object": {
+            "user": { "string": "accounts@vlad.gg" },
+            "trace": { "array": [{ "string": "Bearer abcdefghij" }] }
+          }
+        }
+      },
+      "expectedAttributes": {
+        "context": {
+          "object": {
+            "user": { "string": "<email>" },
+            "trace": { "array": [{ "string": "Bearer <token>" }] }
+          }
+        }
+      }
+    },
+    {
+      "name": "non-string-types-passthrough",
+      "comment": "Numbers, bools, null pass through unchanged — only string-typed values get regex-scrubbed.",
+      "inputAttributes": {
+        "duration_ms": { "int": 412 },
+        "ok": { "bool": true },
+        "ratio": { "double": 0.95 },
+        "missing": { "null": null }
+      },
+      "expectedAttributes": {
+        "duration_ms": { "int": 412 },
+        "ok": { "bool": true },
+        "ratio": { "double": 0.95 },
+        "missing": { "null": null }
+      }
+    }
+  ]
+}
