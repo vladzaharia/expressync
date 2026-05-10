@@ -44,7 +44,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { define } from "../../../../../utils.ts";
 import { db } from "../../../../../src/db/index.ts";
-import { chargers, devices } from "../../../../../src/db/schema.ts";
+import { chargers, devices, users } from "../../../../../src/db/schema.ts";
 import {
   DEVICE_CAPABILITIES,
   type DeviceCapability,
@@ -302,6 +302,26 @@ async function handleDevicePatch(args: {
   // `charger` is auto-managed; an admin must not add or remove it.
   if (existing.has("charger") !== next.has("charger")) {
     return jsonResponse(400, { error: "capability_charger_immutable" });
+  }
+  // Phase 2 Bundle 2a — `managed` is admin-fleet-only. The capability
+  // grants admins the ability to read the device's last-known location
+  // (and, in 2b, to issue silent-push locate-now requests). It MUST
+  // NOT land on customer-owned devices. The check loads the owner
+  // role inline rather than caching on `DeviceRow` so a same-tick
+  // role change is observed.
+  if (next.has("managed") && !existing.has("managed")) {
+    const ownerRoleRow = await db
+      .select({ role: users.role })
+      .from(users)
+      .innerJoin(devices, eq(devices.ownerUserId, users.id))
+      .where(eq(devices.id, deviceId))
+      .limit(1);
+    const ownerRole = ownerRoleRow[0]?.role;
+    if (ownerRole !== "admin") {
+      return jsonResponse(400, {
+        error: "capability_managed_admin_only",
+      });
+    }
   }
 
   // Slice-B legality gate. The gate also rejects `charger` outright

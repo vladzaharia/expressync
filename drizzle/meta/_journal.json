@@ -360,9 +360,16 @@
       "breakpoints": true
     },
     {
-      "idx": 53,
+      "idx": 52,
       "version": "7",
       "when": 1778683200000,
+      "tag": "0052_managed_capability_and_location",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1778683260000,
       "tag": "0053_device_logs",
       "breakpoints": true
     }

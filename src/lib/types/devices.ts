@@ -42,6 +42,14 @@ export const DEVICE_CAPABILITIES = [
   "charger",
   "user",
   "kiosk",
+  // Phase 2 Bundle 2a — managed-fleet flag. Devices with `managed`
+  // upload their last-known location to `devices.last_location_*` on
+  // every sync (subject to feature flag `device.location.upload`).
+  // Customer-role accounts can never carry this capability — the
+  // capabilities-toggle endpoint rejects it with
+  // `capability_managed_admin_only`. Orthogonal to `kiosk` (a kiosk
+  // can be managed too).
+  "managed",
 ] as const;
 export type DeviceCapability = typeof DEVICE_CAPABILITIES[number];
 
@@ -53,6 +61,7 @@ export const APP_REGISTRATION_CAPABILITIES = [
   "scanner",
   "user",
   "kiosk",
+  "managed",
 ] as const satisfies readonly DeviceCapability[];
 
 /**

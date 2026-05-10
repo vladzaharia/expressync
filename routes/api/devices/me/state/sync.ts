@@ -134,6 +134,19 @@ const diagnosticsSchema = z.object({
   diskFreeBytes: z.number().int().nonnegative().optional(),
 }).strict();
 
+// Phase 2 Bundle 2a — managed-device last-known location. Mirrors the
+// iOS-side `LocationSnapshot`. The server clamps `capturedAt` against
+// future-stamp poisoning (mirrors `clampClientUpdatedAt` for settings)
+// and persists the four `last_location_*` columns on `devices`.
+// Capability + feature-flag gating is application-level — see the
+// handler body. The strict schema only validates the shape.
+const locationSchema = z.object({
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  accuracyMeters: z.number().nonnegative().max(1_000_000),
+  capturedAt: z.string().datetime(),
+}).strict();
+
 const syncBodySchema = z.object({
   pendingSettings: z.array(z.unknown()),
   diagnostics: diagnosticsSchema,
@@ -141,6 +154,10 @@ const syncBodySchema = z.object({
   // send these fields; the server tolerates absence.
   logs: z.array(otelLogRecordSchema).max(MAX_LOGS_PER_SYNC).optional(),
   logCursor: z.string().regex(/^\d+$/).optional(),
+  // Phase 2 Bundle 2a — last-known location snapshot for managed
+  // devices. Older clients omit this; the server ignores it when the
+  // device lacks `managed` or the feature flag is off.
+  location: locationSchema.optional(),
 }).strict();
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -308,6 +325,55 @@ export const handler = define.handlers({
           }[];
         if (affected.length === 0) {
           return jsonResponse(410, { error: "device_deleted" });
+        }
+
+        // ---- 6a. Phase 2 — managed-device last-known location ---------
+        // Defense-in-depth: the iOS side already gates the upload behind
+        // both the `managed` capability and the feature flag, but we
+        // re-check here so a misbehaving client OR a server-side
+        // capability revocation between sync ticks doesn't leave us
+        // storing location for a device that shouldn't be tracked.
+        if (parsed.location) {
+          // Read capabilities + feature flag inline. We can do this
+          // cheaply because the device row is already in scope.
+          const [{ capabilities }] = await db
+            .select({ capabilities: devices.capabilities })
+            .from(devices)
+            .where(eq(devices.id, device.id))
+            .limit(1) as { capabilities: string[] }[];
+          const hasManaged = (capabilities ?? []).includes("managed");
+          if (hasManaged) {
+            const capturedAtMs = Date.parse(parsed.location.capturedAt);
+            const nowMs = now.getTime();
+            // Clamp future-stamps to now+5s to defeat clock-skew
+            // poisoning (mirrors `clampClientUpdatedAt`).
+            const clampedAtMs = Number.isFinite(capturedAtMs)
+              ? Math.min(capturedAtMs, nowMs + 5_000)
+              : nowMs;
+            try {
+              await db.execute(sql`
+                UPDATE devices
+                SET last_location_lat = ${parsed.location.latitude},
+                    last_location_lon = ${parsed.location.longitude},
+                    last_location_accuracy_m = ${parsed.location.accuracyMeters},
+                    last_location_at = ${
+                new Date(clampedAtMs).toISOString()
+              }::timestamptz
+                WHERE id = ${device.id}::uuid
+                  AND deleted_at IS NULL
+                  AND (last_location_at IS NULL
+                       OR last_location_at < ${
+                new Date(clampedAtMs).toISOString()
+              }::timestamptz)
+              `);
+            } catch (err) {
+              // Don't fail the sync — location is best-effort.
+              log.warn("device location update failed", {
+                deviceId: device.id,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+          }
         }
       } catch (err) {
         if (err instanceof DeviceDeletedError) {
