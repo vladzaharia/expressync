@@ -29,6 +29,7 @@ import {
   type DeviceCapability,
 } from "../types/devices.ts";
 import { validateCapabilitySet } from "./capability-gate.ts";
+import { resolveFlags } from "./feature-flag-resolver.ts";
 
 /**
  * Online cutoff for a registered device. Mirrors
@@ -67,6 +68,15 @@ export const DeviceStateSchema = z.object({
     displayName: z.string(),
   }).strict(),
   settings: z.record(z.string(), SettingValueSchema),
+  /**
+   * Resolved feature-flag map. Same wire shape as `settings` so the iOS
+   * decoder can reuse `DeviceSettingValue`. Default-omit compression is
+   * applied by the resolver — flags whose effective value equals the
+   * registry default are absent. Charger-kind devices never bearer-auth
+   * to the envelope route, but the resolver short-circuits for them
+   * regardless. iOS tolerates absence (`decodeIfPresent ?? [:]`).
+   */
+  flags: z.record(z.string(), SettingValueSchema),
   scanStatus: z.object({
     armed: z.boolean(),
     pairingCode: z.string().nullable(),
@@ -287,6 +297,13 @@ export async function buildDeviceStateEnvelope(
   const lastStatus = (row.lastStatus ?? null) as Record<string, unknown> | null;
   const connectivity = deriveConnectivity(lastStatus, row.lastSeenAt);
 
+  // Resolve feature flags (per-user values + per-device overrides) with
+  // default-omit compression. The resolver gates on device kind itself;
+  // bearer-auth'd devices that reach this builder are always non-charger
+  // (chargers don't bearer-auth), so this is effectively unconditional —
+  // we still pay the kind round-trip for defense-in-depth.
+  const flags = await resolveFlags(row.ownerUserId, deviceId);
+
   // True when the device has granted push permission but hasn't delivered its
   // APNs token to the server yet. The iOS app should respond by calling
   // registerForRemoteNotifications() and PUT-ing the resulting token.
@@ -329,6 +346,7 @@ export async function buildDeviceStateEnvelope(
       displayName,
     },
     settings,
+    flags,
     scanStatus,
     pushToken,
     needsPushToken,
