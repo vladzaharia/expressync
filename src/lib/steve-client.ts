@@ -597,14 +597,18 @@ class StEvEClient {
     /**
      * Best-effort task status polling.
      *
-     * StEvE 3.12.0 does not ship the `/v1/operations/{taskId}` endpoint
-     * (only master adds a TasksController). Returns `null` on 404 so the
-     * caller can surface a "pending" state with a StEvE admin link instead
-     * of erroring. Other failures propagate so the retry pipeline can
-     * recover from transient network issues.
+     * StEvE upstream (incl. our 3.12.0 fork pre-2026-05) does not ship a
+     * per-task REST endpoint — `TaskStore.get(taskId)` is wrapped only
+     * by the manager-UI `TaskController` under `/manager/operations/tasks`.
+     * The ExpresSync fork adds `OcppTaskStatusController` mounted at
+     * `/api/v1/operations/tasks/{taskId}` returning the same shape used
+     * by the inline POST responses. Returns `null` on 404 (e.g. task
+     * already cleared from the in-memory store) so the caller can leave
+     * the row at `pending` until the next tick. Other failures propagate
+     * so the retry pipeline can recover from transient network issues.
      */
     getTask: async (taskId: number): Promise<OcppTaskStatus | null> => {
-      const url = `${this.baseUrl}/v1/operations/${taskId}`;
+      const url = `${this.baseUrl}/v1/operations/tasks/${taskId}`;
       logger.debug("StEvE", "Polling OCPP task", { taskId });
       try {
         const response = await fetch(url, {
@@ -617,7 +621,7 @@ class StEvEClient {
         if (response.status === 404) {
           logger.debug(
             "StEvE",
-            "Task polling endpoint not available (404) — 3.12.0 has no TasksController",
+            "Task polling: 404 (task evicted from TaskStore or endpoint not deployed)",
             { taskId },
           );
           // Drain the body so the connection is returned to the pool.
