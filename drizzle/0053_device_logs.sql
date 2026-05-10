@@ -15,7 +15,7 @@
 --               device_logs_retention_prune cron added to
 --               sync-worker.ts in this slice.
 
-CREATE TABLE device_logs (
+CREATE TABLE IF NOT EXISTS device_logs (
   device_id        uuid           NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
   seq              numeric(20,0)  NOT NULL,
   timestamp_ns     bigint         NOT NULL,
@@ -33,21 +33,21 @@ CREATE TABLE device_logs (
 
 -- Primary admin query: "logs for device X, newest first, optionally
 -- filtered by severity / category / time".
-CREATE INDEX device_logs_device_observed_idx
+CREATE INDEX IF NOT EXISTS device_logs_device_observed_idx
   ON device_logs (device_id, observed_ts DESC);
 
-CREATE INDEX device_logs_device_severity_idx
+CREATE INDEX IF NOT EXISTS device_logs_device_severity_idx
   ON device_logs (device_id, severity_number, observed_ts DESC);
 
-CREATE INDEX device_logs_device_category_idx
+CREATE INDEX IF NOT EXISTS device_logs_device_category_idx
   ON device_logs (device_id, category, observed_ts DESC);
 
 -- Selective attribute search; jsonb_path_ops gives smaller indexes than
 -- the default jsonb_ops since we only need the @> containment operator.
-CREATE INDEX device_logs_attributes_gin
+CREATE INDEX IF NOT EXISTS device_logs_attributes_gin
   ON device_logs USING gin (attributes jsonb_path_ops);
 
 -- Retention prune walks by observed_ts; standalone btree is cheap and
 -- covers DELETE batches.
-CREATE INDEX device_logs_observed_ts_idx
+CREATE INDEX IF NOT EXISTS device_logs_observed_ts_idx
   ON device_logs (observed_ts);

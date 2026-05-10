@@ -17,10 +17,10 @@
 -- can never receive `managed` so they can never upload.
 
 ALTER TABLE devices
-  ADD COLUMN last_location_lat        double precision,
-  ADD COLUMN last_location_lon        double precision,
-  ADD COLUMN last_location_accuracy_m real,
-  ADD COLUMN last_location_at         timestamptz;
+  ADD COLUMN IF NOT EXISTS last_location_lat        double precision,
+  ADD COLUMN IF NOT EXISTS last_location_lon        double precision,
+  ADD COLUMN IF NOT EXISTS last_location_accuracy_m real,
+  ADD COLUMN IF NOT EXISTS last_location_at         timestamptz;
 
-CREATE INDEX devices_last_location_at_idx
+CREATE INDEX IF NOT EXISTS devices_last_location_at_idx
   ON devices(last_location_at) WHERE last_location_at IS NOT NULL;
