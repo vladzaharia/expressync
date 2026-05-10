@@ -83,11 +83,21 @@ export function PageCard({
         <Card className={cardClassName}>
           {(title || description || headerActions) && (
             <CardHeader
-              className={cn("border-b border-border/50", headerClassName)}
+              className={cn(
+                "border-b border-border/50",
+                // Reserve vertical room + right padding when the
+                // top-right accessory is mounted (e.g.
+                // PublicIdQrPopover renders a 2-row stack ~48px tall
+                // that would otherwise overlap the body content).
+                topRightAccessory && "min-h-[5rem] pr-20",
+                headerClassName,
+              )}
             >
               <div className="flex items-start justify-between gap-4">
-                <div>
-                  {title && <CardTitle>{title}</CardTitle>}
+                <div className="min-w-0">
+                  {title && (
+                    <CardTitle className="break-words">{title}</CardTitle>
+                  )}
                   {description && (
                     <CardDescription>{description}</CardDescription>
                   )}
