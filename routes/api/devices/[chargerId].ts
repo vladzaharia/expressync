@@ -14,7 +14,7 @@
 import { eq } from "drizzle-orm";
 import { define } from "../../../utils.ts";
 import { db } from "../../../src/db/index.ts";
-import { chargersCache } from "../../../src/db/schema.ts";
+import { chargers } from "../../../src/db/schema.ts";
 import {
   CapabilityDeniedError,
   requireCapability,
@@ -22,6 +22,7 @@ import {
 import { logger } from "../../../src/lib/utils/logger.ts";
 import { type ChargerRow, mapChargerState } from "./index.ts";
 import { formatChargerAddress } from "../../../src/lib/charger/format-address.ts";
+import { getPrimaryConnectorSpec } from "../../../src/services/charger-connectors.service.ts";
 
 const CHARGER_STATES = [
   "idle",
@@ -72,12 +73,6 @@ function normalizeConnectorType(v: string | null): WireConnectorType | null {
     : null;
 }
 
-function parseMaxKw(v: string | null): number | null {
-  if (v === null) return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-
 const log = logger;
 
 export const handler = define.handlers({
@@ -102,12 +97,12 @@ export const handler = define.handlers({
       return jsonResponse(400, { error: "chargerId is required" });
     }
 
-    let row: typeof chargersCache.$inferSelect | undefined;
+    let row: typeof chargers.$inferSelect | undefined;
     try {
       [row] = await db
         .select()
-        .from(chargersCache)
-        .where(eq(chargersCache.chargeBoxId, chargerId))
+        .from(chargers)
+        .where(eq(chargers.chargeBoxId, chargerId))
         .limit(1);
     } catch (err) {
       log.error("API", "single-charger fetch failed", {
@@ -135,13 +130,14 @@ export const handler = define.handlers({
     const lat = row.latitude != null ? Number(row.latitude) : null;
     const lon = row.longitude != null ? Number(row.longitude) : null;
 
+    const spec = await getPrimaryConnectorSpec(row.chargeBoxId);
     const charger: ChargerRow = {
       chargerId: row.chargeBoxId,
       label: row.friendlyName ?? row.chargeBoxId,
       siteName: null,
       formFactor: normalizeFormFactor(row.formFactor),
-      connectorType: normalizeConnectorType(row.connectorTypeOverride),
-      maxKw: parseMaxKw(row.maxKwOverride),
+      connectorType: normalizeConnectorType(spec.connectorType),
+      maxKw: spec.maxKw ?? null,
       lastSeenAt: toIso(row.lastStatusAt),
       capabilities: Array.from(caps),
     };
@@ -157,7 +153,7 @@ export const handler = define.handlers({
         Date.now(),
       );
       // Sanity check the wire enum (kept for future-proofing if
-      // someone edits the chargers_cache row directly).
+      // someone edits the chargers row directly).
       charger.state = (CHARGER_STATES as readonly string[]).includes(mapped)
         ? mapped
         : "offline";

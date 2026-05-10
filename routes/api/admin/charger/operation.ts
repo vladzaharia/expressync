@@ -10,7 +10,7 @@ import {
   OPERATION_PARAM_SCHEMAS,
 } from "../../../../src/lib/types/steve.ts";
 import { logger } from "../../../../src/lib/utils/logger.ts";
-import { recordChargerStatus } from "../../../../src/services/charger-cache.service.ts";
+import { recordChargerStatus } from "../../../../src/services/charger.service.ts";
 import { eventBus } from "../../../../src/services/event-bus.service.ts";
 import { withIdempotency } from "../../../../src/lib/idempotency.ts";
 
@@ -197,10 +197,10 @@ export const handler = define.handlers({
         // first to keep the response specific.
         const [chargerRow] = await db
           .select({
-            managementMode: schema.chargersCache.managementMode,
+            managementMode: schema.chargers.managementMode,
           })
-          .from(schema.chargersCache)
-          .where(eq(schema.chargersCache.chargeBoxId, chargeBoxId))
+          .from(schema.chargers)
+          .where(eq(schema.chargers.chargeBoxId, chargeBoxId))
           .limit(1);
         if (chargerRow?.managementMode === "unmanaged") {
           logger.warn("API", "Rejected operation against unmanaged charger", {
@@ -295,7 +295,7 @@ export const handler = define.handlers({
           });
 
           // On a successful TriggerMessage(StatusNotification) dispatch, poke the
-          // sticky cache so `chargers_cache.last_status_at` advances immediately
+          // sticky cache so `chargers.last_status_at` advances immediately
           // instead of waiting for the async StatusNotification to arrive. A
           // single UPSERT — no read-modify-write — keeps us race-safe against
           // parallel polling. "Available" is a neutral placeholder; the real

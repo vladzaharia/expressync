@@ -385,9 +385,9 @@ export async function notifyFinalizedTransactions(
       // Best-effort charger label from the local cache. Falls back to
       // the chargeBoxId when no friendly name is set.
       const [chargerRow] = await db
-        .select({ friendlyName: schema.chargersCache.friendlyName })
-        .from(schema.chargersCache)
-        .where(eq(schema.chargersCache.chargeBoxId, pt.chargeBoxId))
+        .select({ friendlyName: schema.chargers.friendlyName })
+        .from(schema.chargers)
+        .where(eq(schema.chargers.chargeBoxId, pt.chargeBoxId))
         .limit(1);
       const chargerName = chargerRow?.friendlyName ?? pt.chargeBoxId;
 

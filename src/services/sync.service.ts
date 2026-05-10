@@ -34,7 +34,7 @@ import { SyncLogger } from "./sync-logger.ts";
 import { runLagoReconcile } from "./lago-reconcile/index.ts";
 import { eventBus } from "./event-bus.service.ts";
 import { config } from "../lib/config.ts";
-import { refreshChargerCache } from "./charger-cache.service.ts";
+import { refreshCharger } from "./charger.service.ts";
 // Phase P5: charging profile apply-on-tx-start hook
 import { onTransactionStarted as chargingProfileOnTransactionStarted } from "./charging-profile.service.ts";
 
@@ -44,9 +44,9 @@ import { onTransactionStarted as chargingProfileOnTransactionStarted } from "./c
  * Called after `markSyncComplete` so a cache failure never fails the sync.
  * Extracted into a helper because `runSync` has three "complete" exit paths.
  */
-async function safeRefreshChargerCache(syncRunId: number): Promise<void> {
+async function safeRefreshCharger(syncRunId: number): Promise<void> {
   try {
-    await refreshChargerCache();
+    await refreshCharger();
   } catch (error) {
     logger.warn("Sync", "Charger cache refresh failed (non-fatal)", {
       syncRunId,
@@ -204,7 +204,7 @@ export async function runSync(): Promise<SyncResult> {
       await runLagoReconcileBlock(syncLogger);
 
       await markSyncComplete(syncRun.id, 0, 0, undefined, tagStats);
-      await safeRefreshChargerCache(syncRun.id);
+      await safeRefreshCharger(syncRun.id);
       return {
         syncRunId: syncRun.id,
         transactionsProcessed: 0,
@@ -398,7 +398,7 @@ export async function runSync(): Promise<SyncResult> {
         undefined,
         tagStats,
       );
-      await safeRefreshChargerCache(syncRun.id);
+      await safeRefreshCharger(syncRun.id);
       return {
         syncRunId: syncRun.id,
         transactionsProcessed,
@@ -593,7 +593,7 @@ export async function runSync(): Promise<SyncResult> {
       errors,
       tagStats,
     );
-    await safeRefreshChargerCache(syncRun.id);
+    await safeRefreshCharger(syncRun.id);
 
     logger.info("Sync", "Sync run completed successfully", {
       syncRunId: syncRun.id,

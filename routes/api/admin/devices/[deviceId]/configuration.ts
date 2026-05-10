@@ -12,11 +12,11 @@
  *       device, capabilities, settings, diagnostics, recentSyncs,
  *       eligibleCapabilityOptions.
  *
- *   - Non-UUID-shaped `{deviceId}` → returns the `chargers_cache` row's
+ *   - Non-UUID-shaped `{deviceId}` → returns the `chargers` row's
  *       view-model (Slice O):
  *         device         — chargeBoxId, label, kind=charger, friendlyName,
  *                          firstSeenAtIso, lastSeenAtIso
- *         capabilities   — `chargers_cache.capabilities`
+ *         capabilities   — `chargers.capabilities`
  *         settings       — empty (chargers don't carry per-key settings)
  *         diagnostics    — { lastStatus, lastStatusAtIso, friendlyName }
  *                          — no pushToken / app-version etc.
@@ -31,7 +31,7 @@ import { eq } from "drizzle-orm";
 import { define } from "../../../../../utils.ts";
 import { db } from "../../../../../src/db/index.ts";
 import {
-  chargersCache,
+  chargers,
   devices,
   deviceSettings,
   users,
@@ -239,17 +239,17 @@ async function getChargerConfiguration(chargeBoxId: string): Promise<Response> {
   try {
     const [row] = await db
       .select({
-        chargeBoxId: chargersCache.chargeBoxId,
-        friendlyName: chargersCache.friendlyName,
-        formFactor: chargersCache.formFactor,
-        capabilities: chargersCache.capabilities,
-        firstSeenAt: chargersCache.firstSeenAt,
-        lastSeenAt: chargersCache.lastSeenAt,
-        lastStatus: chargersCache.lastStatus,
-        lastStatusAt: chargersCache.lastStatusAt,
+        chargeBoxId: chargers.chargeBoxId,
+        friendlyName: chargers.friendlyName,
+        formFactor: chargers.formFactor,
+        capabilities: chargers.capabilities,
+        firstSeenAt: chargers.firstSeenAt,
+        lastSeenAt: chargers.lastSeenAt,
+        lastStatus: chargers.lastStatus,
+        lastStatusAt: chargers.lastStatusAt,
       })
-      .from(chargersCache)
-      .where(eq(chargersCache.chargeBoxId, chargeBoxId))
+      .from(chargers)
+      .where(eq(chargers.chargeBoxId, chargeBoxId))
       .limit(1);
 
     if (!row) return jsonResponse(404, { error: "not_found" });

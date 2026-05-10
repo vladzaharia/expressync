@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { db as defaultDb } from "../db/index.ts";
-import { chargersCache, type NewChargerCache } from "../db/schema.ts";
+import { chargers, type NewCharger } from "../db/schema.ts";
 import { steveClient } from "../lib/steve-client.ts";
 import { logger } from "../lib/utils/logger.ts";
 
@@ -36,7 +36,7 @@ async function collectSeenChargers(dbh: Db): Promise<Map<string, SeenRow>> {
       });
     }
   } catch (error) {
-    logger.warn("ChargerCache", "Failed to fetch chargers from StEvE", {
+    logger.warn("Charger", "Failed to fetch chargers from StEvE", {
       error: error instanceof Error ? error.message : String(error),
     });
   }
@@ -62,7 +62,7 @@ async function collectSeenChargers(dbh: Db): Promise<Map<string, SeenRow>> {
     }
   } catch (error) {
     logger.debug(
-      "ChargerCache",
+      "Charger",
       "charger_operation_log not available yet (Phase A not deployed?)",
       {
         error: error instanceof Error ? error.message : String(error),
@@ -74,7 +74,7 @@ async function collectSeenChargers(dbh: Db): Promise<Map<string, SeenRow>> {
 }
 
 /**
- * Refresh the sticky chargers_cache table.
+ * Refresh the sticky chargers table.
  *
  * For each charger we observe (from StEvE transactions + operation log):
  * - INSERT if missing (sets first_seen_at = now())
@@ -84,13 +84,13 @@ async function collectSeenChargers(dbh: Db): Promise<Map<string, SeenRow>> {
  * stale chargers to remain visible in the UI (with an Offline badge) rather
  * than disappear. Called at the end of every sync run.
  */
-export async function refreshChargerCache(dbh: Db = defaultDb): Promise<{
+export async function refreshCharger(dbh: Db = defaultDb): Promise<{
   upserted: number;
 }> {
   const seen = await collectSeenChargers(dbh);
 
   if (seen.size === 0) {
-    logger.debug("ChargerCache", "No chargers seen this run; cache unchanged");
+    logger.debug("Charger", "No chargers seen this run; cache unchanged");
     return { upserted: 0 };
   }
 
@@ -107,7 +107,7 @@ export async function refreshChargerCache(dbh: Db = defaultDb): Promise<{
       descByChargeBoxId.set(b.chargeBoxId, trimmed === "" ? null : trimmed);
     }
   } catch (err) {
-    logger.warn("ChargerCache", "Failed to fetch chargeBox descriptions", {
+    logger.warn("Charger", "Failed to fetch chargeBox descriptions", {
       error: err instanceof Error ? err.message : String(err),
     });
     descByChargeBoxId = new Map();
@@ -119,7 +119,7 @@ export async function refreshChargerCache(dbh: Db = defaultDb): Promise<{
   // are NOT touched — `capabilities` is admin-edited from the charger
   // detail page (toggling `'scanner'` on/off), and the StEvE sync must
   // not clobber that decision on every refresh.
-  const values: NewChargerCache[] = Array.from(seen.values()).map((row) => ({
+  const values: NewCharger[] = Array.from(seen.values()).map((row) => ({
     chargeBoxId: row.chargeBoxId,
     chargeBoxPk: row.chargeBoxPk ?? null,
     friendlyName: descByChargeBoxId.get(row.chargeBoxId) ?? null,
@@ -127,14 +127,14 @@ export async function refreshChargerCache(dbh: Db = defaultDb): Promise<{
   }));
 
   await dbh
-    .insert(chargersCache)
+    .insert(chargers)
     .values(values)
     .onConflictDoUpdate({
-      target: chargersCache.chargeBoxId,
+      target: chargers.chargeBoxId,
       set: {
         // Only overwrite charge_box_pk when we have a fresh non-null value.
         chargeBoxPk:
-          sql`COALESCE(EXCLUDED.charge_box_pk, ${chargersCache.chargeBoxPk})`,
+          sql`COALESCE(EXCLUDED.charge_box_pk, ${chargers.chargeBoxPk})`,
         // friendly_name: replace with whatever SteVe currently has,
         // including null if the operator cleared the description. The
         // SteVe-side description is the source of truth.
@@ -153,7 +153,7 @@ export async function refreshChargerCache(dbh: Db = defaultDb): Promise<{
       },
     });
 
-  logger.info("ChargerCache", "Charger cache refreshed", {
+  logger.info("Charger", "Charger cache refreshed", {
     upserted: values.length,
   });
   return { upserted: values.length };
@@ -173,14 +173,14 @@ export async function recordChargerStatus(
   status: string,
 ): Promise<void> {
   await dbh
-    .insert(chargersCache)
+    .insert(chargers)
     .values({
       chargeBoxId,
       lastStatus: status,
       lastStatusAt: new Date(),
     })
     .onConflictDoUpdate({
-      target: chargersCache.chargeBoxId,
+      target: chargers.chargeBoxId,
       set: {
         lastStatus: status,
         lastStatusAt: sql`now()`,
@@ -188,7 +188,7 @@ export async function recordChargerStatus(
       },
     });
 
-  logger.debug("ChargerCache", "Charger status recorded", {
+  logger.debug("Charger", "Charger status recorded", {
     chargeBoxId,
     status,
   });

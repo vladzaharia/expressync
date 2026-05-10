@@ -1,21 +1,30 @@
 /**
  * Per-connector card (island).
  *
- * Renders a single connector's status + inline action buttons. Clicking an
- * action opens the detail-page's `RemoteActionsPanel` dialog with the
- * correct operation + connectorId prefilled; we dispatch a custom event
- * upward because the panel is a sibling island.
+ * Renders one connector's status pill, per-connector spec (type + kW)
+ * with smart-edit affordances, optional active-session details, and the
+ * admin actions appropriate for the charger's management mode.
+ *
+ * Managed (OCPP) chargers show Start / Stop / Reserve / Availability /
+ * Unlock. Unmanaged chargers show only the spec editors and the Remove
+ * affordance — there's no OCPP link to send commands over.
  */
 
-import { useEffect } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { useSignal } from "@preact/signals";
-import { Ban, Lock, Play, Square, Timer } from "lucide-preact";
+import { Ban, Lock, Play, Square, Timer, X } from "lucide-preact";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { BorderBeam } from "@/components/magicui/border-beam.tsx";
 import { subscribeSse } from "@/islands/shared/SseProvider.tsx";
 import { formatSessionDuration } from "./shared/device-visuals.ts";
+import SmartSelectField from "./shared/SmartSelectField.tsx";
+import {
+  CONNECTOR_TYPE_LABELS,
+  CONNECTOR_TYPES,
+  KW_PRESETS,
+} from "@/src/lib/types/connectors.ts";
 
 export type ConnectorUiStatus =
   | "Available"
@@ -42,12 +51,18 @@ export interface ConnectorDto {
   activeTagIdTag: string | null;
   activeTagTagPk: number | null;
   currentKw: number | null;
+  /** Per-connector spec from `charger_connectors`. */
+  connectorType: string | null;
+  maxKw: number | null;
 }
 
 interface Props {
   chargeBoxId: string;
   connector: ConnectorDto;
   isAdmin: boolean;
+  /** Unmanaged chargers don't speak OCPP — hides Start / Stop / Reserve /
+   *  Unlock. The spec editors and Remove button still render. */
+  isUnmanaged: boolean;
 }
 
 interface StatusStyle {
@@ -57,12 +72,6 @@ interface StatusStyle {
   dashed?: boolean;
 }
 
-/**
- * Plan-mandated connector color mapping:
- *   Available=emerald · Preparing/Finishing=sky · Charging/Suspended=amber
- *   (green halo when >0 kW) · Reserved=violet · Unavailable=zinc-400 ·
- *   Faulted=destructive (rose-600) · Offline=zinc-500 dashed.
- */
 function styleFor(
   status: ConnectorUiStatus,
   isDrawingPower: boolean,
@@ -119,11 +128,6 @@ function styleFor(
   }
 }
 
-/**
- * Dispatch a custom event picked up by `RemoteActionsPanel` so it can open
- * the correct dialog with `chargeBoxId` + `connectorId` prefilled. Keeps the
- * two islands decoupled without forcing a shared signal.
- */
 function launchAction(
   operation: string,
   params: Record<string, unknown>,
@@ -134,12 +138,42 @@ function launchAction(
   globalThis.dispatchEvent(evt);
 }
 
+const CONNECTOR_TYPE_OPTIONS = CONNECTOR_TYPES.map((value) => ({
+  value,
+  label: CONNECTOR_TYPE_LABELS[value],
+}));
+
+const KW_OPTIONS = KW_PRESETS.map((p) => ({
+  value: p.value.toString(),
+  label: p.label,
+}));
+
+async function patchConnectorSpec(
+  chargeBoxId: string,
+  connectorId: number,
+  patch: { connectorType?: string | null; maxKw?: number | null },
+): Promise<void> {
+  const res = await fetch(
+    `/api/admin/charger/${chargeBoxId}/connectors/${connectorId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    },
+  );
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error ?? `Save failed (HTTP ${res.status})`);
+  }
+}
+
 export default function ConnectorCard(
-  { chargeBoxId, connector, isAdmin }: Props,
+  { chargeBoxId, connector, isAdmin, isUnmanaged }: Props,
 ) {
-  // Live kW from SSE — overrides the SSR-rendered `connector.currentKw`
-  // when meter events stream in. Filters strictly by chargeBoxId+connectorId.
   const liveKw = useSignal<number | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+
   useEffect(() => {
     let lastSeen = 0;
     let dirty = false;
@@ -189,6 +223,27 @@ export default function ConnectorCard(
   const isDrawingPower = (effectiveKw ?? 0) > 0 && hasActiveSession;
   const style = styleFor(connector.uiStatus, isDrawingPower);
 
+  const handleRemove = async () => {
+    if (hasActiveSession) return;
+    if (!confirm(`Remove connector ${connector.connectorId}?`)) return;
+    setRemoving(true);
+    setRemoveError(null);
+    try {
+      const res = await fetch(
+        `/api/admin/charger/${chargeBoxId}/connectors/${connector.connectorId}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.message ?? json.error ?? `HTTP ${res.status}`);
+      }
+      globalThis.location.reload();
+    } catch (err) {
+      setRemoveError(err instanceof Error ? err.message : String(err));
+      setRemoving(false);
+    }
+  };
+
   return (
     <div
       class={cn(
@@ -197,8 +252,27 @@ export default function ConnectorCard(
       )}
     >
       <div class="flex items-center justify-between">
-        <div class="text-sm font-semibold">
+        <div class="flex items-center gap-2 text-sm font-semibold">
           Connector {connector.connectorId}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={handleRemove}
+              disabled={hasActiveSession || removing}
+              title={hasActiveSession
+                ? "Stop the active session before removing this connector"
+                : "Remove this connector"}
+              aria-label={`Remove connector ${connector.connectorId}`}
+              class={cn(
+                "inline-flex size-5 items-center justify-center rounded text-muted-foreground",
+                "hover:bg-rose-500/10 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                (hasActiveSession || removing) &&
+                  "cursor-not-allowed opacity-40 hover:bg-transparent hover:text-muted-foreground",
+              )}
+            >
+              <X class="size-3.5" />
+            </button>
+          )}
         </div>
         <span
           class={cn(
@@ -214,6 +288,67 @@ export default function ConnectorCard(
         </span>
       </div>
 
+      {/* Per-connector spec — type + kW. Smart-edit for admins. */}
+      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+        <span>Type:</span>
+        {isAdmin
+          ? (
+            <SmartSelectField
+              value={connector.connectorType}
+              options={CONNECTOR_TYPE_OPTIONS}
+              ariaLabel="Edit connector type"
+              onSave={async (next) => {
+                await patchConnectorSpec(chargeBoxId, connector.connectorId, {
+                  connectorType: next,
+                });
+                globalThis.location.reload();
+              }}
+              class="text-foreground"
+            />
+          )
+          : (
+            <span class="text-foreground">
+              {connector.connectorType
+                ? (CONNECTOR_TYPE_LABELS[
+                  connector.connectorType as keyof typeof CONNECTOR_TYPE_LABELS
+                ] ?? connector.connectorType)
+                : "—"}
+            </span>
+          )}
+        <span class="ml-2">Max:</span>
+        {isAdmin
+          ? (
+            <SmartSelectField
+              value={connector.maxKw !== null
+                ? connector.maxKw.toString()
+                : null}
+              options={KW_OPTIONS}
+              ariaLabel="Edit max kW"
+              onSave={async (next) => {
+                await patchConnectorSpec(chargeBoxId, connector.connectorId, {
+                  maxKw: next !== null ? Number(next) : null,
+                });
+                globalThis.location.reload();
+              }}
+              class="text-foreground"
+            />
+          )
+          : (
+            <span class="text-foreground">
+              {connector.maxKw !== null ? `${connector.maxKw} kW` : "—"}
+            </span>
+          )}
+      </div>
+
+      {removeError && (
+        <div
+          role="alert"
+          class="rounded-md border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-xs text-rose-700 dark:text-rose-300"
+        >
+          {removeError}
+        </div>
+      )}
+
       {connector.errorCode && (
         <div class="flex flex-col gap-0.5 rounded-md border border-rose-500/40 bg-rose-500/10 px-2 py-1.5 text-xs text-rose-700 dark:text-rose-300">
           <span class="font-semibold">Error: {connector.errorCode}</span>
@@ -228,66 +363,61 @@ export default function ConnectorCard(
         </div>
       )}
 
-      {hasActiveSession
-        ? (
-          <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+      {hasActiveSession && (
+        <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+          <div class="col-span-2 flex items-center justify-between">
+            <dt class="text-muted-foreground">EV Card</dt>
+            <dd>
+              {connector.activeTagTagPk && connector.activeTagIdTag
+                ? (
+                  <a
+                    href={`/tags/${connector.activeTagTagPk}`}
+                    class="font-mono font-medium hover:underline"
+                  >
+                    {connector.activeTagIdTag}
+                  </a>
+                )
+                : (
+                  <span class="font-mono">
+                    {connector.activeTagIdTag ?? "—"}
+                  </span>
+                )}
+            </dd>
+          </div>
+          <div class="flex items-center justify-between">
+            <dt class="text-muted-foreground">Elapsed</dt>
+            <dd class="font-medium">
+              {connector.activeSessionStartIso
+                ? formatSessionDuration(connector.activeSessionStartIso)
+                : "—"}
+            </dd>
+          </div>
+          <div class="flex items-center justify-between">
+            <dt class="text-muted-foreground">kWh</dt>
+            <dd class="font-medium">
+              {connector.activeSessionKwh !== null
+                ? connector.activeSessionKwh.toFixed(2)
+                : "—"}
+            </dd>
+          </div>
+          {effectiveKw !== null && (
             <div class="col-span-2 flex items-center justify-between">
-              <dt class="text-muted-foreground">EV Card</dt>
-              <dd>
-                {connector.activeTagTagPk && connector.activeTagIdTag
-                  ? (
-                    <a
-                      href={`/tags/${connector.activeTagTagPk}`}
-                      class="font-mono font-medium hover:underline"
-                    >
-                      {connector.activeTagIdTag}
-                    </a>
-                  )
-                  : (
-                    <span class="font-mono">
-                      {connector.activeTagIdTag ?? "—"}
-                    </span>
-                  )}
+              <dt class="text-muted-foreground">Current power</dt>
+              <dd class="flex items-center gap-1.5 font-medium">
+                {liveKw.value !== null && (
+                  <span aria-hidden="true" class="relative flex size-1.5">
+                    <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                    <span class="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+                  </span>
+                )}
+                <span class="tabular-nums">{effectiveKw.toFixed(2)} kW</span>
               </dd>
             </div>
-            <div class="flex items-center justify-between">
-              <dt class="text-muted-foreground">Elapsed</dt>
-              <dd class="font-medium">
-                {connector.activeSessionStartIso
-                  ? formatSessionDuration(connector.activeSessionStartIso)
-                  : "—"}
-              </dd>
-            </div>
-            <div class="flex items-center justify-between">
-              <dt class="text-muted-foreground">kWh</dt>
-              <dd class="font-medium">
-                {connector.activeSessionKwh !== null
-                  ? connector.activeSessionKwh.toFixed(2)
-                  : "—"}
-              </dd>
-            </div>
-            {effectiveKw !== null && (
-              <div class="col-span-2 flex items-center justify-between">
-                <dt class="text-muted-foreground">Current power</dt>
-                <dd class="flex items-center gap-1.5 font-medium">
-                  {liveKw.value !== null && (
-                    <span
-                      aria-hidden="true"
-                      class="relative flex size-1.5"
-                    >
-                      <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                      <span class="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
-                    </span>
-                  )}
-                  <span class="tabular-nums">{effectiveKw.toFixed(2)} kW</span>
-                </dd>
-              </div>
-            )}
-          </dl>
-        )
-        : <div class="text-xs text-muted-foreground">No active session</div>}
+          )}
+        </dl>
+      )}
 
-      {isAdmin && (
+      {isAdmin && !isUnmanaged && (
         <div class="mt-auto flex flex-wrap gap-1.5 pt-2">
           {hasActiveSession
             ? (

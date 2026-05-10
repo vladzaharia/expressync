@@ -11,7 +11,7 @@
  *       on an app row (rejected by `validateCapabilitySet`).
  *
  *   - `charger` rows — synthetic; surfaced via the
- *       `tappable_devices` view from `chargers_cache`, never edited
+ *       `tappable_devices` view from `chargers`, never edited
  *       through the devices admin. The picker on a charger detail
  *       page (if and when we surface one) shows `charger` as a
  *       read-only chip + `scanner` as the only editable toggle.

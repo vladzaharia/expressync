@@ -7,7 +7,7 @@
  *      to *app-side* capability sets. Enforces:
  *        - No `'charger'` (apps cannot self-register as chargers; charger
  *          rows are auto-managed by the StEvE sync path and live in
- *          `chargers_cache`, never in `devices`).
+ *          `chargers`, never in `devices`).
  *        - Kiosk legality: when `'kiosk'` is present, the set must
  *          contain *exactly one* of `{scanner, user}`. A multi-capability
  *          kiosk is illegal because kiosk-mode renders a single screen

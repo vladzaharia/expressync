@@ -170,6 +170,15 @@ export const FORM_FACTORS = [
 ] as const;
 export type FormFactor = typeof FORM_FACTORS[number];
 
+/** Human-readable labels for the form-factor dropdown. The raw enum
+ *  values are wire-pinned by the `chargers_form_factor_check` CHECK; the
+ *  UI uses these labels exclusively. */
+export const FORM_FACTOR_LABELS: Record<FormFactor, string> = {
+  wallbox: "Wallbox",
+  tesla: "Tesla Wall Connector",
+  generic: "Generic",
+};
+
 // ============================================================================
 // === Phase A: OCPP operations (non-destructive subset) ===
 // ============================================================================

@@ -13,7 +13,7 @@
 import { eq } from "drizzle-orm";
 import { define } from "../../../../../utils.ts";
 import { db } from "../../../../../src/db/index.ts";
-import { chargersCache } from "../../../../../src/db/schema.ts";
+import { chargers } from "../../../../../src/db/schema.ts";
 import { logger } from "../../../../../src/lib/utils/logger.ts";
 
 const log = logger;
@@ -29,12 +29,12 @@ export const handler = define.handlers({
       return jsonResponse(400, { error: "chargeBoxId is required" });
     }
 
-    let row: typeof chargersCache.$inferSelect | undefined;
+    let row: typeof chargers.$inferSelect | undefined;
     try {
       [row] = await db
         .select()
-        .from(chargersCache)
-        .where(eq(chargersCache.chargeBoxId, chargeBoxId))
+        .from(chargers)
+        .where(eq(chargers.chargeBoxId, chargeBoxId))
         .limit(1);
     } catch (err) {
       log.error("ChargerDeactivate", "fetch failed", err as Error);
@@ -56,10 +56,10 @@ export const handler = define.handlers({
 
     try {
       const [updated] = await db
-        .update(chargersCache)
+        .update(chargers)
         .set({ deactivatedAt: new Date() })
-        .where(eq(chargersCache.chargeBoxId, chargeBoxId))
-        .returning({ deactivatedAt: chargersCache.deactivatedAt });
+        .where(eq(chargers.chargeBoxId, chargeBoxId))
+        .returning({ deactivatedAt: chargers.deactivatedAt });
       return jsonResponse(200, {
         deactivatedAt: updated.deactivatedAt?.toISOString() ?? null,
       });

@@ -28,7 +28,7 @@
 import { define } from "@/utils.ts";
 import { db } from "@/src/db/index.ts";
 import {
-  chargersCache,
+  chargers,
   reservations,
   syncedTransactionEvents,
   syncRuns,
@@ -186,18 +186,18 @@ function jsonOk(payload: CommandSearchResponse): Response {
 async function searchChargers(like: string): Promise<CommandSearchHit[]> {
   const rows = await db
     .select({
-      id: chargersCache.chargeBoxId,
-      friendlyName: chargersCache.friendlyName,
-      lastStatus: chargersCache.lastStatus,
+      id: chargers.chargeBoxId,
+      friendlyName: chargers.friendlyName,
+      lastStatus: chargers.lastStatus,
     })
-    .from(chargersCache)
+    .from(chargers)
     .where(
       or(
-        ilike(chargersCache.chargeBoxId, like),
-        ilike(chargersCache.friendlyName, like),
+        ilike(chargers.chargeBoxId, like),
+        ilike(chargers.friendlyName, like),
       ),
     )
-    .orderBy(desc(chargersCache.lastSeenAt))
+    .orderBy(desc(chargers.lastSeenAt))
     .limit(LIMIT);
 
   return rows.map((r) => ({

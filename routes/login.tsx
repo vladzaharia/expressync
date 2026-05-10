@@ -70,8 +70,8 @@ export const handler = define.handlers({
       const phoneCutoff = new Date(Date.now() - 90 * 1000);
       const [chargerRow] = await db
         .select({ c: sql<number>`count(*)::int` })
-        .from(schema.chargersCache)
-        .where(gte(schema.chargersCache.lastStatusAt, chargerCutoff));
+        .from(schema.chargers)
+        .where(gte(schema.chargers.lastStatusAt, chargerCutoff));
       if (Number(chargerRow?.c ?? 0) > 0) {
         hasOnlineTapTarget = true;
       } else {

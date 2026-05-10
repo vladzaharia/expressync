@@ -5,9 +5,9 @@
  * re-check `ctx.state.user?.role === "admin"` here as defense-in-depth,
  * mirroring `routes/api/admin/charger/operation.ts`).
  *
- * Creates a new "unmanaged" charger row in `chargers_cache` — used for
+ * Creates a new "unmanaged" charger row in `chargers` — used for
  * Tesla Wall Connectors and other non-OCPP units that live entirely in
- * our DB. The sync worker (`charger-cache.service.ts`) skips these rows
+ * our DB. The sync worker (`charger.service.ts`) skips these rows
  * because they never appear in StEvE's transaction or operation log.
  *
  * Body:
@@ -22,7 +22,7 @@
 import { eq } from "drizzle-orm";
 import { define } from "../../../../utils.ts";
 import { db } from "../../../../src/db/index.ts";
-import { chargersCache } from "../../../../src/db/schema.ts";
+import { chargers } from "../../../../src/db/schema.ts";
 import {
   FORM_FACTORS,
   type FormFactor,
@@ -100,9 +100,9 @@ export const handler = define.handlers({
     // Conflict check before INSERT — clearer error than catching the
     // unique-violation, and avoids burning a tx slot on an obvious dup.
     const existing = await db
-      .select({ chargeBoxId: chargersCache.chargeBoxId })
-      .from(chargersCache)
-      .where(eq(chargersCache.chargeBoxId, chargeBoxId))
+      .select({ chargeBoxId: chargers.chargeBoxId })
+      .from(chargers)
+      .where(eq(chargers.chargeBoxId, chargeBoxId))
       .limit(1);
     if (existing.length > 0) {
       return jsonResponse(409, {
@@ -113,7 +113,7 @@ export const handler = define.handlers({
 
     try {
       const [inserted] = await db
-        .insert(chargersCache)
+        .insert(chargers)
         .values({
           chargeBoxId,
           friendlyName,

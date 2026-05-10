@@ -1,25 +1,29 @@
 /**
  * Charge Box Details page (`/admin/chargers/[chargeBoxId]`).
  *
- * Canonical URL for charger detail. The unified `/admin/devices`
- * listing links here directly (and `/admin/devices/[deviceId]` 307s
- * charger ids here for back-compat with anyone hitting the wrong
- * URL by accident).
+ * Layout (post 2026-05 redesign — single skeleton for managed and
+ * unmanaged):
  *
- * Rebuild scope (see plan `polaris-express-is-an-streamed-crown.md`):
- *   - Header strip (friendlyName + chargeBoxId + status pills)
- *   - Identity card (island) + live-status card (island), 1+2 split at lg:
- *   - Per-connector grid (island)
- *   - Recent transactions + operation audit log, side-by-side at xl:
- *   - Admin-only Remote Actions palette
+ *   PageCard
+ *     ChargerHeaderStrip          ← pills + heartbeat + Refresh +
+ *                                   active-session mini-summary; absorbs
+ *                                   the old ChargerLiveStatusCard
+ *     ┌─────────────────────────┬──────────────────────────────────┐
+ *     │ ChargerIdentityCard     │ Location (SectionCard)           │
+ *     │ (1/3 width)             │  Capabilities (SectionCard, below) │
+ *     │                         │ (2/3 width, stacked)             │
+ *     └─────────────────────────┴──────────────────────────────────┘
+ *     ConnectorsSection           ← full-width SectionCard with `+ Add`
+ *                                   (managed-only sections below)
+ *     ┌────────────┬────────────┐
+ *     │ Recent tx  │ Op. audit  │
+ *     └────────────┴────────────┘
+ *     RemoteActionsPanel
  *
- * Loader notes:
- *   - Pulls the sticky charger row from `chargers_cache`.
- *   - `Promise.allSettled` for StEvE + DB side-calls so a transient StEvE
- *     failure (or a missing transactions table row) doesn't nuke the page.
- *   - `steveFetchFailed` bubbles up as a banner flag on the live-status card.
- *   - Reservations / raw-cache sections are deferred (explicit per plan
- *     scope notes); the sections above are the DoD surface.
+ * Connector source: `charger_connectors` table is the canonical list.
+ * Managed chargers also auto-insert a row when StEvE reports a
+ * connector we haven't observed yet, so admins can edit spec without
+ * needing to manually create the row.
  */
 
 import { desc, eq } from "drizzle-orm";
@@ -42,7 +46,6 @@ import { ChargerHeaderStrip } from "../../../components/chargers/ChargerHeaderSt
 import PublicIdQrPopover from "../../../islands/shared/PublicIdQrPopover.tsx";
 import ChargerLocationEditor from "../../../islands/charger-actions/ChargerLocationEditor.tsx";
 import ChargerIdentityCard from "../../../islands/ChargerIdentityCard.tsx";
-import ChargerLiveStatusCard from "../../../islands/ChargerLiveStatusCard.tsx";
 import ConnectorsSection from "../../../islands/ConnectorsSection.tsx";
 import type {
   ConnectorDto,
@@ -56,14 +59,13 @@ import ChargerOperationLogTable, {
 } from "../../../islands/ChargerOperationLogTable.tsx";
 import RemoteActionsPanel from "../../../islands/charger-actions/RemoteActionsPanel.tsx";
 import { SectionCard } from "../../../components/shared/SectionCard.tsx";
-import { ClipboardList, MapPin, Settings2, Sticker } from "lucide-preact";
+import { ClipboardList, MapPin, Settings2 } from "lucide-preact";
 import AppConfigurationForm from "../../../islands/devices/AppConfigurationForm.tsx";
 import type { DeviceCapability } from "../../../src/lib/types/devices.ts";
 import {
-  DUMB_CHARGER_HEADLINE,
-  DUMB_CHARGER_STEPS,
-  DUMB_CHARGER_TAGLINE,
-} from "../../../src/lib/content/dumb-charger-instructions.ts";
+  ensureConnectorExists,
+  listConnectors,
+} from "../../../src/services/charger-connectors.service.ts";
 
 // ---------------------------------------------------------------------------
 // Loader DTO
@@ -79,16 +81,9 @@ interface ActiveSessionCtx {
 interface ChargerDetailLoaderData {
   charger: null | {
     chargeBoxId: string;
-    /** 8-char Crockford-ish public ID — sticker-printable, used in
-     *  https://example.com/c/<publicId> and the top-right popover.
-     *  Migration 0046; backfilled for every existing row. */
     publicId: string;
-    chargeBoxPk: number | null;
     friendlyName: string | null;
     formFactor: string;
-    // W8-rest — structured address + coordinates surfaced into the
-    // inline ChargerLocationEditor. All optional; the editor's
-    // read-only view collapses to "no address set" when blank.
     addressLine1: string | null;
     addressLine2: string | null;
     addressCity: string | null;
@@ -102,32 +97,24 @@ interface ChargerDetailLoaderData {
     lastStatus: string | null;
     lastStatusAtIso: string | null;
 
-    // StEvE-augmented fields (nullable when StEvE is unreachable).
-    ocppProtocol: string | null;
+    // Identity — display rule applied at the boundary so islands stay
+    // simple. `vendor / model / firmwareVersion` carry the effective
+    // value (override ?? steveValue ?? null); the matching `*Override`
+    // fields carry the raw override for the smart-text inputs.
     vendor: string | null;
+    vendorOverride: string | null;
     model: string | null;
+    modelOverride: string | null;
     firmwareVersion: string | null;
-    iccid: string | null;
+    firmwareVersionOverride: string | null;
     registrationStatus: "Accepted" | "Pending" | "Rejected" | null;
 
-    // Derived
     uiStatus: UiStatus;
     isStale: boolean;
     isOffline: boolean;
 
-    // Wave 6 Slice O — admin-editable capability set. Always contains
-    // `'charger'` (auto-on); admin may toggle `'scanner'`.
     capabilities: DeviceCapability[];
 
-    // Migration 0040 — admin overrides for connector spec when StEvE
-    // doesn't surface them (or surfaces them incorrectly).
-    connectorTypeOverride: string | null;
-    maxKwOverride: number | null;
-
-    // Migration 0043 — non-OCPP "unmanaged" chargers (Tesla Wall
-    // Connectors etc.). When `managementMode === 'unmanaged'` the page
-    // renders an entirely separate, leaner layout that hides every
-    // OCPP-derived section.
     managementMode: "ocpp" | "unmanaged";
     locationDescription: string | null;
   };
@@ -151,11 +138,6 @@ function txDeliveredKwh(tx: StEvETransaction): number | null {
   return (stop - start) / 1000;
 }
 
-/**
- * Per-connector UI bucket — similar shape to `normalizeStatus` but we keep
- * Preparing/Finishing/Suspended distinct per the plan's connector-card color
- * spec. Falls back to Offline when we've got no data.
- */
 function normalizeConnectorStatus(
   raw: string | null,
   hasActive: boolean,
@@ -186,12 +168,12 @@ export const handler = define.handlers({
     const isAdmin = ctx.state.user?.role === "admin";
 
     // 1. Cache row — if this fails we can't render the page at all.
-    let cacheRow: schema.ChargerCache | null = null;
+    let cacheRow: schema.Charger | null = null;
     try {
       const [row] = await db
         .select()
-        .from(schema.chargersCache)
-        .where(eq(schema.chargersCache.chargeBoxId, chargeBoxId))
+        .from(schema.chargers)
+        .where(eq(schema.chargers.chargeBoxId, chargeBoxId))
         .limit(1);
       cacheRow = row ?? null;
     } catch (error) {
@@ -216,18 +198,16 @@ export const handler = define.handlers({
       };
     }
 
-    // Migration 0043: unmanaged chargers don't speak OCPP, so StEvE and
-    // the operation log will always be empty for them. Skip the network
-    // calls entirely — they'd just produce 90s timeouts.
     const isUnmanaged = cacheRow.managementMode === "unmanaged";
 
-    // 2. Parallel pulls — allSettled so the page renders even when StEvE or
-    //    the operation log query hiccups. For unmanaged chargers we
-    //    short-circuit with empty fulfilled results.
+    // 2. Parallel pulls — allSettled so the page renders even when a
+    // backend hiccups. Includes the `charger_connectors` query so the
+    // canonical connector list is always available.
     const [
       txActiveSettled,
       txRecentSettled,
       opLogSettled,
+      connectorsSettled,
     ] = isUnmanaged
       ? [
         { status: "fulfilled" as const, value: [] as StEvETransaction[] },
@@ -246,6 +226,10 @@ export const handler = define.handlers({
             requestedByUserId: string | null;
             requestedByEmail: string | null;
           }>,
+        },
+        {
+          status: "fulfilled" as const,
+          value: await listConnectors(chargeBoxId).catch(() => []),
         },
       ]
       : await Promise.allSettled([
@@ -280,6 +264,7 @@ export const handler = define.handlers({
           .where(eq(schema.chargerOperationLog.chargeBoxId, chargeBoxId))
           .orderBy(desc(schema.chargerOperationLog.createdAt))
           .limit(50),
+        listConnectors(chargeBoxId),
       ]);
 
     const txActive = txActiveSettled.status === "fulfilled"
@@ -291,34 +276,14 @@ export const handler = define.handlers({
     const opRows = opLogSettled.status === "fulfilled"
       ? opLogSettled.value
       : [];
+    const connectorRows = connectorsSettled.status === "fulfilled"
+      ? connectorsSettled.value
+      : [];
 
     const steveFetchFailed = txActiveSettled.status === "rejected" ||
       txRecentSettled.status === "rejected";
 
-    if (txActiveSettled.status === "rejected") {
-      logger.warn(
-        "ChargerDetail",
-        "Active transactions fetch failed — rendering from cache",
-        { error: String(txActiveSettled.reason) },
-      );
-    }
-    if (txRecentSettled.status === "rejected") {
-      logger.warn(
-        "ChargerDetail",
-        "Recent transactions fetch failed — rendering from cache",
-        { error: String(txRecentSettled.reason) },
-      );
-    }
-    if (opLogSettled.status === "rejected") {
-      logger.warn(
-        "ChargerDetail",
-        "Operation log fetch failed — rendering empty audit table",
-        { error: String(opLogSettled.reason) },
-      );
-    }
-
-    // 3. Look up active-tag PKs in DB via userMappings so we can link the
-    //    TagChip to /tags/[tagPk]. One batched query keeps the loader fast.
+    // 3. Active-tag PK lookup (unchanged).
     let tagPkByIdTag = new Map<
       string,
       { tagPk: number; tagType: string | null }
@@ -350,11 +315,7 @@ export const handler = define.handlers({
       });
     }
 
-    // 4. Build active session contexts per connector. StEvE 3.12.0 doesn't
-    //    expose a connector-status endpoint, so the "Charging" indicator
-    //    comes from active transactions and everything else leans on the
-    //    cached `last_status`. When we add a connector-status table later
-    //    this block merges in without rewriting the page.
+    // 4. Active sessions.
     const activeSessions: ActiveSessionCtx[] = txActive.map((t) => ({
       transactionId: t.id,
       connectorId: t.connectorId,
@@ -362,46 +323,91 @@ export const handler = define.handlers({
       idTag: t.ocppIdTag,
     }));
 
-    const connectorIdSet = new Set<number>();
-    for (const t of txActive) connectorIdSet.add(t.connectorId);
-    for (const t of txRecent.slice(0, 20)) connectorIdSet.add(t.connectorId);
-    // Most chargers ship with connector 1 — surface it even with no data.
-    if (connectorIdSet.size === 0) connectorIdSet.add(1);
+    // 5. Connector merge: union of (DB rows, observed StEvE connector
+    // ids). For managed chargers, observed-but-not-stored connectors
+    // get auto-inserted (fire-and-forget) so admins can edit their
+    // spec on the next render.
+    const connectorMap = new Map<number, ConnectorDto>();
 
-    const connectors: ConnectorDto[] = Array.from(connectorIdSet)
-      .sort((a, b) => a - b)
-      .map((connectorId) => {
-        const active = txActive.find((t) => t.connectorId === connectorId);
-        const activeTagInfo = active
-          ? tagPkByIdTag.get(active.ocppIdTag) ?? null
-          : null;
-        const uiStatus = normalizeConnectorStatus(
-          cacheRow!.lastStatus,
-          Boolean(active),
-        );
-        return {
-          connectorId,
-          rawStatus: cacheRow!.lastStatus,
-          uiStatus,
-          errorCode: null,
-          vendorErrorCode: null,
-          info: null,
-          updatedAtIso: cacheRow!.lastStatusAt
-            ? cacheRow!.lastStatusAt.toISOString()
-            : null,
-          activeTransactionId: active ? active.id : null,
-          // Live kWh isn't available without a stop value — leave null; the
-          // per-connector card renders "—" for null. Future work (Phase E1
-          // meter-value pump) will populate this from StEvE live meter reads.
-          activeSessionKwh: null,
-          activeSessionStartIso: active ? active.startTimestamp : null,
-          activeTagIdTag: active ? active.ocppIdTag : null,
-          activeTagTagPk: activeTagInfo?.tagPk ?? null,
-          currentKw: null,
-        };
-      });
+    const buildDto = (
+      connectorId: number,
+      connectorType: string | null,
+      maxKw: number | null,
+    ): ConnectorDto => {
+      const active = txActive.find((t) => t.connectorId === connectorId);
+      const activeTagInfo = active
+        ? tagPkByIdTag.get(active.ocppIdTag) ?? null
+        : null;
+      const uiStatus = normalizeConnectorStatus(
+        cacheRow!.lastStatus,
+        Boolean(active),
+      );
+      return {
+        connectorId,
+        rawStatus: cacheRow!.lastStatus,
+        uiStatus,
+        errorCode: null,
+        vendorErrorCode: null,
+        info: null,
+        updatedAtIso: cacheRow!.lastStatusAt
+          ? cacheRow!.lastStatusAt.toISOString()
+          : null,
+        activeTransactionId: active ? active.id : null,
+        activeSessionKwh: null,
+        activeSessionStartIso: active ? active.startTimestamp : null,
+        activeTagIdTag: active ? active.ocppIdTag : null,
+        activeTagTagPk: activeTagInfo?.tagPk ?? null,
+        currentKw: null,
+        connectorType,
+        maxKw,
+      };
+    };
 
-    // 5. Recent transactions table rows (limit 20, newest first).
+    for (const row of connectorRows) {
+      connectorMap.set(
+        row.connectorId,
+        buildDto(
+          row.connectorId,
+          row.connectorType,
+          row.maxKw !== null ? Number(row.maxKw) : null,
+        ),
+      );
+    }
+
+    // For managed chargers, seed any connector observed via StEvE
+    // that's not yet in the table. Fire-and-forget per the deploy
+    // plan; PK conflicts are handled by `onConflictDoNothing()`.
+    if (!isUnmanaged) {
+      const observed = new Set<number>();
+      for (const t of txActive) observed.add(t.connectorId);
+      for (const t of txRecent.slice(0, 20)) observed.add(t.connectorId);
+      for (const id of observed) {
+        if (!connectorMap.has(id)) {
+          connectorMap.set(id, buildDto(id, null, null));
+          // Background insert; we don't await on it here so the page
+          // renders fast. Next request will pick up the row.
+          ensureConnectorExists(chargeBoxId, id).catch((err) => {
+            logger.warn(
+              "ChargerDetail",
+              "ensureConnectorExists failed",
+              { error: err instanceof Error ? err.message : String(err) },
+            );
+          });
+        }
+      }
+    }
+
+    // If still empty, seed connector 1 — covers freshly-created
+    // unmanaged rows and managed chargers that have never reported.
+    if (connectorMap.size === 0) {
+      connectorMap.set(1, buildDto(1, null, null));
+      ensureConnectorExists(chargeBoxId, 1).catch(() => {});
+    }
+
+    const connectors: ConnectorDto[] = Array.from(connectorMap.values())
+      .sort((a, b) => a.connectorId - b.connectorId);
+
+    // 6. Recent transactions.
     const recentTransactions: ChargerRecentTxRow[] = txRecent
       .slice()
       .sort((a, b) =>
@@ -425,11 +431,9 @@ export const handler = define.handlers({
         };
       });
 
-    // 6. Operation log rows for the island.
+    // 7. Operation log rows.
     const operationLog: OperationLogRow[] = opRows.map((r) => ({
       id: r.id,
-      // operation is `text` in the DB — coerce to the named union at the
-      // boundary; the island treats unknown strings gracefully.
       operation: r.operation as OperationLogRow["operation"],
       params: (r.params ?? null) as Record<string, unknown> | null,
       status: r.status,
@@ -440,62 +444,61 @@ export const handler = define.handlers({
       completedAtIso: r.completedAt ? r.completedAt.toISOString() : null,
     }));
 
-    // 7. Derive freshness buckets from the cache timestamps.
+    // 8. Freshness.
     const lastStatusAtIso = cacheRow.lastStatusAt
       ? cacheRow.lastStatusAt.toISOString()
       : null;
     const age = lastStatusAtIso
       ? Date.now() - new Date(lastStatusAtIso).getTime()
       : Number.POSITIVE_INFINITY;
-    const isStale = age > STALE_DIM_MS && age <= OFFLINE_AFTER_MS;
-    const isOffline = age > OFFLINE_AFTER_MS;
+    const isStale = !isUnmanaged && age > STALE_DIM_MS &&
+      age <= OFFLINE_AFTER_MS;
+    const isOffline = !isUnmanaged && age > OFFLINE_AFTER_MS;
 
-    const uiStatus = normalizeStatus(
+    // Unmanaged chargers don't speak OCPP and have no offline concept —
+    // always render as "Available". Managed chargers go through the
+    // normal status normalization.
+    const uiStatus: UiStatus = isUnmanaged ? "Available" : normalizeStatus(
       cacheRow.lastStatus,
       lastStatusAtIso,
       activeSessions.length > 0,
     );
 
-    // Slice O — sanitize the persisted capability set to the typed union
-    // before sending it across the SSR boundary. The DB CHECK guarantees
-    // `'charger'` is present and the forbidden tokens are absent, but
-    // the typed array still needs an explicit cast.
     const capabilities = (cacheRow.capabilities ?? ["charger"]).filter(
       (c): c is DeviceCapability =>
         c === "charger" || c === "scanner" || c === "user" || c === "kiosk",
     );
 
+    // Effective identity values: override takes precedence; StEvE 3.12.0
+    // doesn't expose vendor/model/firmware over its API yet, so the
+    // StEvE source is null today. When that changes, replace `null`
+    // here with the StEvE-fetched value.
+    const steveVendor: string | null = null;
+    const steveModel: string | null = null;
+    const steveFirmware: string | null = null;
+
     const data: ChargerDetailLoaderData = {
       charger: {
         chargeBoxId: cacheRow.chargeBoxId,
         publicId: cacheRow.publicId,
-        chargeBoxPk: cacheRow.chargeBoxPk,
         friendlyName: cacheRow.friendlyName,
         formFactor: cacheRow.formFactor,
         capabilities,
-        connectorTypeOverride: cacheRow.connectorTypeOverride ?? null,
-        maxKwOverride: cacheRow.maxKwOverride !== null
-          ? Number(cacheRow.maxKwOverride)
-          : null,
         firstSeenAtIso: (cacheRow.firstSeenAt ?? new Date()).toISOString(),
         lastSeenAtIso: (cacheRow.lastSeenAt ?? new Date()).toISOString(),
         lastStatus: cacheRow.lastStatus,
         lastStatusAtIso,
-        // StEvE 3.12.0 doesn't expose these yet — null placeholders so the
-        // identity card renders the "—" fallback. When a status-details
-        // endpoint lands, we'll wire it in via Promise.allSettled above.
-        ocppProtocol: null,
-        vendor: null,
-        model: null,
-        firmwareVersion: null,
-        iccid: null,
+        vendor: cacheRow.vendorOverride ?? steveVendor,
+        vendorOverride: cacheRow.vendorOverride,
+        model: cacheRow.modelOverride ?? steveModel,
+        modelOverride: cacheRow.modelOverride,
+        firmwareVersion: cacheRow.firmwareVersionOverride ?? steveFirmware,
+        firmwareVersionOverride: cacheRow.firmwareVersionOverride,
         registrationStatus: null,
         uiStatus,
         isStale,
         isOffline,
-        managementMode: cacheRow.managementMode === "unmanaged"
-          ? "unmanaged"
-          : "ocpp",
+        managementMode: isUnmanaged ? "unmanaged" : "ocpp",
         locationDescription: cacheRow.locationDescription,
         addressLine1: cacheRow.addressLine1,
         addressLine2: cacheRow.addressLine2,
@@ -550,30 +553,23 @@ export default define.page<typeof handler>(
       );
     }
 
-    const displayName = charger.friendlyName ?? charger.chargeBoxId;
-
-    // W8-rest — single render path. Per the cross-cutting principle
-    // ("managed and unmanaged should look and feel as similar as
-    // possible"), we don't fork the page template on managementMode;
-    // each OCPP-specific section gates itself below on `isUnmanaged`.
-    // Only the page accent flips (orange for managed, blue for
-    // unmanaged) so the operator gets an at-a-glance signal of which
-    // mode they're looking at.
     const isUnmanaged = charger.managementMode === "unmanaged";
     const accent = isUnmanaged ? "blue" : "orange";
-    // Universal-link URL printed on the sticker. Same value the
-    // PublicIdQrPopover encodes and what the public /c/<publicId>
-    // landing renders for.
-    const universalLink = `https://example.com/c/${charger.publicId}`;
 
-    const activeSessionForLive = data.activeSessions[0]
+    // Title rules: prefer friendlyName; for unmanaged with no friendly
+    // name, use a humanised fallback so the page title isn't a raw
+    // nanoid. The chargeBoxId chip below the strip carries the full
+    // nanoid (allowed to wrap two-line — no truncation).
+    const displayName = charger.friendlyName ??
+      (isUnmanaged ? "Unmanaged charger" : charger.chargeBoxId);
+
+    // Active session for the right-side mini-summary on the strip.
+    const activeForStrip = data.activeSessions[0]
       ? {
         transactionId: data.activeSessions[0].transactionId,
         connectorId: data.activeSessions[0].connectorId,
         startTimestampIso: data.activeSessions[0].startTimestampIso,
         idTag: data.activeSessions[0].idTag,
-        currentKw: null,
-        sessionKwh: null,
       }
       : null;
 
@@ -585,9 +581,6 @@ export default define.page<typeof handler>(
       >
         <PageCard
           title={displayName}
-          description={isUnmanaged
-            ? "Unmanaged charger — no OCPP connection. Customers tap the sticker to land on a public 'just plug in' page."
-            : undefined}
           colorScheme={accent}
           topRightAccessory={
             <PublicIdQrPopover
@@ -598,132 +591,97 @@ export default define.page<typeof handler>(
           }
         >
           <div class="flex flex-col gap-6">
-            {
-              /* Unmanaged-only header pills — managed chargers use
-                ChargerHeaderStrip below for the same role. */
-            }
-            {isUnmanaged && (
-              <div class="flex flex-wrap items-center gap-2 text-sm">
-                <span class="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                  Free
-                </span>
-                <span class="inline-flex items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">
-                  Unmanaged
-                </span>
-                <span class="ml-2 truncate font-mono text-xs text-muted-foreground">
-                  {charger.chargeBoxId}
-                </span>
-              </div>
-            )}
+            {/* Status strip — pills + heartbeat + Refresh + active-session */}
+            <ChargerHeaderStrip
+              chargeBoxId={charger.chargeBoxId}
+              isUnmanaged={isUnmanaged}
+              registrationStatus={charger.registrationStatus}
+              uiStatus={charger.uiStatus}
+              isStale={charger.isStale}
+              isOffline={charger.isOffline}
+              lastStatusAtIso={charger.lastStatusAtIso}
+              connectors={data.connectors.map((c) => ({
+                uiStatus: c.uiStatus,
+              }))}
+              activeSession={activeForStrip}
+              steveFetchFailed={data.steveFetchFailed}
+            />
 
-            {/* Managed-only header strip — identity + status pills */}
-            {!isUnmanaged && (
-              <ChargerHeaderStrip
-                chargeBoxId={charger.chargeBoxId}
-                friendlyName={charger.friendlyName}
-                registrationStatus={charger.registrationStatus}
-                uiStatus={charger.uiStatus}
-                isStale={charger.isStale}
-                isOffline={charger.isOffline}
-                lastStatusAtIso={charger.lastStatusAtIso}
-                connectors={data.connectors.map((c) => ({
-                  uiStatus: c.uiStatus,
-                }))}
-              />
-            )}
-
-            {
-              /* Row 1: identity + (managed-only) live status. The
-                identity card carries the form-factor / connector-type-
-                override / max-kW selects and is shared by both modes
-                — unmanaged chargers benefit from those same editors.
-                Live status is OCPP-only; when unmanaged, identity
-                spans the full row instead of 1/3. */
-            }
-            <div
-              class={`grid grid-cols-1 gap-6 ${
-                isUnmanaged ? "" : "lg:grid-cols-3"
-              }`}
-            >
+            {/* Hero: identity (1/3) + Location/Capabilities stacked (2/3) */}
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <ChargerIdentityCard
-                class={isUnmanaged ? "" : "lg:col-span-1"}
+                class="lg:col-span-1"
                 chargeBoxId={charger.chargeBoxId}
-                chargeBoxPk={charger.chargeBoxPk}
                 friendlyName={charger.friendlyName}
                 formFactor={charger.formFactor}
                 firstSeenAtIso={charger.firstSeenAtIso}
                 lastSeenAtIso={charger.lastSeenAtIso}
-                ocppProtocol={charger.ocppProtocol}
                 vendor={charger.vendor}
+                vendorOverride={charger.vendorOverride}
                 model={charger.model}
+                modelOverride={charger.modelOverride}
                 firmwareVersion={charger.firmwareVersion}
-                iccid={charger.iccid}
-                connectorTypeOverride={charger.connectorTypeOverride}
-                maxKwOverride={charger.maxKwOverride}
+                firmwareVersionOverride={charger.firmwareVersionOverride}
                 uiStatus={charger.uiStatus}
                 isAdmin={data.isAdmin}
               />
-              {!isUnmanaged && (
-                <ChargerLiveStatusCard
-                  class="lg:col-span-2"
-                  chargeBoxId={charger.chargeBoxId}
-                  uiStatus={charger.uiStatus}
-                  lastStatus={charger.lastStatus}
-                  lastStatusAtIso={charger.lastStatusAtIso}
-                  isStale={charger.isStale}
-                  isOffline={charger.isOffline}
-                  activeSession={activeSessionForLive}
-                  steveFetchFailed={data.steveFetchFailed}
-                />
-              )}
+              <div class="flex flex-col gap-6 lg:col-span-2">
+                <SectionCard title="Location" accent={accent} icon={MapPin}>
+                  <ChargerLocationEditor
+                    chargeBoxId={charger.chargeBoxId}
+                    initial={{
+                      addressLine1: charger.addressLine1,
+                      addressLine2: charger.addressLine2,
+                      addressCity: charger.addressCity,
+                      addressRegion: charger.addressRegion,
+                      addressPostalCode: charger.addressPostalCode,
+                      addressCountry: charger.addressCountry,
+                      latitude: charger.latitude,
+                      longitude: charger.longitude,
+                    }}
+                  />
+                </SectionCard>
+
+                {data.isAdmin && (
+                  <SectionCard
+                    title="Capabilities"
+                    description="Admin-editable capabilities for this charger."
+                    icon={Settings2}
+                    accent={accent}
+                  >
+                    <AppConfigurationForm
+                      deviceId={charger.chargeBoxId}
+                      kind="charger"
+                      current={charger.capabilities}
+                    />
+                  </SectionCard>
+                )}
+              </div>
             </div>
 
-            {
-              /* Row 1.5: structured location editor — inline edit.
-                Always rendered; the editor's read view collapses to
-                "no address set" when blank. */
-            }
-            <SectionCard title="Location" accent={accent} icon={MapPin}>
-              <ChargerLocationEditor
-                chargeBoxId={charger.chargeBoxId}
-                initial={{
-                  addressLine1: charger.addressLine1,
-                  addressLine2: charger.addressLine2,
-                  addressCity: charger.addressCity,
-                  addressRegion: charger.addressRegion,
-                  addressPostalCode: charger.addressPostalCode,
-                  addressCountry: charger.addressCountry,
-                  latitude: charger.latitude,
-                  longitude: charger.longitude,
-                }}
-              />
-            </SectionCard>
+            {/* Full-width Connectors card */}
+            <ConnectorsSection
+              chargeBoxId={charger.chargeBoxId}
+              connectors={data.connectors}
+              isAdmin={data.isAdmin}
+              isUnmanaged={isUnmanaged}
+              accent={accent}
+            />
 
-            {
-              /* Row 2: connector cards (managed only — unmanaged has
-                no live connector data to render). */
-            }
-            {!isUnmanaged && (
-              <ConnectorsSection
-                chargeBoxId={charger.chargeBoxId}
-                connectors={data.connectors}
-                isAdmin={data.isAdmin}
-              />
-            )}
-
-            {/* Row 3: recent tx + operation audit, managed-only. */}
+            {/* Managed-only: recent tx + operation audit, side-by-side at xl */}
             {!isUnmanaged && (
               <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
                 <ChargerRecentTransactionsSection
                   chargeBoxId={charger.chargeBoxId}
                   rows={data.recentTransactions}
                   steveFetchFailed={data.steveFetchFailed}
+                  accent={accent}
                 />
                 <SectionCard
                   title="Operation audit"
                   description={`Last ${data.operationLog.length} entries`}
                   icon={ClipboardList}
-                  accent="orange"
+                  accent={accent}
                 >
                   <ChargerOperationLogTable
                     rows={data.operationLog}
@@ -733,34 +691,7 @@ export default define.page<typeof handler>(
               </div>
             )}
 
-            {
-              /* Slice O — Charger Configuration (admin-only). Mirrors the
-                "App Configuration" tab on the devices page, but the only
-                editable capability for a charger is `'scanner'` —
-                `'charger'` is auto-on and rendered as a read-only chip.
-                Settings + state-sync sections are intentionally absent
-                (chargers don't carry per-key device_settings; the model
-                is app-scoped). */
-            }
-            {data.isAdmin && !isUnmanaged && (
-              <SectionCard
-                title="Charger Configuration"
-                description="Admin-editable capabilities for this charger."
-                icon={Settings2}
-                accent="orange"
-              >
-                <AppConfigurationForm
-                  deviceId={charger.chargeBoxId}
-                  kind="charger"
-                  current={charger.capabilities}
-                />
-              </SectionCard>
-            )}
-
-            {
-              /* Row 4: admin-only actions palette (managed only —
-                unmanaged chargers have nothing to remote-control). */
-            }
+            {/* Managed-only: Remote actions palette */}
             {data.isAdmin && !isUnmanaged && (
               <RemoteActionsPanel
                 chargeBoxId={charger.chargeBoxId}
@@ -771,54 +702,6 @@ export default define.page<typeof handler>(
                   startTimestampIso: s.startTimestampIso,
                 }))}
               />
-            )}
-
-            {
-              /* Unmanaged-only: sticker URL + customer-facing
-                instructions preview. */
-            }
-            {isUnmanaged && (
-              <>
-                <SectionCard
-                  title="Scan codes"
-                  accent={accent}
-                  icon={Sticker}
-                >
-                  <p class="text-sm text-muted-foreground">
-                    Print and affix this URL to the charger as a QR or NFC
-                    sticker. iOS opens the app directly when installed; everyone
-                    else lands on a public "plug in and charge" page.
-                  </p>
-                  <div class="mt-3 rounded-md border bg-muted/40 p-3">
-                    <code class="break-all text-xs">{universalLink}</code>
-                  </div>
-                  <p class="mt-3 text-xs text-muted-foreground">
-                    QR generation lands in a follow-up; for now the
-                    PublicIdQrPopover (top-right of this page) renders the same
-                    URL as a printable QR.
-                  </p>
-                </SectionCard>
-
-                <SectionCard
-                  title="User instructions preview"
-                  accent={accent}
-                >
-                  <p class="text-xs uppercase tracking-wide text-muted-foreground">
-                    What customers see when they scan the sticker
-                  </p>
-                  <h3 class="mt-2 text-base font-semibold">
-                    {DUMB_CHARGER_HEADLINE}
-                  </h3>
-                  <ol class="mt-3 list-decimal space-y-1 pl-6 text-sm">
-                    {DUMB_CHARGER_STEPS.map((step) => (
-                      <li key={step}>{step}</li>
-                    ))}
-                  </ol>
-                  <p class="mt-3 text-sm text-muted-foreground">
-                    {DUMB_CHARGER_TAGLINE}
-                  </p>
-                </SectionCard>
-              </>
             )}
           </div>
         </PageCard>

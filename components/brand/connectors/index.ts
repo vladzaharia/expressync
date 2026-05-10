@@ -21,7 +21,7 @@ import { NacsGlyph } from "./NacsGlyph.tsx";
 import { Type2Glyph } from "./Type2Glyph.tsx";
 
 /** The five connector types we render glyphs for. Matches the
- *  `connector_type_override` CHECK in `chargers_cache`. */
+ *  `connector_type_override` CHECK in `chargers`. */
 export type ConnectorType = "ccs" | "j1772" | "nacs" | "chademo" | "type2";
 
 /**

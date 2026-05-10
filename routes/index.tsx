@@ -50,6 +50,7 @@ import type {
   CustomerChargerStatus,
 } from "../islands/customer/CustomerChargersSection.tsx";
 import { normalizeStatus } from "../islands/shared/device-visuals.ts";
+import { getPrimaryConnectorSpecsBatch } from "../src/services/charger-connectors.service.ts";
 
 const log = logger.child("DashboardLoader");
 
@@ -328,18 +329,21 @@ async function loadCustomerData(
   try {
     const rows = await db
       .select({
-        chargeBoxId: schema.chargersCache.chargeBoxId,
-        publicId: schema.chargersCache.publicId,
-        friendlyName: schema.chargersCache.friendlyName,
-        lastStatus: schema.chargersCache.lastStatus,
-        lastStatusAt: schema.chargersCache.lastStatusAt,
-        lastSeenAt: schema.chargersCache.lastSeenAt,
-        formFactor: schema.chargersCache.formFactor,
-        connectorTypeOverride: schema.chargersCache.connectorTypeOverride,
-        maxKwOverride: schema.chargersCache.maxKwOverride,
+        chargeBoxId: schema.chargers.chargeBoxId,
+        publicId: schema.chargers.publicId,
+        friendlyName: schema.chargers.friendlyName,
+        lastStatus: schema.chargers.lastStatus,
+        lastStatusAt: schema.chargers.lastStatusAt,
+        lastSeenAt: schema.chargers.lastSeenAt,
+        formFactor: schema.chargers.formFactor,
       })
-      .from(schema.chargersCache)
+      .from(schema.chargers)
       .limit(50);
+    // Pull primary connector spec for every charger in one round-trip
+    // (replaces the per-charger override columns dropped in 0050).
+    const specsByChargeBox = await getPrimaryConnectorSpecsBatch(
+      rows.map((r) => r.chargeBoxId),
+    );
     const ONLINE_WINDOW_MS = 60 * 60 * 1000;
     const now = Date.now();
     totalChargers = rows.length;
@@ -380,7 +384,8 @@ async function loadCustomerData(
       } else {
         status = "online";
       }
-      const ct = r.connectorTypeOverride;
+      const spec = specsByChargeBox.get(r.chargeBoxId);
+      const ct = spec?.connectorType ?? null;
       chargerCards.push({
         chargeBoxId: r.chargeBoxId,
         friendlyName: r.friendlyName,
@@ -393,7 +398,7 @@ async function loadCustomerData(
             )
             ? (ct as "ccs" | "j1772" | "nacs" | "chademo" | "type2")
             : null,
-        maxKw: r.maxKwOverride !== null ? Number(r.maxKwOverride) : null,
+        maxKw: spec?.maxKw ?? null,
       });
     }
   } catch (err) {

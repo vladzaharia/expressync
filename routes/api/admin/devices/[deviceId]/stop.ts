@@ -17,7 +17,7 @@
  *   401 unauthorized          — no bearer
  *   403 capability_denied     — caller lacks `user`
  *   400 invalid_body          — body fails the strict schema
- *   404 charger_not_found     — charger unknown to `chargers_cache`
+ *   404 charger_not_found     — charger unknown to `chargers`
  *   404 no_active_transaction — no active StEvE transaction on the charger
  *                              (after offline preflight passed; this is
  *                              the "charger is online but idle" case)

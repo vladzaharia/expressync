@@ -28,7 +28,7 @@
 import { eq } from "drizzle-orm";
 import { define } from "../../utils.ts";
 import { db } from "../../src/db/index.ts";
-import { chargersCache } from "../../src/db/schema.ts";
+import { chargers } from "../../src/db/schema.ts";
 import { PublicShell } from "../../components/public/PublicShell.tsx";
 import { PublicIdDisplay } from "../../components/shared/PublicIdDisplay.tsx";
 import { ConnectorSpec } from "../../components/shared/ConnectorSpec.tsx";
@@ -39,6 +39,7 @@ import {
   DUMB_CHARGER_TAGLINE,
 } from "../../src/lib/content/dumb-charger-instructions.ts";
 import { isValidPublicId } from "../../src/lib/utils/public-id.ts";
+import { getPrimaryConnectorSpec } from "../../src/services/charger-connectors.service.ts";
 
 type Status = "available" | "charging" | "offline" | "unknown";
 
@@ -88,8 +89,8 @@ export const handler = define.handlers({
 
     const [row] = await db
       .select()
-      .from(chargersCache)
-      .where(eq(chargersCache.publicId, publicId))
+      .from(chargers)
+      .where(eq(chargers.publicId, publicId))
       .limit(1);
 
     if (!row) {
@@ -118,7 +119,8 @@ export const handler = define.handlers({
       ctx.state.appBannerArgument = `https://example.com/c/${row.publicId}`;
     }
 
-    const ct = row.connectorTypeOverride;
+    const spec = await getPrimaryConnectorSpec(row.chargeBoxId);
+    const ct = spec.connectorType;
     const connectorType =
       (["ccs", "j1772", "nacs", "chademo", "type2"] as const).includes(
           ct as "ccs" | "j1772" | "nacs" | "chademo" | "type2",
@@ -126,11 +128,7 @@ export const handler = define.handlers({
         ? (ct as "ccs" | "j1772" | "nacs" | "chademo" | "type2")
         : null;
 
-    const maxKw = row.maxKwOverride !== null
-      ? Number.isFinite(Number(row.maxKwOverride))
-        ? Number(row.maxKwOverride)
-        : null
-      : null;
+    const maxKw = spec.maxKw;
 
     return {
       data: {

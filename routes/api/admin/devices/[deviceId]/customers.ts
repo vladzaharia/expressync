@@ -7,7 +7,7 @@
  * the operator picks a *customer*, not a tag, and the server resolves
  * `OCPP-{externalId}` (the customer's auto-managed parent meta-tag) at
  * Start time. `[deviceId]` is the **charger** id — i.e.
- * `chargers_cache.charge_box_id`.
+ * `chargers.charge_box_id`.
  *
  * Returns a flat list of the org's customers with at least one active
  * mapping, sorted by recency-of-use (most recent transaction first), then
@@ -30,14 +30,14 @@
  * Auth + gates:
  *   - Bearer (`/api/admin/devices/{id}/customers` is bearer per `selectAuth`).
  *   - `requireCapability(ctx, "user")` — 403 on miss.
- *   - 404 if `deviceId` is not a charger row in `chargers_cache`.
+ *   - 404 if `deviceId` is not a charger row in `chargers`.
  */
 
 import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { define } from "../../../../../utils.ts";
 import { db } from "../../../../../src/db/index.ts";
 import {
-  chargersCache,
+  chargers,
   syncedTransactionEvents,
   userMappings,
   users,
@@ -97,9 +97,9 @@ const defaultOwnerLagoLoader: OwnerLagoLoader = async (userId) => {
 
 const defaultChargerExistsCheck: ChargerExistsCheck = async (chargeBoxId) => {
   const [row] = await db
-    .select({ chargeBoxId: chargersCache.chargeBoxId })
-    .from(chargersCache)
-    .where(eq(chargersCache.chargeBoxId, chargeBoxId))
+    .select({ chargeBoxId: chargers.chargeBoxId })
+    .from(chargers)
+    .where(eq(chargers.chargeBoxId, chargeBoxId))
     .limit(1);
   return !!row;
 };

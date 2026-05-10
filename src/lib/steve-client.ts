@@ -338,7 +338,7 @@ class StEvEClient {
    * upstream SteVe.
    *
    * Phase B: callers that need a stable charger roster should read from
-   * `chargers_cache` via `src/services/charger-cache.service.ts` instead
+   * `chargers` via `src/services/charger.service.ts` instead
    * of calling this on every request. The cache is refreshed at the end
    * of every sync run and records `first_seen_at` / `last_seen_at` so
    * stale chargers stay visible with an "Offline" badge.

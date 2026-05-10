@@ -1,6 +1,6 @@
 /**
  * Server-side formatter for the structured address columns on
- * `chargers_cache`. Produces a single-line string suitable for
+ * `chargers`. Produces a single-line string suitable for
  * Apple Maps' `?address=` URL parameter and human-readable on the
  * iOS detail screen.
  *

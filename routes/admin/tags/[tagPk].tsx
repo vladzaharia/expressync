@@ -197,11 +197,11 @@ export const handler = define.handlers({
           try {
             const cacheRows = await db
               .select({
-                chargeBoxId: schema.chargersCache.chargeBoxId,
-                friendlyName: schema.chargersCache.friendlyName,
+                chargeBoxId: schema.chargers.chargeBoxId,
+                friendlyName: schema.chargers.friendlyName,
               })
-              .from(schema.chargersCache)
-              .where(inArray(schema.chargersCache.chargeBoxId, cbids));
+              .from(schema.chargers)
+              .where(inArray(schema.chargers.chargeBoxId, cbids));
             for (const r of cacheRows) {
               friendlyByCbid.set(r.chargeBoxId, r.friendlyName);
             }

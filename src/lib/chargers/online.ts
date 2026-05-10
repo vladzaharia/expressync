@@ -14,7 +14,7 @@
 
 import { eq } from "drizzle-orm";
 import { db } from "../../db/index.ts";
-import { chargersCache } from "../../db/schema.ts";
+import { chargers } from "../../db/schema.ts";
 
 /** 90 s cutoff — matches the scan-arm online window for app devices. */
 export const CHARGER_ONLINE_WINDOW_MS = 90 * 1000;
@@ -52,15 +52,15 @@ type ChargerLoader = (chargeBoxId: string) => Promise<ChargerRow | null>;
 const defaultChargerLoader: ChargerLoader = async (chargeBoxId) => {
   const [row] = await db
     .select({
-      chargeBoxId: chargersCache.chargeBoxId,
-      chargeBoxPk: chargersCache.chargeBoxPk,
-      friendlyName: chargersCache.friendlyName,
-      lastSeenAt: chargersCache.lastSeenAt,
-      lastStatus: chargersCache.lastStatus,
-      lastStatusAt: chargersCache.lastStatusAt,
+      chargeBoxId: chargers.chargeBoxId,
+      chargeBoxPk: chargers.chargeBoxPk,
+      friendlyName: chargers.friendlyName,
+      lastSeenAt: chargers.lastSeenAt,
+      lastStatus: chargers.lastStatus,
+      lastStatusAt: chargers.lastStatusAt,
     })
-    .from(chargersCache)
-    .where(eq(chargersCache.chargeBoxId, chargeBoxId))
+    .from(chargers)
+    .where(eq(chargers.chargeBoxId, chargeBoxId))
     .limit(1);
   return row ?? null;
 };

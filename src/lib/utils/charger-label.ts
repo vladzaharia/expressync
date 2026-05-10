@@ -2,7 +2,7 @@
  * Shared helper for the canonical charger display label.
  *
  * The chargeBoxId is an opaque OCPP identity string; operators set a friendlier
- * description in StEvE which mirrors into `chargers_cache.friendly_name`. UIs
+ * description in StEvE which mirrors into `chargers.friendly_name`. UIs
  * should display the friendly name as the primary label and surface the
  * chargeBoxId as a small monospace disambiguator only when a friendly name is
  * actually present (otherwise the chargeBoxId itself is the label).

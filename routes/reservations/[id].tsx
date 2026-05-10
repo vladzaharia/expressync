@@ -41,6 +41,7 @@ import {
   resolveCustomerScope,
 } from "../../src/lib/scoping.ts";
 import { logger } from "../../src/lib/utils/logger.ts";
+import { getPrimaryConnectorSpec } from "../../src/services/charger-connectors.service.ts";
 import type { ReservationStatus } from "../../src/db/schema.ts";
 
 const log = logger.child("CustomerReservationDetailPage");
@@ -168,15 +169,14 @@ export const handler = define.handlers({
       try {
         const [cacheRow] = await db
           .select({
-            publicId: schema.chargersCache.publicId,
-            connectorTypeOverride: schema.chargersCache.connectorTypeOverride,
-            maxKwOverride: schema.chargersCache.maxKwOverride,
+            publicId: schema.chargers.publicId,
           })
-          .from(schema.chargersCache)
-          .where(eq(schema.chargersCache.chargeBoxId, row.chargeBoxId))
+          .from(schema.chargers)
+          .where(eq(schema.chargers.chargeBoxId, row.chargeBoxId))
           .limit(1);
         if (cacheRow) {
-          const ct = cacheRow.connectorTypeOverride;
+          const spec = await getPrimaryConnectorSpec(row.chargeBoxId);
+          const ct = spec.connectorType;
           charger = {
             publicId: cacheRow.publicId,
             connectorType:
@@ -185,9 +185,7 @@ export const handler = define.handlers({
                 )
                 ? (ct as "ccs" | "j1772" | "nacs" | "chademo" | "type2")
                 : null,
-            maxKw: cacheRow.maxKwOverride !== null
-              ? Number(cacheRow.maxKwOverride)
-              : null,
+            maxKw: spec.maxKw,
           };
         }
       } catch (_err) {

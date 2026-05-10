@@ -11,7 +11,7 @@
  *     satisfy `validateCapabilitySet`; `'charger'` is rejected with
  *     `capability_charger_immutable` (apps can never carry `charger`).
  *
- *   - Non-UUID-shaped `{deviceId}` → operates on the `chargers_cache`
+ *   - Non-UUID-shaped `{deviceId}` → operates on the `chargers`
  *     row keyed by `charge_box_id` (Slice O). The charger-side rules
  *     differ:
  *       - `'charger'` is auto-on; missing it server-side is auto-added.
@@ -44,7 +44,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { define } from "../../../../../utils.ts";
 import { db } from "../../../../../src/db/index.ts";
-import { chargersCache, devices } from "../../../../../src/db/schema.ts";
+import { chargers, devices } from "../../../../../src/db/schema.ts";
 import {
   DEVICE_CAPABILITIES,
   type DeviceCapability,
@@ -137,11 +137,11 @@ const defaultCapabilityWriter: CapabilityWriter = async (
 const defaultChargerLoader: ChargerLoader = async (chargeBoxId) => {
   const [row] = await db
     .select({
-      chargeBoxId: chargersCache.chargeBoxId,
-      capabilities: chargersCache.capabilities,
+      chargeBoxId: chargers.chargeBoxId,
+      capabilities: chargers.capabilities,
     })
-    .from(chargersCache)
-    .where(eq(chargersCache.chargeBoxId, chargeBoxId))
+    .from(chargers)
+    .where(eq(chargers.chargeBoxId, chargeBoxId))
     .limit(1);
   return row ?? null;
 };
@@ -151,12 +151,12 @@ const defaultChargerCapabilityWriter: ChargerCapabilityWriter = async (
   capabilities,
 ) => {
   const [updated] = await db
-    .update(chargersCache)
+    .update(chargers)
     .set({ capabilities })
-    .where(eq(chargersCache.chargeBoxId, chargeBoxId))
+    .where(eq(chargers.chargeBoxId, chargeBoxId))
     .returning({
-      chargeBoxId: chargersCache.chargeBoxId,
-      capabilities: chargersCache.capabilities,
+      chargeBoxId: chargers.chargeBoxId,
+      capabilities: chargers.capabilities,
     });
   return updated ?? null;
 };
@@ -255,7 +255,7 @@ export const handler = define.handlers({
       const requested = parsed.capabilities;
 
       // Slice O: route by id shape. UUID → devices row; otherwise →
-      // chargers_cache row keyed by charge_box_id.
+      // chargers row keyed by charge_box_id.
       if (isUuid(deviceId)) {
         return await handleDevicePatch({
           deviceId,
@@ -409,7 +409,7 @@ async function handleChargerPatch(args: {
   // Chargers have no SSE stream of their own — the publish below fires
   // on the bus for parity with the device path and to keep audit/SSE
   // wiring symmetrical, but no subscriber receives it. (The
-  // `tappable_devices` view re-reads `chargers_cache.capabilities` on
+  // `tappable_devices` view re-reads `chargers.capabilities` on
   // its next query, so the effective cache-invalidation path is the
   // page reload triggered by the picker.)
   try {
