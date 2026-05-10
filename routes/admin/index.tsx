@@ -187,6 +187,13 @@ export default define.page<typeof handler>(
                 contentClassName={sectionContent}
               >
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {/*
+                    Each tile carries its target page's nav accent so
+                    the dashboard reads as a navigational preview, not
+                    confetti. Order: kWh→green (Sessions), syncs→blue
+                    (Sync), cards→cyan (EV Cards), reservations→indigo
+                    (Reservations). Mirrors ADMIN_NAV_SECTIONS.
+                  */}
                   <MetricTile
                     icon={Zap}
                     label="kWh delivered"
@@ -195,7 +202,7 @@ export default define.page<typeof handler>(
                       overview.weekly.kwhWeek,
                       overview.weekly.kwhWeekPrior,
                     )}
-                    accent="emerald"
+                    accent="green"
                   />
                   <MetricTile
                     icon={Layers}
@@ -208,13 +215,13 @@ export default define.page<typeof handler>(
                     icon={Tag}
                     label="EV Cards activated"
                     value={overview.weekly.tagsActivatedWeek}
-                    accent="violet"
+                    accent="cyan"
                   />
                   <MetricTile
                     icon={Calendar}
                     label="Reservations completed"
                     value={overview.weekly.reservationsCompletedWeek}
-                    accent="cyan"
+                    accent="indigo"
                   />
                 </div>
               </SectionCard>

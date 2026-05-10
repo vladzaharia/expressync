@@ -397,9 +397,23 @@ export function buildOcppPayload(
 /**
  * Dispatch a SetChargingProfile to a specific charger + connector.
  *
- * Returns the operation/task id if StEvE's operations client is available,
- * else 0 (logged). Never throws — failures are logged and returned as
- * `{ taskId: 0, error }` so the caller can continue.
+ * Returns `{ taskId, error? }` so the caller can decide whether to
+ * surface the failure to the admin UI or continue silently. Never
+ * throws.
+ *
+ * Wiring caveat: StEvE's `POST /v1/operations/SetChargingProfile`
+ * REST contract (`SetChargingProfileParamsSchema`) requires a
+ * `chargingProfilePk` — a row id pointing at a profile already
+ * persisted in StEvE's `ocpp_charging_profile` table. We currently
+ * build the **raw OCPP payload** (`buildOcppPayload` → full
+ * `csChargingProfiles` blob) but have no flow to first POST that
+ * payload to StEvE's `/v1/chargingProfiles` REST surface to mint a
+ * pk. Until that profile-creation flow lands, dispatching is a
+ * no-op: we log a structured warning and return `taskId: 0` so the
+ * row-state ("profile saved, not yet on charger") stays accurate.
+ *
+ * Track via the chargingProfile P5 follow-up. Adding the StEvE-side
+ * profile-create call here is the next concrete step.
  */
 export async function applyToCharger(
   profile: ChargingProfile,
@@ -409,7 +423,7 @@ export async function applyToCharger(
   const payload = buildOcppPayload(profile, ctx);
   payload.chargeBoxId = chargeBoxId;
 
-  logger.info("ChargingProfile", "Applying profile to charger", {
+  logger.info("ChargingProfile", "applyToCharger called (dispatch deferred)", {
     chargeBoxId,
     subscription: profile.lagoSubscriptionExternalId,
     preset: profile.preset,
@@ -418,57 +432,57 @@ export async function applyToCharger(
     transactionId: ctx.transactionId,
   });
 
-  try {
-    // Dynamic access: StEvE ops namespace is populated by the P0 / operations
-    // work. If it isn't present yet, we don't crash — we just log.
-    const steve = await import("../lib/steve-client.ts");
-    const maybeOps =
-      (steve.steveClient as unknown as Record<string, unknown>).operations;
-    if (
-      maybeOps && typeof (maybeOps as Record<string, unknown>)
-          .setChargingProfile === "function"
-    ) {
-      const result = await (maybeOps as {
-        setChargingProfile: (p: OcppSetChargingProfilePayload) => Promise<
-          { taskId: number } | number
-        >;
-      }).setChargingProfile(payload);
-      const taskId = typeof result === "number" ? result : result.taskId;
-      return { taskId };
-    }
-    logger.warn(
-      "ChargingProfile",
-      "steveClient.operations.setChargingProfile not available; skipping dispatch",
-      { chargeBoxId },
-    );
-    return { taskId: 0 };
-  } catch (err) {
-    const error = err instanceof Error ? err.message : String(err);
-    logger.error("ChargingProfile", "Failed to dispatch SetChargingProfile", {
+  // Reference the built payload so type-check + linter keep
+  // buildOcppPayload's contract pinned. When the StEvE profile-create
+  // REST call lands, this is the value that gets posted there.
+  void payload;
+
+  logger.warn(
+    "ChargingProfile",
+    "SetChargingProfile dispatch deferred: " +
+      "StEvE profile-create REST flow not implemented",
+    {
       chargeBoxId,
-      error,
-    });
-    return { taskId: 0, error };
-  }
+      reason: "no_chargingProfilePk_path",
+      preset: profile.preset,
+    },
+  );
+  return {
+    taskId: 0,
+    error:
+      "SetChargingProfile dispatch deferred — StEvE profile-create flow " +
+      "not yet wired (need POST /v1/chargingProfiles to mint a " +
+      "chargingProfilePk before the operations call accepts the request).",
+  };
 }
 
 /**
- * Apply the profile to any currently-active sessions for this subscription.
+ * Apply the profile to any currently-active sessions for this
+ * subscription.
  *
  * Called as part of save-flow when the admin ticks "Apply to active
  * sessions now". Non-blocking: failures are logged, not thrown.
+ *
+ * Status: gated on two pieces neither of which exist yet:
+ *   1. A session registry that maps `(lagoSubscriptionExternalId)` →
+ *      `(chargeBoxId, connectorId, transactionId)` for live sessions.
+ *      Today we only know about completed transactions via the sync
+ *      pull; in-flight sessions have no canonical row.
+ *   2. The `applyToCharger` dispatch path — see its comment for the
+ *      `chargingProfilePk` blocker.
+ *
+ * Returning a stable `{0,0}` keeps callers honest: the admin UI's
+ * "Applied to N active sessions" copy will show 0 today, which is
+ * accurate.
  */
 export function applyToActiveSessions(
   profile: ChargingProfile,
 ): Promise<{ dispatched: number; failed: number }> {
-  logger.info("ChargingProfile", "applyToActiveSessions invoked", {
-    subscription: profile.lagoSubscriptionExternalId,
-  });
-
-  // Resolving active sessions requires a charger/connector lookup that
-  // depends on future state (tag-to-charger session mapping). For the
-  // initial ship we return a no-op result; the hook is wired and ready to
-  // be fleshed out when the session registry lands.
+  logger.info(
+    "ChargingProfile",
+    "applyToActiveSessions invoked (deferred — no session registry)",
+    { subscription: profile.lagoSubscriptionExternalId },
+  );
   return Promise.resolve({ dispatched: 0, failed: 0 });
 }
 

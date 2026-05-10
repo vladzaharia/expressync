@@ -221,11 +221,14 @@ export async function createReservation(
 
   // Dispatch ReserveNow to StEvE. Non-blocking — a StEvE outage must not
   // break local reservation creation, so we log+swallow failures and leave
-  // `steve_reservation_id = null`. The row stays at `status='pending'`;
-  // transition to `confirmed` is the responsibility of a future task-
-  // resolver that polls `steveClient.operations.getTask(taskId)` and
-  // interprets the async ReserveNow response. TODO: build that resolver
-  // (likely a cron + webhook-on-StatusNotification combo).
+  // `steve_reservation_id = null`. The row stays at `status='pending'`
+  // until `reservation-resolver.service.ts` flips it to `confirmed` /
+  // `conflicted`: a per-minute cron polls `steveClient.operations
+  // .getTask(taskId)` (no-op until StEvE is upgraded past 3.12.0), and
+  // `tryConfirmFromStatusNotification` provides a side-channel that
+  // closes the loop the moment the connector reports `Reserved` (wired
+  // when the OCPP StatusNotification stream surfaces connector-level
+  // status into `recordChargerStatus`).
   try {
     const taskResult = await steveClient.operations.reserveNow({
       chargeBoxId: reservation.chargeBoxId,
