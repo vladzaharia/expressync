@@ -26,7 +26,8 @@
  * this card.
  */
 
-import { Check, Copy, Smartphone } from "lucide-preact";
+import { Check, Copy, MapPin, Smartphone } from "lucide-preact";
+import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import { CapabilityPill } from "@/components/devices/CapabilityPill.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
@@ -46,6 +47,9 @@ export interface DeviceIdentityCardProps {
   lastSeenAtIso: string | null;
   registeredAtIso: string;
   isAdmin?: boolean;
+  /** Renders a "Location" sub-section below the identity dl,
+   *  separated by a divider. Pass `<DeviceLocationCard …/>` here. */
+  locationSlot?: ComponentChildren;
   class?: string;
 }
 
@@ -88,6 +92,7 @@ export function DeviceIdentityCard({
   lastSeenAtIso,
   registeredAtIso,
   isAdmin: _isAdmin = true,
+  locationSlot,
   class: className,
 }: DeviceIdentityCardProps) {
   const [copied, setCopied] = useState(false);
@@ -206,6 +211,16 @@ export function DeviceIdentityCard({
           </dd>
         </div>
       </dl>
+
+      {locationSlot && (
+        <div class="border-t pt-4">
+          <div class="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <MapPin class="size-4" aria-hidden />
+            <span>Location</span>
+          </div>
+          {locationSlot}
+        </div>
+      )}
     </div>
   );
 }

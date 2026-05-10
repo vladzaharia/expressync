@@ -67,8 +67,11 @@ export default function DeviceLogsCard({ deviceId, initialLogs }: Props) {
   const [records, setRecords] = useState<OTelLogRecord[]>(initialLogs ?? []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Pre-select INFO/WARN/ERROR — the levels admins almost always care
+  // about. DEBUG and FATAL are opt-in (DEBUG is too noisy, FATAL is
+  // rare enough that you'd be searching for it specifically).
   const [selectedSeverities, setSelectedSeverities] = useState<Set<string>>(
-    new Set(),
+    new Set(["INFO", "WARN", "ERROR"]),
   );
   const [category, setCategory] = useState("");
   const [rangeMs, setRangeMs] = useState<number>(60 * 60_000); // 1h default
@@ -189,10 +192,10 @@ function FilterBar(props: {
             type="button"
             key={opt.value}
             onClick={() => props.onToggleSeverity(opt.value)}
-            class={`rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
+            class={`rounded-full border px-2 py-0.5 text-xs font-medium transition-colors ${
               active
                 ? severityFilterClass(opt.value)
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                : "border-slate-300 text-slate-600 hover:border-slate-400 hover:text-slate-700"
             }`}
           >
             {opt.label}
@@ -343,19 +346,22 @@ function formatTimestamp(nanosString: string): string {
 }
 
 function severityFilterClass(sev: string): string {
+  // `border-transparent` so the chip's outer `border` class (used to
+  // outline the inactive variants) doesn't draw a visible ring on top
+  // of the solid active fill.
   switch (sev) {
     case "DEBUG":
-      return "bg-slate-500 text-white";
+      return "bg-slate-500 text-white border-transparent";
     case "INFO":
-      return "bg-sky-600 text-white";
+      return "bg-sky-600 text-white border-transparent";
     case "WARN":
-      return "bg-amber-500 text-white";
+      return "bg-amber-500 text-white border-transparent";
     case "ERROR":
-      return "bg-rose-600 text-white";
+      return "bg-rose-600 text-white border-transparent";
     case "FATAL":
-      return "bg-rose-800 text-white";
+      return "bg-rose-800 text-white border-transparent";
     default:
-      return "bg-slate-500 text-white";
+      return "bg-slate-500 text-white border-transparent";
   }
 }
 

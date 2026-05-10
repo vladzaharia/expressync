@@ -51,7 +51,6 @@ import DeviceLogsCard from "../../../islands/admin/DeviceLogsCard.tsx";
 import {
   ClipboardList,
   History as HistoryIcon,
-  MapPin,
   Settings2,
 } from "lucide-preact";
 import { deviceSettings as deviceSettingsTable } from "../../../src/db/schema.ts";
@@ -479,6 +478,16 @@ export default define.page<typeof handler>(
                     isOnline={isOnline}
                     lastSeenAtIso={device.lastSeenAtIso}
                     registeredAtIso={device.registeredAtIso}
+                    locationSlot={
+                      <DeviceLocationCard
+                        deviceId={device.deviceId}
+                        enabled={device.capabilities.includes("managed")}
+                        initialLat={device.lastLocationLat}
+                        initialLon={device.lastLocationLon}
+                        initialAccuracyM={device.lastLocationAccuracyM}
+                        initialAtIso={device.lastLocationAtIso}
+                      />
+                    }
                   />
                   <DeviceLiveStatusCard
                     class="lg:col-span-2"
@@ -521,32 +530,20 @@ export default define.page<typeof handler>(
                   >
                     <RecentScansEmpty />
                   </SectionCard>
-
-                  <SectionCard
-                    title="Location"
-                    description="Last-known location for managed devices. The device reports significant-change updates on every sync; admins can request an on-demand fix via Locate now."
-                    icon={MapPin}
-                    accent="teal"
-                  >
-                    <DeviceLocationCard
-                      deviceId={device.deviceId}
-                      enabled={device.capabilities.includes("managed")}
-                      initialLat={device.lastLocationLat}
-                      initialLon={device.lastLocationLon}
-                      initialAccuracyM={device.lastLocationAccuracyM}
-                      initialAtIso={device.lastLocationAtIso}
-                    />
-                  </SectionCard>
-
-                  <SectionCard
-                    title="Device logs"
-                    description="OpenTelemetry-shaped log records shipped from this device on every sync. Last 7 days; PII scrubbed on-device before write."
-                    icon={ClipboardList}
-                    accent="teal"
-                  >
-                    <DeviceLogsCard deviceId={device.deviceId} />
-                  </SectionCard>
                 </div>
+
+                {
+                  /* Row 4: device logs full-width — log lines need horizontal
+                    space; cramming them into a half column wraps every row. */
+                }
+                <SectionCard
+                  title="Device logs"
+                  description="OpenTelemetry-shaped log records shipped from this device on every sync. Last 7 days; PII scrubbed on-device before write."
+                  icon={ClipboardList}
+                  accent="teal"
+                >
+                  <DeviceLogsCard deviceId={device.deviceId} />
+                </SectionCard>
               </div>
             );
           })()}
