@@ -75,6 +75,12 @@ export type AuthAuditEvent =
   // ExpresScan v2 / Wave 6 Slice D — admin App Configuration writes.
   | "device.capability.changed"
   | "device.settings.updated"
+  // Feature flags (per-user values + per-device overrides). Audited with
+  // the changed key list + redacted-or-omitted values in `metadata`.
+  // Snake_case here to match the rest of the audit identifiers; the SSE
+  // topic uses kebab-case for iOS parity.
+  | "user.feature_flags.changed"
+  | "device.feature_flags.changed"
   // ExpresScan v2 / Wave 6 Slice J — admin charger remote-control.
   // Emitted by `/api/admin/devices/{id}/{start,stop,cancel-reservation}`
   // when an iOS device with the `user` capability invokes the charger
@@ -224,6 +230,10 @@ export const logDeviceCapabilityChanged = (p: AuthEventPayload) =>
   logAuthEvent("device.capability.changed", p);
 export const logDeviceSettingsUpdated = (p: AuthEventPayload) =>
   logAuthEvent("device.settings.updated", p);
+export const logAdminUserFeatureFlagsChanged = (p: AuthEventPayload) =>
+  logAuthEvent("user.feature_flags.changed", p);
+export const logAdminDeviceFeatureFlagsChanged = (p: AuthEventPayload) =>
+  logAuthEvent("device.feature_flags.changed", p);
 
 // ExpresScan v2 / Wave 6 Slice J — admin charger remote-control shims.
 // `metadata.chargerId` is the target charge_box_id; `metadata.deviceId` is

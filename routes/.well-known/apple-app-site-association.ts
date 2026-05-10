@@ -12,15 +12,17 @@
  *   - Valid JSON
  *
  * The committed bundle ID `ABC1234XYZ.com.example.expresscharge.ios` matches the iOS
- * app's signing identity and the path component `/app/register/*`
- * matches the Universal Link landing page emitted by the registration
- * flow (see `30-backend.md` § "Registration flow (PKCE)").
+ * app's signing identity. The four component paths cover:
+ *   - `/app/register/*` — admin-host PKCE registration landing
+ *   - `/c/*`            — customer-host charger sticker deep link
+ *   - `/u/*`            — customer-host user-QR sign-in
+ *   - `/m/*`            — customer-host magic-email sign-in landing
  *
- * Only the admin host (`manage.example.com`) needs to serve this —
- * the customer host doesn't have the iOS app — but this handler is
- * surface-agnostic. The route classifier marks `/.well-known/*` as
- * PUBLIC; the admin path-rewrite skips `/.well-known/` so the file is
- * reached at the URL root regardless of host.
+ * Both hosts (`manage.example.com` and `example.com`) serve this
+ * file: the route classifier marks `/.well-known/*` as PUBLIC and the
+ * admin path-rewrite skips `/.well-known/`, so the manifest is reached
+ * at the URL root regardless of host. iOS entitlements list both
+ * `applinks:manage.example.com` and `applinks:example.com`.
  *
  * The matching JSON file `apple-app-site-association.json` lives next
  * to this handler so a developer eyeballing the directory can confirm

@@ -265,3 +265,19 @@ export interface DeviceSettingsChangedPayload {
   deviceId: string;
   keys: string[];
 }
+
+/**
+ * Body of the `device.feature-flags.changed` event. Published by the
+ * admin feature-flag PATCH endpoints (per-user fan-out + per-device
+ * direct) after an upsert/delete. iOS subscribes via scan-stream and
+ * re-fetches its `me/state` envelope on receipt. `keys` carries the
+ * registry-validated flag keys that actually changed in this write.
+ *
+ * Note: topic name uses kebab-case (`feature-flags`) for iOS parity,
+ * while the audit event type (in `audit.ts`) and DB columns use
+ * snake_case (`feature_flags`). Don't unify them.
+ */
+export interface DeviceFeatureFlagsChangedPayload {
+  deviceId: string;
+  keys: string[];
+}

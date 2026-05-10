@@ -28,6 +28,7 @@ import {
 } from "../lib/sse-transport.ts";
 import type {
   DeviceCapabilitiesChangedPayload,
+  DeviceFeatureFlagsChangedPayload,
   DeviceScanCancelledPayload,
   DeviceScanCompletedPayload,
   DeviceScanRequestedPayload,
@@ -63,6 +64,7 @@ export type EventBusEventType =
   | "device.token.revoked"
   | "device.capabilities.changed"
   | "device.settings.changed"
+  | "device.feature-flags.changed"
   // Phase 3c — device-logs ingest publishes one event per inserted
   // record so the admin web UI's "Live tail" SSE consumer can render
   // logs without polling. Single-replica fan-out only (in-process bus).
@@ -246,6 +248,10 @@ export type EventBusEvent =
   | {
     type: "device.settings.changed";
     payload: DeviceSettingsChangedPayload;
+  }
+  | {
+    type: "device.feature-flags.changed";
+    payload: DeviceFeatureFlagsChangedPayload;
   }
   | {
     type: "device.logs.appended";

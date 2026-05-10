@@ -45,6 +45,7 @@ import {
 } from "../../../src/lib/devices/registration.ts";
 import { ensureDeviceTag } from "../../../src/lib/customer-meta-tags.ts";
 import { createCustomerSession } from "../../../src/lib/auth-helpers.ts";
+import { customerCapabilityDefaults } from "../../../src/lib/auth/customer-capabilities.ts";
 import { checkRateLimit } from "../../../src/lib/utils/rate-limit.ts";
 import { isValidPublicId } from "../../../src/lib/utils/public-id.ts";
 import {
@@ -155,8 +156,10 @@ export const handler = define.handlers({
           // Customer-registered devices land with the `user` capability
           // only — they can list chargers and Mobile Start, but not
           // scanner / kiosk. Admins keep the full picker via the
-          // existing /api/devices/register path.
-          capabilities: ["user"],
+          // existing /api/devices/register path. Always go through the
+          // shared helper so a future change (e.g. adding `notifications`)
+          // ripples to every customer-mint surface in lockstep.
+          capabilities: [...customerCapabilityDefaults()],
           ownerUserId: user.id,
           platform: body.platform,
           model: body.model,

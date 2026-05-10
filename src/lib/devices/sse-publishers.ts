@@ -21,6 +21,7 @@ import { eventBus } from "../../services/event-bus.service.ts";
 import type {
   DeviceCapabilitiesChangedPayload,
   DeviceCapability,
+  DeviceFeatureFlagsChangedPayload,
   DeviceSettingsChangedPayload,
 } from "../types/devices.ts";
 import { logger } from "../utils/logger.ts";
@@ -71,6 +72,36 @@ export function publishDeviceSettingsChanged(
     eventBus.publish({ type: "device.settings.changed", payload });
   } catch (err) {
     log.warn("Failed to publish device.settings.changed", {
+      deviceId,
+      keyCount: changedKeys.length,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+/**
+ * Publish `device.feature-flags.changed` for `deviceId`. Called by both
+ * feature-flag PATCH endpoints — the per-user endpoint fans this out
+ * to every flag-eligible owned device after a user-scoped write, and
+ * the per-device endpoint emits it directly after a device-override
+ * write. iOS subscribes via scan-stream and refetches `me/state` on
+ * receipt; the key list is informational only.
+ *
+ * Topic uses kebab-case for iOS parity with the existing
+ * `ScanCoordinator.handleSSEEvent` switch.
+ */
+export function publishDeviceFeatureFlagsChanged(
+  deviceId: string,
+  changedKeys: readonly string[],
+): void {
+  const payload: DeviceFeatureFlagsChangedPayload = {
+    deviceId,
+    keys: [...changedKeys],
+  };
+  try {
+    eventBus.publish({ type: "device.feature-flags.changed", payload });
+  } catch (err) {
+    log.warn("Failed to publish device.feature-flags.changed", {
       deviceId,
       keyCount: changedKeys.length,
       error: err instanceof Error ? err.message : String(err),
