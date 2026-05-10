@@ -17,6 +17,7 @@
 import { useState } from "preact/hooks";
 import {
   BatteryCharging,
+  Compass,
   Loader2,
   Lock,
   Save,
@@ -24,6 +25,7 @@ import {
   User,
 } from "lucide-preact";
 import { Button } from "@/components/ui/button.tsx";
+import { Switch } from "@/components/ui/switch.tsx";
 import { CapabilityPill } from "@/components/devices/CapabilityPill.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { toast } from "sonner";
@@ -62,6 +64,8 @@ function iconFor(c: DeviceCapability) {
       return User;
     case "kiosk":
       return Lock;
+    case "managed":
+      return Compass;
   }
 }
 
@@ -137,26 +141,95 @@ export default function CapabilityPicker(
     }
   };
 
+  const modeCaps = editableList.filter(
+    (c) => CAPABILITY_METADATA[c].group === "mode",
+  );
+  const featureCaps = editableList.filter(
+    (c) => CAPABILITY_METADATA[c].group === "feature",
+  );
+
   return (
     <div class="flex flex-col gap-4">
+      {readOnlyList.length > 0 && (
+        <ul class="flex flex-col gap-2">
+          {readOnlyList.map((c) => (
+            <li
+              key={c}
+              class="flex items-center gap-3 rounded-md border border-border bg-muted/30 p-3 opacity-80"
+            >
+              <CapabilityPill capability={c} />
+              <span class="flex-1 text-xs text-muted-foreground">
+                {CAPABILITY_METADATA[c].description} (auto-managed)
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {modeCaps.length > 0 && (
+        <GroupedList
+          title="Mode"
+          description="App-wide posture. Changing these reshapes the whole experience."
+          caps={modeCaps}
+          selected={selected}
+          saving={saving}
+          onToggle={toggle}
+        />
+      )}
+      {featureCaps.length > 0 && (
+        <GroupedList
+          title="Features"
+          description="Optional capability surfaces. Turn on what this device should do."
+          caps={featureCaps}
+          selected={selected}
+          saving={saving}
+          onToggle={toggle}
+        />
+      )}
+
+      {error && <p class="text-xs text-destructive">{error}</p>}
+
+      <div class="flex justify-end">
+        <Button
+          size="sm"
+          disabled={!dirty || saving}
+          onClick={onSave}
+        >
+          {saving
+            ? <Loader2 class="size-4 animate-spin" />
+            : <Save class="size-4" />}
+          Save capabilities
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function GroupedList({
+  title,
+  description,
+  caps,
+  selected,
+  saving,
+  onToggle,
+}: {
+  title: string;
+  description: string;
+  caps: DeviceCapability[];
+  selected: Set<DeviceCapability>;
+  saving: boolean;
+  onToggle: (c: DeviceCapability) => void;
+}) {
+  return (
+    <div class="flex flex-col gap-2">
+      <div class="flex flex-col gap-0.5">
+        <h4 class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80">
+          {title}
+        </h4>
+        <p class="text-[11px] text-muted-foreground/70">{description}</p>
+      </div>
       <ul class="flex flex-col gap-2">
-        {
-          /* Read-only / auto-managed caps (e.g. `charger` on a charger
-            row) render first so the identity-defining capability sits
-            at the top of the list, with editable toggles below. */
-        }
-        {readOnlyList.map((c) => (
-          <li
-            key={c}
-            class="flex items-center gap-3 rounded-md border border-border bg-muted/30 p-3 opacity-80"
-          >
-            <CapabilityPill capability={c} />
-            <span class="flex-1 text-xs text-muted-foreground">
-              {CAPABILITY_METADATA[c].description} (auto-managed)
-            </span>
-          </li>
-        ))}
-        {editableList.map((c) => {
+        {caps.map((c) => {
           const meta = CAPABILITY_METADATA[c];
           const Icon = iconFor(c);
           const checked = selected.has(c);
@@ -180,43 +253,24 @@ export default function CapabilityPicker(
                 )}
               />
               <div class="flex flex-1 flex-col gap-0.5">
-                <label
-                  class="text-sm font-medium"
-                  for={`cap-${c}`}
-                >
+                <label class="text-sm font-medium" for={`cap-${c}`}>
                   {meta.label}
                 </label>
                 <span class="text-xs text-muted-foreground">
                   {meta.description}
                 </span>
               </div>
-              <input
+              <Switch
                 id={`cap-${c}`}
-                type="checkbox"
+                aria-label={`Toggle ${meta.label}`}
                 checked={checked}
                 disabled={saving}
-                onChange={() => toggle(c)}
-                class="size-5 cursor-pointer accent-teal-600"
+                onCheckedChange={() => onToggle(c)}
               />
             </li>
           );
         })}
       </ul>
-
-      {error && <p class="text-xs text-destructive">{error}</p>}
-
-      <div class="flex justify-end">
-        <Button
-          size="sm"
-          disabled={!dirty || saving}
-          onClick={onSave}
-        >
-          {saving
-            ? <Loader2 class="size-4 animate-spin" />
-            : <Save class="size-4" />}
-          Save capabilities
-        </Button>
-      </div>
     </div>
   );
 }

@@ -33,6 +33,7 @@ import { db } from "../../db/index.ts";
 import {
   deviceFeatureFlagOverrides,
   devices,
+  globalFeatureFlagValues,
   userFeatureFlagValues,
 } from "../../db/schema.ts";
 import {
@@ -80,6 +81,18 @@ interface FlagRowReader {
       updatedBy: string;
     }[]
   >;
+  /**
+   * Global tier — admin-set flag values that apply to every consumer
+   * unless overridden per-user or per-device. Singleton per flag_key.
+   */
+  loadGlobalFlags(): Promise<
+    {
+      flagKey: string;
+      valueJson: unknown;
+      updatedAt: Date;
+      updatedBy: string;
+    }[]
+  >;
 }
 
 const defaultReader: FlagRowReader = {
@@ -113,6 +126,17 @@ const defaultReader: FlagRowReader = {
       })
       .from(deviceFeatureFlagOverrides)
       .where(eq(deviceFeatureFlagOverrides.deviceId, deviceId));
+    return rows;
+  },
+  async loadGlobalFlags() {
+    const rows = await db
+      .select({
+        flagKey: globalFeatureFlagValues.flagKey,
+        valueJson: globalFeatureFlagValues.valueJson,
+        updatedAt: globalFeatureFlagValues.updatedAt,
+        updatedBy: globalFeatureFlagValues.updatedBy,
+      })
+      .from(globalFeatureFlagValues);
     return rows;
   },
 };
@@ -194,17 +218,37 @@ export async function resolveFlags(
     }
   }
 
+  // Global tier — admin-set values applying to every consumer in the
+  // absence of a user or device override. Always loaded (no
+  // per-consumer keying — singleton table).
+  const globalMap = new Map<
+    string,
+    { value: unknown; updatedAt: Date; updatedBy: string }
+  >();
+  const globalRows = await activeReader.loadGlobalFlags();
+  for (const r of globalRows) {
+    if (!isFeatureFlag(r.flagKey)) continue;
+    globalMap.set(r.flagKey, {
+      value: r.valueJson,
+      updatedAt: r.updatedAt,
+      updatedBy: r.updatedBy,
+    });
+  }
+
   const out: Record<string, ResolvedFlagValue> = {};
   for (const flagKey of Object.keys(FEATURE_FLAGS)) {
     const key = flagKey as FeatureFlag;
     const spec = FEATURE_FLAGS[key];
 
+    // Precedence: device override > user value > global value > default.
     let source: { value: unknown; updatedAt: Date; updatedBy: string } | null =
       null;
     if (deviceMap.has(key)) {
       source = deviceMap.get(key)!;
     } else if (userMap.has(key)) {
       source = userMap.get(key)!;
+    } else if (globalMap.has(key)) {
+      source = globalMap.get(key)!;
     }
 
     const effective = source ? source.value : spec.defaultValue;

@@ -263,14 +263,11 @@ export const handler = define.handlers({
           });
         }
         const spec = FEATURE_FLAGS[f.key];
-        const scope = getFeatureFlagScope(f.key);
-        if (scope !== "user" && scope !== "both") {
-          return jsonResponse(400, {
-            error: "invalid_scope",
-            key: f.key,
-            scope,
-          });
-        }
+        // All registered flags are scoped "both" since the 2026-05
+        // cleanup — every flag is settable at every tier. We retain
+        // the `getFeatureFlagScope` call for forward-compat in case
+        // future flags reintroduce scope restrictions.
+        void getFeatureFlagScope;
         if (f.value === null) {
           deletes.push(f.key);
           continue;

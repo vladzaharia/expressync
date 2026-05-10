@@ -11,15 +11,19 @@ import { SidebarLayout } from "../../../components/SidebarLayout.tsx";
 import { PageCard } from "../../../components/PageCard.tsx";
 import { SectionCard } from "../../../components/shared/SectionCard.tsx";
 import { Flag } from "lucide-preact";
+import { db } from "../../../src/db/index.ts";
+import { globalFeatureFlagValues } from "../../../src/db/schema.ts";
 import { FEATURE_FLAGS } from "../../../src/lib/devices/feature-flags.ts";
+import GlobalFeatureFlagsForm from "../../../islands/feature-flags/GlobalFeatureFlagsForm.tsx";
 
 interface FlagRow {
   key: string;
   name: string;
   description: string;
-  scope: "user" | "device" | "both";
   defaultValue: unknown;
   type: string;
+  /** Currently-set global value, undefined when unset. */
+  globalValue: unknown | undefined;
 }
 
 interface PageData {
@@ -37,34 +41,34 @@ function typeLabel(v: unknown): string {
   return "object";
 }
 
-function valueToString(v: unknown): string {
-  if (v === null || v === undefined) return "—";
-  if (typeof v === "string") return JSON.stringify(v);
-  if (typeof v === "number" || typeof v === "boolean") return String(v);
-  try {
-    return JSON.stringify(v);
-  } catch {
-    return String(v);
-  }
-}
-
 export const handler = define.handlers({
-  GET(ctx) {
+  async GET(ctx) {
     if (ctx.state.user?.role !== "admin") {
       return new Response(null, {
         status: 302,
         headers: { Location: "/admin/login" },
       });
     }
+    // Load any globally-set values so the editor reflects current state.
+    const globalRows = await db
+      .select({
+        flagKey: globalFeatureFlagValues.flagKey,
+        valueJson: globalFeatureFlagValues.valueJson,
+      })
+      .from(globalFeatureFlagValues);
+    const globalByKey = new Map<string, unknown>(
+      globalRows.map((r) => [r.flagKey, r.valueJson]),
+    );
+
     const flags: FlagRow[] = Object.entries(FEATURE_FLAGS).map((
       [key, spec],
     ) => ({
       key,
       name: spec.name,
       description: spec.description,
-      scope: spec.scope,
       defaultValue: spec.defaultValue,
       type: typeLabel(spec.defaultValue),
+      globalValue: globalByKey.has(key) ? globalByKey.get(key) : undefined,
     }));
     return { data: { flags } satisfies PageData };
   },
@@ -81,11 +85,12 @@ export default define.page<typeof handler>(
       >
         <PageCard
           title="Feature flags"
-          description="Code-defined registry. Values are assigned per-user and (optionally) per-device on each entity's detail page."
+          description="Code-defined registry. Global values fall back to the registry default; per-user and per-device overrides are edited on each entity's detail page."
           colorScheme="indigo"
         >
           <SectionCard
             title={`${flags.length} flag${flags.length === 1 ? "" : "s"}`}
+            description="Effective precedence: device override → user value → global value → registry default."
             icon={Flag}
             accent="indigo"
           >
@@ -97,43 +102,17 @@ export default define.page<typeof handler>(
                 </p>
               )
               : (
-                <div class="overflow-x-auto">
-                  <table class="w-full text-sm">
-                    <thead>
-                      <tr class="border-b text-xs text-muted-foreground uppercase tracking-wide">
-                        <th class="py-2 pr-3 text-left">Name / key</th>
-                        <th class="py-2 pr-3 text-left">Type</th>
-                        <th class="py-2 pr-3 text-left">Default</th>
-                        <th class="py-2 pr-3 text-left">Scope</th>
-                        <th class="py-2 text-left">Description</th>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
-                      {flags.map((f) => (
-                        <tr key={f.key} class="align-top">
-                          <td class="py-2 pr-3">
-                            <div class="font-medium">{f.name}</div>
-                            <div class="font-mono text-xs text-muted-foreground">
-                              {f.key}
-                            </div>
-                          </td>
-                          <td class="py-2 pr-3 font-mono text-xs">{f.type}</td>
-                          <td class="py-2 pr-3 font-mono text-xs">
-                            {valueToString(f.defaultValue)}
-                          </td>
-                          <td class="py-2 pr-3">
-                            <span class="inline-flex items-center rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-700 dark:text-indigo-300 capitalize">
-                              {f.scope}
-                            </span>
-                          </td>
-                          <td class="py-2 text-sm text-muted-foreground">
-                            {f.description}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <GlobalFeatureFlagsForm
+                  flags={flags.map((f) => ({
+                    key: f.key,
+                    name: f.name,
+                    description: f.description,
+                    kind: f.type as "bool" | "string" | "int" | "double" |
+                      "json",
+                    defaultValue: f.defaultValue,
+                    globalValue: f.globalValue,
+                  }))}
+                />
               )}
           </SectionCard>
         </PageCard>

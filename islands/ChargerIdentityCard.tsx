@@ -15,7 +15,7 @@
  */
 
 import { useState } from "preact/hooks";
-import { Check, Copy } from "lucide-preact";
+import { Check, Copy, X } from "lucide-preact";
 import SmartTextField from "./shared/SmartTextField.tsx";
 import SmartSelectField from "./shared/SmartSelectField.tsx";
 import { FORM_FACTOR_LABELS, FORM_FACTORS } from "@/src/lib/types/steve.ts";
@@ -274,15 +274,89 @@ function IdentityRow({
             />
           )
           : <span>{value ?? "—"}</span>}
-        {override !== null && (
+        {override !== null && isAdmin && (
+          <OverrideDot
+            label={label}
+            onClear={() => onSave(null)}
+          />
+        )}
+        {override !== null && !isAdmin && (
           <span
-            class="text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-400"
+            aria-hidden
             title="Admin override of the StEvE-reported value"
-          >
-            override
-          </span>
+            class="size-2.5 shrink-0 rounded-full bg-amber-500"
+          />
         )}
       </dd>
     </div>
+  );
+}
+
+/**
+ * Override-affordance dot.
+ *
+ * Two-stage interaction:
+ *   1. Idle: a large yellow dot, indicating "this value is an admin
+ *      override of the StEvE-reported value." Hovering keeps the dot.
+ *   2. Click once: dot expands into an X icon (still yellow) with a
+ *      tooltip "Click to clear override." This separates "I saw an
+ *      override exists" from "I want to delete it" so the destructive
+ *      action requires two intentional clicks.
+ *   3. Click X: invokes `onClear()` (writes `null` to the override
+ *      column). The parent re-renders without the dot since `override`
+ *      is now null.
+ *   4. Click anywhere outside / press Esc: returns to idle dot.
+ */
+function OverrideDot({
+  label,
+  onClear,
+}: {
+  label: string;
+  onClear: () => Promise<void> | void;
+}) {
+  const [armed, setArmed] = useState(false);
+  const [clearing, setClearing] = useState(false);
+
+  const handleClick = async (e: Event) => {
+    e.stopPropagation();
+    if (!armed) {
+      setArmed(true);
+      return;
+    }
+    setClearing(true);
+    try {
+      await onClear();
+    } finally {
+      setClearing(false);
+      setArmed(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      onBlur={() => setArmed(false)}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") setArmed(false);
+      }}
+      disabled={clearing}
+      title={armed
+        ? `Click again to clear ${label.toLowerCase()} override`
+        : `${label} override applied (click to clear)`}
+      aria-label={armed
+        ? `Clear ${label.toLowerCase()} override`
+        : `${label} override applied`}
+      class={cn(
+        "ml-1 inline-flex shrink-0 items-center justify-center rounded-full transition-all",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50",
+        armed
+          ? "size-5 bg-amber-500 text-white hover:bg-amber-600"
+          : "size-3 bg-amber-500 hover:size-3.5 hover:bg-amber-600",
+        clearing && "opacity-50",
+      )}
+    >
+      {armed && <X aria-hidden class="size-3.5" />}
+    </button>
   );
 }

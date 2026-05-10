@@ -158,9 +158,17 @@ export const handler = define.handlers({
         if (r.category && attributes.category !== r.category) {
           attributes.category = r.category;
         }
+        // Drizzle returns `timestamp` columns as Date by default but
+        // postgres-js can hand back a string for some pg server
+        // configurations. Coerce defensively so `.getTime()` always
+        // works — used to throw "x.getTime is not a function" on rows
+        // where the driver gave us a string.
+        const observedDate = r.observedTs instanceof Date
+          ? r.observedTs
+          : new Date(r.observedTs as unknown as string);
         return {
           timestamp: r.timestampNs.toString(),
-          observed_timestamp: (BigInt(r.observedTs.getTime()) * 1_000_000n)
+          observed_timestamp: (BigInt(observedDate.getTime()) * 1_000_000n)
             .toString(),
           severity_text: r.severityText,
           severity_number: r.severityNumber,
@@ -194,11 +202,19 @@ export const handler = define.handlers({
         latestSeq,
       });
     } catch (err) {
+      // Log the full stack trace — the previous best-effort message-only
+      // path made the prod 500 untriagable. Type-coerce failures (drizzle
+      // numeric/bigint quirks) tend to fire deep inside `.map()` so the
+      // stack is what we need.
       log.error("device_logs query failed", {
         deviceId,
         error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
       });
-      return jsonResponse(500, { error: "internal" });
+      return jsonResponse(500, {
+        error: "internal",
+        message: err instanceof Error ? err.message : String(err),
+      });
     }
   },
 });

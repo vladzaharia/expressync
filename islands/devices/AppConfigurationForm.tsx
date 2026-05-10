@@ -22,14 +22,15 @@ import { useState } from "preact/hooks";
 import {
   BatteryCharging,
   Bell,
+  Compass,
   Loader2,
   Lock,
-  MapPin,
   Save,
   Smartphone,
   User,
 } from "lucide-preact";
 import { Button } from "@/components/ui/button.tsx";
+import { Switch } from "@/components/ui/switch.tsx";
 import { CapabilityPill } from "@/components/devices/CapabilityPill.tsx";
 import { cn } from "@/src/lib/utils/cn.ts";
 import { toast } from "sonner";
@@ -73,7 +74,11 @@ function iconFor(c: DeviceCapability) {
     case "kiosk":
       return Lock;
     case "managed":
-      return MapPin;
+      // Compass reads as "fleet posture / orientation," differentiating
+      // it from the location-pin glyph used for the Location card. The
+      // capability is about being part of the managed fleet, not about
+      // a single coordinate read.
+      return Compass;
   }
 }
 
@@ -212,65 +217,66 @@ export default function AppConfigurationForm(
   return (
     <div class="flex flex-col gap-6">
       {/* Capabilities section */}
-      <div class="flex flex-col gap-3">
+      <div class="flex flex-col gap-4">
         <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Capabilities
         </h3>
-        <ul class="flex flex-col gap-2">
-          {readOnlyList.map((c) => (
-            <li
-              key={c}
-              class="flex items-center gap-3 rounded-md border border-border bg-muted/30 p-3 opacity-80"
-            >
-              <CapabilityPill capability={c} />
-              <span class="flex-1 text-xs text-muted-foreground">
-                {CAPABILITY_METADATA[c].description} (auto-managed)
-              </span>
-            </li>
-          ))}
-          {editableList.map((c) => {
-            const meta = CAPABILITY_METADATA[c];
-            const Icon = iconFor(c);
-            const checked = selected.has(c);
-            return (
+
+        {/* Read-only / auto-managed (system) capabilities — e.g. `charger`
+            on a charger row. Identity-defining, not editable. */}
+        {readOnlyList.length > 0 && (
+          <ul class="flex flex-col gap-2">
+            {readOnlyList.map((c) => (
               <li
                 key={c}
-                class={cn(
-                  "flex items-center gap-3 rounded-md border p-3 transition-colors",
-                  checked
-                    ? "border-teal-500/40 bg-teal-500/5"
-                    : "border-border bg-card",
-                )}
+                class="flex items-center gap-3 rounded-md border border-border bg-muted/30 p-3 opacity-80"
               >
-                <Icon
-                  aria-hidden
-                  class={cn(
-                    "size-5 shrink-0",
-                    checked
-                      ? "text-teal-600 dark:text-teal-400"
-                      : "text-muted-foreground",
-                  )}
-                />
-                <div class="flex flex-1 flex-col gap-0.5">
-                  <label class="text-sm font-medium" for={`cap-${c}`}>
-                    {meta.label}
-                  </label>
-                  <span class="text-xs text-muted-foreground">
-                    {meta.description}
-                  </span>
-                </div>
-                <input
-                  id={`cap-${c}`}
-                  type="checkbox"
-                  checked={checked}
-                  disabled={saving}
-                  onChange={() => toggle(c)}
-                  class="size-5 cursor-pointer accent-teal-600"
-                />
+                <CapabilityPill capability={c} />
+                <span class="flex-1 text-xs text-muted-foreground">
+                  {CAPABILITY_METADATA[c].description} (auto-managed)
+                </span>
               </li>
-            );
-          })}
-        </ul>
+            ))}
+          </ul>
+        )}
+
+        {/* Mode group — app-wide cutting concerns (managed, kiosk).
+            Rendered first because changing one of these reshapes the
+            whole app, not just a single tab. */}
+        {(() => {
+          const modeCaps = editableList.filter(
+            (c) => CAPABILITY_METADATA[c].group === "mode",
+          );
+          if (modeCaps.length === 0) return null;
+          return (
+            <CapabilityGroup
+              title="Mode"
+              description="App-wide posture. Changing these reshapes the whole experience."
+              caps={modeCaps}
+              selected={selected}
+              saving={saving}
+              onToggle={toggle}
+            />
+          );
+        })()}
+
+        {/* Feature group — discrete feature gates (scanner, user). */}
+        {(() => {
+          const featureCaps = editableList.filter(
+            (c) => CAPABILITY_METADATA[c].group === "feature",
+          );
+          if (featureCaps.length === 0) return null;
+          return (
+            <CapabilityGroup
+              title="Features"
+              description="Optional capability surfaces. Turn on what this device should do."
+              caps={featureCaps}
+              selected={selected}
+              saving={saving}
+              onToggle={toggle}
+            />
+          );
+        })()}
       </div>
 
       {/* Settings section — app devices only */}
@@ -303,19 +309,13 @@ export default function AppConfigurationForm(
                   : "When off, the device only sees scan-arm events while in foreground."}
               </span>
             </div>
-            <input
+            <Switch
               id="setting-notifications-scan-request"
-              type="checkbox"
+              aria-label="Toggle scanning request notifications"
               checked={hasApnsToken && scanRequestPush}
               disabled={saving || !hasApnsToken}
-              onChange={(e) =>
-                setScanRequestPush(
-                  (e.currentTarget as HTMLInputElement).checked,
-                )}
-              class={cn(
-                "size-5 accent-teal-600",
-                hasApnsToken ? "cursor-pointer" : "cursor-not-allowed",
-              )}
+              onCheckedChange={(next) => setScanRequestPush(next)}
+              className={hasApnsToken ? "" : "cursor-not-allowed"}
             />
           </div>
         </div>
@@ -331,6 +331,81 @@ export default function AppConfigurationForm(
           Save
         </Button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * One labelled group of capability switches. Used to separate the
+ * "mode" group (app-wide cuts) from the "features" group (discrete
+ * surface gates) without re-implementing the row layout in two places.
+ */
+function CapabilityGroup({
+  title,
+  description,
+  caps,
+  selected,
+  saving,
+  onToggle,
+}: {
+  title: string;
+  description: string;
+  caps: DeviceCapability[];
+  selected: Set<DeviceCapability>;
+  saving: boolean;
+  onToggle: (c: DeviceCapability) => void;
+}) {
+  return (
+    <div class="flex flex-col gap-2">
+      <div class="flex flex-col gap-0.5">
+        <h4 class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80">
+          {title}
+        </h4>
+        <p class="text-[11px] text-muted-foreground/70">{description}</p>
+      </div>
+      <ul class="flex flex-col gap-2">
+        {caps.map((c) => {
+          const meta = CAPABILITY_METADATA[c];
+          const Icon = iconFor(c);
+          const checked = selected.has(c);
+          return (
+            <li
+              key={c}
+              class={cn(
+                "flex items-center gap-3 rounded-md border p-3 transition-colors",
+                checked
+                  ? "border-teal-500/40 bg-teal-500/5"
+                  : "border-border bg-card",
+              )}
+            >
+              <Icon
+                aria-hidden
+                class={cn(
+                  "size-5 shrink-0",
+                  checked
+                    ? "text-teal-600 dark:text-teal-400"
+                    : "text-muted-foreground",
+                )}
+              />
+              <div class="flex flex-1 flex-col gap-0.5">
+                <label class="text-sm font-medium" for={`cap-${c}`}>
+                  {meta.label}
+                </label>
+                <span class="text-xs text-muted-foreground">
+                  {meta.description}
+                </span>
+              </div>
+              <Switch
+                id={`cap-${c}`}
+                aria-label={`Toggle ${meta.label}`}
+                checked={checked}
+                disabled={saving}
+                onCheckedChange={() => onToggle(c)}
+              />
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

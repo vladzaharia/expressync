@@ -1,7 +1,7 @@
 /**
  * DeviceLogsCard — admin-only Phase 3d. Renders the OTel-shaped log
  * stream from `/api/admin/devices/{id}/logs` for a single device with
- * severity / category / time-range filters.
+ * severity + time-range filters.
  *
  * Server-side query through our own Fresh handler; renders inside the
  * existing admin chrome. NO iframe to Grafana — the integration
@@ -12,6 +12,10 @@
  *
  * Live-tail is OFF by default. Polling refresh button is the simple
  * path; SSE live-tail will land in a follow-up slice.
+ *
+ * Category column dropped 2026-05: the OTel `category` was rarely
+ * useful for triage in our deployment (most categories are uniform
+ * per device anyway). Severity + body + expanded JSON is enough.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
@@ -73,7 +77,6 @@ export default function DeviceLogsCard({ deviceId, initialLogs }: Props) {
   const [selectedSeverities, setSelectedSeverities] = useState<Set<string>>(
     new Set(["INFO", "WARN", "ERROR"]),
   );
-  const [category, setCategory] = useState("");
   const [rangeMs, setRangeMs] = useState<number>(60 * 60_000); // 1h default
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
@@ -85,7 +88,6 @@ export default function DeviceLogsCard({ deviceId, initialLogs }: Props) {
       if (selectedSeverities.size > 0) {
         params.set("severity", [...selectedSeverities].join(","));
       }
-      if (category.trim()) params.set("category", category.trim());
       const since = new Date(Date.now() - rangeMs).toISOString();
       params.set("since", since);
       const url = `/api/admin/devices/${deviceId}/logs?${params}`;
@@ -94,7 +96,17 @@ export default function DeviceLogsCard({ deviceId, initialLogs }: Props) {
         headers: { Accept: "application/json" },
       });
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
+        // Pull the structured `error` field when the server returns
+        // JSON so the operator sees the actual reason, not a bare
+        // HTTP status. Falls back to status on parse failure.
+        let detail = `HTTP ${res.status}`;
+        try {
+          const body = await res.json() as { error?: string };
+          if (body?.error) detail = `${detail} (${body.error})`;
+        } catch {
+          // Non-JSON response — keep the bare status code.
+        }
+        throw new Error(detail);
       }
       const body = (await res.json()) as FetchResponse;
       setRecords(body.logs);
@@ -103,7 +115,7 @@ export default function DeviceLogsCard({ deviceId, initialLogs }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [deviceId, selectedSeverities, category, rangeMs]);
+  }, [deviceId, selectedSeverities, rangeMs]);
 
   // Initial fetch (in case the SSR initialLogs is empty/stale).
   useEffect(() => {
@@ -142,8 +154,6 @@ export default function DeviceLogsCard({ deviceId, initialLogs }: Props) {
       <FilterBar
         severities={selectedSeverities}
         onToggleSeverity={toggleSeverity}
-        category={category}
-        onCategory={setCategory}
         rangeMs={rangeMs}
         onRangeMs={setRangeMs}
         onRefresh={fetchLogs}
@@ -170,8 +180,6 @@ export default function DeviceLogsCard({ deviceId, initialLogs }: Props) {
 function FilterBar(props: {
   severities: Set<string>;
   onToggleSeverity: (sev: string) => void;
-  category: string;
-  onCategory: (v: string) => void;
   rangeMs: number;
   onRangeMs: (ms: number) => void;
   onRefresh: () => void;
@@ -185,50 +193,52 @@ function FilterBar(props: {
         <Filter class="size-3.5" aria-hidden />
         Severity:
       </div>
-      {SEVERITY_OPTIONS.map((opt) => {
-        const active = props.severities.has(opt.value);
-        return (
-          <button
-            type="button"
-            key={opt.value}
-            onClick={() => props.onToggleSeverity(opt.value)}
-            class={`rounded-full border px-2 py-0.5 text-xs font-medium transition-colors ${
-              active
-                ? severityFilterClass(opt.value)
-                : "border-slate-300 text-slate-600 hover:border-slate-400 hover:text-slate-700"
-            }`}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-      <div class="ml-2 inline-flex items-center gap-1 text-xs text-slate-500">
+      <div class="inline-flex flex-wrap items-center gap-1.5">
+        {SEVERITY_OPTIONS.map((opt) => {
+          const active = props.severities.has(opt.value);
+          return (
+            <button
+              type="button"
+              key={opt.value}
+              onClick={() => props.onToggleSeverity(opt.value)}
+              class={`rounded-full border px-2 py-0.5 text-xs font-medium transition-colors ${
+                active
+                  ? severityFilterClass(opt.value)
+                  : "border-slate-300 text-slate-600 hover:border-slate-400 hover:text-slate-700"
+              }`}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Larger gap between the Severity group and the Range group so
+          they read as two separate filter sets. `ml-6` (24px) instead
+          of the inter-chip 2-space gap. */}
+      <div class="ml-6 inline-flex items-center gap-1 text-xs text-slate-500">
         Range:
       </div>
-      {RANGE_OPTIONS.map((r) => {
-        const active = props.rangeMs === r.ms;
-        return (
-          <button
-            type="button"
-            key={r.value}
-            onClick={() => props.onRangeMs(r.ms)}
-            class={`rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
-              active
-                ? "bg-teal-600 text-white"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            {r.label}
-          </button>
-        );
-      })}
-      <input
-        type="text"
-        placeholder="category"
-        value={props.category}
-        onInput={(e) => props.onCategory((e.target as HTMLInputElement).value)}
-        class="ml-2 w-32 rounded-md border border-slate-300 px-2 py-1 text-xs"
-      />
+      <div class="inline-flex flex-wrap items-center gap-1.5">
+        {RANGE_OPTIONS.map((r) => {
+          const active = props.rangeMs === r.ms;
+          return (
+            <button
+              type="button"
+              key={r.value}
+              onClick={() => props.onRangeMs(r.ms)}
+              class={`rounded-full border px-2 py-0.5 text-xs font-medium transition-colors ${
+                active
+                  ? "border-transparent bg-teal-600 text-white"
+                  : "border-slate-300 text-slate-600 hover:border-slate-400 hover:text-slate-700"
+              }`}
+            >
+              {r.label}
+            </button>
+          );
+        })}
+      </div>
+
       <div class="ml-auto flex items-center gap-2">
         <span class="text-xs text-slate-500">
           {props.loading ? "Loading…" : `${props.recordCount} records`}
@@ -294,7 +304,6 @@ function LogRow(props: {
 }) {
   const r = props.record;
   const time = useMemo(() => formatTimestamp(r.timestamp), [r.timestamp]);
-  const category = (r.attributes?.["category"] as string | undefined) ?? "";
   return (
     <li class="border-b border-slate-200 last:border-b-0">
       <button
@@ -316,7 +325,6 @@ function LogRow(props: {
         >
           {r.severity_text}
         </span>
-        {category && <span class="shrink-0 text-slate-500">{category}</span>}
         <span class="grow truncate text-slate-900">{r.body}</span>
       </button>
       {props.expanded && (

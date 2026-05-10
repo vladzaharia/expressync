@@ -1703,6 +1703,28 @@ export type DeviceFeatureFlagOverride =
 export type NewDeviceFeatureFlagOverride =
   typeof deviceFeatureFlagOverrides.$inferInsert;
 
+// Migration 0054 — global feature-flag tier. Singleton per flag_key;
+// applies to every consumer in the absence of a user or device
+// override. Effective precedence:
+//   device override > user value > global value > registry default
+
+export const globalFeatureFlagValues = pgTable(
+  "global_feature_flag_values",
+  {
+    flagKey: text("flag_key").primaryKey(),
+    valueJson: jsonb("value_json").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedBy: text("updated_by").notNull(),
+  },
+);
+
+export type GlobalFeatureFlagValue =
+  typeof globalFeatureFlagValues.$inferSelect;
+export type NewGlobalFeatureFlagValue =
+  typeof globalFeatureFlagValues.$inferInsert;
+
 // ============================================================================
 // === Phase 3c: device logs (OpenTelemetry-shaped) ===
 // ============================================================================
