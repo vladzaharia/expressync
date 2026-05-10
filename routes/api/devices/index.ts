@@ -193,7 +193,7 @@ function normalizeFormFactor(v: string | null): ChargerRow["formFactor"] {
 }
 
 /** Wire the override-or-null connector type. The CHECK constraint
- *  on `chargers.connector_type_override` already pins valid
+ *  on `charger_connectors.connector_type` already pins valid
  *  values; this guard is defence in depth in case the column is
  *  ever loosened. */
 function normalizeConnectorType(
