@@ -108,8 +108,14 @@ type ViewRow = {
   friendly_name: string | null;
   form_factor: string | null;
   capabilities?: string[] | null;
-  connector_type_override: string | null;
-  max_kw_override: string | null;
+  // Migration 0050 promoted connector type + max_kw to a separate
+  // `charger_connectors` table keyed by (charge_box_id, connector_id).
+  // The list view reads connector 1 (the row backfilled from the
+  // dropped `*_override` columns); we still expose them as a single
+  // value on the wire because the iOS list UI only renders one
+  // connector per row.
+  connector_type: string | null;
+  max_kw: string | null;
   management_mode: string | null;
   address_line1: string | null;
   address_line2: string | null;
@@ -234,8 +240,8 @@ const defaultLoader: ChargerListLoader = async () => {
       cc.friendly_name,
       cc.form_factor,
       cc.capabilities,
-      cc.connector_type_override,
-      cc.max_kw_override,
+      ccon.connector_type,
+      ccon.max_kw,
       cc.management_mode,
       cc.address_line1,
       cc.address_line2,
@@ -248,6 +254,8 @@ const defaultLoader: ChargerListLoader = async () => {
     FROM tappable_devices tv
     LEFT JOIN chargers cc
       ON tv.kind = 'charger' AND cc.charge_box_id = tv.id
+    LEFT JOIN charger_connectors ccon
+      ON ccon.charge_box_id = cc.charge_box_id AND ccon.connector_id = 1
     WHERE tv.kind = 'charger'
       AND tv.deleted_at IS NULL
     ORDER BY tv.last_seen_at DESC NULLS LAST
@@ -330,8 +338,8 @@ export const handler = define.handlers({
           // rating, so we surface admin-set overrides from
           // chargers. Both fields stay nullable on the wire
           // when no override is set; iOS renders `—` in that case.
-          connectorType: normalizeConnectorType(r.connector_type_override),
-          maxKw: parseMaxKw(r.max_kw_override),
+          connectorType: normalizeConnectorType(r.connector_type),
+          maxKw: parseMaxKw(r.max_kw),
           // The wire field is named `lastSeenAt` for backward
           // compatibility, but it's the time we last received a real
           // OCPP status from the charger. The cache's `last_seen_at`
