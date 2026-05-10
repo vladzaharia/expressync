@@ -57,6 +57,7 @@ import {
 import { parseSettingDelta } from "../../../../../src/lib/devices/settings-keys.ts";
 import { withIdempotency } from "../../../../../src/lib/idempotency.ts";
 import { logger } from "../../../../../src/lib/utils/logger.ts";
+import { eventBus } from "../../../../../src/services/event-bus.service.ts";
 
 const log = logger.child("DeviceMeStateSync");
 
@@ -395,6 +396,10 @@ export const handler = define.handlers({
       // seqs) are safe.
       let logsAckedSeq: bigint | null = null;
       let logsDroppedDuplicates = 0;
+      // Records that successfully INSERTed — published to the
+      // event-bus AFTER the loop so SSE consumers see the same shape
+      // the read API returns.
+      const newlyInsertedRecords: Array<Record<string, unknown>> = [];
       if (parsed.logs && parsed.logs.length > 0) {
         const nowMs = now.getTime();
         const insertedSeqs = new Set<string>();
@@ -440,6 +445,19 @@ export const handler = define.handlers({
               if (logsAckedSeq === null || seq > logsAckedSeq) {
                 logsAckedSeq = seq;
               }
+              // Build the OTel-shaped record for SSE fan-out. Mirrors
+              // what the GET /logs route reconstructs from columns.
+              newlyInsertedRecords.push({
+                timestamp: tsNs.toString(),
+                observed_timestamp: (BigInt(nowMs) * 1_000_000n).toString(),
+                severity_text: record.severity_text,
+                severity_number: record.severity_number,
+                body: record.body,
+                attributes: record.attributes,
+                resource: record.resource,
+                trace_id: record.trace_id ?? null,
+                span_id: record.span_id ?? null,
+              });
             } else {
               logsDroppedDuplicates += 1;
               // Even duplicates count as "acked" — the server already
@@ -465,6 +483,18 @@ export const handler = define.handlers({
           dropped: logsDroppedDuplicates,
           ackedSeq: logsAckedSeq?.toString() ?? null,
         });
+        // Phase 3c — fan-out fresh records to in-process SSE consumers
+        // (the admin web UI's "Live tail" button). Best-effort; the
+        // bus has its own backpressure.
+        if (newlyInsertedRecords.length > 0) {
+          eventBus.publish({
+            type: "device.logs.appended",
+            payload: {
+              deviceId: device.id,
+              records: newlyInsertedRecords,
+            },
+          });
+        }
       }
 
       // ---- 7. Return the post-merge envelope -----------------------------

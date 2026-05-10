@@ -62,7 +62,11 @@ export type EventBusEventType =
   | "device.session.replaced"
   | "device.token.revoked"
   | "device.capabilities.changed"
-  | "device.settings.changed";
+  | "device.settings.changed"
+  // Phase 3c — device-logs ingest publishes one event per inserted
+  // record so the admin web UI's "Live tail" SSE consumer can render
+  // logs without polling. Single-replica fan-out only (in-process bus).
+  | "device.logs.appended";
 
 export interface NotificationCreatedPayload {
   id: number;
@@ -242,7 +246,20 @@ export type EventBusEvent =
   | {
     type: "device.settings.changed";
     payload: DeviceSettingsChangedPayload;
+  }
+  | {
+    type: "device.logs.appended";
+    payload: DeviceLogsAppendedPayload;
   };
+
+/** Phase 3c — payload for `device.logs.appended`. The admin SSE
+ *  consumer filters by `deviceId`. Records are the OTel-shaped JSON
+ *  rows just inserted into `device_logs`. Bounded to the per-sync cap
+ *  (100). */
+export interface DeviceLogsAppendedPayload {
+  deviceId: string;
+  records: Array<Record<string, unknown>>;
+}
 
 export interface DeliveredEvent {
   seq: number;
