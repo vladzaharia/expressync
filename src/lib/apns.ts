@@ -169,6 +169,92 @@ export async function sendApns(
 }
 
 // ---------------------------------------------------------------------------
+// Silent (content-available) pushes — Phase 2 Bundle 2b "Locate-now"
+// ---------------------------------------------------------------------------
+//
+// Distinct from the alert path above. A silent push has NO alert/sound/badge;
+// it wakes the app for a brief background-fetch window. iOS uses the same
+// JWT + APNs host but a different `apns-push-type` ("background") and
+// priority 5 (not 10).
+
+export interface SilentApnsPayload {
+  /** Bundle ID (apns-topic header) — defaults to `config.APNS_TOPIC`. */
+  topic?: string;
+  /** Coalesce key. Sending twice with the same id replaces the prior. */
+  collapseId?: string;
+  /** Unix seconds when delivery becomes pointless; APNs drops afterward. */
+  expirationEpochSec?: number;
+  /** Custom payload fields merged at the top level (NOT inside `aps`). */
+  custom: Record<string, unknown>;
+}
+
+export async function sendSilentApns(
+  target: ApnsTarget,
+  payload: SilentApnsPayload,
+): Promise<ApnsResult> {
+  const host = target.environment === "production"
+    ? "api.push.apple.com"
+    : "api.sandbox.push.apple.com";
+  const url = `https://${host}/3/device/${target.pushToken}`;
+
+  const topic = payload.topic ?? Deno.env.get("APNS_TOPIC") ??
+    config.APNS_TOPIC;
+  const headers: Record<string, string> = {
+    "apns-topic": topic,
+    // Silent pushes use priority 5 — Apple deprioritises and may
+    // throttle them. Priority 10 is the alert path only.
+    "apns-priority": "5",
+    "apns-push-type": "background",
+    "apns-expiration": payload.expirationEpochSec !== undefined
+      ? String(payload.expirationEpochSec)
+      : "0",
+    "content-type": "application/json",
+  };
+  if (payload.collapseId) {
+    headers["apns-collapse-id"] = payload.collapseId;
+  }
+
+  let jwt: string;
+  try {
+    jwt = await getApnsJwt();
+  } catch (err) {
+    log.error("JWT signing failed (silent)", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return { ok: false, status: 0, reason: "JwtSignFailed" };
+  }
+  headers.authorization = `bearer ${jwt}`;
+
+  const body: Record<string, unknown> = {
+    aps: { "content-available": 1 },
+    ...payload.custom,
+  };
+
+  let res: Response;
+  try {
+    res = await globalThis.fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    log.error("APNs silent fetch failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return { ok: false, status: 0, reason: "FetchFailed" };
+  }
+  if (res.status === 200) return { ok: true };
+  let reason = "Unknown";
+  try {
+    const j = await res.json() as { reason?: string };
+    if (typeof j.reason === "string") reason = j.reason;
+  } catch {
+    // ignore
+  }
+  return { ok: false, status: res.status, reason };
+}
+
+// ---------------------------------------------------------------------------
 // Body rendering
 // ---------------------------------------------------------------------------
 
