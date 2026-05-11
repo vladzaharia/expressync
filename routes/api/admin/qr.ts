@@ -67,90 +67,211 @@ const FINDER_BLUE = "#1d4ed8";
 // Rounded lightning-bolt polygon
 // --------------------------------------------------------------------
 //
-// The six sharp Zap-path vertices in 24-unit space, normalised to
-// 0..1. Polygon winding is the same as the SVG path:
+// Source: the exact `Zap` glyph rendered in the admin sidebar — the
+// current Lucide path (lucide-preact 0.511.0 icons/zap.js) which uses
+// elliptical arcs at every corner rather than the older straight-line
+// Zap (M13 2 L3 14 …). That older path is what the hand-rolled
+// rounded polygon used to approximate; this version matches the
+// nav-bar logo byte-for-byte.
 //
-//   A: top tip
-//   B: top-left inner corner
-//   C: mid-left split
-//   D: bottom tip
-//   E: bottom-right inner corner
-//   F: mid-right split
-//
-// Corner-rounding is applied uniformly at all six vertices via a
-// quadratic-Bézier arc (start = `radius` along the prev-edge,
-// control = the sharp vertex, end = `radius` along the next-edge).
+// The path is parsed once at module load and sampled into a flat
+// polygon — line-segments + small arc samples — that the
+// point-in-polygon test below can scan. Native 24×24 viewBox space,
+// then normalised to 0..1 before use.
 
-const SHARP_BOLT: Array<[number, number]> = [
-  [13 / 24, 2 / 24], // A — top tip
-  [3 / 24, 14 / 24], // B — top-left inner corner
-  [12 / 24, 14 / 24], // C — mid-left split
-  [11 / 24, 22 / 24], // D — bottom tip
-  [21 / 24, 10 / 24], // E — bottom-right inner corner
-  [12 / 24, 10 / 24], // F — mid-right split
-];
+const LUCIDE_ZAP_PATH =
+  "M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z";
 
-const CORNER_RADIUS = 0.06; // in 0..1 space — gives a soft but recognisable round
-const ARC_STEPS = 6; // per corner
+const ARC_STEPS_PER_RADIAN = 14;
 
-function buildRoundedBolt(): Array<[number, number]> {
-  const out: Array<[number, number]> = [];
-  const n = SHARP_BOLT.length;
-  for (let i = 0; i < n; i++) {
-    const prev = SHARP_BOLT[(i - 1 + n) % n];
-    const v = SHARP_BOLT[i];
-    const next = SHARP_BOLT[(i + 1) % n];
-    out.push(...roundCorner(prev, v, next, CORNER_RADIUS, ARC_STEPS));
+interface PathToken {
+  cmd: string;
+  args: number[];
+}
+
+/**
+ * Tokenise an SVG path into `{cmd, args}` pairs via `String.matchAll`.
+ * Handles signed/unsigned floats including the no-separator form
+ * (`1.5-2.3` → `[1.5, -2.3]`).
+ */
+function tokeniseSvgPath(p: string): PathToken[] {
+  const out: PathToken[] = [];
+  const cmdRe = /([MLlhHaAzZ])([^MLlhHaAzZ]*)/g;
+  const numRe = /-?\d*\.?\d+(?:[eE][-+]?\d+)?/g;
+  for (const m of p.matchAll(cmdRe)) {
+    const cmd = m[1];
+    const args: number[] = [];
+    const argStr = m[2].trim();
+    if (argStr.length > 0) {
+      for (const nm of argStr.matchAll(numRe)) args.push(parseFloat(nm[0]));
+    }
+    out.push({ cmd, args });
   }
   return out;
 }
 
 /**
- * Replace the sharp corner at `v` with a quadratic-Bézier arc.
- * `prev`→`v`→`next` are consecutive polygon vertices. The arc starts
- * `radius` along the `prev`→`v` edge, passes near `v` (which is the
- * Bézier control point), and ends `radius` along the `v`→`next` edge.
+ * SVG 1.1 §F.6.5 endpoint-to-centre parameterisation. Samples an
+ * elliptic arc and returns the new points (start is assumed already
+ * in the polygon).
  */
-function roundCorner(
-  prev: [number, number],
-  v: [number, number],
-  next: [number, number],
-  radius: number,
-  steps: number,
+function sampleSvgArc(
+  x1: number,
+  y1: number,
+  rx: number,
+  ry: number,
+  xAxisRotDeg: number,
+  largeArcFlag: number,
+  sweepFlag: number,
+  x2: number,
+  y2: number,
 ): Array<[number, number]> {
-  const dPrevX = v[0] - prev[0];
-  const dPrevY = v[1] - prev[1];
-  const lenPrev = Math.hypot(dPrevX, dPrevY) || 1;
-  const dNextX = next[0] - v[0];
-  const dNextY = next[1] - v[1];
-  const lenNext = Math.hypot(dNextX, dNextY) || 1;
-
-  // Clamp the radius so it never overshoots half the shorter incident
-  // edge — otherwise adjacent arcs would cross each other.
-  const r = Math.min(radius, lenPrev / 2.5, lenNext / 2.5);
-
-  const start: [number, number] = [
-    v[0] - (dPrevX / lenPrev) * r,
-    v[1] - (dPrevY / lenPrev) * r,
-  ];
-  const end: [number, number] = [
-    v[0] + (dNextX / lenNext) * r,
-    v[1] + (dNextY / lenNext) * r,
-  ];
-
+  if (rx === 0 || ry === 0) return [[x2, y2]];
+  rx = Math.abs(rx);
+  ry = Math.abs(ry);
+  const phi = (xAxisRotDeg * Math.PI) / 180;
+  const cosPhi = Math.cos(phi);
+  const sinPhi = Math.sin(phi);
+  const dx2 = (x1 - x2) / 2;
+  const dy2 = (y1 - y2) / 2;
+  const x1p = cosPhi * dx2 + sinPhi * dy2;
+  const y1p = -sinPhi * dx2 + cosPhi * dy2;
+  const lambda = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry);
+  if (lambda > 1) {
+    const s = Math.sqrt(lambda);
+    rx *= s;
+    ry *= s;
+  }
+  const sign = largeArcFlag === sweepFlag ? -1 : 1;
+  const sq = ((rx * rx * ry * ry) - (rx * rx * y1p * y1p) -
+    (ry * ry * x1p * x1p)) /
+    ((rx * rx * y1p * y1p) + (ry * ry * x1p * x1p));
+  const coef = sign * Math.sqrt(Math.max(0, sq));
+  const cxp = coef * ((rx * y1p) / ry);
+  const cyp = coef * (-(ry * x1p) / rx);
+  const cx = cosPhi * cxp - sinPhi * cyp + (x1 + x2) / 2;
+  const cy = sinPhi * cxp + cosPhi * cyp + (y1 + y2) / 2;
+  const angle = (ux: number, uy: number, vx: number, vy: number) => {
+    const dot = ux * vx + uy * vy;
+    const len = Math.sqrt(ux * ux + uy * uy) * Math.sqrt(vx * vx + vy * vy);
+    let a = Math.acos(Math.min(1, Math.max(-1, dot / (len || 1))));
+    if (ux * vy - uy * vx < 0) a = -a;
+    return a;
+  };
+  const theta1 = angle(1, 0, (x1p - cxp) / rx, (y1p - cyp) / ry);
+  let deltaTheta = angle(
+    (x1p - cxp) / rx,
+    (y1p - cyp) / ry,
+    (-x1p - cxp) / rx,
+    (-y1p - cyp) / ry,
+  );
+  if (sweepFlag === 0 && deltaTheta > 0) deltaTheta -= 2 * Math.PI;
+  if (sweepFlag === 1 && deltaTheta < 0) deltaTheta += 2 * Math.PI;
+  const steps = Math.max(
+    2,
+    Math.ceil(Math.abs(deltaTheta) * ARC_STEPS_PER_RADIAN),
+  );
   const out: Array<[number, number]> = [];
-  for (let i = 0; i <= steps; i++) {
+  for (let i = 1; i <= steps; i++) {
     const t = i / steps;
-    const omt = 1 - t;
+    const theta = theta1 + deltaTheta * t;
+    const cosT = Math.cos(theta);
+    const sinT = Math.sin(theta);
     out.push([
-      omt * omt * start[0] + 2 * omt * t * v[0] + t * t * end[0],
-      omt * omt * start[1] + 2 * omt * t * v[1] + t * t * end[1],
+      cosPhi * (rx * cosT) - sinPhi * (ry * sinT) + cx,
+      sinPhi * (rx * cosT) + cosPhi * (ry * sinT) + cy,
     ]);
   }
   return out;
 }
 
-const BOLT_POLYGON = buildRoundedBolt();
+/**
+ * Walk the tokenised path, emitting a flat polygon in 0..1 space
+ * (divided by the 24-unit Lucide viewBox edge). Handles M, L/l, h/H,
+ * A/a, Z/z — the subset Lucide's Zap actually uses.
+ */
+function buildLucideZapPolygon(): Array<[number, number]> {
+  const tokens = tokeniseSvgPath(LUCIDE_ZAP_PATH);
+  const poly: Array<[number, number]> = [];
+  let cx = 0, cy = 0, startX = 0, startY = 0;
+  for (const t of tokens) {
+    switch (t.cmd) {
+      case "M":
+        cx = t.args[0];
+        cy = t.args[1];
+        startX = cx;
+        startY = cy;
+        poly.push([cx / 24, cy / 24]);
+        break;
+      case "L":
+        for (let i = 0; i < t.args.length; i += 2) {
+          cx = t.args[i];
+          cy = t.args[i + 1];
+          poly.push([cx / 24, cy / 24]);
+        }
+        break;
+      case "l":
+        for (let i = 0; i < t.args.length; i += 2) {
+          cx += t.args[i];
+          cy += t.args[i + 1];
+          poly.push([cx / 24, cy / 24]);
+        }
+        break;
+      case "h":
+        for (const d of t.args) {
+          cx += d;
+          poly.push([cx / 24, cy / 24]);
+        }
+        break;
+      case "H":
+        for (const x of t.args) {
+          cx = x;
+          poly.push([cx / 24, cy / 24]);
+        }
+        break;
+      case "A":
+      case "a": {
+        const rel = t.cmd === "a";
+        for (let i = 0; i < t.args.length; i += 7) {
+          const rx = t.args[i];
+          const ry = t.args[i + 1];
+          const rot = t.args[i + 2];
+          const large = t.args[i + 3];
+          const sweep = t.args[i + 4];
+          let x2 = t.args[i + 5];
+          let y2 = t.args[i + 6];
+          if (rel) {
+            x2 += cx;
+            y2 += cy;
+          }
+          const samples = sampleSvgArc(
+            cx,
+            cy,
+            rx,
+            ry,
+            rot,
+            large,
+            sweep,
+            x2,
+            y2,
+          );
+          for (const [sx, sy] of samples) poly.push([sx / 24, sy / 24]);
+          cx = x2;
+          cy = y2;
+        }
+        break;
+      }
+      case "z":
+      case "Z":
+        cx = startX;
+        cy = startY;
+        break;
+    }
+  }
+  return poly;
+}
+
+const BOLT_POLYGON = buildLucideZapPolygon();
 // Tight bounding box of the polygon in normalised 0..1 space.
 const BOLT_BBOX = (() => {
   let minX = 1, minY = 1, maxX = 0, maxY = 0;
