@@ -48,6 +48,7 @@ import { db } from "../../src/db/index.ts";
 import { chargers } from "../../src/db/schema.ts";
 import { PublicShell } from "../../components/public/PublicShell.tsx";
 import { PublicChargerHero } from "../../components/public/PublicChargerHero.tsx";
+import { PublicIdDisplay } from "../../components/shared/PublicIdDisplay.tsx";
 import { isValidPublicId } from "../../src/lib/utils/public-id.ts";
 import { getPrimaryConnectorSpec } from "../../src/services/charger-connectors.service.ts";
 import type { FormFactor } from "../../src/lib/types/steve.ts";
@@ -183,7 +184,19 @@ export default define.page<typeof handler>(function ChargerLanding({ data }) {
         { href: "/terms", label: "Terms" },
       ]}
     >
-      <HeaderRow status={data.status} isUnmanaged={data.isUnmanaged} />
+      {
+        /* Header row: status pill on the left, the charger's public ID
+          on the right. The ID is read-only — used by an attendant or
+          customer to confirm "yes, this is the charger I'm at" by
+          eyeballing the value against the sticker. Not clickable, no
+          QR popover here. */
+      }
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <HeaderRow status={data.status} isUnmanaged={data.isUnmanaged} />
+        <div aria-label={`Charger ID ${data.publicId}`}>
+          <PublicIdDisplay publicId={data.publicId} size="md" />
+        </div>
+      </div>
 
       <div class="mt-6">
         <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -207,14 +220,12 @@ export default define.page<typeof handler>(function ChargerLanding({ data }) {
         />
       </div>
 
-      {data.isUnmanaged
-        ? <PlugInCard />
-        : (
-          <ManagedActions
-            appUrl={data.appUrl}
-            hasScanner={data.hasScanner}
-          />
-        )}
+      {data.isUnmanaged ? <PlugInCard /> : (
+        <ManagedActions
+          appUrl={data.appUrl}
+          hasScanner={data.hasScanner}
+        />
+      )}
 
       <p class="mt-10 text-center text-xs text-muted-foreground">
         Need help?{" "}
