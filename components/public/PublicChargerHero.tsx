@@ -134,9 +134,11 @@ export function PublicChargerHero(
           stroke-linecap="round"
           stroke-linejoin="round"
         />
-        {/* Strain-relief boots — small rounded rects at each cable
+        {
+          /* Strain-relief boots — small rounded rects at each cable
             entry point. Filled with the status halo colour at full
-            opacity so they read as solid grommets. */}
+            opacity so they read as solid grommets. */
+        }
         <rect
           x={131}
           y={164}
@@ -155,9 +157,11 @@ export function PublicChargerHero(
         />
       </svg>
 
-      {/* Charger glyph — absolute-positioned in the same coordinate
+      {
+        /* Charger glyph — absolute-positioned in the same coordinate
           space as the cable. Centred at (140, 100) with 120×120 box,
-          so top-left = (80, 40). */}
+          so top-left = (80, 40). */
+      }
       <div
         class="absolute"
         style="left: 16.7%; top: 18.2%; width: 25%; aspect-ratio: 1;"
@@ -169,21 +173,21 @@ export function PublicChargerHero(
         />
       </div>
 
-      {/* Connector glyph — centred at (340, 96) with 88×88 box, so
-          top-left = (296, 52). */}
+      {
+        /* Connector glyph — centred at (340, 96) with 88×88 box, so
+          top-left = (296, 52). */
+      }
       <div
         class="absolute flex items-center justify-center text-foreground"
         style="left: 61.7%; top: 23.6%; width: 18.3%; aspect-ratio: 1;"
       >
-        {ConnectorGlyph
-          ? <ConnectorGlyph size={88} />
-          : (
-            <div
-              class="rounded-full border-[3px] border-dashed opacity-40"
-              style="width: 80%; aspect-ratio: 1;"
-              aria-hidden="true"
-            />
-          )}
+        {ConnectorGlyph ? <ConnectorGlyph size={88} /> : (
+          <div
+            class="rounded-full border-[3px] border-dashed opacity-40"
+            style="width: 80%; aspect-ratio: 1;"
+            aria-hidden="true"
+          />
+        )}
       </div>
 
       {/* kW + label, centred above the connector glyph at (340, 26). */}
