@@ -1,0 +1,24 @@
+# gitleaks config — extends the default ruleset with project-specific allowlist
+# entries for test fixtures and intentionally-committed values. See CLAUDE.md
+# for the rationale on each entry.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test fixtures and baked test-image credentials"
+paths = [
+  # APNs JWT key tests use a generated key pair embedded in the test file.
+  '''src/lib/apns\.test\.ts''',
+  # docs/logging fixtures contain redaction-pipeline test inputs.
+  '''docs/logging/scrubber-fixtures\.json''',
+  # Test files that contain push-token / device-id fixtures.
+  '''.*\.test\.ts''',
+  # Integration test harness — see comment in env.ts about SteVe's baked
+  # test-image credentials.
+  '''tests/integration/.*''',
+]
+# Stopwords / known-not-secret values present in normal source files.
+regexes = [
+  '''cmdk\.recent\.migrated_v1''',
+]
