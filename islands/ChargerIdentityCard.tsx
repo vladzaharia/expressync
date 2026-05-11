@@ -295,17 +295,13 @@ function IdentityRow({
 /**
  * Override-affordance dot.
  *
- * Two-stage interaction:
- *   1. Idle: a large yellow dot, indicating "this value is an admin
- *      override of the StEvE-reported value." Hovering keeps the dot.
- *   2. Click once: dot expands into an X icon (still yellow) with a
- *      tooltip "Click to clear override." This separates "I saw an
- *      override exists" from "I want to delete it" so the destructive
- *      action requires two intentional clicks.
- *   3. Click X: invokes `onClear()` (writes `null` to the override
- *      column). The parent re-renders without the dot since `override`
- *      is now null.
- *   4. Click anywhere outside / press Esc: returns to idle dot.
+ * Hover/focus reveals a bare X (no background fill) — the same slot
+ * just swaps from the small yellow dot to a yellow ✕ glyph. Click the
+ * X (or the dot itself on touch) to clear the override.
+ *
+ * Touch fallback: with no hover, the first click "arms" the dot
+ * (also swapping it to an X) and the second click invokes `onClear`.
+ * Blur / Esc disarms.
  */
 function OverrideDot({
   label,
@@ -319,6 +315,9 @@ function OverrideDot({
 
   const handleClick = async (e: Event) => {
     e.stopPropagation();
+    // Touch / keyboard: first click arms; second click clears.
+    // Pointer hover paths skip the arm step because the hover state
+    // already showed the X — see comment on the class chain below.
     if (!armed) {
       setArmed(true);
       return;
@@ -342,21 +341,26 @@ function OverrideDot({
       }}
       disabled={clearing}
       title={armed
-        ? `Click again to clear ${label.toLowerCase()} override`
-        : `${label} override applied (click to clear)`}
+        ? `Click to clear ${label.toLowerCase()} override`
+        : `${label} override applied`}
       aria-label={armed
         ? `Clear ${label.toLowerCase()} override`
         : `${label} override applied`}
       class={cn(
-        "ml-1 inline-flex shrink-0 items-center justify-center rounded-full transition-all",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50",
-        armed
-          ? "size-5 bg-amber-500 text-white hover:bg-amber-600"
-          : "size-3 bg-amber-500 hover:size-3.5 hover:bg-amber-600",
+        "ml-1 inline-flex size-3 shrink-0 items-center justify-center text-amber-500 transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 focus-visible:rounded-sm",
+        // Idle: small filled yellow dot. Hover/focus/armed: bare X
+        // glyph (no background fill), still yellow.
+        armed ? "[&_.dot]:hidden" : "hover:[&_.dot]:hidden focus:[&_.dot]:hidden",
+        armed ? "[&_.x]:block" : "[&_.x]:hidden hover:[&_.x]:block focus:[&_.x]:block",
         clearing && "opacity-50",
       )}
     >
-      {armed && <X aria-hidden class="size-3.5" />}
+      <span
+        aria-hidden
+        class="dot block size-2 rounded-full bg-amber-500"
+      />
+      <X aria-hidden class="x size-3" strokeWidth={3} />
     </button>
   );
 }

@@ -85,16 +85,11 @@ export const handler = define.handlers({
     );
 
     // Raw bitmap so we can colourise per-module instead of returning
-    // the encoder's default-black SVG.
-    //
-    // The `raw` output is a `Bitmap` instance (square boolean grid);
-    // we treat it as a 2D number array via `data[y][x]` access (0/1)
-    // to keep the rendering loop bog-standard.
-    // deno-lint-ignore no-explicit-any
-    const raw = encodeQR(value, "raw", { ecc: "medium" }) as any;
-    const matrix: number[][] = Array.isArray(raw)
-      ? raw as number[][]
-      : (raw?.data as number[][]) ?? [];
+    // the encoder's default-black SVG. `encodeQR(value, "raw")`
+    // returns a square `boolean[][]` (truthy = dark module). The
+    // previous version typed this as `number[][]` and checked for
+    // `=== 1`, which never matched and produced an empty SVG.
+    const matrix: boolean[][] = encodeQR(value, "raw", { ecc: "medium" });
     const size = matrix.length;
     if (size === 0) {
       // Fall back to the encoder's default svg if the raw shape isn't
@@ -140,7 +135,7 @@ export const handler = define.handlers({
 
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
-        if (matrix[y][x] !== 1) continue;
+        if (!matrix[y][x]) continue;
         const bolt = isInBolt(x, y, size);
         const finder = isFinder(x, y);
         const fill = finder
