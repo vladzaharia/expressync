@@ -62,20 +62,7 @@ export default function PublicIdQrPopover({
           interactive
         />
       </PopoverTrigger>
-      <PopoverContent
-        class="w-80 bg-card"
-        // Overlay the trigger: `side="bottom"` + a negative
-        // `sideOffset` lifts the panel up so its top edge aligns with
-        // the trigger's top edge (the trigger chip is ~32px tall).
-        // `align="center"` keeps it horizontally centered over the
-        // trigger. `avoidCollisions={false}` keeps Radix from
-        // flipping it away from the trigger near viewport edges —
-        // covering the trigger is the intended layout.
-        side="bottom"
-        sideOffset={-40}
-        align="center"
-        avoidCollisions={false}
-      >
+      <PopoverContent class="w-80 bg-card" align="end">
         <div class="flex flex-col gap-3">
           <div class="flex justify-center">
             <img
