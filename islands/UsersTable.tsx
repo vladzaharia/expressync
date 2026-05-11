@@ -192,10 +192,12 @@ export default function UsersTable({
                     isCurrentUser && "border-amber-500/30",
                   )}
                 >
-                  {/* User Info — clickable link to detail page. The
+                  {
+                    /* User Info — clickable link to detail page. The
                       role-select / delete actions stay click-isolated
                       in their own region to the right so they don't
-                      navigate accidentally. */}
+                      navigate accidentally. */
+                  }
                   <a
                     href={`/admin/users/${encodeURIComponent(user.id)}`}
                     className="flex items-center gap-3 flex-1 min-w-0 rounded-md -m-1 p-1 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40"

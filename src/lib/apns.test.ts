@@ -349,7 +349,10 @@ Deno.test("sendApns — sends canonical headers + body to production host", asyn
           "https://api.push.apple.com/3/device/abc123hex",
         );
         assertEquals(req.method, "POST");
-        assertEquals(req.headers["apns-topic"], "com.example.expresscharge.ios");
+        assertEquals(
+          req.headers["apns-topic"],
+          "com.example.expresscharge.ios",
+        );
         assertEquals(req.headers["apns-priority"], "10");
         assertEquals(req.headers["apns-push-type"], "alert");
         assertEquals(req.headers["apns-expiration"], "1745622090");
@@ -562,7 +565,10 @@ Deno.test({
             assert(captured !== null, "server should have observed a request");
             const got = captured as unknown as CapturedRequest;
             assertEquals(got.method, "POST");
-            assertEquals(got.headers["apns-topic"], "com.example.expresscharge.ios");
+            assertEquals(
+              got.headers["apns-topic"],
+              "com.example.expresscharge.ios",
+            );
             assert(got.headers["authorization"].startsWith("bearer "));
             assertEquals(
               (got.body as { v: number }).v,

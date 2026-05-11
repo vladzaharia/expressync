@@ -213,9 +213,11 @@ function FilterBar(props: {
         })}
       </div>
 
-      {/* Larger gap between the Severity group and the Range group so
+      {
+        /* Larger gap between the Severity group and the Range group so
           they read as two separate filter sets. `ml-6` (24px) instead
-          of the inter-chip 2-space gap. */}
+          of the inter-chip 2-space gap. */
+      }
       <div class="ml-6 inline-flex items-center gap-1 text-xs text-slate-500">
         Range:
       </div>

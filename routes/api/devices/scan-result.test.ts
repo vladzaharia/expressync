@@ -28,8 +28,7 @@ import {
 } from "./scan-result.ts";
 import { eventBus } from "../../../src/services/event-bus.service.ts";
 
-const URL_SCAN_RESULT =
-  "https://manage.example.com/api/devices/scan-result";
+const URL_SCAN_RESULT = "https://manage.example.com/api/devices/scan-result";
 
 interface MockDevice {
   id: string;

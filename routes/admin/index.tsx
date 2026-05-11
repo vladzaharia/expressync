@@ -187,13 +187,15 @@ export default define.page<typeof handler>(
                 contentClassName={sectionContent}
               >
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {/*
+                  {
+                    /*
                     Each tile carries its target page's nav accent so
                     the dashboard reads as a navigational preview, not
                     confetti. Order: kWh→green (Sessions), syncs→blue
                     (Sync), cards→cyan (EV Cards), reservations→indigo
                     (Reservations). Mirrors ADMIN_NAV_SECTIONS.
-                  */}
+                  */
+                  }
                   <MetricTile
                     icon={Zap}
                     label="kWh delivered"

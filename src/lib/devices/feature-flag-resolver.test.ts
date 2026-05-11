@@ -109,7 +109,10 @@ Deno.test({
       assertEquals(Object.keys(out), ["customer.connectivityCheck"]);
       assertEquals(out["customer.connectivityCheck"].value, false);
       assertEquals(out["customer.connectivityCheck"].updatedBy, "admin:adm-1");
-      assertEquals(out["customer.connectivityCheck"].updatedAt, T0.toISOString());
+      assertEquals(
+        out["customer.connectivityCheck"].updatedAt,
+        T0.toISOString(),
+      );
     } finally {
       _resetFeatureFlagResolverTestSeams();
     }

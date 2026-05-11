@@ -77,15 +77,19 @@ export default function PublicIdQrPopover({
             />
           </div>
           <div class="flex flex-col items-center gap-2">
-            {/* Larger nanoid display so the popover doubles as a
-                quick visual confirmation of the id before scanning. */}
+            {
+              /* Larger nanoid display so the popover doubles as a
+                quick visual confirmation of the id before scanning. */
+            }
             <PublicIdDisplay publicId={publicId} size="xl" />
             <code class="text-xs text-muted-foreground break-all text-center">
               {stickerUrl}
             </code>
           </div>
-          {/* `w-full` on the row + `flex-1` on each button → the pair
-              spans the entire popover width with no trailing gap. */}
+          {
+            /* `w-full` on the row + `flex-1` on each button → the pair
+              spans the entire popover width with no trailing gap. */
+          }
           <div class="flex w-full gap-2">
             <CopyButton label="Copy URL" value={stickerUrl} />
             <CopyButton label="Copy ID" value={publicId} />

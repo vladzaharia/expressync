@@ -222,8 +222,10 @@ export default function AppConfigurationForm(
           Capabilities
         </h3>
 
-        {/* Read-only / auto-managed (system) capabilities — e.g. `charger`
-            on a charger row. Identity-defining, not editable. */}
+        {
+          /* Read-only / auto-managed (system) capabilities — e.g. `charger`
+            on a charger row. Identity-defining, not editable. */
+        }
         {readOnlyList.length > 0 && (
           <ul class="flex flex-col gap-2">
             {readOnlyList.map((c) => (
@@ -240,9 +242,11 @@ export default function AppConfigurationForm(
           </ul>
         )}
 
-        {/* Mode group — app-wide cutting concerns (managed, kiosk).
+        {
+          /* Mode group — app-wide cutting concerns (managed, kiosk).
             Rendered first because changing one of these reshapes the
-            whole app, not just a single tab. */}
+            whole app, not just a single tab. */
+        }
         {(() => {
           const modeCaps = editableList.filter(
             (c) => CAPABILITY_METADATA[c].group === "mode",

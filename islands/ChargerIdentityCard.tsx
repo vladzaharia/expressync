@@ -351,8 +351,12 @@ function OverrideDot({
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 focus-visible:rounded-sm",
         // Idle: small filled yellow dot. Hover/focus/armed: bare X
         // glyph (no background fill), still yellow.
-        armed ? "[&_.dot]:hidden" : "hover:[&_.dot]:hidden focus:[&_.dot]:hidden",
-        armed ? "[&_.x]:block" : "[&_.x]:hidden hover:[&_.x]:block focus:[&_.x]:block",
+        armed
+          ? "[&_.dot]:hidden"
+          : "hover:[&_.dot]:hidden focus:[&_.dot]:hidden",
+        armed
+          ? "[&_.x]:block"
+          : "[&_.x]:hidden hover:[&_.x]:block focus:[&_.x]:block",
         clearing && "opacity-50",
       )}
     >

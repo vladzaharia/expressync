@@ -261,7 +261,9 @@ Deno.test({
       upserted = rows.map((r) => ({ key: r.key, value: r.value }));
       return Promise.resolve();
     });
-    _setFlagResolverForTests(() => Promise.resolve({ "customer.connectivityCheck": true }));
+    _setFlagResolverForTests(() =>
+      Promise.resolve({ "customer.connectivityCheck": true })
+    );
 
     const seen: string[] = [];
     const unsub = eventBus.subscribe(
@@ -279,7 +281,10 @@ Deno.test({
     const body = await res.json();
     assertEquals(body.ok, true);
     assertEquals(body.flags, { "customer.connectivityCheck": true });
-    assertEquals(upserted, [{ key: "customer.connectivityCheck", value: true }]);
+    assertEquals(upserted, [{
+      key: "customer.connectivityCheck",
+      value: true,
+    }]);
     assertEquals(seen, [DEVICE_UUID]);
     unsub();
     _resetDeviceFeatureFlagsTestSeams();

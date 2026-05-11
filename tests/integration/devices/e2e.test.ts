@@ -69,8 +69,7 @@ const ZERO_SECRET = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
 const SCAN_ARM_URL =
   `https://manage.example.com/api/admin/devices/${DEVICE_UUID}/scan-arm`;
-const SCAN_RESULT_URL =
-  "https://manage.example.com/api/devices/scan-result";
+const SCAN_RESULT_URL = "https://manage.example.com/api/devices/scan-result";
 
 // ============================================================================
 // Types — minimal shape to satisfy the handler contexts.

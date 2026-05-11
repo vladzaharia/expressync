@@ -140,8 +140,7 @@ export default function GlobalFeatureFlagsForm({ flags }: Props) {
             draft={drafts[f.key]}
             initialDraft={initialDrafts[f.key]}
             disabled={saving}
-            onChange={(next) =>
-              setDrafts((p) => ({ ...p, [f.key]: next }))}
+            onChange={(next) => setDrafts((p) => ({ ...p, [f.key]: next }))}
             onReset={() =>
               setDrafts((p) => ({
                 ...p,
@@ -190,7 +189,9 @@ function FlagRow(props: {
           <span class="text-xs text-muted-foreground">{spec.description}</span>
           <span class="text-[11px] text-muted-foreground">
             default: <code>{valueToString(spec.defaultValue)}</code>
-            {overrideActive && <span class="ml-2">· global override active</span>}
+            {overrideActive && (
+              <span class="ml-2">· global override active</span>
+            )}
           </span>
         </div>
         <div class="flex items-center gap-2">
@@ -214,8 +215,7 @@ function FlagRow(props: {
           kind={spec.kind}
           value={draft.hasValue ? draft.raw : spec.defaultValue}
           disabled={disabled}
-          onChange={(next) =>
-            props.onChange({ hasValue: true, raw: next })}
+          onChange={(next) => props.onChange({ hasValue: true, raw: next })}
         />
       </div>
     </li>
@@ -261,8 +261,7 @@ function ValueEditor(props: {
         type="text"
         value={typeof value === "string" ? value : ""}
         disabled={disabled}
-        onInput={(e) =>
-          onChange((e.currentTarget as HTMLInputElement).value)}
+        onInput={(e) => onChange((e.currentTarget as HTMLInputElement).value)}
         className="max-w-[320px]"
       />
     );

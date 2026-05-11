@@ -1673,8 +1673,7 @@ export const userFeatureFlagValues = pgTable("user_feature_flag_values", {
 ]);
 
 export type UserFeatureFlagValue = typeof userFeatureFlagValues.$inferSelect;
-export type NewUserFeatureFlagValue =
-  typeof userFeatureFlagValues.$inferInsert;
+export type NewUserFeatureFlagValue = typeof userFeatureFlagValues.$inferInsert;
 
 export const deviceFeatureFlagOverrides = pgTable(
   "device_feature_flag_overrides",

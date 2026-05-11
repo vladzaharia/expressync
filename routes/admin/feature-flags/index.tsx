@@ -107,8 +107,12 @@ export default define.page<typeof handler>(
                     key: f.key,
                     name: f.name,
                     description: f.description,
-                    kind: f.type as "bool" | "string" | "int" | "double" |
-                      "json",
+                    kind: f.type as
+                      | "bool"
+                      | "string"
+                      | "int"
+                      | "double"
+                      | "json",
                     defaultValue: f.defaultValue,
                     globalValue: f.globalValue,
                   }))}

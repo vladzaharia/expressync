@@ -5,8 +5,7 @@
 The Polaris Express customer portal ships as the same Fresh container that
 serves the existing admin tool. Two Traefik routers split traffic by host:
 
-- `manage.example.com` → admin surface (rename from
-  `expressync.polaris.gdn`)
+- `manage.example.com` → admin surface (rename from `expressync.polaris.gdn`)
 - `example.com` → customer surface
 - `expressync.polaris.gdn` → 301 → `manage.example.com` (90-day grace)
 
@@ -17,8 +16,8 @@ links, session summaries, reservation cancellations, admin password resets).
 
 - DNS control over `example.com` and `manage.example.com`
 - Cloudflare account with Workers Paid plan (~$5/mo) for the email Worker
-- The `example.com` zone added to Cloudflare with Email Routing enabled
-  (already set up — verify in Cloudflare dashboard)
+- The `example.com` zone added to Cloudflare with Email Routing enabled (already
+  set up — verify in Cloudflare dashboard)
 - Ability to update `docker-compose.env` on the production host
 
 ## Deploy steps
@@ -282,9 +281,9 @@ matches.
     (POST), does NOT consume the token. (Track C two-step consume.)
 
 19. **Admin impersonation audit**: as admin, navigate to
-    `example.com/?as=<customer-uuid>`. Expected: ImpersonationBanner
-    visible, `impersonation_audit` row written, state-changing POST rejected
-    with 403 "Read-only while impersonating".
+    `example.com/?as=<customer-uuid>`. Expected: ImpersonationBanner visible,
+    `impersonation_audit` row written, state-changing POST rejected with 403
+    "Read-only while impersonating".
 
 20. **Brute-force admin password**: POST `/api/auth/sign-in/email` with wrong
     password 100 times in 1 minute from one IP. Expected: rate-limit 429 well

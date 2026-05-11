@@ -171,7 +171,9 @@ Deno.test({
     _setUserLoaderForTests(() => Promise.resolve({ id: USER_ID }));
     const res = await callPatch({
       state: adminState(),
-      body: { flags: [{ key: "customer.connectivityCheck", value: "not-a-bool" }] },
+      body: {
+        flags: [{ key: "customer.connectivityCheck", value: "not-a-bool" }],
+      },
     });
     assertEquals(res.status, 400);
     const body = await res.json();
@@ -222,7 +224,9 @@ Deno.test({
         },
       ])
     );
-    _setFlagResolverForTests(() => Promise.resolve({ "customer.connectivityCheck": true }));
+    _setFlagResolverForTests(() =>
+      Promise.resolve({ "customer.connectivityCheck": true })
+    );
 
     const seen: string[] = [];
     const unsub = eventBus.subscribe(

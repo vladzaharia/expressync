@@ -214,8 +214,8 @@ through Postgres `LISTEN/NOTIFY` or a Redis pubsub.
 
 When the table exceeds 5 GB, full-text search becomes a frequent need, or
 trace-correlation across iOS+server is wanted: swap the sink to Grafana Loki
-monolithic + Grafana behind Authentik via oauth2-proxy on `logs.example.com`
-(or VictoriaLogs as the lighter alternative). The wire format doesn't change.
+monolithic + Grafana behind Authentik via oauth2-proxy on `logs.example.com` (or
+VictoriaLogs as the lighter alternative). The wire format doesn't change.
 Concretely:
 
 1. Replace the `INSERT INTO device_logs` in
