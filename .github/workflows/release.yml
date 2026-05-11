@@ -46,7 +46,12 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          # arm64 emulation under QEMU triggers a V8 unreachable trap in
+          # `deno task build` on this codebase. Production deploys to amd64
+          # (greenwood-ts), so amd64 only for now. Reintroduce arm64 once
+          # we either have a native arm64 runner or the V8/QEMU bug is
+          # resolved upstream.
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
