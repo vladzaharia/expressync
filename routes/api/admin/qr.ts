@@ -16,29 +16,36 @@
  *   `pngjs` dep uses CJS `module.exports = …`, triggering a runtime
  *   `ReferenceError: module is not defined`.
  *
- * - ECC level: **H** (~30% recovery). We embed the Polaris lightning
- *   bolt at the centre of the symbol, occluding the modules under it.
- *   H tolerates losing up to ~30% of modules; our centre cutout is
- *   sized to stay well below that (≤ ~10% of total area for any
- *   realistic payload).
+ * - ECC level: **H** (~30% recovery) — kept high even though we no
+ *   longer occlude modules, as a buffer against any decoder that
+ *   over-reacts to the dual-tone fill.
  *
- * - Logo: the canonical Lucide Zap path (`M13 2 L3 14 h9 l-1 8 L21 10
- *   h-9 l1 -8 z`) on a 24×24 viewBox. This is the same bolt used in
- *   `static/logo.svg`, `static/favicon.svg`, `static/logo-foreground.svg`,
- *   and `components/brand/ExpresSyncBrand.tsx`. Pulling the raw path
- *   directly avoids parsing/normalising another SVG at request time
- *   and keeps the bolt vector-perfect at every scale. logo.svg was
- *   picked as the source-of-truth because it's the cleanest variant
- *   (single fill, no glow filter or stroke widening that would
- *   thicken the silhouette).
+ * - Bolt as **module recoloring** (not overlay). Every dark module
+ *   stays put — finder squares, timing, alignment, data — so the QR
+ *   is structurally identical to a plain monochrome render. The bolt
+ *   silhouette only changes the *colour* of modules that fall inside
+ *   its polygon: green inside, blue outside, with finder squares
+ *   getting a darker-blue accent. Both colours threshold as "dark"
+ *   against the popover's light card background, so luminance-based
+ *   QR decoders (every commodity scanner) see a normal black-and-
+ *   white symbol.
  *
- * - Colours: blue data modules, darker-blue finder squares, emerald
- *   bolt overlay. Background stays transparent so the popover's
- *   `bg-card` surface shows through.
+ * - Bolt silhouette: a hand-tuned rounded version of the Lucide Zap
+ *   path (`M13 2 L3 14 h9 l-1 8 L21 10 h-9 l1 -8 z`). Each of the
+ *   six sharp corners is replaced with a quadratic-Bézier arc so the
+ *   shape reads as a smooth lightning bolt instead of a 3-segment
+ *   zigzag. The polygon spans ~70% of the symbol width / 88% of
+ *   height (re-fit to the symbol bbox), making the bolt visibly
+ *   dominant inside the QR.
  *
- * - Scannability: verified locally by round-tripping `https://polaris
- *   .express/c/ABCDEF12` through `rsvg-convert | zbarimg`. The decoded
- *   payload matched the input byte-for-byte.
+ * - Colours: blue data modules (Tailwind blue-500), darker-blue finder
+ *   squares (blue-700), emerald bolt fill (emerald-500). Background
+ *   stays transparent so the popover's `bg-card` surface shows
+ *   through.
+ *
+ * - Scannability: every module is preserved (no cutout). Tested with
+ *   `rsvg-convert | zbarimg` over a 256px render; payload round-trips
+ *   byte-for-byte at ECC=H.
  */
 
 import encodeQR from "@paulmillr/qr";
@@ -48,25 +55,141 @@ const MAX_LENGTH = 512;
 const MIN_SCALE = 1;
 const MAX_SCALE = 32;
 
-// Polaris theme palette (Tailwind blue-500 / blue-700 / emerald-500).
-// The popover sits on a `bg-card`-class surface and these hues read
-// well in both light and dark modes.
+// Polaris theme palette. The popover sits on a `bg-card`-class surface
+// and these hues read well in both light and dark modes. Both fills
+// are dark enough (luminance <0.4) to threshold below the card
+// background, keeping the QR luminance-decodable.
 const BLUE = "#2563eb";
 const GREEN = "#10b981";
 const FINDER_BLUE = "#1d4ed8";
 
-// Lucide Zap path on a 24×24 viewBox. The tight bounding box is
-// x ∈ [3, 21] (width 18), y ∈ [2, 22] (height 20).
-const BOLT_PATH = "M13 2 L3 14 h9 l-1 8 L21 10 h-9 l1 -8 z";
-const BOLT_VIEW = 24; // viewBox edge length the path is authored against
-const BOLT_BBOX = { x: 3, y: 2, w: 18, h: 20 };
+// --------------------------------------------------------------------
+// Rounded lightning-bolt polygon
+// --------------------------------------------------------------------
+//
+// The six sharp Zap-path vertices in 24-unit space, normalised to
+// 0..1. Polygon winding is the same as the SVG path:
+//
+//   A: top tip
+//   B: top-left inner corner
+//   C: mid-left split
+//   D: bottom tip
+//   E: bottom-right inner corner
+//   F: mid-right split
+//
+// Corner-rounding is applied uniformly at all six vertices via a
+// quadratic-Bézier arc (start = `radius` along the prev-edge,
+// control = the sharp vertex, end = `radius` along the next-edge).
 
-// Centre cutout size in QR modules. 11×11 modules is large enough to
-// host a legible bolt at any practical render size, and small enough
-// that even on a tiny version-3 (29-module) symbol the coverage stays
-// at ~14% — comfortably inside ECC=H's ~30% recovery budget. On a
-// typical version-6 (41-module) symbol it's ~7%.
-const CUTOUT_MODULES = 11;
+const SHARP_BOLT: Array<[number, number]> = [
+  [13 / 24, 2 / 24], // A — top tip
+  [3 / 24, 14 / 24], // B — top-left inner corner
+  [12 / 24, 14 / 24], // C — mid-left split
+  [11 / 24, 22 / 24], // D — bottom tip
+  [21 / 24, 10 / 24], // E — bottom-right inner corner
+  [12 / 24, 10 / 24], // F — mid-right split
+];
+
+const CORNER_RADIUS = 0.06; // in 0..1 space — gives a soft but recognisable round
+const ARC_STEPS = 6; // per corner
+
+function buildRoundedBolt(): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  const n = SHARP_BOLT.length;
+  for (let i = 0; i < n; i++) {
+    const prev = SHARP_BOLT[(i - 1 + n) % n];
+    const v = SHARP_BOLT[i];
+    const next = SHARP_BOLT[(i + 1) % n];
+    out.push(...roundCorner(prev, v, next, CORNER_RADIUS, ARC_STEPS));
+  }
+  return out;
+}
+
+/**
+ * Replace the sharp corner at `v` with a quadratic-Bézier arc.
+ * `prev`→`v`→`next` are consecutive polygon vertices. The arc starts
+ * `radius` along the `prev`→`v` edge, passes near `v` (which is the
+ * Bézier control point), and ends `radius` along the `v`→`next` edge.
+ */
+function roundCorner(
+  prev: [number, number],
+  v: [number, number],
+  next: [number, number],
+  radius: number,
+  steps: number,
+): Array<[number, number]> {
+  const dPrevX = v[0] - prev[0];
+  const dPrevY = v[1] - prev[1];
+  const lenPrev = Math.hypot(dPrevX, dPrevY) || 1;
+  const dNextX = next[0] - v[0];
+  const dNextY = next[1] - v[1];
+  const lenNext = Math.hypot(dNextX, dNextY) || 1;
+
+  // Clamp the radius so it never overshoots half the shorter incident
+  // edge — otherwise adjacent arcs would cross each other.
+  const r = Math.min(radius, lenPrev / 2.5, lenNext / 2.5);
+
+  const start: [number, number] = [
+    v[0] - (dPrevX / lenPrev) * r,
+    v[1] - (dPrevY / lenPrev) * r,
+  ];
+  const end: [number, number] = [
+    v[0] + (dNextX / lenNext) * r,
+    v[1] + (dNextY / lenNext) * r,
+  ];
+
+  const out: Array<[number, number]> = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const omt = 1 - t;
+    out.push([
+      omt * omt * start[0] + 2 * omt * t * v[0] + t * t * end[0],
+      omt * omt * start[1] + 2 * omt * t * v[1] + t * t * end[1],
+    ]);
+  }
+  return out;
+}
+
+const BOLT_POLYGON = buildRoundedBolt();
+// Tight bounding box of the polygon in normalised 0..1 space.
+const BOLT_BBOX = (() => {
+  let minX = 1, minY = 1, maxX = 0, maxY = 0;
+  for (const [px, py] of BOLT_POLYGON) {
+    if (px < minX) minX = px;
+    if (px > maxX) maxX = px;
+    if (py < minY) minY = py;
+    if (py > maxY) maxY = py;
+  }
+  return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY };
+})();
+
+// Bolt visual footprint inside the QR symbol. The polygon is mapped
+// from its tight bbox into a centred region of `BOLT_FOOTPRINT` of
+// the symbol's edge length. 0.72 gives a large, dominant bolt while
+// leaving a one-finder-square margin on each side — finder squares
+// stay structurally readable (they're tinted finder-blue rather than
+// recoloured, even if the polygon happens to graze them).
+const BOLT_FOOTPRINT = 0.72;
+
+/**
+ * Standard ray-casting point-in-polygon test. `poly` is a closed
+ * polygon (last vertex implicitly connects to the first).
+ */
+function pointInPolygon(
+  x: number,
+  y: number,
+  poly: Array<[number, number]>,
+): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i][0], yi = poly[i][1];
+    const xj = poly[j][0], yj = poly[j][1];
+    const intersect = (yi > y) !== (yj > y) &&
+      x < ((xj - xi) * (y - yi)) / (yj - yi || 1e-9) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
 
 export const handler = define.handlers({
   GET(ctx) {
@@ -79,11 +202,6 @@ export const handler = define.handlers({
     if (!value) return jsonError(400, "missing_value");
     if (value.length > MAX_LENGTH) return jsonError(400, "value_too_long");
 
-    // The legacy `size=…` query param is a pixel target; the encoder
-    // works in module-multiples (each QR module is `scale` pixels).
-    // Translate by dividing through a typical QR symbol size and
-    // clamping. We assume ~37 modules for the divisor since ECC=H
-    // pushes the symbol a version or two larger than ECC=M did.
     const sizeRaw = Number(url.searchParams.get("size") ?? "256");
     const targetSize = Number.isFinite(sizeRaw) ? Math.floor(sizeRaw) : 256;
     const scale = Math.max(
@@ -91,14 +209,12 @@ export const handler = define.handlers({
       Math.min(MAX_SCALE, Math.round(targetSize / 37)),
     );
 
-    // Raw boolean matrix at ECC=H. We render every dark module
-    // ourselves so we can colour the finder squares separately and
-    // skip the modules under the centre cutout.
+    // Raw boolean matrix at ECC=H. Strategy A: recolour dark modules
+    // based on whether they fall inside the bolt silhouette. NO modules
+    // are skipped — finder, timing, alignment, data all render normally.
     const matrix: boolean[][] = encodeQR(value, "raw", { ecc: "high" });
     const size = matrix.length;
     if (size === 0) {
-      // Encoder shape changed under us — fall back to its default
-      // black SVG so the popover still shows *something* useful.
       const svg = encodeQR(value, "svg", {
         ecc: "high",
         border: 2,
@@ -116,19 +232,36 @@ export const handler = define.handlers({
     const border = 2;
     const dim = size + border * 2;
 
-    // Centre cutout in module coordinates (inclusive bounds). We pick
-    // a square aligned to the symbol centre and snap the size so it
-    // remains <= the bolt's natural aspect (≈ 9:10) without exceeding
-    // ECC's recovery budget. The bolt itself is drawn inside this
-    // region at the bolt-path's intrinsic aspect ratio.
-    const cutout = Math.min(CUTOUT_MODULES, size - 14); // never overlap finders
-    const cutoutStart = Math.floor((size - cutout) / 2);
-    const cutoutEnd = cutoutStart + cutout; // exclusive
-    const coveragePct = ((cutout * cutout) / (size * size)) * 100;
+    // Map the bolt polygon's tight bbox into a centred region of the
+    // symbol. Modules sit on integer (x, y); we test their centroid
+    // (x + 0.5, y + 0.5) in symbol-space, then transform that into
+    // bolt-bbox-normalised space for the point-in-polygon check.
+    const targetPx = size * BOLT_FOOTPRINT;
+    const aspect = BOLT_BBOX.h / BOLT_BBOX.w; // bolt is taller than wide
+    const boxW = targetPx;
+    const boxH = targetPx * aspect;
+    const boxX = (size - boxW) / 2;
+    const boxY = (size - boxH) / 2;
 
-    // Finder-square corners: each is 7×7 in standard QR (top-left,
-    // top-right, bottom-left). Tinted darker-blue so the eye still
-    // parses the QR structure.
+    /**
+     * True when the module centroid at `(x + 0.5, y + 0.5)` falls
+     * inside the rounded bolt silhouette as projected onto the symbol.
+     */
+    const isInBolt = (x: number, y: number): boolean => {
+      const cx = x + 0.5;
+      const cy = y + 0.5;
+      // To polygon-space (0..1 along the polygon bbox).
+      const nx = ((cx - boxX) / boxW) * BOLT_BBOX.w + BOLT_BBOX.minX;
+      const ny = ((cy - boxY) / boxH) * BOLT_BBOX.h + BOLT_BBOX.minY;
+      if (
+        nx < BOLT_BBOX.minX || nx > BOLT_BBOX.maxX ||
+        ny < BOLT_BBOX.minY || ny > BOLT_BBOX.maxY
+      ) {
+        return false;
+      }
+      return pointInPolygon(nx, ny, BOLT_POLYGON);
+    };
+
     const isFinder = (x: number, y: number) => {
       const inTL = x < 7 && y < 7;
       const inTR = x >= size - 7 && y < 7;
@@ -136,16 +269,8 @@ export const handler = define.handlers({
       return inTL || inTR || inBL;
     };
 
-    const isInsideCutout = (x: number, y: number) =>
-      x >= cutoutStart && x < cutoutEnd && y >= cutoutStart && y < cutoutEnd;
-
-    // Module debug breadcrumb so an admin tracing a scan failure can
-    // confirm the cutout is within the ECC budget. Only logged once
-    // per request and only at debug level.
-    console.debug(
-      `[admin/qr] value=${value.length}ch size=${size}mod ecc=H cutout=${cutout}×${cutout} ` +
-        `coverage=${coveragePct.toFixed(1)}%`,
-    );
+    let greenCount = 0;
+    let totalDark = 0;
 
     const parts: string[] = [];
     parts.push(
@@ -154,64 +279,41 @@ export const handler = define.handlers({
         `shape-rendering="crispEdges">`,
     );
 
-    // 1. Data modules — every dark module except those under the
-    //    centre cutout. The cutout is left fully empty (transparent)
-    //    so the bolt has clean negative space around it.
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
         if (!matrix[y][x]) continue;
-        if (isInsideCutout(x, y)) continue;
-        const fill = isFinder(x, y) ? FINDER_BLUE : BLUE;
+        totalDark++;
+        // Finder squares stay structurally tinted so the eye still
+        // parses the QR's three corners. The bolt does NOT recolour
+        // finder modules even when its silhouette overlaps them —
+        // keeps the finders' luminance contrast crisp.
+        let fill: string;
+        if (isFinder(x, y)) {
+          fill = FINDER_BLUE;
+        } else if (isInBolt(x, y)) {
+          fill = GREEN;
+          greenCount++;
+        } else {
+          fill = BLUE;
+        }
         parts.push(
           `<rect x="${x + border}" y="${y + border}" width="1" height="1" ` +
             `fill="${fill}"/>`,
         );
       }
     }
+    parts.push("</svg>");
 
-    // 2. Bolt overlay. Anchored at the cutout in module space; the
-    //    path's tight bbox is scaled uniformly to fit inside the
-    //    cutout with a one-module padding so it doesn't visually
-    //    crowd the surrounding modules. `geometricPrecision` here so
-    //    the bolt's diagonal edges don't get pixel-aligned by the
-    //    surrounding `crispEdges` setting.
-    const pad = 1;
-    const innerW = cutout - pad * 2;
-    const innerH = cutout - pad * 2;
-    const fit = Math.min(innerW / BOLT_BBOX.w, innerH / BOLT_BBOX.h);
-    const boltW = BOLT_BBOX.w * fit;
-    const boltH = BOLT_BBOX.h * fit;
-    const boltX = border + cutoutStart + (cutout - boltW) / 2;
-    const boltY = border + cutoutStart + (cutout - boltH) / 2;
-    // Translate so the bbox's top-left lands at (boltX, boltY).
-    // The path itself lives in viewBox coords; we scale by `fit` and
-    // shift the bbox origin to 0,0 by subtracting BOLT_BBOX.x/y first.
-    const tx = boltX - BOLT_BBOX.x * fit;
-    const ty = boltY - BOLT_BBOX.y * fit;
-    parts.push(
-      `<g transform="translate(${tx.toFixed(4)} ${ty.toFixed(4)}) ` +
-        `scale(${fit.toFixed(4)})" ` +
-        `shape-rendering="geometricPrecision">` +
-        `<path d="${BOLT_PATH}" fill="${GREEN}" stroke="${GREEN}" ` +
-        `stroke-width="0.6" stroke-linejoin="round"/></g>`,
+    const greenPct = totalDark === 0 ? 0 : (greenCount / totalDark) * 100;
+    console.debug(
+      `[admin/qr] value=${value.length}ch size=${size}mod ecc=H ` +
+        `dark=${totalDark} green=${greenCount} (${greenPct.toFixed(1)}%)`,
     );
 
-    // Touch BOLT_VIEW so the documented constant isn't reported as
-    // unused — it's the natural viewBox the path is authored against
-    // and a future refactor (e.g. switching to a different bolt SVG)
-    // will need it.
-    void BOLT_VIEW;
-
-    parts.push("</svg>");
-    const svg = parts.join("");
-
-    return new Response(svg, {
+    return new Response(parts.join(""), {
       status: 200,
       headers: {
         "Content-Type": "image/svg+xml; charset=utf-8",
-        // Admin-only resource; allow short private caching so the
-        // popover re-renders instantly without exposing the SVG to
-        // shared CDNs.
         "Cache-Control": "private, max-age=300",
       },
     });
