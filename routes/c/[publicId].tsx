@@ -7,6 +7,23 @@
  * their own gates on `managementMode` so we never branch on the
  * page template itself.
  *
+ * Modelled on the iOS `ChargerDetailView`:
+ *   - Status pill + name + location
+ *   - Hero artwork (charger glyph + cable U + connector glyph + kW
+ *     label) — see `components/public/PublicChargerHero.tsx`
+ *   - For managed chargers: two action cards (mobile + NFC) with an
+ *     "or" divider. The "Open in app" button is just a link to the
+ *     same URL — Apple's Universal Link routing hands it to the app
+ *     when installed; otherwise the page stays as-is. We never link
+ *     to the App Store from here.
+ *   - For unmanaged chargers (Tesla Wall Connectors, etc.): a single
+ *     "Plug in. Charge. Free." card mirroring the iOS dumb-charger
+ *     instructions.
+ *
+ * The NFC / QR mechanics are NOT mentioned in the customer copy —
+ * they're plumbing that gets the right charger into the app and
+ * aren't actions the customer takes themselves.
+ *
  * Routing precedence (first match wins):
  *   1. iOS app installed → universal link intercepts via the `/c/*`
  *      AASA component; this handler is never reached.
@@ -30,15 +47,11 @@ import { define } from "../../utils.ts";
 import { db } from "../../src/db/index.ts";
 import { chargers } from "../../src/db/schema.ts";
 import { PublicShell } from "../../components/public/PublicShell.tsx";
-import { PublicIdDisplay } from "../../components/shared/PublicIdDisplay.tsx";
-import { ConnectorSpec } from "../../components/shared/ConnectorSpec.tsx";
-import {
-  DUMB_CHARGER_HEADLINE,
-  DUMB_CHARGER_STEPS,
-  DUMB_CHARGER_SUPPORT_EMAIL,
-} from "../../src/lib/content/dumb-charger-instructions.ts";
+import { PublicChargerHero } from "../../components/public/PublicChargerHero.tsx";
 import { isValidPublicId } from "../../src/lib/utils/public-id.ts";
 import { getPrimaryConnectorSpec } from "../../src/services/charger-connectors.service.ts";
+import type { FormFactor } from "../../src/lib/types/steve.ts";
+import type { ConnectorType } from "../../components/brand/connectors/index.ts";
 
 type Status = "available" | "charging" | "offline" | "unknown";
 
@@ -50,9 +63,12 @@ type LoaderData =
     locationDescription: string | null;
     isUnmanaged: boolean;
     isDeactivated: boolean;
-    connectorType: "ccs" | "j1772" | "nacs" | "chademo" | "type2" | null;
+    hasScanner: boolean;
+    formFactor: FormFactor;
+    connectorType: ConnectorType | null;
     maxKw: number | null;
     status: Status;
+    appUrl: string;
   }
   | { found: false };
 
@@ -109,25 +125,33 @@ export const handler = define.handlers({
     const isUnmanaged = row.managementMode === "unmanaged";
     const isDeactivated = row.deactivatedAt !== null;
 
+    const appUrl = `https://example.com/c/${row.publicId}`;
+
     // Apple Smart App Banner — set the app-argument to the canonical
     // public URL so iOS Safari shows "Open in ExpresScan" and the
     // app receives this exact URL on launch after install. Skipped
     // for retired chargers (no point installing the app to interact
     // with a charger that's gone).
     if (!isDeactivated) {
-      ctx.state.appBannerArgument = `https://example.com/c/${row.publicId}`;
+      ctx.state.appBannerArgument = appUrl;
     }
 
     const spec = await getPrimaryConnectorSpec(row.chargeBoxId);
     const ct = spec.connectorType;
     const connectorType =
       (["ccs", "j1772", "nacs", "chademo", "type2"] as const).includes(
-          ct as "ccs" | "j1772" | "nacs" | "chademo" | "type2",
+          ct as ConnectorType,
         )
-        ? (ct as "ccs" | "j1772" | "nacs" | "chademo" | "type2")
+        ? (ct as ConnectorType)
         : null;
 
     const maxKw = spec.maxKw;
+
+    // The `scanner` capability on a charger row indicates a built-in
+    // RFID/NFC reader — mirrors the iOS `entry.capabilities?.contains("scanner")`
+    // gate on the "Tap your card" hint.
+    const hasScanner = Array.isArray(row.capabilities) &&
+      row.capabilities.includes("scanner");
 
     return {
       data: {
@@ -137,21 +161,20 @@ export const handler = define.handlers({
         locationDescription: row.locationDescription,
         isUnmanaged,
         isDeactivated,
+        hasScanner,
+        formFactor: (row.formFactor ?? "wallbox") as FormFactor,
         connectorType,
         maxKw,
         status: deriveStatus(isUnmanaged, row.lastStatus, row.lastStatusAt),
+        appUrl,
       } satisfies LoaderData,
     };
   },
 });
 
 export default define.page<typeof handler>(function ChargerLanding({ data }) {
-  if (!data.found) {
-    return <NotFoundLanding />;
-  }
-  if (data.isDeactivated) {
-    return <DeactivatedLanding />;
-  }
+  if (!data.found) return <NotFoundLanding />;
+  if (data.isDeactivated) return <DeactivatedLanding />;
 
   return (
     <PublicShell
@@ -175,52 +198,54 @@ export default define.page<typeof handler>(function ChargerLanding({ data }) {
           : null}
       </div>
 
-      <div class="mt-6 flex flex-wrap items-center gap-6">
-        <ConnectorSpec
-          type={data.connectorType}
-          kw={data.maxKw}
-          size="lg"
+      <div class="mt-8">
+        <PublicChargerHero
+          formFactor={data.formFactor}
+          connectorType={data.connectorType}
+          maxKw={data.maxKw}
+          status={data.status}
         />
-        <PublicIdDisplay publicId={data.publicId} size="md" />
       </div>
 
-      <InstructionsCard isUnmanaged={data.isUnmanaged} />
-
-      <GetTheAppCard />
+      {data.isUnmanaged
+        ? <PlugInCard />
+        : (
+          <ManagedActions
+            appUrl={data.appUrl}
+            hasScanner={data.hasScanner}
+          />
+        )}
 
       <p class="mt-10 text-center text-xs text-muted-foreground">
         Need help?{" "}
         <a
           class="underline-offset-2 hover:underline"
-          href={`mailto:${DUMB_CHARGER_SUPPORT_EMAIL}`}
+          href="mailto:support@example.com"
         >
-          {DUMB_CHARGER_SUPPORT_EMAIL}
+          support@example.com
         </a>
       </p>
     </PublicShell>
   );
 });
 
+// -------------------------------------------------------------------
+// Status / header
+// -------------------------------------------------------------------
+
 function HeaderRow(
   { status, isUnmanaged }: { status: Status; isUnmanaged: boolean },
 ) {
   return (
     <div class="flex flex-wrap items-center gap-3">
-      {
-        /* "Free charging" pill is the unmanaged-charger signal — a
-          customer trust marker so they know there's no billing flow. */
-      }
-      {isUnmanaged && (
-        <span class="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-sm font-medium text-emerald-600 dark:text-emerald-400">
-          <BoltIcon class="h-4 w-4" />
-          Free charging
-        </span>
-      )}
-      {
-        /* Status pill is gated on managed chargers — unmanaged units
-          have no live state to report. */
-      }
-      {!isUnmanaged && <StatusPill status={status} />}
+      {isUnmanaged
+        ? (
+          <span class="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+            <BoltIcon class="h-4 w-4" />
+            Free charging
+          </span>
+        )
+        : <StatusPill status={status} />}
     </div>
   );
 }
@@ -257,76 +282,128 @@ function StatusPill({ status }: { status: Status }) {
   );
 }
 
-function InstructionsCard({ isUnmanaged }: { isUnmanaged: boolean }) {
-  // Same card shell for both kinds — only the headline + body copy
-  // swap. Honors the "one page, capability-gated" rule.
-  if (isUnmanaged) {
-    return (
-      <section
-        class="mt-8 rounded-xl border border-sky-500/30 bg-sky-500/[0.06] p-6"
-        aria-labelledby="charger-instructions-heading"
-      >
-        <div class="flex items-center gap-3">
-          <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-500/15 text-sky-600 dark:text-sky-300">
-            <PlugIcon class="h-5 w-5" />
-          </span>
-          <h2
-            id="charger-instructions-heading"
-            class="text-lg font-semibold"
-          >
-            {DUMB_CHARGER_HEADLINE}
-          </h2>
-        </div>
-        <ol class="mt-4 list-decimal space-y-2 pl-6 text-base text-foreground">
-          {DUMB_CHARGER_STEPS.map((step) => <li key={step}>{step}</li>)}
-        </ol>
-      </section>
-    );
-  }
+// -------------------------------------------------------------------
+// Action cards — managed
+// -------------------------------------------------------------------
 
+function ManagedActions(
+  { appUrl, hasScanner }: { appUrl: string; hasScanner: boolean },
+) {
+  return (
+    <div class="mt-8 flex flex-col gap-4">
+      <MobileCard appUrl={appUrl} />
+      {hasScanner && (
+        <>
+          <OrDivider />
+          <TapCardCard />
+        </>
+      )}
+    </div>
+  );
+}
+
+function MobileCard({ appUrl }: { appUrl: string }) {
+  return (
+    <section
+      class="rounded-xl border border-sky-500/30 bg-sky-500/[0.06] p-6"
+      aria-labelledby="mobile-card-heading"
+    >
+      <div class="flex items-center gap-3">
+        <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-500/15 text-sky-600 dark:text-sky-300">
+          <PhoneIcon class="h-5 w-5" />
+        </span>
+        <h2 id="mobile-card-heading" class="text-lg font-semibold">
+          Use the app
+        </h2>
+      </div>
+      <p class="mt-3 text-base text-foreground">
+        Open ExpresScan and start charging from your phone.
+      </p>
+      <div class="mt-4">
+        <a
+          href={appUrl}
+          // Universal Link: iOS hands this off to ExpresScan when
+          // installed, otherwise the same page re-renders. We don't
+          // need the App Store fallback here — first-time users see
+          // the page they're already on, which is helpful in itself.
+          class="inline-flex items-center justify-center gap-2 rounded-lg bg-sky-600 px-5 py-2.5 text-base font-semibold text-white shadow-sm hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 transition-colors"
+        >
+          <BoltIcon class="h-4 w-4" />
+          Open in app
+        </a>
+      </div>
+    </section>
+  );
+}
+
+function TapCardCard() {
+  return (
+    <section
+      class="rounded-xl border border-cyan-500/30 bg-cyan-500/[0.06] p-6"
+      aria-labelledby="tap-card-heading"
+    >
+      <div class="flex items-center gap-3">
+        <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-500/15 text-cyan-600 dark:text-cyan-300">
+          <CardIcon class="h-5 w-5" />
+        </span>
+        <h2 id="tap-card-heading" class="text-lg font-semibold">
+          Tap your card
+        </h2>
+      </div>
+      <p class="mt-3 text-base text-foreground">
+        This charger reads RFID cards — tap one to start charging without using
+        the app.
+      </p>
+    </section>
+  );
+}
+
+function OrDivider() {
+  return (
+    <div
+      class="flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+      aria-hidden="true"
+    >
+      <span class="h-px flex-1 bg-border" />
+      <span>or</span>
+      <span class="h-px flex-1 bg-border" />
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------
+// Unmanaged "free" card
+// -------------------------------------------------------------------
+
+function PlugInCard() {
+  const steps = [
+    "Plug in your cable.",
+    "Your car negotiates power automatically.",
+    "Unplug when you're done.",
+  ];
   return (
     <section
       class="mt-8 rounded-xl border border-sky-500/30 bg-sky-500/[0.06] p-6"
-      aria-labelledby="charger-instructions-heading"
+      aria-labelledby="plug-in-heading"
     >
       <div class="flex items-center gap-3">
         <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-500/15 text-sky-600 dark:text-sky-300">
           <PlugIcon class="h-5 w-5" />
         </span>
-        <h2
-          id="charger-instructions-heading"
-          class="text-lg font-semibold"
-        >
-          Tap the sticker with ExpresScan to start charging
+        <h2 id="plug-in-heading" class="text-lg font-semibold">
+          Plug in. Charge. Free.
         </h2>
       </div>
-      <p class="mt-4 text-base text-foreground">
-        Open the ExpresScan iOS app and tap your phone to the sticker on the
-        charger. The app handles the rest — start, monitor, and stop your
-        session right from your phone.
-      </p>
+      <ol class="mt-4 list-decimal space-y-2 pl-6 text-base text-foreground">
+        {steps.map((s) => <li key={s}>{s}</li>)}
+      </ol>
     </section>
   );
 }
 
-function GetTheAppCard() {
-  return (
-    <section class="mt-6 rounded-xl border bg-card p-6">
-      <h2 class="text-base font-semibold">
-        Get the app for one-tap access to all our chargers
-      </h2>
-      <p class="mt-2 text-sm text-muted-foreground">
-        ExpresScan opens automatically when you tap a sticker. iOS only for now
-        — Android coming soon.
-      </p>
-      <div class="mt-4">
-        <span class="inline-flex h-10 items-center justify-center rounded-md border bg-muted px-4 text-sm text-muted-foreground">
-          App Store — Coming soon
-        </span>
-      </div>
-    </section>
-  );
-}
+// -------------------------------------------------------------------
+// Error states
+// -------------------------------------------------------------------
 
 function NotFoundLanding() {
   return (
@@ -347,9 +424,9 @@ function NotFoundLanding() {
         scanning again. If the problem persists, drop us a line at{" "}
         <a
           class="underline-offset-2 hover:underline"
-          href={`mailto:${DUMB_CHARGER_SUPPORT_EMAIL}`}
+          href="mailto:support@example.com"
         >
-          {DUMB_CHARGER_SUPPORT_EMAIL}
+          support@example.com
         </a>{" "}
         and we'll sort you out.
       </p>
@@ -376,14 +453,19 @@ function DeactivatedLanding() {
         mistake, please contact us at{" "}
         <a
           class="underline-offset-2 hover:underline"
-          href={`mailto:${DUMB_CHARGER_SUPPORT_EMAIL}`}
+          href="mailto:support@example.com"
         >
-          {DUMB_CHARGER_SUPPORT_EMAIL}
+          support@example.com
         </a>.
       </p>
     </PublicShell>
   );
 }
+
+// -------------------------------------------------------------------
+// Inline icons (matches the page's visual language without dragging
+// in a bigger icon dependency)
+// -------------------------------------------------------------------
 
 function BoltIcon({ class: cls }: { class?: string }) {
   return (
@@ -418,6 +500,43 @@ function PlugIcon({ class: cls }: { class?: string }) {
       <path d="M9 7V2" />
       <path d="M15 7V2" />
       <path d="M6 13V8h12v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4z" />
+    </svg>
+  );
+}
+
+function PhoneIcon({ class: cls }: { class?: string }) {
+  return (
+    <svg
+      class={cls}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+      <line x1="12" y1="18" x2="12.01" y2="18" />
+    </svg>
+  );
+}
+
+function CardIcon({ class: cls }: { class?: string }) {
+  return (
+    <svg
+      class={cls}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="2" y="6" width="20" height="13" rx="2" ry="2" />
+      <line x1="2" y1="11" x2="22" y2="11" />
+      <line x1="6" y1="15" x2="10" y2="15" />
     </svg>
   );
 }
