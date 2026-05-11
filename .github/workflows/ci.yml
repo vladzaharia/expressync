@@ -21,7 +21,7 @@ jobs:
     # Informational while the codebase is tightened up.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
@@ -45,7 +45,7 @@ jobs:
     env:
       DATABASE_URL: postgres://postgres:ci@localhost:5432/postgres
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
@@ -58,7 +58,7 @@ jobs:
     name: build (docker smoke)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: docker build smoke
         run: docker build -t web:ci .
 
@@ -66,7 +66,7 @@ jobs:
     name: host dispatch sanity
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: verify host constants exist
         run: |
           grep -q 'ADMIN_HOSTS' src/lib/hostname-dispatch.ts || { echo 'ADMIN_HOSTS missing'; exit 1; }
@@ -76,7 +76,7 @@ jobs:
     name: gitleaks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: install gitleaks
