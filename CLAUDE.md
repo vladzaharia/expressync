@@ -1,4 +1,53 @@
-# ExpresSync — project notes for Claude
+# ExpressCharge web — project notes for Claude
+
+## Project overview
+
+This repo is the **web** half of ExpressCharge — a Deno 2 / Fresh fullstack app
+that serves both the operator admin console and the customer portal, plus a
+background sync worker.
+
+- **Runtime:** Deno 2.x. The Fresh app boots from `main.ts`; production uses
+  `prod-server.ts` (deno serve). The background `sync-worker.ts` is a separate
+  long-running process (cron-driven via Croner).
+- **Host dispatch:** `utils.ts` splits traffic into admin vs customer surfaces
+  via `ADMIN_HOSTS` and `CUSTOMER_HOSTS` constants. After the ExpressCharge
+  rebrand these point at `manage.example.com` / `example.com` placeholders — set
+  the real hosts in your `.env` for local dev.
+- **DB:** PostgreSQL via Drizzle (`drizzle/` migrations, `src/db/`).
+- **Email worker:** lives in its own repo at
+  https://github.com/expresscharge/email-worker. The HTTP client lives in
+  `src/email/` and points at `CF_EMAIL_WORKER_URL`.
+
+## Key commands
+
+- `deno task check` — fmt + lint + typecheck (fast)
+- `deno task test` — unit + integration tests (needs `DATABASE_URL`)
+- `deno task build` / `deno task start` — Vite build / prod serve
+- `deno task db:migrate` — apply migrations
+- `bin/precommit.sh` — canonical pre-commit gate (check + test + migration
+  smoke)
+
+## Local CI fallback
+
+When GitHub Actions is unavailable, `bin/precommit.sh` reproduces the full CI
+matrix locally. Per workflow job:
+
+| CI job                | Local equivalent                                                  |
+| --------------------- | ----------------------------------------------------------------- |
+| `check`               | `deno task check`                                                 |
+| `test`                | `deno task test` (after `deno task db:migrate` against postgres)  |
+| `build`               | `deno task build && docker build -t web:local .`                  |
+| `host-dispatch-guard` | `grep -q ADMIN_HOSTS utils.ts && grep -q CUSTOMER_HOSTS utils.ts` |
+| `secrets-scan`        | `gitleaks detect --no-banner`                                     |
+
+`bin/precommit.sh` chains the first three plus a migration smoke against an
+ephemeral `postgres:16` Docker container — running it covers the practical "is
+this commit shippable" question.
+
+For the release pipeline (`docker buildx build` + push to GHCR), the local
+equivalent is `docker build -t ghcr.io/expresscharge/web:local .` then
+`docker run` to smoke. The push step requires `GITHUB_TOKEN` and isn't locally
+relevant.
 
 ## Admin UI layout conventions
 
