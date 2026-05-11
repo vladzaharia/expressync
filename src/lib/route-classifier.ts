@@ -204,7 +204,13 @@ function isPrefixMatch(pathname: string, prefix: string): boolean {
     // to other rules. Without this guard, "/" would swallow every request.
     return pathname === "/";
   }
-  return pathname === prefix || pathname.startsWith(prefix + "/");
+  // Normalise so a rule written as `/c/` (with trailing slash) and one
+  // written as `/c` both behave identically. Without this, the path
+  // check became `startsWith("/c//")` — never true — so e.g.
+  // `/c/<publicId>` fell through to SHARED and the middleware
+  // redirected anonymous sticker scans to `/login`.
+  const normalized = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
+  return pathname === normalized || pathname.startsWith(normalized + "/");
 }
 
 /**
